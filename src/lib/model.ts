@@ -324,7 +324,7 @@ function colorIn(v: unknown): string {
 }
 
 export function parseProject(input: unknown): Project {
-  if (!object(input) || input.version !== 1 || !Array.isArray(input.panels) || !Array.isArray(input.connections)) throw new Error('This is not a Playwood Studio project (version 1).')
+  if (!object(input) || input.version !== 1 || !Array.isArray(input.panels) || !Array.isArray(input.connections)) throw new Error('This is not a playwood. APP project (version 1).')
   if (input.panels.length > 200 || input.connections.length > 400) throw new Error('Projects support up to 200 panels and 400 connections.')
   const panels = input.panels.map((raw): Panel => {
     if (!object(raw)) throw new Error('Invalid panel.')

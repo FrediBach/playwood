@@ -1,4 +1,4 @@
-# Playwood Studio
+# playwood. APP
 
 A local, full-window furniture design workspace built with Vite, React, TypeScript, Three.js, React Three Fiber, and shadcn/ui components backed by Radix. Warm neutral colors, restrained controls, and independent scrolling inspectors keep the assembly in view.
 
@@ -40,6 +40,21 @@ Repeated plans across room collections appear once. The workshop-table PDF's H-t
 Accessory inserts fit the clear openings between frame panels, including the connector spacing. Dividers meet the floor and ceiling, insert shelves meet their supporting sides, and doors and display faces touch their backing. Known saved or imported examples with the original floating inserts are repaired when their geometry is unchanged, preserving names, finishes and identities. Repairs on load support Undo; examples with custom geometry are left alone.
 
 Examples preserve the supplied panel dimensions and connector layouts where available. The Totem retains the source panel sizes and connector quantities, but centers its deeper base beneath the stack instead of extending it forward; its clamp distribution is adapted to the editor's shared-joint geometry. The corner booth uses square panel corners in place of the source's rounded corners. Dividers, doors, and printed inserts are simplified accessories; their custom slots, folds, hinges, and print artwork are not fabrication geometry. The open-plinth plan's printed parts list disagrees with its drawing: its three four-panel frames require eight 350 × 350 mm panels and four 735 × 350 mm panels. Those examples follow the depicted frames. The supplied Bizu stool, Nordic chair, and Lean table use other construction systems and are excluded from the connector library. Printing templates and artwork instructions are supporting resources, not additional builds.
+
+## Production deployment
+
+The public address is **https://playwood.app/**. Import this repository into Vercel and attach `playwood.app` in the project's domain settings, following the DNS records Vercel provides. `vercel.json` selects Vite, runs `npm run build`, serves `dist`, and sets security headers and immutable caching for hashed assets. The app has one URL (`/`) and needs no server or environment variables.
+
+The HTML includes canonical, Open Graph, and Twitter card metadata. `public/` contains the 1200 × 630 sharing image, favicon, app icons, web manifest, robots rules, and sitemap. The manifest supports standalone launch; offline operation is not implemented. Browser saves retain the original storage key so existing projects survive the branding change.
+
+The header and generated artwork share `public/favicon.svg`. After editing the logo or social card layout, regenerate the committed PNG assets with:
+
+```sh
+npx playwright install chromium
+node scripts/generate-brand-assets.mjs
+```
+
+Asset generation is a development step; Vercel serves the committed files without needing Chromium during the build. Configuration reference: [Vercel project configuration](https://vercel.com/docs/project-configuration/vercel-json).
 
 ## Verification
 

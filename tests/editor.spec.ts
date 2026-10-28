@@ -4,7 +4,7 @@ test('editor renders, creates panels, previews attachments, saves and undoes', a
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Make room for ideas.' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Preview mode' })).toBeVisible()
   await expect(page.locator('canvas')).toBeVisible()
   await expect.poll(()=>page.locator('canvas').evaluate(canvas=>(canvas as HTMLCanvasElement).toDataURL().length),{timeout:15000}).toBeGreaterThan(30000)
   await page.screenshot({ path: 'test-results/studio-desktop.png' })

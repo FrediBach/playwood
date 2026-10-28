@@ -31,7 +31,7 @@ test('room preview preserves the assembly, selection and studio controls', async
 
   await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Realistic preview', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('heading', { name: 'See it at home.' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Preview mode' })).toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Project panels' })).not.toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Panel inspector' })).not.toBeVisible()
   await expect(page.getByRole('combobox', { name: 'Camera view' })).not.toBeVisible()
