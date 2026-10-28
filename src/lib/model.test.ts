@@ -284,6 +284,23 @@ describe('project safety and feedback', () => {
     expect(validateProject(p).filter(i => i.id.endsWith('-alignment'))).toHaveLength(2)
   })
 
+  it('accepts equivalent rectangular half-turns at supports while rejecting a changed panel direction', () => {
+    for (const axis of [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)]) {
+      const source = createStarterProject('shelf')
+      const p = { ...source, panels: resolvePanels(source), connections: source.connections.filter(c => c.role === 'support') }
+      const child = p.panels.find(panel => panel.name === 'Middle shelf')!
+      const original = new Quaternion().setFromEuler(new Euler(...child.rotation))
+      const setRotation = (angle: number) => {
+        const e = new Euler().setFromQuaternion(original.clone().multiply(new Quaternion().setFromAxisAngle(axis, angle)))
+        child.rotation = [e.x, e.y, e.z]
+      }
+      setRotation(Math.PI)
+      expect(validateProject(p).filter(issue => issue.id.endsWith('-alignment'))).toEqual([])
+      setRotation(Math.PI / 2)
+      expect(validateProject(p).filter(issue => issue.id.endsWith('-alignment'))).toHaveLength(1)
+    }
+  })
+
   it('removes a complete shared support when any of its panels loses its attachment', () => {
     const p = createStarterProject('shelf')
     const middle = p.panels.find(panel => panel.name === 'Middle shelf')!

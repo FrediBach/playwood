@@ -15,7 +15,7 @@ Open the local URL printed by Vite. No accounts, API keys, backend, or external 
 
 ## Design workflow
 
-- Start with a shelf, desk, display, or blank project.
+- Start with a shelf, desk, display, a resource example from the Library, or a blank project.
 - Add your own panels with dimensions in millimeters, material, finish color, and thickness. Choose solid, pegboard, or rounded slots; holes are real openings through the mesh.
 - Select a panel in the model or panel list. Change dimensions, position, and orientation in the inspector.
 - Drag a panel thumbnail to reorder the list. Hover or focus a row for rename, visibility, and remove controls; double-click a name to rename it in place. Amber markers identify overlaps and name the other panels on hover or focus. These changes autosave and support undo.
@@ -30,6 +30,14 @@ Open the local URL printed by Vite. No accounts, API keys, backend, or external 
 Keyboard: **F** fits the view; **⌘/Ctrl Z** undoes; **⌘/Ctrl Shift Z** redoes; **⌘/Ctrl D** duplicates; **Delete** removes a panel; **Escape** cancels selection/preview. Text fields retain normal editing shortcuts.
 
 In the panel list, **F2** edits a focused name. Focus a thumbnail and press **Space** to pick it up, **↑/↓** (or **Home/End**) to choose its position, then **Space/Enter** to drop or **Escape** to cancel. Renaming accepts **Enter** to save and **Escape** to cancel.
+
+## Resource examples
+
+The Library and Templates chooser include 22 resource examples alongside the three original starters. Search or filter by category to find editable assemblies from `resources/library-3d`. Numbered CAD resources supply the totem, corner, shelf with doors, H-table 180, and promotional desk. The collection PDFs add shelves, tables, counters, a bench, a trade fair display, an island display, and individual exhibition plinths. Each thumbnail is generated from the assembly it opens; switching examples supports Undo.
+
+Repeated plans across room collections appear once. The workshop-table PDF's H-table and cube are separate examples, as are the three closed plinths and the open tall and wide plinths. The open cube uses the same example as the standalone cube. The workshop table with shelves and Organizer Workstation 08 are the same build. The shelf with six doors and reception counter with four doors remain separate variants.
+
+Examples preserve the supplied panel dimensions and connector layouts where available. The Totem retains the source panel sizes and connector quantities, but centers its deeper base beneath the stack instead of extending it forward; its clamp distribution is adapted to the editor's shared-joint geometry. The corner booth uses square panel corners in place of the source's rounded corners. Dividers, doors, and printed inserts are simplified accessories; their custom slots, folds, hinges, and print artwork are not fabrication geometry. The open-plinth plan's printed parts list disagrees with its drawing: its three four-panel frames require eight 350 × 350 mm panels and four 735 × 350 mm panels. Those examples follow the depicted frames. The supplied Bizu stool, Nordic chair, and Lean table use other construction systems and are excluded from the connector library. Printing templates and artwork instructions are supporting resources, not additional builds.
 
 ## Verification
 
@@ -60,6 +68,11 @@ The app stores panels in local XY coordinates, with thickness on local Z. Projec
 
 - `src/App.tsx`: workspace and editing flows.
 - `src/lib/model.ts`: attachment geometry, validation, templates, imports, and parts export.
+- `src/lib/example-library.ts`: shared example catalog and resource references.
+- `src/lib/cad-examples.ts`: editable assemblies based on the numbered CAD resources.
+- `src/lib/pdf-examples.ts`: editable assemblies based on the collection plans.
+- `src/lib/platform-examples.ts`: workshop table and tiered island assemblies.
+- `src/components/ExampleBrowser.tsx`: resource example selection and previews.
 - `src/lib/legacy-shelf.ts`: conservative repair of the original shelf's embedded middle connectors.
 - `src/components/Scene.tsx`: cameras, panel materials, selection, and 3D rendering.
 - `src/components/ConnectorMeshes.tsx`: placement and materials for the supplied connector models.

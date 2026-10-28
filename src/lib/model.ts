@@ -244,8 +244,14 @@ export function validateProject(project: Project): ValidationIssue[] {
     if (c.role === 'support') {
       const expected = attachmentPose(parent, child, c)
       const positionError = vec(expected.position).distanceTo(vec(child.position))
-      const rotationError = Math.abs(quaternion({ ...child, rotation: expected.rotation }).dot(quaternion(child)))
-      if (positionError > 1 || rotationError < 0.9999) issues.push({ id: `${c.id}-alignment`, severity: 'error', message: `The support joint between ${parent.name} and ${child.name} no longer aligns. Restore the panel dimensions or detach and rebuild this joint.`, panelIds: [parent.id, child.id] })
+      const expectedRotation = quaternion({ ...child, rotation: expected.rotation })
+      const actualRotation = quaternion(child)
+      // A rectangular panel occupies the same slot after a half-turn about any
+      // local axis. Closed assemblies can reach it from opposite ends. Preserve
+      // width/height correspondence: a quarter-turn is not interchangeable.
+      const alignedAxes = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)].every(axis =>
+        Math.abs(axis.clone().applyQuaternion(expectedRotation).dot(axis.clone().applyQuaternion(actualRotation))) > 0.9999)
+      if (positionError > 1 || !alignedAxes) issues.push({ id: `${c.id}-alignment`, severity: 'error', message: `The support joint between ${parent.name} and ${child.name} no longer aligns. Restore the panel dimensions or detach and rebuild this joint.`, panelIds: [parent.id, child.id] })
     }
   }
   const boxes = panels.map(panelObb)
