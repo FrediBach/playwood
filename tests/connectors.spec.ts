@@ -128,7 +128,7 @@ for (const [type, label, branches] of [
     const preview = await renderedConnectors(page)
     for (const connector of preview) {
       expect(connector.type).toBe(type)
-      expect(connector.source).toBe('connectors-3d/Connettori sharing.obj')
+      expect(connector.source).toBe('resources/connectors-3d/Connettori sharing.obj')
       expect(connector.parts.length).toBeGreaterThanOrEqual(2)
       for (const part of connector.parts) {
         expect(part.name).toMatch(/^object_\d+$/)

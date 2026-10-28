@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
-import connectorSource from '../../connectors-3d/Connettori sharing.obj?raw'
+import connectorSource from '../../resources/connectors-3d/Connettori sharing.obj?raw'
 import type { ConnectorType, Vec3 } from '@/lib/types'
 
 interface ConnectorProfile {

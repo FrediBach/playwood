@@ -4,7 +4,7 @@ import type { Connection, Panel } from '@/lib/types'
 import { getConnectorPlacements } from '@/lib/model'
 import { getConnectorGeometry } from './connector-geometry'
 
-const source = 'connectors-3d/Connettori sharing.obj'
+const source = 'resources/connectors-3d/Connettori sharing.obj'
 const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 
 function ConnectorJoint({ connection, parent, child, ghost }: {
