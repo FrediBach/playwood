@@ -18,6 +18,7 @@ Open the local URL printed by Vite. No accounts, API keys, backend, or external 
 - Start with a shelf, desk, display, or blank project.
 - Add your own panels with dimensions in millimeters, material, finish color, and thickness. Choose solid, pegboard, or rounded slots; holes are real openings through the mesh.
 - Select a panel in the model or panel list. Change dimensions, position, and orientation in the inspector.
+- Shift-click, Ctrl/⌘-click, or use the panel checkboxes to select multiple panels. Shared parameters stay editable and apply to the entire selection; differing values show **Mixed** and are disabled. Related edits preserve mixed finishes and perforation spacing. Select all with **⌘/Ctrl A**.
 - Choose **Attach** to connect a new or existing panel to any of six sides. Explore 90°, 105°, 150°, T, and cross joints, offsets, insets, flip direction, connector color, and quantity. Ghost previews update as settings change.
 - T and cross joints add the complete set of branches. Changes to a parent propagate to its connected descendants. Detaching preserves world positions.
 - Thickness and shared-edge errors block new attachments. Panel overlaps, inaccessible clamp positions, and supports that have moved out of alignment appear as review notes.

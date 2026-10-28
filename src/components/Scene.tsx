@@ -13,8 +13,8 @@ const ACCENT = '#e75a35'
 export interface SceneProps {
   panels: Panel[]
   connections: Connection[]
-  selectedId: string | null
-  onSelect: (id: string | null) => void
+  selectedIds: readonly string[]
+  onSelect: (id: string | null, additive?: boolean) => void
   previewPanels?: Panel[]
   previewConnections?: Connection[]
   view: CameraView
@@ -105,7 +105,7 @@ function PanelMesh({ panel, selected, ghost, onSelect, displacement }: {
   const position = vector(panel.position).add(displacement)
   return <group position={position} rotation={panel.rotation}>
     <mesh name={panel.name} geometry={geometry} material={[face, edge]} castShadow={!ghost} receiveShadow={!ghost}
-      onClick={ghost ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id) }}
+      onClick={ghost ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey) }}
       onPointerOver={ghost ? undefined : event => { event.stopPropagation(); document.body.style.cursor = 'pointer' }}
       onPointerOut={ghost ? undefined : () => { document.body.style.cursor = 'auto' }}>
     </mesh>
@@ -246,7 +246,7 @@ function CameraController({ bounds, view, fitSignal, zoomSignal }: Pick<ScenePro
 }
 
 function World(props: SceneProps) {
-  const { panels, connections, selectedId, onSelect, previewPanels = [], previewConnections = [], showGrid, showDimensions, exploded } = props
+  const { panels, connections, selectedIds, onSelect, previewPanels = [], previewConnections = [], showGrid, showDimensions, exploded } = props
   const displayPanels = useMemo(() => {
     if (!exploded) return panels
     const center = boundsOf(panels).getCenter(new THREE.Vector3())
@@ -273,7 +273,7 @@ function World(props: SceneProps) {
     </mesh>
     {showGrid && <Grid position={[0, floorY, 0]} args={[extent, extent]} cellSize={0.1} sectionSize={0.5} cellThickness={0.5} sectionThickness={0.7}
       cellColor="#cccfc5" sectionColor="#b9bdb2" fadeDistance={extent * 0.65} fadeStrength={2} fadeFrom={0} infiniteGrid />}
-    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedId === panel.id} onSelect={onSelect} displacement={new THREE.Vector3()} />)}
+    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIds.includes(panel.id)} onSelect={onSelect} displacement={new THREE.Vector3()} />)}
     {!exploded && <ConnectorMeshes panels={panels} connections={connections} />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} displacement={new THREE.Vector3()} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} ghost />}
@@ -293,10 +293,10 @@ class ViewportBoundary extends Component<{ children: ReactNode }, { error: boole
 
 export default function Scene(props: SceneProps) {
   return <ViewportBoundary>
-    <Canvas aria-label="Interactive 3D furniture design. Drag to orbit, scroll to zoom, click a panel to select it." shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
+    <Canvas aria-label="Interactive 3D furniture design. Drag to orbit, scroll to zoom, click a panel to select it. Shift-click, Command-click, or Control-click to select multiple panels." shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
       style={{ width: '100%', height: '100%', touchAction: 'none' }}
-      onPointerMissed={event => { if (event.type === 'click') props.onSelect(null) }}
+      onPointerMissed={event => { if (event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}
       fallback={<div style={{ padding: 32 }}>Your browser needs WebGL to display this 3D workspace.</div>}>
       <World {...props} />
     </Canvas>
