@@ -1,16 +1,8 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
-import type { Material, Panel, Pattern } from '@/lib/types'
+import type { Panel, Pattern } from '@/lib/types'
 import { getSharedPanelFields } from '@/lib/selection'
-
-export const MATERIALS: {id:Material;name:string;color:string;detail:string}[] = [
-  {id:'birch',name:'Birch plywood',color:'#d9bb87',detail:'Light, layered & versatile'},
-  {id:'oak',name:'Oak plywood',color:'#bc945e',detail:'A warm, natural grain'},
-  {id:'walnut',name:'Walnut plywood',color:'#79563d',detail:'Rich & characterful'},
-  {id:'mdf',name:'Natural MDF',color:'#bca17c',detail:'Smooth & uniform'},
-  {id:'painted',name:'Painted board',color:'#e8e5db',detail:'Your color, your way'},
-]
-export const COLORS = [{name:'Natural',color:'#d9bb87'},{name:'Chalk',color:'#e8e5db'},{name:'Charcoal',color:'#414641'},{name:'Sage',color:'#94a18c'},{name:'Terracotta',color:'#bc6c50'},{name:'Blue gray',color:'#778b99'}]
+import { MATERIALS, COLORS } from '@/lib/materials'
 
 export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false}: {
   label:string;value:number;onChange:(v:number)=>void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean
@@ -55,6 +47,25 @@ export function SelectField({label,value,onChange,children,disabled=false,mixed=
   </label>
 }
 
+function FinishField({color,mixed,disabled,onChange}: {color:string;mixed:boolean;disabled:boolean;onChange:(color:string)=>void}) {
+  const finishName=mixed?'Mixed':COLORS.find(c=>c.color.toLowerCase()===color.toLowerCase())?.name || (MATERIALS.some(m=>m.color===color)||['#d9bd8c','#b88b54','#76523b','#ae9677'].includes(color)?'Natural':'Custom')
+  return <div className={`field ${disabled?'field-disabled':''}`}>
+      <span>Finish <span className="field-hint">{finishName}</span></span>
+      <div className="swatches">
+        {COLORS.map(c=>{
+          const selected=!mixed&&color.toLowerCase()===c.color.toLowerCase()
+          return <button key={c.color} className={`swatch ${selected?'selected':''}`} style={{background:c.color}}
+            disabled={disabled} aria-label={`${c.name} finish`} aria-pressed={selected} onClick={()=>onChange(c.color)}>
+            {selected&&<Check size={15} color={c.color==='#414641'?'white':'#272823'}/>}
+          </button>
+        })}
+        <label className="custom-color" title={mixed?'Different finish colors in the selection':'Custom finish color'}>
+          <input type="color" aria-label="Custom finish color" disabled={disabled} value={mixed?'#808080':color} onChange={e=>onChange(e.target.value)}/><span>+</span>
+        </label>
+      </div>
+    </div>
+}
+
 export function PanelFields({panel,panels,onChange:applyChange,compact=false,disabledFields=[]}: {
   panel:Panel;panels?:Panel[];onChange:(v:Partial<Panel>)=>void;compact?:boolean;disabledFields?:readonly (keyof Panel)[]
 }) {
@@ -82,7 +93,6 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
   const holeControlsDisabled=patternMixed||selection.some(p=>p.pattern==='solid')
   const maxHoleSize=Math.min(40,...selection.map(p=>p.holeSpacing-6))
   const minSpacing=Math.max(...selection.map(p=>Math.max(15,p.holeSize+6,Math.ceil(Math.sqrt(p.width*p.height/4500)))))
-  const finishName=colorMixed?'Mixed':COLORS.find(c=>c.color.toLowerCase()===panel.color.toLowerCase())?.name || (MATERIALS.some(m=>m.color===panel.color)||['#d9bd8c','#b88b54','#76523b','#ae9677'].includes(panel.color)?'Natural':'Custom')
   return <>
     <div className="field-row">
       <NumberField label="Width" value={panel.width} min={80} max={3000} {...numberProps('width')} onChange={width=>onChange({width})}/>
@@ -93,21 +103,7 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
       onChange={v=>{const m=MATERIALS.find(m=>m.id===v)!;onChange({material:m.id,...(!disabled('color')?{color:m.color}:{})})}}>
       {MATERIALS.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
     </SelectField>
-    <div className={`field ${disabled('color')?'field-disabled':''}`}>
-      <span>Finish <span className="field-hint">{finishName}</span></span>
-      <div className="swatches">
-        {COLORS.map(c=>{
-          const selected=!colorMixed&&panel.color.toLowerCase()===c.color.toLowerCase()
-          return <button key={c.color} className={`swatch ${selected?'selected':''}`} style={{background:c.color}}
-            disabled={disabled('color')} aria-label={`${c.name} finish`} aria-pressed={selected} onClick={()=>onChange({color:c.color})}>
-            {selected&&<Check size={15} color={c.color==='#414641'?'white':'#272823'}/>}
-          </button>
-        })}
-        <label className="custom-color" title={colorMixed?'Different finish colors in the selection':'Custom finish color'}>
-          <input type="color" aria-label="Custom finish color" disabled={disabled('color')} value={colorMixed?'#808080':panel.color} onChange={e=>onChange({color:e.target.value})}/><span>+</span>
-        </label>
-      </div>
-    </div>
+    <FinishField color={panel.color} mixed={colorMixed} disabled={disabled('color')} onChange={color=>onChange({color})}/>
     <div className={`field ${disabled('pattern')?'field-disabled':''}`}>
       <span>Surface{patternMixed&&<span className="field-hint">Mixed</span>}</span>
       <div className="pattern-options">

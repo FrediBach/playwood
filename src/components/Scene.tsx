@@ -6,7 +6,8 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraView, Connection, Panel, Vec3 } from '@/lib/types'
 import { ConnectorMeshes } from './ConnectorMeshes'
 import { makePanelGeometry } from './scene-geometry'
-import { RoomEnvironment, getRoomLayout } from './RoomEnvironment'
+import { RoomEnvironment } from './RoomEnvironment'
+import { getRoomLayout } from './room-layout'
 
 const MM = 0.001
 const ACCENT = '#e75a35'
