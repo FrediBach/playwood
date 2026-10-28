@@ -75,7 +75,8 @@ function woodTexture(material: Panel['material']) {
 function PanelMesh({ panel, selected, ghost, interactive = true, onSelect }: {
   panel: Panel; selected: boolean; ghost?: boolean; interactive?: boolean; onSelect: SceneProps['onSelect']
 }) {
-  const geometry = useMemo(() => makePanelGeometry(panel), [panel.width, panel.height, panel.thickness, panel.pattern, panel.holeSize, panel.holeSpacing])
+  const { width, height, thickness, pattern, holeSize, holeSpacing } = panel
+  const geometry = useMemo(() => makePanelGeometry({ width, height, thickness, pattern, holeSize, holeSpacing }), [width, height, thickness, pattern, holeSize, holeSpacing])
   const texture = useMemo(() => panel.material !== 'painted' ? woodTexture(panel.material) : null, [panel.material])
   const face = useMemo(() => new THREE.MeshStandardMaterial({
     color: ghost ? ACCENT : panel.color, map: ghost ? null : texture,

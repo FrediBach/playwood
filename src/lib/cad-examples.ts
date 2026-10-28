@@ -46,10 +46,10 @@ function totemProject(): Project {
   // The original deep bay extends forward. Native shared joints currently
   // require one common seam offset, so this editable version centers its
   // deeper panels. Additional corner clamps use the remaining open seam.
-  const panels = resolvePanels(p)
+  const panelsByName = new Map(resolvePanels(p).map(panel => [panel.name, panel]))
   for (const shelfName of ['Shelf 3.1', 'Shelf 3.2']) for (const sideName of ['Upright 3.1', 'Upright 4.1']) {
-    const parent = panels.find(panel => panel.name === shelfName)!
-    const child = panels.find(panel => panel.name === sideName)!
+    const parent = panelsByName.get(shelfName)!
+    const child = panelsByName.get(sideName)!
     for (const side of ['left', 'right'] as const) for (const flip of [false, true]) {
       const c = { id: `${crypto.randomUUID()}:0`, parentId: parent.id, childId: child.id,
         type: '90' as const, side, flip, offset: 0, inset: 0, count: 1, color: '#e75a35' }

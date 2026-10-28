@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Eye, EyeOff, GripVertical, Pencil, TriangleAlert, Trash2 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -70,8 +70,8 @@ export function PanelList({ panels, selectedIds, issues, onSelect, onRename, onR
     return result
   }, [panels, issues])
 
-  const updateSort = (next: SortSession | null) => { sortRef.current = next; setSort(next) }
-  const finishSort = (save: boolean) => {
+  const updateSort = useCallback((next: SortSession | null) => { sortRef.current = next; setSort(next) }, [])
+  const finishSort = useCallback((save: boolean) => {
     const current = sortRef.current
     if (!current) return
     if (save && current.active) {
@@ -81,9 +81,9 @@ export function PanelList({ panels, selectedIds, issues, onSelect, onRename, onR
       setAnnouncement(`${panels.find(panel => panel.id === current.id)?.name} moved to position ${position} of ${panels.length}.`)
     } else if (current.active) setAnnouncement('Reorder cancelled.')
     updateSort(null)
-  }
+  }, [onReorder, panels, updateSort])
 
-  const updatePointer = (pointerY: number) => {
+  const updatePointer = useCallback((pointerY: number) => {
     const current = sortRef.current
     if (!current || current.mode !== 'pointer') return
     const active = current.active || Math.abs(pointerY - current.startY) >= 4
@@ -97,7 +97,7 @@ export function PanelList({ panels, selectedIds, issues, onSelect, onRename, onR
       })?.dataset.panelId ?? null
     }
     updateSort({ ...current, active, pointerY, beforeId })
-  }
+  }, [updateSort])
 
   // Scroll the existing sidebar while holding a panel near either edge.
   useEffect(() => {
@@ -117,26 +117,29 @@ export function PanelList({ panels, selectedIds, issues, onSelect, onRename, onR
     }
     frame = requestAnimationFrame(scroll)
     return () => cancelAnimationFrame(frame)
-  }, [sort?.active, sort?.mode])
+  }, [sort?.active, sort?.mode, updatePointer])
 
+  const cancelSort = useEffectEvent(() => finishSort(false))
+  const isSorting = sort !== null
   useEffect(() => {
-    if (!sort) return
+    if (!isSorting) return
     const cancel = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopImmediatePropagation()
-        finishSort(false)
+        cancelSort()
       }
     }
-    const cancelOnBlur = () => finishSort(false)
+    const cancelOnBlur = () => cancelSort()
     window.addEventListener('keydown', cancel, true)
     window.addEventListener('blur', cancelOnBlur)
     return () => {
       window.removeEventListener('keydown', cancel, true)
       window.removeEventListener('blur', cancelOnBlur)
     }
-  }, [!!sort])
+  }, [isSorting])
 
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
   const draggedPanel = sort?.active ? panels.find(panel => panel.id === sort.id) : undefined
   const lastOtherId = panels.filter(panel => panel.id !== sort?.id).at(-1)?.id
   const restoreNameFocus = (id: string) => {
@@ -153,7 +156,7 @@ export function PanelList({ panels, selectedIds, issues, onSelect, onRename, onR
     <div className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
     <div ref={listRef} className={`panel-list ${draggedPanel ? 'is-sorting' : ''}`}>
       {panels.map((panel, index) => {
-        const selected = selectedIds.includes(panel.id)
+        const selected = selectedIdSet.has(panel.id)
         const overlapNames = [...(overlaps.get(panel.id) ?? [])]
         const overlapLabel = `Overlaps with ${overlapNames.join(', ')}`
         const dragging = draggedPanel?.id === panel.id

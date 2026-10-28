@@ -3,7 +3,7 @@ import type { Panel } from '@/lib/types'
 
 const MM = 0.001
 
-export function makePanelGeometry(panel: Panel) {
+export function makePanelGeometry(panel: Pick<Panel, 'width' | 'height' | 'thickness' | 'pattern' | 'holeSize' | 'holeSpacing'>) {
   const w = panel.width * MM, h = panel.height * MM, t = panel.thickness * MM
   const shape = new THREE.Shape()
   shape.moveTo(-w / 2, -h / 2); shape.lineTo(w / 2, -h / 2)

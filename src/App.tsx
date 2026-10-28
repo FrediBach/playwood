@@ -46,7 +46,8 @@ export default function App() {
   const [editingName,setEditingName]=useState(false)
   const importRef=useRef<HTMLInputElement>(null)
   const panels=useMemo(()=>resolvePanels(project),[project])
-  const selectedPanels=panels.filter(p=>selectedIds.includes(p.id))
+  const selectedIdSet=useMemo(()=>new Set(selectedIds),[selectedIds])
+  const selectedPanels=panels.filter(p=>selectedIdSet.has(p.id))
   const selected=selectedPanels.length===1?selectedPanels[0]:undefined
   const selectedId=selected?.id??null
   const connection=project.connections.find(c=>c.childId===selectedId&&c.role!=='support')
@@ -89,7 +90,7 @@ export default function App() {
 
   return <TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
     <header className="app-header">
-      <a className="brand" href="#" onClick={e=>{e.preventDefault();setDialog('help')}} aria-label="About playwood. APP"><img className="brand-mark" src="/favicon.svg" width="36" height="36" alt=""/><span>playwood<span className="brand-dot">.</span></span><span className="app-tag">APP</span></a>
+      <button type="button" className="brand" onClick={()=>setDialog('help')} aria-label="About playwood. APP"><img className="brand-mark" src="/favicon.svg" width="36" height="36" alt=""/><span>playwood<span className="brand-dot">.</span></span><span className="app-tag">APP</span></button>
       <div className="header-divider"/>
       <div className="project-heading">{editingName?<input className="project-name-input" aria-label="Project name" autoFocus defaultValue={project.name} maxLength={80} onBlur={e=>{commit(p=>({...p,name:e.target.value.trim()||'Untitled project'}));setEditingName(false)}} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape')setEditingName(false)}}/>:<button className="project-name" onClick={()=>setEditingName(true)} title="Rename project">{project.name}<ChevronDown size={14}/></button>}<span className="save-label"><span className="status-dot"/>{saveStatus}</span></div>
       <div className="header-actions"><div className="undo-actions"><IconButton label="Undo (⌘/Ctrl Z)" disabled={!canUndo} onClick={undo}><Undo2 size={18}/></IconButton><IconButton label="Redo (⌘/Ctrl Shift Z)" disabled={!canRedo} onClick={redo}><Redo2 size={18}/></IconButton></div><Button variant="ghost" onClick={()=>setDialog('templates')} className="templates-button"><LayoutTemplate size={17}/>Templates</Button><Button variant="secondary" onClick={()=>setDialog('export')}><ArrowDownToLine size={17}/><span>Export project</span></Button></div>

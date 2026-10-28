@@ -85,19 +85,21 @@ export function repairLegacyShelf(project: Project): Project {
   }
   next.panels = resolvePanels(next)
   if (validateProject(next).some(issue => issue.severity === 'error')) return project
+  const beforeById = new Map(before.map(panel => [panel.id, panel]))
+  const nextById = new Map(next.panels.map(panel => [panel.id, panel]))
   // Require exact shelf placement, even when a legacy support fell within the
   // validator's looser alignment tolerance.
-  if ([base, top, middle].some(panel => !samePose(before.find(p => p.id === panel.id)!, next.panels.find(p => p.id === panel.id)!))) return project
+  if ([base, top, middle].some(panel => !samePose(beforeById.get(panel.id)!, nextById.get(panel.id)!))) return project
   for (const [original, upper, lowerWidth, upperWidth, direction] of [
     [left, upperLeft, lowerLeftWidth, upperLeftWidth, -1],
     [right, upperRight, lowerRightWidth, upperRightWidth, 1],
   ] as const) {
-    const old = before.find(panel => panel.id === original.id)!
+    const old = beforeById.get(original.id)!
     const inward = new Vector3(direction, 0, 0).applyEuler(new Euler(...old.rotation))
     const lowerPosition = new Vector3(...old.position).addScaledVector(inward, -(old.width - lowerWidth) / 2)
     const upperPosition = new Vector3(...old.position).addScaledVector(inward, (old.width - upperWidth) / 2)
-    if (!samePose({ ...old, position: lowerPosition.toArray() }, next.panels.find(panel => panel.id === old.id)!)
-      || !samePose({ ...old, position: upperPosition.toArray() }, next.panels.find(panel => panel.id === upper.id)!)) return project
+    if (!samePose({ ...old, position: lowerPosition.toArray() }, nextById.get(old.id)!)
+      || !samePose({ ...old, position: upperPosition.toArray() }, nextById.get(upper.id)!)) return project
   }
   return next
 }
