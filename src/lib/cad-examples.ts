@@ -14,25 +14,27 @@ function insert(project: Project, cx: number, cy: number, width: number, height:
     createPanel({ ...base, name: `${label} right`, width: depth, height, position: [cx + width / 2 - thickness / 2, cy, 7], rotation: [0, Math.PI / 2, 0] }),
     createPanel({ ...base, name: `${label} shelf`, width: width - thickness * 2, height: depth, position: [cx, cy, 7], rotation: [-Math.PI / 2, 0, 0] }),
   )
-  if (doors) project.panels.push(accessory({ name: `${label} lower door`, width: width - thickness * 2, height: height / 2 - thickness,
-    color, position: [cx, cy - height / 4, 138] }))
+  // The door overlaps the insert sides and rests against their front faces;
+  // leaving a gap here made it appear to hang independently of its cabinet.
+  if (doors) project.panels.push(accessory({ name: `${label} lower door`, width, height: height / 2 - thickness,
+    color, position: [cx, cy - height / 4, 136.5] }))
 }
 
 export function counterWithDoorsProject(): Project {
   const p = gridProject('Counter with doors', [735, 735, 735], [735])
   for (const [bay, x] of [-770, 0, 770].entries()) for (const [side, dx] of [-185, 185].entries()) {
-    insert(p, x + dx, 394, 370, 750, true, `Bay ${bay + 1}.${side + 1}`)
+    insert(p, x + dx, 394, 370, 752, true, `Bay ${bay + 1}.${side + 1}`)
   }
   return p
 }
 
 function promotionalDeskProject(): Project {
   const p = gridProject('Promotional desk', [735], [735, 350])
-  for (const [i, x] of [-185, 185].entries()) insert(p, x, 394, 370, 750, false, `Lower insert ${i + 1}`)
-  insert(p, 0, 971.5, 750, 365, false, 'Upper insert')
+  for (const [i, x] of [-185, 185].entries()) insert(p, x, 394, 370, 752, false, `Lower insert ${i + 1}`)
+  insert(p, 0, 971.5, 750, 367, false, 'Upper insert')
   p.panels.push(
-    accessory({ name: 'Lower printed panel', width: 747, height: 747, position: [0, 394, 150] }),
-    accessory({ name: 'Upper printed panel', width: 747, height: 362, position: [0, 971.5, 150] }),
+    accessory({ name: 'Lower printed panel', width: 747, height: 747, position: [0, 394, 136.5] }),
+    accessory({ name: 'Upper printed panel', width: 747, height: 362, position: [0, 971.5, 136.5] }),
   )
   return p
 }
@@ -55,8 +57,10 @@ function totemProject(): Project {
       if (expected.position.every((value, i) => Math.abs(value - child.position[i]) < 0.01)) p.connections.push({ ...c, role: 'support' })
     }
   }
-  for (const [x, y] of cells) p.panels.push(accessory({ name: `Printed panel ${x + 1}.${y + 1}`, width: 362,
-    height: y === 2 ? 747 : 362, position: [(x - 1) * 385, y === 2 ? 1164 : 201.5 + y * 385, 145] }))
+  // Fit the insert to the clear opening so its edges meet the surrounding
+  // frame. The artwork's trim dimensions alone leave an unsupported air gap.
+  for (const [x, y] of cells) p.panels.push(accessory({ name: `Printed panel ${x + 1}.${y + 1}`, width: 367,
+    height: y === 2 ? 752 : 367, position: [(x - 1) * 385, y === 2 ? 1164 : 201.5 + y * 385, 145] }))
   return p
 }
 

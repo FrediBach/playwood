@@ -37,6 +37,8 @@ The Library and Templates chooser include 22 resource examples alongside the thr
 
 Repeated plans across room collections appear once. The workshop-table PDF's H-table and cube are separate examples, as are the three closed plinths and the open tall and wide plinths. The open cube uses the same example as the standalone cube. The workshop table with shelves and Organizer Workstation 08 are the same build. The shelf with six doors and reception counter with four doors remain separate variants.
 
+Accessory inserts fit the clear openings between frame panels, including the connector spacing. Dividers meet the floor and ceiling, insert shelves meet their supporting sides, and doors and display faces touch their backing. Known saved or imported examples with the original floating inserts are repaired when their geometry is unchanged, preserving names, finishes and identities. Repairs on load support Undo; examples with custom geometry are left alone.
+
 Examples preserve the supplied panel dimensions and connector layouts where available. The Totem retains the source panel sizes and connector quantities, but centers its deeper base beneath the stack instead of extending it forward; its clamp distribution is adapted to the editor's shared-joint geometry. The corner booth uses square panel corners in place of the source's rounded corners. Dividers, doors, and printed inserts are simplified accessories; their custom slots, folds, hinges, and print artwork are not fabrication geometry. The open-plinth plan's printed parts list disagrees with its drawing: its three four-panel frames require eight 350 × 350 mm panels and four 735 × 350 mm panels. Those examples follow the depicted frames. The supplied Bizu stool, Nordic chair, and Lean table use other construction systems and are excluded from the connector library. Printing templates and artwork instructions are supporting resources, not additional builds.
 
 ## Verification
@@ -74,6 +76,7 @@ The app stores panels in local XY coordinates, with thickness on local Z. Projec
 - `src/lib/platform-examples.ts`: workshop table and tiered island assemblies.
 - `src/components/ExampleBrowser.tsx`: resource example selection and previews.
 - `src/lib/legacy-shelf.ts`: conservative repair of the original shelf's embedded middle connectors.
+- `src/lib/legacy-example-inserts.ts`: conservative repair of original floating library inserts.
 - `src/components/Scene.tsx`: cameras, panel materials, selection, and 3D rendering.
 - `src/components/ConnectorMeshes.tsx`: placement and materials for the supplied connector models.
 - `src/components/connector-geometry.ts`: imported connector parts, source normalization, and shared mesh geometry.

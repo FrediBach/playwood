@@ -37,14 +37,20 @@ export function workstationProject(): Project {
     project = support(project, base, front, { side: 'top', flip: true })
 
     // The source's folded/slotted inserts are accessories rather than connector
-    // panels. Represent their four compartments with a divider and split shelf;
-    // preserve clearance around the 18 mm structural boards and clamp bodies.
+    // panels. Size the divider to the actual opening between the base and
+    // worktop, and fit each shelf between that divider and a pedestal wall.
+    // The 35 mm connector spacing makes these openings 17 mm larger than
+    // the structural cuts after allowing for the two 9 mm panel half-thicknesses.
+    const opening = 735 + 35 - 18
+    const insertThickness = 5
+    const shelfDepth = (opening - insertThickness) / 2
+    const shelfOffset = (opening + insertThickness) / 4
     const divider = createPanel({
-      name: `${label} insert divider`, width: 350, height: 735, thickness: 5,
+      name: `${label} insert divider`, width: 350, height: opening, thickness: insertThickness,
       position: [x, 411.5, 0],
     })
-    const shelves = [-187.5, 187.5].map((z, index) => createPanel({
-      name: `${label} insert shelf ${index + 1}`, width: 350, height: 355, thickness: 5,
+    const shelves = [-shelfOffset, shelfOffset].map((z, index) => createPanel({
+      name: `${label} insert shelf ${index + 1}`, width: 350, height: shelfDepth, thickness: insertThickness,
       position: [x, 411.5, z], rotation: [-Math.PI / 2, 0, 0],
     }))
     project = { ...project, panels: [...project.panels, divider, ...shelves] }

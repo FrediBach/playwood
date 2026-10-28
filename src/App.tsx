@@ -12,6 +12,7 @@ import { createExampleProject } from '@/lib/example-library'
 import { selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
 import { useProject } from '@/hooks/use-project'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
+import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { attachPanel, attachExistingPanel, detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, validateProject } from '@/lib/model'
 import type { AttachmentOptions, CameraView, ConnectorType, Panel, Side, Vec3 } from '@/lib/types'
 
@@ -82,7 +83,7 @@ export default function App() {
   const loadTemplate=(template:string)=>{const next=createExampleProject(template);commit(next);setSelectedId(next.panels[0]?.id??null);setInspectorTab('panel');setDialog(null);setExploded(false);setFitSignal(v=>v+1);notify(template==='blank'?'A fresh start. Add your first panel.':'Template loaded. Make it your own.')}
   const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
-  const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const repaired=repairLegacyShelf(imported);commit(repaired);setSelectedId(repaired.panels[0]?.id??null);setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
+  const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=repairLegacyShelf(imported);const repaired=repairLegacyExampleInserts(shelf);commit(repaired);setSelectedId(repaired.panels[0]?.id??null);setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
 
   return <TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
     <header className="app-header">

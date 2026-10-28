@@ -46,15 +46,19 @@ function benchProject(): Project {
   return centerProject(closeRing(project, back, base, options))
 }
 
-// Divider accessories use their rectangular envelopes. Their proprietary slots,
-// door hinges and printed graphics are not part of the panel editor's geometry.
-// Leave these inserts freely placed rather than inventing PlayWood hardware.
+// The cut dimensions exclude the 35 mm joint between panel centerlines. An
+// insert must fill the clear opening between the two 18 mm frame panels, not
+// the smaller structural cut size. Accessories fit without PlayWood hardware;
+// their proprietary slots, hinges and printed graphics remain simplified.
+const INSERT_THICKNESS = 6
+const INSERT_DEPTH = 330
+const clearOpening = (cutSize: number) => cutSize + 35 - 18
 function divider(project: Project, x: number, y: number, width: number, height: number, label: string): void {
-  const thickness = 6
-  const depth = 330
-  project.panels.push(createPanel({ name: `${label} divider`, width: depth, height: height - 20, thickness, position: [x, y, 0], rotation: [0, HALF_PI, 0] }))
-  if (height > 500) for (const direction of [-1, 1]) project.panels.push(createPanel({ name: `${label} insert shelf ${direction < 0 ? 'left' : 'right'}`, width: width / 2 - thickness / 2 - 10, height: depth, thickness,
-    position: [x + direction * (width / 4 + thickness / 4), y, 0], rotation: [-HALF_PI, 0, 0] }))
+  const thickness = INSERT_THICKNESS
+  const openingWidth = clearOpening(width)
+  project.panels.push(createPanel({ name: `${label} divider`, width: INSERT_DEPTH, height: clearOpening(height), thickness, position: [x, y, 0], rotation: [0, HALF_PI, 0] }))
+  if (height > 500) for (const direction of [-1, 1]) project.panels.push(createPanel({ name: `${label} insert shelf ${direction < 0 ? 'left' : 'right'}`, width: (openingWidth - thickness) / 2, height: INSERT_DEPTH, thickness,
+    position: [x + direction * (openingWidth + thickness) / 4, y, 0], rotation: [-HALF_PI, 0, 0] }))
 }
 
 function filledGrid(name: string, columns: number[], rows: number[], options: { doors?: [number, number][]; fronts?: [number, number][]; divide?: boolean } = {}): Project {
@@ -70,9 +74,10 @@ function filledGrid(name: string, columns: number[], rows: number[], options: { 
       const cx = x + (width + 35) / 2, cy = y + (height + 35) / 2
       if (options.divide !== false) divider(project, cx, cy, width, height, `Cell ${column + 1}.${row + 1}`)
       if (options.doors?.some(([c, r]) => c === column && r === row)) {
-        for (const direction of [-1, 1]) project.panels.push(panel(`Cell ${column + 1}.${row + 1} ${direction < 0 ? 'left' : 'right'} door`, (width - 10) / 2, (height - 10) / 2, { thickness: 6, color: '#d9bd8c', position: [cx + direction * width / 4, cy - height / 4, 181] }))
+        for (const direction of [-1, 1]) project.panels.push(panel(`Cell ${column + 1}.${row + 1} ${direction < 0 ? 'left' : 'right'} door`, (clearOpening(width) - INSERT_THICKNESS) / 2, (clearOpening(height) - INSERT_THICKNESS) / 2,
+          { thickness: INSERT_THICKNESS, color: '#d9bd8c', position: [cx + direction * (clearOpening(width) + INSERT_THICKNESS) / 4, cy - (clearOpening(height) + INSERT_THICKNESS) / 4, (INSERT_DEPTH - INSERT_THICKNESS) / 2] }))
       }
-      if (options.fronts?.some(([c, r]) => c === column && r === row)) project.panels.push(panel(`Cell ${column + 1}.${row + 1} display face`, width + 12, height + 12, { thickness: 3, color: '#cbd1cd', position: [cx, cy, 184] }))
+      if (options.fronts?.some(([c, r]) => c === column && r === row)) project.panels.push(panel(`Cell ${column + 1}.${row + 1} display face`, width + 12, height + 12, { thickness: 3, color: '#cbd1cd', position: [cx, cy, (INSERT_DEPTH + 3) / 2] }))
       y += height + 35
     }
     x += width + 35
@@ -102,7 +107,10 @@ export const PDF_EXAMPLES = [
 function highTableProject(): Project {
   const project = gridProject('High meeting table', [350], [735, 350])
   const baseY = getProjectBounds(resolvePanels(project)).min[1] + 9
-  project.panels.push(createPanel({ name: 'Lower compartment insert shelf', width: 330, height: 330, thickness: 6, position: [0, baseY + 385, 0], rotation: [-HALF_PI, 0, 0] }))
+  const width = clearOpening(350), height = clearOpening(735), y = baseY + 385
+  project.panels.push(createPanel({ name: 'Lower compartment insert shelf', width: width - INSERT_THICKNESS * 2, height: INSERT_DEPTH, thickness: INSERT_THICKNESS, position: [0, y, 0], rotation: [-HALF_PI, 0, 0] }))
+  for (const direction of [-1, 1]) project.panels.push(createPanel({ name: `Lower compartment insert ${direction < 0 ? 'left' : 'right'} side`, width: INSERT_DEPTH, height, thickness: INSERT_THICKNESS,
+    position: [direction * (width - INSERT_THICKNESS) / 2, y, 0], rotation: [0, HALF_PI, 0] }))
   return project
 }
 
@@ -112,9 +120,9 @@ function popupCounter(): Project {
   const project = gridProject('Popup counter', [735, 735, 735], [350, 350], { omitShelves: [[0, 1], [2, 1]] })
   for (const x of [-770, 770]) {
     divider(project, x, 394, 735, 735, x < 0 ? 'Left bay' : 'Right bay')
-    project.panels.push(panel(`${x < 0 ? 'Left' : 'Right'} display face`, 747, 747, { thickness: 3, color: '#cbd1cd', position: [x, 394, 184] }))
+    project.panels.push(panel(`${x < 0 ? 'Left' : 'Right'} display face`, 747, 747, { thickness: 3, color: '#cbd1cd', position: [x, 394, (INSERT_DEPTH + 3) / 2] }))
   }
   for (const [row, y] of [201.5, 586.5].entries()) divider(project, 0, y, 735, 350, `Middle bay ${row + 1}`)
-  project.panels.push(panel('Middle lower display face', 747, 362, { thickness: 3, color: '#cbd1cd', position: [0, 201.5, 184] }))
+  project.panels.push(panel('Middle lower display face', 747, 362, { thickness: 3, color: '#cbd1cd', position: [0, 201.5, (INSERT_DEPTH + 3) / 2] }))
   return project
 }
