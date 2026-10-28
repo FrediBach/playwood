@@ -1,0 +1,83 @@
+import type { Dispatch, SetStateAction } from 'react'
+import { Box, ChevronDown, Expand, Grid2X2, House, Maximize, Minus, MousePointer2, PanelLeftOpen, Plus, RotateCw, Ruler, SlidersHorizontal, Sun } from 'lucide-react'
+import Scene, { type SceneProps } from './Scene'
+import { IconButton } from './editor-controls'
+import { Tooltip } from './ui/tooltip'
+import { Button } from './ui/button'
+import type { CameraView, Side } from '@/lib/types'
+import { getProjectBounds } from '@/lib/model'
+
+type Setter<T> = Dispatch<SetStateAction<T>>
+interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'previewConnections'> {
+  previewPanels: NonNullable<SceneProps['previewPanels']>
+  previewConnections: NonNullable<SceneProps['previewConnections']>
+  choosePanel: SceneProps['onSelect']
+  realisticPreview: boolean
+  setRealisticPreview: Setter<boolean>
+  leftOpen: boolean
+  rightOpen: boolean
+  setLeftOpen: Setter<boolean>
+  setRightOpen: Setter<boolean>
+  setShowDimensions: Setter<boolean>
+  setShowGrid: Setter<boolean>
+  setView: Setter<CameraView>
+  setZoomSignal: Setter<SceneProps['zoomSignal']>
+  setFitSignal: Setter<number>
+  setExploded: Setter<boolean>
+  onRotate: () => void
+  addPanel: () => void
+  isAttaching: boolean
+  attachmentSide: Side
+  visibleBounds: ReturnType<typeof getProjectBounds>
+  hasVisiblePanels: boolean
+}
+const number = (n:number)=>Math.round(n).toLocaleString()
+
+export function AssemblyWorkspace({panels,connections,selectedIds,choosePanel,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels}: Props) {
+  const previewIds = new Set(previewPanels.map(panel => panel.id))
+  const sceneProps: SceneProps = realisticPreview
+    ? { panels, connections, selectedIds: [], onSelect: () => {}, view: 'perspective', showGrid: false, showDimensions, exploded: false, realisticPreview, fitSignal, zoomSignal }
+    : { panels: panels.filter(panel => !previewIds.has(panel.id)), connections: connections.filter(connection => !previewIds.has(connection.childId) && !previewIds.has(connection.parentId)), selectedIds, onSelect: choosePanel, previewPanels, previewConnections, view, showGrid, showDimensions, exploded, realisticPreview, fitSignal, zoomSignal }
+  return <main className="workspace" aria-label="3D assembly workspace">
+      <WorkspaceToolbar panels={panels} realisticPreview={realisticPreview} setRealisticPreview={setRealisticPreview} onRotate={onRotate} leftOpen={leftOpen} setLeftOpen={setLeftOpen} rightOpen={rightOpen} setRightOpen={setRightOpen} showDimensions={showDimensions} setShowDimensions={setShowDimensions} showGrid={showGrid} setShowGrid={setShowGrid}/>
+      <div className="scene-container"><Scene {...sceneProps}/></div>
+      {!realisticPreview&&isAttaching&&<div className="preview-badge"><span className="pulsing-dot"/>Attachment preview <span>·</span> {attachmentSide} side</div>}
+      {!realisticPreview&&!panels.length&&<div className="canvas-empty"><h2>Something good starts here.</h2><p>Bring a panel. Build an idea.</p><Button onClick={addPanel}><Plus size={18}/>Add your first panel</Button></div>}
+      {realisticPreview&&<div className="room-details" aria-label="Room scale reference">
+        <span className="room-eyebrow"><Sun size={14}/>THE DAYLIGHT ROOM</span>
+        <h2>{hasVisiblePanels?'Your design, in proportion.':'A room for your next idea.'}</h2>
+        {hasVisiblePanels?<p className="room-dimensions">{number(visibleBounds.width)} × {number(visibleBounds.height)} × {number(visibleBounds.depth)} <span>mm · W × H × D</span></p>:<p>Add or show a panel in Studio to see it here.</p>}
+        <p className="room-scale-note">Life-size setting · floor lamp 165 cm tall</p>
+      </div>}
+      <ViewControls realisticPreview={realisticPreview} view={view} setView={setView} setZoomSignal={setZoomSignal} setFitSignal={setFitSignal} exploded={exploded} setExploded={setExploded}/>
+      {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}
+    </main>
+}
+
+function ViewControls({realisticPreview,view,setView,setZoomSignal,setFitSignal,exploded,setExploded}: Pick<Props, 'realisticPreview' | 'view' | 'setView' | 'setZoomSignal' | 'setFitSignal' | 'exploded' | 'setExploded'>) {
+  return <div className="canvas-bottom">
+        <div className="canvas-instructions"><MousePointer2 size={14}/><span>Drag to orbit<span className="instruction-dot">·</span>Scroll to zoom{!realisticPreview&&<><span className="instruction-dot">·</span>Shift-click to multi-select</>}</span></div>
+        <div className="view-controls">
+          {realisticPreview?<span className="room-view-label"><House size={15}/>Room view</span>:<div className="view-select"><Box size={16}/><select aria-label="Camera view" value={view} onChange={e=>setView(e.target.value as CameraView)}><option value="perspective">Perspective</option><option value="front">Front</option><option value="top">Top</option><option value="right">Right</option></select><ChevronDown size={13}/></div>}
+          <span className="control-divider"/><IconButton label="Zoom out" onClick={()=>setZoomSignal(v=>({direction:-1,key:v.key+1}))}><Minus size={17}/></IconButton><IconButton label="Zoom in" onClick={()=>setZoomSignal(v=>({direction:1,key:v.key+1}))}><Plus size={17}/></IconButton><span className="control-divider"/>
+          <IconButton label={realisticPreview?'Reset room view (F)':'Fit assembly (F)'} onClick={()=>setFitSignal(v=>v+1)}><Maximize size={17}/></IconButton>
+          {!realisticPreview&&<IconButton label="Exploded view" aria-pressed={exploded} className={exploded?'is-active':''} onClick={()=>setExploded(v=>!v)}><Expand size={17}/></IconButton>}
+        </div>
+      </div>
+}
+
+function WorkspaceToolbar({panels,realisticPreview,setRealisticPreview,onRotate,leftOpen,setLeftOpen,rightOpen,setRightOpen,showDimensions,setShowDimensions,showGrid,setShowGrid}: Pick<Props, 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onRotate' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
+  return <div className="workspace-top">
+        <div className="preview-mode-switch" role="group" aria-label="Preview mode">
+          <button aria-pressed={!realisticPreview} onClick={()=>setRealisticPreview(false)}><Box size={15}/>Studio</button>
+          <button aria-pressed={realisticPreview} onClick={()=>setRealisticPreview(true)}><House size={15}/>Realistic preview</button>
+        </div>
+        <div className="workspace-options">
+          <IconButton label="Rotate creation" disabled={!panels.length} onClick={onRotate}><RotateCw size={18}/></IconButton>
+          {!realisticPreview&&!leftOpen&&<IconButton label="Open panel list" onClick={()=>setLeftOpen(true)}><PanelLeftOpen size={18}/></IconButton>}
+          <Tooltip label="Show dimensions"><button className={`canvas-toggle ${showDimensions?'active':''}`} aria-label="Show dimensions" aria-pressed={showDimensions} onClick={()=>setShowDimensions(v=>!v)}><Ruler size={18}/></button></Tooltip>
+          {!realisticPreview&&<Tooltip label="Show grid"><button className={`canvas-toggle ${showGrid?'active':''}`} aria-label="Show grid" aria-pressed={showGrid} onClick={()=>setShowGrid(v=>!v)}><Grid2X2 size={17}/></button></Tooltip>}
+          {!realisticPreview&&!rightOpen&&<IconButton label="Open inspector" onClick={()=>setRightOpen(true)}><SlidersHorizontal size={18}/></IconButton>}
+        </div>
+      </div>
+}
