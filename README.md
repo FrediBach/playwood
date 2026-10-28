@@ -23,6 +23,7 @@ Open the local URL printed by Vite. No accounts, API keys, backend, or external 
 - T and cross joints add the complete set of branches. Changes to a parent propagate to its connected descendants. Detaching preserves world positions.
 - Thickness and shared-edge errors block new attachments. Panel overlaps, inaccessible clamp positions, and supports that have moved out of alignment appear as review notes.
 - Orbit, pan, zoom, inspect orthographic views, show dimensions, and explore the exploded view. Export editable JSON or a CSV cutting/parts list.
+- Choose **Realistic preview** to see your assembled furniture at its actual scale in a modern room with daylight, oak flooring, and familiar furnishings. The 165 cm floor lamp provides a size reference; dimensions describe the visible assembly. Orbit and zoom to explore, press **F** to reset the room view, and return to **Studio** (or press **Escape**) to resume editing with your selection and view settings preserved. The room renders locally without external assets or API keys.
 
 Keyboard: **F** fits the view; **⌘/Ctrl Z** undoes; **⌘/Ctrl Shift Z** redoes; **⌘/Ctrl D** duplicates; **Delete** removes a panel; **Escape** cancels selection/preview. Text fields retain normal editing shortcuts.
 
@@ -56,6 +57,7 @@ The app stores panels in local XY coordinates, with thickness on local Z. Projec
 - `src/App.tsx`: workspace and editing flows.
 - `src/lib/model.ts`: attachment geometry, validation, templates, imports, and parts export.
 - `src/components/Scene.tsx`: cameras, materials, connectors, selection, and 3D rendering.
+- `src/components/RoomEnvironment.tsx`: room architecture, furnishings, procedural materials, and lighting for realistic preview.
 - `src/components/scene-geometry.ts`: solid/perforated panel geometry.
 - `src/components/ui/`: editable shadcn-style Radix primitives; aliases in `components.json`.
 - `src/hooks/use-project.ts`: undo/redo and browser-local persistence.

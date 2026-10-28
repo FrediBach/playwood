@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
@@ -6,6 +6,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraView, Connection, Panel, Vec3 } from '@/lib/types'
 import { getConnectionAnchors } from '@/lib/model'
 import { makePanelGeometry } from './scene-geometry'
+import { RoomEnvironment, getRoomLayout } from './RoomEnvironment'
 
 const MM = 0.001
 const ACCENT = '#e75a35'
@@ -21,6 +22,7 @@ export interface SceneProps {
   showGrid: boolean
   showDimensions: boolean
   exploded: boolean
+  realisticPreview?: boolean
   fitSignal: number
   zoomSignal: { direction: number; key: number }
 }
@@ -68,8 +70,8 @@ function woodTexture(material: Panel['material']) {
 }
 
 
-function PanelMesh({ panel, selected, ghost, onSelect, displacement }: {
-  panel: Panel; selected: boolean; ghost?: boolean; onSelect: SceneProps['onSelect']; displacement: THREE.Vector3
+function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, displacement }: {
+  panel: Panel; selected: boolean; ghost?: boolean; interactive?: boolean; onSelect: SceneProps['onSelect']; displacement: THREE.Vector3
 }) {
   const geometry = useMemo(() => makePanelGeometry(panel), [panel.width, panel.height, panel.thickness, panel.pattern, panel.holeSize, panel.holeSpacing])
   const texture = useMemo(() => panel.material !== 'painted' ? woodTexture(panel.material) : null, [panel.material])
@@ -105,9 +107,9 @@ function PanelMesh({ panel, selected, ghost, onSelect, displacement }: {
   const position = vector(panel.position).add(displacement)
   return <group position={position} rotation={panel.rotation}>
     <mesh name={panel.name} geometry={geometry} material={[face, edge]} castShadow={!ghost} receiveShadow={!ghost}
-      onClick={ghost ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey) }}
-      onPointerOver={ghost ? undefined : event => { event.stopPropagation(); document.body.style.cursor = 'pointer' }}
-      onPointerOut={ghost ? undefined : () => { document.body.style.cursor = 'auto' }}>
+      onClick={ghost || !interactive ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey) }}
+      onPointerOver={ghost || !interactive ? undefined : event => { event.stopPropagation(); document.body.style.cursor = 'pointer' }}
+      onPointerOut={ghost || !interactive ? undefined : () => { document.body.style.cursor = 'auto' }}>
     </mesh>
     {(selected || ghost) && <lineSegments geometry={outline} raycast={() => null}>
       <lineBasicMaterial color={ACCENT} transparent opacity={ghost ? 0.7 : 0.95} depthTest={false} />
@@ -183,16 +185,23 @@ function Dimensions({ bounds }: { bounds: THREE.Box3 }) {
   </group>
 }
 
-function CameraController({ bounds, view, fitSignal, zoomSignal }: Pick<SceneProps, 'view' | 'fitSignal' | 'zoomSignal'> & { bounds: THREE.Box3 }) {
+function CameraController({ bounds, view, fitSignal, zoomSignal, realisticPreview }: Pick<SceneProps, 'view' | 'fitSignal' | 'zoomSignal' | 'realisticPreview'> & { bounds: THREE.Box3 }) {
   const controls = useRef<OrbitControlsImpl>(null)
+  const [roomMaxDistance, setRoomMaxDistance] = useState(100)
   const { camera, size, invalidate } = useThree()
   const boundsRef = useRef(bounds)
   const lastZoomKey = useRef(0)
   boundsRef.current = bounds
   useEffect(() => {
     const cameraBounds = boundsRef.current.clone().expandByScalar(0.08)
+    if (realisticPreview) {
+      const room = getRoomLayout(boundsRef.current)
+      // Include life-size reference objects without scaling the design to the room.
+      cameraBounds.expandByPoint(new THREE.Vector3(boundsRef.current.min.x - 0.75, room.floorY, room.backZ + 0.2))
+      cameraBounds.expandByPoint(new THREE.Vector3(room.chairX + 0.55, Math.max(room.floorY + 1.9, boundsRef.current.max.y + 0.25), room.chairZ + 0.5))
+    }
     const center = cameraBounds.getCenter(new THREE.Vector3())
-    const direction = view === 'front' ? new THREE.Vector3(0, 0, 1) : view === 'top' ? new THREE.Vector3(0, 1, 0.0001) : view === 'right' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(1.35, 0.9, 1.6).normalize()
+    const direction = realisticPreview ? new THREE.Vector3(0.33, size.width < size.height ? 0.1 : 0.22, 1).normalize() : view === 'front' ? new THREE.Vector3(0, 0, 1) : view === 'top' ? new THREE.Vector3(0, 1, 0.0001) : view === 'right' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(1.35, 0.9, 1.6).normalize()
     const extent = cameraBounds.getSize(new THREE.Vector3()).length()
     camera.position.copy(center).addScaledVector(direction, Math.max(3, extent * 2.5))
     camera.up.set(0, 1, 0)
@@ -219,6 +228,11 @@ function CameraController({ bounds, view, fitSignal, zoomSignal }: Pick<ScenePro
       }
       camera.position.copy(center).addScaledVector(direction, distance)
       camera.zoom = 1
+      if (realisticPreview) {
+        const maxDistance = Math.max(6, distance * 1.3)
+        setRoomMaxDistance(maxDistance)
+        if (controls.current) controls.current.maxDistance = maxDistance
+      }
     } else {
       camera.zoom = Math.min(size.width / Math.max(maxX - minX, 0.1), size.height / Math.max(maxY - minY, 0.1)) * 0.74
     }
@@ -226,13 +240,13 @@ function CameraController({ bounds, view, fitSignal, zoomSignal }: Pick<ScenePro
     controls.current?.target.copy(center)
     controls.current?.update()
     invalidate()
-  }, [camera, view, fitSignal, size.width, size.height, invalidate])
+  }, [camera, view, fitSignal, size.width, size.height, invalidate, realisticPreview])
   useEffect(() => {
     if (!zoomSignal.key || zoomSignal.key === lastZoomKey.current) return
     lastZoomKey.current = zoomSignal.key
     if (camera instanceof THREE.PerspectiveCamera && controls.current) {
       const offset = camera.position.clone().sub(controls.current.target)
-      const distance = THREE.MathUtils.clamp(offset.length() * (zoomSignal.direction > 0 ? 1 / 1.18 : 1.18), 0.08, 100)
+      const distance = THREE.MathUtils.clamp(offset.length() * (zoomSignal.direction > 0 ? 1 / 1.18 : 1.18), realisticPreview ? 0.6 : 0.08, realisticPreview ? roomMaxDistance : 100)
       camera.position.copy(controls.current.target).add(offset.setLength(distance))
       controls.current.update()
     } else {
@@ -240,13 +254,14 @@ function CameraController({ bounds, view, fitSignal, zoomSignal }: Pick<ScenePro
     }
     camera.updateProjectionMatrix()
     invalidate()
-  }, [camera, zoomSignal.key, zoomSignal.direction, invalidate])
+  }, [camera, zoomSignal.key, zoomSignal.direction, invalidate, realisticPreview, roomMaxDistance])
   return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.12} minZoom={25} maxZoom={4000}
-    minDistance={0.08} maxDistance={100} maxPolarAngle={Math.PI * 0.94} enableRotate={view === 'perspective'} screenSpacePanning />
+    minDistance={realisticPreview ? 0.6 : 0.08} maxDistance={realisticPreview ? roomMaxDistance : 100} minPolarAngle={realisticPreview ? 0.25 : 0} maxPolarAngle={Math.PI * (realisticPreview ? 0.49 : 0.94)}
+    minAzimuthAngle={realisticPreview ? 0 : -Infinity} maxAzimuthAngle={realisticPreview ? Math.PI / 3 : Infinity} enableRotate={view === 'perspective'} enablePan={!realisticPreview} screenSpacePanning />
 }
 
 function World(props: SceneProps) {
-  const { panels, connections, selectedIds, onSelect, previewPanels = [], previewConnections = [], showGrid, showDimensions, exploded } = props
+  const { panels, connections, selectedIds, onSelect, previewPanels = [], previewConnections = [], showGrid, showDimensions, exploded, realisticPreview } = props
   const displayPanels = useMemo(() => {
     if (!exploded) return panels
     const center = boundsOf(panels).getCenter(new THREE.Vector3())
@@ -260,9 +275,10 @@ function World(props: SceneProps) {
   const extent = Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5)
   return <>
     {props.view === 'perspective'
-      ? <PerspectiveCamera makeDefault fov={35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
+      ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
       : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
-    <color attach="background" args={['#eeede8']} />
+    <color attach="background" args={[realisticPreview ? '#e9e7df' : '#eeede8']} />
+    {realisticPreview ? <RoomEnvironment bounds={bounds} /> : <>
     <ambientLight intensity={0.9} />
     <hemisphereLight args={['#ffffff', '#b6b0a0', 1.0]} />
     <directionalLight position={[2.5, 5, 3.5]} intensity={2.3} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.001}
@@ -273,12 +289,13 @@ function World(props: SceneProps) {
     </mesh>
     {showGrid && <Grid position={[0, floorY, 0]} args={[extent, extent]} cellSize={0.1} sectionSize={0.5} cellThickness={0.5} sectionThickness={0.7}
       cellColor="#cccfc5" sectionColor="#b9bdb2" fadeDistance={extent * 0.65} fadeStrength={2} fadeFrom={0} infiniteGrid />}
-    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIds.includes(panel.id)} onSelect={onSelect} displacement={new THREE.Vector3()} />)}
+    </>}
+    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIds.includes(panel.id)} interactive={!realisticPreview} onSelect={onSelect} displacement={new THREE.Vector3()} />)}
     {!exploded && <ConnectorMeshes panels={panels} connections={connections} />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} displacement={new THREE.Vector3()} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} ghost />}
-    {showDimensions && panels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
-    <CameraController bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} zoomSignal={props.zoomSignal} />
+    {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
+    <CameraController bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
 }
 
@@ -293,7 +310,7 @@ class ViewportBoundary extends Component<{ children: ReactNode }, { error: boole
 
 export default function Scene(props: SceneProps) {
   return <ViewportBoundary>
-    <Canvas aria-label="Interactive 3D furniture design. Drag to orbit, scroll to zoom, click a panel to select it. Shift-click, Command-click, or Control-click to select multiple panels." shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
+    <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit and scroll to zoom.' : 'Interactive 3D furniture design. Drag to orbit, scroll to zoom, click a panel to select it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
       style={{ width: '100%', height: '100%', touchAction: 'none' }}
       onPointerMissed={event => { if (event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}

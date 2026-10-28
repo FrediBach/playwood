@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownToLine, ArrowRight, Box, Check, CheckCheck, ChevronDown, ChevronRight, CircleHelp, Copy, Download, Expand, Eye, EyeOff, FolderOpen, Grid2X2, Layers, LayoutTemplate, Link2, ListChecks, Maximize, Minus, MousePointer2, Move3D, PanelLeftClose, PanelLeftOpen, Plus, Redo2, Ruler, Settings2, SlidersHorizontal, Trash2, Undo2, Upload, X } from 'lucide-react'
+import { ArrowDownToLine, ArrowRight, Box, Check, CheckCheck, ChevronDown, ChevronRight, CircleHelp, Copy, Download, Expand, Eye, EyeOff, FolderOpen, Grid2X2, House, Layers, LayoutTemplate, Link2, ListChecks, Maximize, Minus, MousePointer2, Move3D, PanelLeftClose, PanelLeftOpen, Plus, Redo2, Ruler, Settings2, SlidersHorizontal, Sun, Trash2, Undo2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip'
@@ -32,6 +32,7 @@ export default function App() {
   const [attachTarget,setAttachTarget]=useState('new')
   const [attachment,setAttachment]=useState<AttachmentOptions>(INITIAL_ATTACHMENT)
   const [view,setView]=useState<CameraView>('perspective')
+  const [realisticPreview,setRealisticPreview]=useState(false)
   const [showGrid,setShowGrid]=useState(true),[showDimensions,setShowDimensions]=useState(false),[exploded,setExploded]=useState(false)
   const [fitSignal,setFitSignal]=useState(0),[zoomSignal,setZoomSignal]=useState({direction:0,key:0})
   const [leftOpen,setLeftOpen]=useState(window.innerWidth>900),[rightOpen,setRightOpen]=useState(window.innerWidth>680)
@@ -44,6 +45,8 @@ export default function App() {
   const selectedId=selected?.id??null
   const connection=project.connections.find(c=>c.childId===selectedId&&c.role!=='support')
   const bounds=useMemo(()=>getProjectBounds(panels),[panels])
+  const visibleBounds=useMemo(()=>getProjectBounds(panels.filter(panel=>panel.visible)),[panels])
+  const hasVisiblePanels=panels.some(panel=>panel.visible)
   const issues=useMemo(()=>validateProject(project),[project])
   const connectorCount=project.connections.reduce((sum,c)=>sum+c.count,0)
   const notify=useCallback((message:string)=>setToast(message),[])
@@ -52,7 +55,7 @@ export default function App() {
   const updatePanel=useCallback((patch:Partial<Panel>)=>{if(selectedId)commit(p=>({...p,panels:p.panels.map(panel=>panel.id===selectedId?{...panel,...patch}:panel)}))},[commit,selectedId])
   const deleteSelected=useCallback(()=>{if(selectedIds.length){commit(p=>selectedIds.reduce((current,id)=>removePanel(current,id),p));notify(`${selectedIds.length===1?'Panel':'Panels'} removed. Undo to bring them back.`)}},[selectedIds,commit,notify])
   const duplicateSelected=useCallback(()=>{if(selectedIds.length){let next=project;const copies:string[]=[];for(const id of selectedIds){const duplicate=duplicatePanel(next,id);if(duplicate!==next)copies.push(duplicate.panels.at(-1)!.id);next=duplicate}commit(next);setSelectedIds(copies);notify(`${copies.length===1?'Panel':'Panels'} duplicated`)}},[selectedIds,project,commit,notify])
-  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{const target=e.target as HTMLElement;if(target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||dialog)return;if(e.metaKey||e.ctrlKey){if(e.key.toLowerCase()==='a'){e.preventDefault();setSelectedIds(project.panels.map(p=>p.id));setInspectorTab('panel');setRightOpen(true)}else if(e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}else if(e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected()}}else if(!dialog){if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected()}if(e.key.toLowerCase()==='f')setFitSignal(v=>v+1);if(e.key==='Escape'){setInspectorTab('panel');setSelectedId(null)}}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[undo,redo,deleteSelected,duplicateSelected,dialog,project.panels,setSelectedId])
+  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{const target=e.target as HTMLElement;if(target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||dialog)return;if(realisticPreview){if(e.metaKey||e.ctrlKey){if(['a','d','z'].includes(e.key.toLowerCase()))e.preventDefault();return}if(e.key.toLowerCase()==='f')setFitSignal(v=>v+1);if(e.key==='Escape')setRealisticPreview(false);return}if(e.metaKey||e.ctrlKey){if(e.key.toLowerCase()==='a'){e.preventDefault();setSelectedIds(project.panels.map(p=>p.id));setInspectorTab('panel');setRightOpen(true)}else if(e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}else if(e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected()}}else if(!dialog){if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected()}if(e.key.toLowerCase()==='f')setFitSignal(v=>v+1);if(e.key==='Escape'){setInspectorTab('panel');setSelectedId(null)}}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[undo,redo,deleteSelected,duplicateSelected,dialog,project.panels,setSelectedId,realisticPreview])
   const previewResult=useMemo(()=>{
     if(inspectorTab!=='attach'||!selected)return {project:null,error:''}
     try {
@@ -76,7 +79,7 @@ export default function App() {
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
   const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));commit(imported);setSelectedId(imported.panels[0]?.id??null);setFitSignal(v=>v+1);setImportError('');setDialog(null);notify('Project imported')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
 
-  return <TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'}`}>
+  return <TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
     <header className="app-header">
       <a className="brand" href="#" onClick={e=>{e.preventDefault();setDialog('help')}} aria-label="About Playwood Studio"><span className="brand-mark"><span/><span/><span/></span><span>playwood<span className="brand-dot">.</span></span><span className="studio-tag">STUDIO</span></a>
       <div className="header-divider"/>
@@ -100,12 +103,38 @@ export default function App() {
     </aside>
 
     <main className="workspace" aria-label="3D assembly workspace">
-      <div className="workspace-top"><div className="workspace-heading"><span className="overline">YOUR WORKSPACE</span><h1>Make room for ideas<span>.</span></h1></div><div className="workspace-options">{!leftOpen&&<IconButton label="Open panel list" onClick={()=>setLeftOpen(true)}><PanelLeftOpen size={18}/></IconButton>}<Tooltip label="Show dimensions"><button className={`canvas-toggle ${showDimensions?'active':''}`} aria-label="Show dimensions" aria-pressed={showDimensions} onClick={()=>setShowDimensions(v=>!v)}><Ruler size={18}/></button></Tooltip><Tooltip label="Show grid"><button className={`canvas-toggle ${showGrid?'active':''}`} aria-label="Show grid" aria-pressed={showGrid} onClick={()=>setShowGrid(v=>!v)}><Grid2X2 size={17}/></button></Tooltip>{!rightOpen&&<IconButton label="Open inspector" onClick={()=>setRightOpen(true)}><SlidersHorizontal size={18}/></IconButton>}</div></div>
-      <div className="scene-container"><Scene panels={panels.filter(p=>!previewIds.has(p.id))} connections={project.connections.filter(c=>!previewIds.has(c.childId)&&!previewIds.has(c.parentId))} selectedIds={selectedIds} onSelect={choosePanel} previewPanels={previewPanels} previewConnections={previewConnections} view={view} showGrid={showGrid} showDimensions={showDimensions} exploded={exploded} fitSignal={fitSignal} zoomSignal={zoomSignal}/></div>
-      {inspectorTab==='attach'&&selected&&<div className="preview-badge"><span className="pulsing-dot"/>Attachment preview <span>·</span> {attachment.side} side</div>}
-      {!panels.length&&<div className="canvas-empty"><h2>Something good starts here.</h2><p>Bring a panel. Build an idea.</p><Button onClick={addPanel}><Plus size={18}/>Add your first panel</Button></div>}
-      <div className="canvas-bottom"><div className="canvas-instructions"><MousePointer2 size={14}/><span>Drag to orbit<span className="instruction-dot">·</span>Scroll to zoom<span className="instruction-dot">·</span>Shift-click to multi-select</span></div><div className="view-controls"><div className="view-select"><Box size={16}/><select aria-label="Camera view" value={view} onChange={e=>setView(e.target.value as CameraView)}><option value="perspective">Perspective</option><option value="front">Front</option><option value="top">Top</option><option value="right">Right</option></select><ChevronDown size={13}/></div><span className="control-divider"/><IconButton label="Zoom out" onClick={()=>setZoomSignal(v=>({direction:-1,key:v.key+1}))}><Minus size={17}/></IconButton><IconButton label="Zoom in" onClick={()=>setZoomSignal(v=>({direction:1,key:v.key+1}))}><Plus size={17}/></IconButton><span className="control-divider"/><IconButton label="Fit assembly (F)" onClick={()=>setFitSignal(v=>v+1)}><Maximize size={17}/></IconButton><IconButton label="Exploded view" aria-pressed={exploded} className={exploded?'is-active':''} onClick={()=>setExploded(v=>!v)}><Expand size={17}/></IconButton></div></div>
-      <div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>
+      <div className="workspace-top">
+        <div className="workspace-heading"><span className="overline">{realisticPreview?'A PLACE FOR YOUR DESIGN':'YOUR WORKSPACE'}</span><h1>{realisticPreview?'See it at home':'Make room for ideas'}<span>.</span></h1></div>
+        <div className="workspace-options">
+          {!realisticPreview&&!leftOpen&&<IconButton label="Open panel list" onClick={()=>setLeftOpen(true)}><PanelLeftOpen size={18}/></IconButton>}
+          <Tooltip label="Show dimensions"><button className={`canvas-toggle ${showDimensions?'active':''}`} aria-label="Show dimensions" aria-pressed={showDimensions} onClick={()=>setShowDimensions(v=>!v)}><Ruler size={18}/></button></Tooltip>
+          {!realisticPreview&&<Tooltip label="Show grid"><button className={`canvas-toggle ${showGrid?'active':''}`} aria-label="Show grid" aria-pressed={showGrid} onClick={()=>setShowGrid(v=>!v)}><Grid2X2 size={17}/></button></Tooltip>}
+          {!realisticPreview&&!rightOpen&&<IconButton label="Open inspector" onClick={()=>setRightOpen(true)}><SlidersHorizontal size={18}/></IconButton>}
+        </div>
+      </div>
+      <div className="preview-mode-switch" role="group" aria-label="Preview mode">
+        <button aria-pressed={!realisticPreview} onClick={()=>setRealisticPreview(false)}><Box size={15}/>Studio</button>
+        <button aria-pressed={realisticPreview} onClick={()=>setRealisticPreview(true)}><House size={15}/>Realistic preview</button>
+      </div>
+      <div className="scene-container"><Scene panels={realisticPreview?panels:panels.filter(p=>!previewIds.has(p.id))} connections={realisticPreview?project.connections:project.connections.filter(c=>!previewIds.has(c.childId)&&!previewIds.has(c.parentId))} selectedIds={realisticPreview?[]:selectedIds} onSelect={realisticPreview?()=>{}:choosePanel} previewPanels={realisticPreview?[]:previewPanels} previewConnections={realisticPreview?[]:previewConnections} view={realisticPreview?'perspective':view} showGrid={!realisticPreview&&showGrid} showDimensions={showDimensions} exploded={!realisticPreview&&exploded} realisticPreview={realisticPreview} fitSignal={fitSignal} zoomSignal={zoomSignal}/></div>
+      {!realisticPreview&&inspectorTab==='attach'&&selected&&<div className="preview-badge"><span className="pulsing-dot"/>Attachment preview <span>·</span> {attachment.side} side</div>}
+      {!realisticPreview&&!panels.length&&<div className="canvas-empty"><h2>Something good starts here.</h2><p>Bring a panel. Build an idea.</p><Button onClick={addPanel}><Plus size={18}/>Add your first panel</Button></div>}
+      {realisticPreview&&<div className="room-details" aria-label="Room scale reference">
+        <span className="room-eyebrow"><Sun size={14}/>THE DAYLIGHT ROOM</span>
+        <h2>{hasVisiblePanels?'Your design, in proportion.':'A room for your next idea.'}</h2>
+        {hasVisiblePanels?<p className="room-dimensions">{number(visibleBounds.width)} × {number(visibleBounds.height)} × {number(visibleBounds.depth)} <span>mm · W × H × D</span></p>:<p>Add or show a panel in Studio to see it here.</p>}
+        <p className="room-scale-note">Life-size setting · floor lamp 165 cm tall</p>
+      </div>}
+      <div className="canvas-bottom">
+        <div className="canvas-instructions"><MousePointer2 size={14}/><span>Drag to orbit<span className="instruction-dot">·</span>Scroll to zoom{!realisticPreview&&<><span className="instruction-dot">·</span>Shift-click to multi-select</>}</span></div>
+        <div className="view-controls">
+          {realisticPreview?<span className="room-view-label"><House size={15}/>Room view</span>:<div className="view-select"><Box size={16}/><select aria-label="Camera view" value={view} onChange={e=>setView(e.target.value as CameraView)}><option value="perspective">Perspective</option><option value="front">Front</option><option value="top">Top</option><option value="right">Right</option></select><ChevronDown size={13}/></div>}
+          <span className="control-divider"/><IconButton label="Zoom out" onClick={()=>setZoomSignal(v=>({direction:-1,key:v.key+1}))}><Minus size={17}/></IconButton><IconButton label="Zoom in" onClick={()=>setZoomSignal(v=>({direction:1,key:v.key+1}))}><Plus size={17}/></IconButton><span className="control-divider"/>
+          <IconButton label={realisticPreview?'Reset room view (F)':'Fit assembly (F)'} onClick={()=>setFitSignal(v=>v+1)}><Maximize size={17}/></IconButton>
+          {!realisticPreview&&<IconButton label="Exploded view" aria-pressed={exploded} className={exploded?'is-active':''} onClick={()=>setExploded(v=>!v)}><Expand size={17}/></IconButton>}
+        </div>
+      </div>
+      {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}
     </main>
 
     <aside className="right-sidebar" aria-label="Panel inspector"><div className="inspector-header"><span><Settings2 size={17}/>Inspector</span><IconButton label="Collapse inspector" onClick={()=>setRightOpen(false)}><X size={17}/></IconButton></div>
