@@ -1,0 +1,39 @@
+/* Panel tools share the existing two-line row; the thumbnail doubles as a grip. */
+.panel-list-row{height:60px;min-height:60px;gap:8px;padding-right:6px}
+.panel-selection-toggle{width:19px;min-width:19px;margin-left:1px}
+.panel-drag-handle{position:relative;display:grid;place-items:center;width:27px;min-width:27px;height:42px;padding:0;background:none;cursor:grab;touch-action:none;border-radius:4px}
+.panel-drag-handle:disabled{opacity:1;cursor:default}
+.panel-drag-handle .panel-thumbnail{width:24px;height:32px}
+.panel-grip{position:absolute;inset:4px 0;display:grid;place-items:center;border-radius:3px;background:#faf9f0d9;color:#5e6652;opacity:0;transition:opacity .15s}
+.panel-list-row:hover .panel-grip,.panel-drag-handle:focus-visible .panel-grip,.is-dragging .panel-grip{opacity:1}
+.panel-drag-handle:disabled .panel-grip{display:none}
+.panel-list .panel-list-copy{flex:1;min-width:0;gap:1px}
+.panel-name-line{height:23px;display:flex;align-items:center;gap:3px;min-width:0}
+.panel-list .panel-list-select{display:block;flex:1;min-width:0;padding:3px 0;text-align:left;line-height:17px;border-radius:2px;background:none}
+.panel-list-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:550}
+.panel-row-details{display:flex;align-items:center;height:22px;min-width:0;gap:2px}
+.panel-dimensions{padding:0;flex:1;min-width:0;background:none;text-align:left;font-size:10px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#77796e;font-variant-numeric:tabular-nums}
+.panel-row-actions{display:flex;align-items:center;flex-shrink:0}
+.panel-row-action{display:grid;place-items:center;width:21px;height:22px;padding:0;background:none;color:#7c8472;border-radius:3px;flex-shrink:0}
+.panel-row-action:hover{background:#dde2d2;color:#3e4c32}
+.panel-row-action.reveal-action{width:0;opacity:0;overflow:hidden;pointer-events:none}
+.panel-list-row:hover .reveal-action,.panel-list-row:focus-within .reveal-action,.panel-list-row.selected .reveal-action{width:21px;opacity:1;pointer-events:auto}
+.panel-remove-action:hover{background:#f4e2d9;color:#b13e29}
+.panel-inline-name{width:100%;min-width:0;height:23px;padding:1px 3px;border:1px solid #9ba88a;border-radius:3px;background:#fffef8;color:inherit;font-size:12px;font-weight:550;outline-offset:1px}
+.panel-overlap-indicator{display:grid;place-items:center;width:19px;height:19px;flex-shrink:0;padding:0;background:#f4e4bd;color:#92651d;border-radius:4px}
+.panel-overlap-indicator:hover{background:#ecd49b;color:#745016}
+.panel-list-row.is-hidden{opacity:1}
+.panel-list-row.is-hidden .panel-thumbnail,.panel-list-row.is-hidden .panel-list-name,.panel-list-row.is-hidden .panel-dimensions{opacity:.5}
+.panel-list-row.is-dragging{background:#e8ecdf;border-color:#b8c3a7;opacity:.45}
+.panel-list.is-sorting{user-select:none}
+.panel-list-row.drop-before:before,.panel-list-row.drop-after:after{content:'';position:absolute;left:1px;right:1px;height:2px;border-radius:2px;background:var(--accent);z-index:2;pointer-events:none;box-shadow:-3px 0 0 var(--accent)}
+.panel-list-row.drop-before:before{top:-4px}
+.panel-list-row.drop-after:after{bottom:-4px}
+.panel-drag-preview{position:fixed;z-index:100;pointer-events:none;display:flex;align-items:center;gap:10px;height:60px;padding:7px 10px;border:1px solid #b6bea9;border-radius:6px;background:#fcfcf5;box-shadow:0 8px 25px #27351b2b;transform:rotate(-1deg);color:#4b5540}
+.panel-drag-preview .panel-thumbnail{width:24px;height:32px}
+.panel-drag-preview>div{min-width:0;display:flex;flex-direction:column;gap:5px}
+.panel-drag-preview strong{font-size:12px;font-weight:550;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.panel-drag-preview small{font-size:10px;color:#77796e}
+@media(hover:none),(pointer:coarse){.panel-list-row .panel-row-action.reveal-action{width:24px;opacity:1;pointer-events:auto}.panel-list-row .panel-row-action{height:24px;width:24px}.panel-grip{opacity:.7}}
+@media(max-width:1150px){.panel-list-row{height:55px;min-height:55px}.panel-drag-preview{height:55px}}
+@media(min-width:901px) and (max-width:1150px){.panel-list-row{gap:5px;padding-right:4px}.panel-list-name{font-size:11px}.panel-drag-handle{width:22px;min-width:22px}.panel-drag-handle .panel-thumbnail{width:20px;height:30px}.panel-dimensions{font-size:9px}}
