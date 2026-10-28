@@ -29,7 +29,7 @@ async function rename(page: Page, name: string) {
 test('pointer sorting preserves attachments and selection, supports undo, and persists', async ({ page }) => {
   await page.goto('/')
   const names = page.locator('.panel-list-name')
-  const original = ['Bottom shelf', 'Left side', 'Right side', 'Top shelf', 'Middle shelf']
+  const original = ['Bottom shelf', 'Left side', 'Right side', 'Top shelf', 'Middle shelf', 'Left upper side', 'Right upper side']
   await expect(names).toHaveText(original)
   await page.locator('.panel-list-select').nth(3).click()
   const handle = await page.getByRole('button', { name: 'Reorder Top shelf', exact: true }).boundingBox()
@@ -40,10 +40,10 @@ test('pointer sorting preserves attachments and selection, supports undo, and pe
   await page.mouse.down()
   await page.mouse.move(target!.x + target!.width / 2, target!.y + 3, { steps: 15 })
   await page.mouse.up()
-  const reordered = ['Top shelf', 'Bottom shelf', 'Left side', 'Right side', 'Middle shelf']
+  const reordered = ['Top shelf', 'Bottom shelf', 'Left side', 'Right side', 'Middle shelf', 'Left upper side', 'Right upper side']
   await expect(names).toHaveText(reordered)
   await expect(page.getByLabel('Panel name', { exact: true })).toHaveValue('Top shelf')
-  await expect(page.locator('.attached-to')).toHaveText('Attached to Left side')
+  await expect(page.locator('.attached-to')).toHaveText('Attached to Left upper side')
   await expect(page.locator('.panel-list-row.selected')).toHaveCount(1)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
   await expect(names).toHaveText(original)
@@ -52,7 +52,7 @@ test('pointer sorting preserves attachments and selection, supports undo, and pe
   await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
   await page.reload()
   await expect(names).toHaveText(reordered)
-  await expect(page.locator('.attached-to')).toHaveText('Attached to Left side')
+  await expect(page.locator('.attached-to')).toHaveText('Attached to Left upper side')
 })
 
 test('keyboard sorting can be cancelled and commits the move as one undo step', async ({ page }) => {
@@ -130,14 +130,14 @@ test('removing a row deletes only that panel and preserves attached survivors', 
   await expect(page.locator('.panel-list-row.selected')).toHaveCount(2)
   await row(page, 'Bottom shelf').hover()
   await page.getByRole('button', { name: 'Remove Bottom shelf', exact: true }).click()
-  await expect(page.locator('.panel-list-row')).toHaveCount(4)
-  await expect(page.locator('.panel-list-name')).toHaveText(['Left side', 'Right side', 'Top shelf', 'Middle shelf'])
+  await expect(page.locator('.panel-list-row')).toHaveCount(6)
+  await expect(page.locator('.panel-list-name')).toHaveText(['Left side', 'Right side', 'Top shelf', 'Middle shelf', 'Left upper side', 'Right upper side'])
   await expect(page.getByLabel('Panel name', { exact: true })).toHaveValue('Left side')
   for (const [index, axis] of ['X', 'Y', 'Z'].entries()) {
     await expect(page.getByLabel(`Position ${axis}`, { exact: true })).toHaveValue(String(Math.round(leftSide.position[index] * 10) / 10))
   }
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
-  await expect(page.locator('.panel-list-row')).toHaveCount(5)
+  await expect(page.locator('.panel-list-row')).toHaveCount(7)
   await expect(page.locator('.attached-to')).toHaveText('Attached to Bottom shelf')
 })
 
@@ -196,12 +196,12 @@ test('compact and touch layouts keep row actions available and support touch sor
       await input.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: startY + (endY - startY) * step / 12 }] })
     }
     await input.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-    await expect(touchPage.locator('.panel-list-name')).toHaveText(['Middle shelf', 'Bottom shelf', 'Left side', 'Right side', 'Top shelf'])
+    await expect(touchPage.locator('.panel-list-name')).toHaveText(['Middle shelf', 'Bottom shelf', 'Left side', 'Right side', 'Top shelf', 'Left upper side', 'Right upper side'])
     expect(await touchPage.locator('.panel-list-row').evaluateAll(rows => rows.every(row => row.getBoundingClientRect().height === 55))).toBe(true)
     expect(await touchPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBe(true)
     await touchPage.screenshot({ path: 'test-results/panel-list-touch.png' })
     await touchPage.getByRole('button', { name: 'Remove Middle shelf', exact: true }).tap()
-    await expect(touchPage.locator('.panel-list-row')).toHaveCount(4)
+    await expect(touchPage.locator('.panel-list-row')).toHaveCount(6)
     await touchPage.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).tap()
     await expect(touchPage.locator('.panel-list-name').first()).toHaveText('Middle shelf')
     expect(errors).toEqual([])

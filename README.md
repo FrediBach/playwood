@@ -22,7 +22,8 @@ Open the local URL printed by Vite. No accounts, API keys, backend, or external 
 - Shift-click, Ctrl/⌘-click, or use the panel checkboxes to select multiple panels. Shared parameters stay editable and apply to the entire selection; differing values show **Mixed** and are disabled. Related edits preserve mixed finishes and perforation spacing. Select all with **⌘/Ctrl A**.
 - Choose **Attach** to connect a new or existing panel to any of six sides. Explore 90°, 105°, 150°, T, and cross joints, offsets, insets, flip direction, connector color, and quantity. Ghost previews update as settings change.
 - T and cross joints add the complete set of branches. Changes to a parent propagate to its connected descendants. Detaching preserves world positions.
-- Thickness and shared-edge errors block new attachments. Panel overlaps, inaccessible clamp positions, and supports that have moved out of alignment appear as review notes.
+- The Everyday shelf uses eight 90° connectors at its corners and four T connectors at the middle shelf. Each side has separate lower and upper panels with the 35 mm gap required by the T body. Recognized copies of the former five-panel template are repaired on load/import while preserving finishes, names, shelf positions, and overall dimensions; the load repair supports Undo.
+- Thickness, shared-edge, and embedded edge-joint errors block new attachments. Panel overlaps, inaccessible face clamp positions, and supports that have moved out of alignment appear as review notes. The inspector and parts list identify the actual connector types.
 - Orbit, pan, zoom, inspect orthographic views, show dimensions, and explore the exploded view. Export editable JSON or a CSV cutting/parts list.
 - Choose **Realistic preview** to see your assembled furniture at its actual scale in a modern room with daylight, oak flooring, and familiar furnishings. The 165 cm floor lamp provides a size reference; dimensions describe the visible assembly. Orbit and zoom to explore, press **F** to reset the room view, and return to **Studio** (or press **Escape**) to resume editing with your selection and view settings preserved. The room renders locally without external assets or API keys.
 
@@ -49,9 +50,9 @@ Manufacturer references:
 - [Official metric technical drawings](https://www.playwood.it/site/assets/files/18237/technical_information_playwood_connectors.pdf)
 - [Manuals and project inspiration](https://www.playwood.it/en/business-page-landing-post-login/manuals-catalogs/)
 
-Angled connectors accept 16–19 mm panels. T/cross use the current product page's 18–19 mm range; the older technical PDF lists 17–19 mm. The drawings specify 40 mm depth along the joint and 35 mm spans for the 90° profile. Displayed clamp jaws use these nominal dimensions.
+Angled connectors accept 16–19 mm panels. T/cross use the current product page's 18–19 mm range; the older technical PDF lists 17–19 mm. The supplied connector models have a 40 mm depth along the joint.
 
-Connector meshes are **schematic**, not manufacturer CAD. The common 8.5 mm clearance is a drawing-based approximation, particularly for non-90° joints. Molded profiles, screw seats, manufacturing tolerances, actual clamp reach, material strength, load capacity, and cut-through interference with connectors are not simulated. Front/back attachment previews may require an accessible edge. Starter assemblies are editable design studies, not certified construction plans. Check physical clearances against the official drawings before fabrication.
+Connector meshes use the supplied CAD export in `connectors-3d/Connettori sharing.obj`, including the distinct 90°, 105°, 150°, T, and cross profiles and their separate clamp parts. The original OBJ, 3DS, and STEP files are retained in `connectors-3d`; the OBJ is bundled locally, with no external model requests. The geometry is shared across connector instances and used in the studio, attachment previews, and room preview. Panel spacing follows the shoulders in each connector profile, including the continuation branches of T/cross joints. The supplied models depict nominal 18 mm slots and do not include separate screw geometry. Manufacturing tolerances, tightening, material strength, load capacity, and cut-through interference with connectors are not simulated. Front/back attachment previews may require an accessible edge. Starter assemblies are editable design studies, not certified construction plans. Check physical clearances against the official drawings before fabrication.
 
 The app stores panels in local XY coordinates, with thickness on local Z. Project values are millimeters and Euler radians; the renderer converts to meters. Connections form a directed attachment tree, with optional non-driving supports for additional hardware between already positioned panels.
 
@@ -59,7 +60,10 @@ The app stores panels in local XY coordinates, with thickness on local Z. Projec
 
 - `src/App.tsx`: workspace and editing flows.
 - `src/lib/model.ts`: attachment geometry, validation, templates, imports, and parts export.
-- `src/components/Scene.tsx`: cameras, materials, connectors, selection, and 3D rendering.
+- `src/lib/legacy-shelf.ts`: conservative repair of the original shelf's embedded middle connectors.
+- `src/components/Scene.tsx`: cameras, panel materials, selection, and 3D rendering.
+- `src/components/ConnectorMeshes.tsx`: placement and materials for the supplied connector models.
+- `src/components/connector-geometry.ts`: imported connector parts, source normalization, and shared mesh geometry.
 - `src/components/RoomEnvironment.tsx`: room architecture, furnishings, procedural materials, and lighting for realistic preview.
 - `src/components/scene-geometry.ts`: solid/perforated panel geometry.
 - `src/components/ui/`: editable shadcn-style Radix primitives; aliases in `components.json`.

@@ -4,7 +4,7 @@ import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera 
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraView, Connection, Panel, Vec3 } from '@/lib/types'
-import { getConnectionAnchors } from '@/lib/model'
+import { ConnectorMeshes } from './ConnectorMeshes'
 import { makePanelGeometry } from './scene-geometry'
 import { RoomEnvironment, getRoomLayout } from './RoomEnvironment'
 
@@ -115,53 +115,6 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, displ
       <lineBasicMaterial color={ACCENT} transparent opacity={ghost ? 0.7 : 0.95} depthTest={false} />
     </lineSegments>}
   </group>
-}
-
-// Schematic clamp geometry follows the official 40 mm depth and 35 mm arms.
-// It deliberately does not imply a production-ready manufacturer CAD model.
-function ClampJaw({ panel, anchor, seam, color, ghost }: { panel: Panel; anchor: THREE.Vector3; seam: THREE.Vector3; color: string; ghost?: boolean }) {
-  const normal = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(...panel.rotation))
-  const inward = vector(panel.position).sub(anchor).addScaledVector(seam, -vector(panel.position).sub(anchor).dot(seam))
-  inward.addScaledVector(normal, -inward.dot(normal))
-  if (inward.lengthSq() < 0.000001) inward.crossVectors(seam, normal)
-  inward.normalize()
-  const tangent = new THREE.Vector3().crossVectors(normal, inward).normalize()
-  const matrix = new THREE.Matrix4().makeBasis(inward, tangent, normal)
-  const quaternion = new THREE.Quaternion().setFromRotationMatrix(matrix)
-  const gap = panel.thickness * MM
-  return <group position={anchor} quaternion={quaternion}>
-    {[-1, 1].map(sign => <mesh key={sign} position={[0.0115, 0, sign * (gap / 2 + 0.0025)]} castShadow={!ghost} receiveShadow>
-      <boxGeometry args={[0.035, 0.04, 0.005]} />
-      <meshStandardMaterial color={color} roughness={0.52} transparent={ghost} opacity={ghost ? 0.42 : 1} />
-    </mesh>)}
-    <mesh position={[-0.006, 0, 0]} castShadow={!ghost}>
-      <boxGeometry args={[0.006, 0.04, gap + 0.01]} />
-      <meshStandardMaterial color={color} roughness={0.52} transparent={ghost} opacity={ghost ? 0.42 : 1} />
-    </mesh>
-    {!ghost && <mesh position={[0.013, 0, gap / 2 + 0.0053]} rotation={[Math.PI / 2, 0, 0]}>
-      <cylinderGeometry args={[0.0035, 0.0035, 0.0012, 6]} />
-      <meshStandardMaterial color="#554f49" roughness={0.4} metalness={0.5} />
-    </mesh>}
-  </group>
-}
-
-function ConnectorMeshes({ panels, connections, ghost }: { panels: Panel[]; connections: Connection[]; ghost?: boolean }) {
-  return <>{connections.map(connection => {
-    const parent = panels.find(panel => panel.id === connection.parentId)
-    const child = panels.find(panel => panel.id === connection.childId)
-    if (!parent?.visible || !child?.visible) return null
-    const jointId = connection.id.replace(/:\d+$/, '')
-    const primary = connections.find(c => c.id.replace(/:\d+$/, '') === jointId && c.count > 0)
-    const anchors = getConnectionAnchors(connection.count ? connection : { ...connection, count: primary?.count ?? 0 }, parent, child)
-    const axis = connection.side === 'left' || connection.side === 'right' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)
-    axis.applyEuler(new THREE.Euler(...parent.rotation))
-    return <group key={connection.id} name={`Connector ${connection.type}`}>
-      {anchors.map((point, index) => <group key={index}>
-        {connection.count > 0 && <ClampJaw panel={parent} anchor={vector(point)} seam={axis} color={connection.color} ghost={ghost} />}
-        <ClampJaw panel={child} anchor={vector(point)} seam={axis} color={connection.color} ghost={ghost} />
-      </group>)}
-    </group>
-  })}</>
 }
 
 function Measure({ from, to, label }: { from: Vec3; to: Vec3; label: string }) {

@@ -1,10 +1,8 @@
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import type { AttachmentOptions, Connection, Panel, Project, ValidationIssue, Vec3 } from './types'
+import { CONNECTOR_PROFILES } from './connector-profile'
 
-// The official 90° drawing shows 8.5 mm clearance with an 18 mm panel.
-// Other connector profiles use the same visual clearance until native CAD is supplied.
-export const CONNECTOR_CLEARANCE = 8.5
 const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', painted: '#e8e7df' }
 const uid = () => globalThis.crypto?.randomUUID?.() ?? `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 const vec = (v: Vec3) => new Vector3(...v)
@@ -45,20 +43,19 @@ function attachmentPose(parent: Panel, child: Panel, c: Connection): Pick<Panel,
   const seam = seamInfo(parent, c)
   const branch = branchIndex(c)
   const flatBranch = (c.type === 't' && branch === 1) || (c.type === 'cross' && branch === 2)
-  const angle = flatBranch ? 0 : c.type === '105' ? 75 : c.type === '150' ? 30 : 90
+  const profile = CONNECTOR_PROFILES[c.type]
+  const angle = flatBranch ? 0 : profile.bend
   let direction = (c.flip ? -1 : 1) * seam.front
   if (c.type === 'cross' && branch === 1) direction *= -1
-  const localRotation = new Quaternion().setFromAxisAngle(seam.tangent, seam.sign * direction * angle * Math.PI / 180)
+  const localRotation = new Quaternion().setFromAxisAngle(seam.tangent, seam.sign * direction * angle)
   const childRadial = seam.radial.clone().applyQuaternion(localRotation)
   const childLength = seam.horizontalSeam ? child.height : child.width
   const center = seam.edge.clone()
-  if (flatBranch) {
-    center.addScaledVector(seam.radial, CONNECTOR_CLEARANCE * 2 + childLength / 2)
-  } else {
-    center.addScaledVector(seam.radial, seam.face ? 0 : child.thickness / 2 + CONNECTOR_CLEARANCE)
-    center.addScaledVector(new Vector3(0, 0, 1), direction * (parent.thickness / 2 + CONNECTOR_CLEARANCE))
-    center.addScaledVector(childRadial, childLength / 2)
-  }
+  // Place each panel's leading edge at its CAD shoulder, measured along its
+  // own slot. Using a fixed orthogonal gap makes the 105°/150° panels miss
+  // their slots and puts the continuation of a T/cross inside the body.
+  center.addScaledVector(seam.radial, seam.face ? 0 : profile.seat)
+  center.addScaledVector(childRadial, profile.seat + childLength / 2)
   const parentRotation = quaternion(parent)
   return {
     position: tuple(center.applyQuaternion(parentRotation).add(vec(parent.position))),
@@ -106,11 +103,12 @@ export function detachPanel(project: Project, id: string): Project {
   const incoming = project.connections.find(c => c.childId === id && c.role !== 'support')
   const affectedJoint = incoming && jointId(incoming)
   const detachedChildren = new Set([id, ...project.connections.filter(c => affectedJoint && jointId(c) === affectedJoint).map(c => c.childId)])
+  const affectedSupports = new Set(project.connections.filter(c => c.role === 'support' && detachedChildren.has(c.childId)).map(jointId))
   return {
     ...project,
     panels: resolvePanels(project),
     connections: project.connections.filter(c =>
-      (!affectedJoint || jointId(c) !== affectedJoint) && !(c.role === 'support' && detachedChildren.has(c.childId))),
+      (!affectedJoint || jointId(c) !== affectedJoint) && !affectedSupports.has(jointId(c))),
   }
 }
 
@@ -141,9 +139,21 @@ export function getConnectionAnchors(connection: Connection, parent: Panel, chil
   return Array.from({ length: connection.count }, (_, i) => {
     const along = connection.count === 1 ? middle : middle - reach + (2 * reach * i) / (connection.count - 1)
     const point = seam.edge.clone().addScaledVector(seam.tangent, along - connection.offset)
-    if (!seam.face) point.addScaledVector(seam.radial, child.thickness / 2 + CONNECTOR_CLEARANCE)
+    if (!seam.face) point.addScaledVector(seam.radial, CONNECTOR_PROFILES[connection.type].seat)
     return tuple(point.applyQuaternion(rotation).add(vec(parent.position)))
   })
+}
+
+/** Rigid CAD instances, with positions in project millimeters. */
+export function getConnectorPlacements(connection: Connection, parent: Panel, child: Panel): Pick<Panel, 'position' | 'rotation'>[] {
+  const seam = seamInfo(parent, connection)
+  const direction = (connection.flip ? -1 : 1) * seam.front
+  const x = seam.radial.clone().negate()
+  const z = new Vector3(0, 0, direction)
+  const y = new Vector3().crossVectors(z, x)
+  const local = new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(x, y, z))
+  const rotation = rotationTuple(quaternion(parent).multiply(local))
+  return getConnectionAnchors(connection, parent, child).map(position => ({ position, rotation }))
 }
 
 export function removePanel(project: Project, id: string): Project {
@@ -151,9 +161,10 @@ export function removePanel(project: Project, id: string): Project {
   const worldPanels = resolvePanels(project)
   const affectedJointIds = new Set(project.connections.filter(c => c.parentId === id || c.childId === id).map(jointId))
   const detachedChildren = new Set(project.connections.filter(c => affectedJointIds.has(jointId(c))).map(c => c.childId))
+  const affectedSupports = new Set(project.connections.filter(c => c.role === 'support' && detachedChildren.has(c.childId)).map(jointId))
   return { ...project,
     panels: worldPanels.filter(p => p.id !== id),
-    connections: project.connections.filter(c => !affectedJointIds.has(jointId(c)) && !(c.role === 'support' && detachedChildren.has(c.childId))),
+    connections: project.connections.filter(c => !affectedJointIds.has(jointId(c)) && !affectedSupports.has(jointId(c))),
   }
 }
 
@@ -204,6 +215,7 @@ export function validateProject(project: Project): ValidationIssue[] {
   const issues: ValidationIssue[] = jointStructureIssues(project.connections)
   const panels = resolvePanels(project)
   const byId = new Map(panels.map(p => [p.id, p]))
+  const jointQuantities = new Map(project.connections.filter(c => c.count > 0).map(c => [jointId(c), c.count]))
   for (const p of panels) {
     if (p.pattern !== 'solid' && (p.holeSpacing < Math.max(15, p.holeSize + 5) || Math.floor(p.width / p.holeSpacing) * Math.floor(p.height / p.holeSpacing) > 5000)) {
       issues.push({ id: `${p.id}-pattern`, severity: 'error', message: `${p.name}: increase hole spacing. Leave 5 mm between holes and use at most 5,000 holes per panel.`, panelIds: [p.id] })
@@ -223,9 +235,11 @@ export function validateProject(project: Project): ValidationIssue[] {
     const insetMin = seam.face ? -parent.height / 2 : 0
     const insetMax = seam.face ? parent.height / 2 : parentRadialLength
     if ((c.inset < insetMin || c.inset > insetMax) && c.count > 0) issues.push({ id: `${c.id}-inset`, severity: 'error', message: `The attachment is outside ${parent.name}. Keep inset between ${insetMin} and ${insetMax} mm.`, panelIds: [parent.id, child.id] })
+    if (!seam.face && c.inset > 0 && c.inset < parentRadialLength && c.count > 0) issues.push({ id: `${c.id}-edge-access`, severity: 'error', message: `${parent.name} needs an exposed edge for this connector. Use a T joint with separate panels instead of an interior inset.`, panelIds: [parent.id, child.id] })
     const childLength = seam.horizontalSeam ? child.width : child.height
     const overlap = Math.min(seam.seamLength / 2, c.offset + childLength / 2) - Math.max(-seam.seamLength / 2, c.offset - childLength / 2)
-    if (overlap < Math.max(40, c.count * 40)) issues.push({ id: `${c.id}-overlap`, severity: 'error', message: `Not enough shared edge for ${c.count || 1} connector${c.count > 1 ? 's' : ''}. Reduce the offset.`, panelIds: [parent.id, child.id] })
+    const quantity = jointQuantities.get(jointId(c)) ?? 1
+    if (overlap < quantity * 40) issues.push({ id: `${c.id}-overlap`, severity: 'error', message: `Not enough shared edge for ${quantity} connector${quantity > 1 ? 's' : ''}. Reduce the offset.`, panelIds: [parent.id, child.id] })
     if (seam.face && c.count > 0) issues.push({ id: `${c.id}-face`, severity: 'warning', message: 'This face attachment needs an accessible panel edge. Check clamp access before making.', panelIds: [parent.id, child.id] })
     if (c.role === 'support') {
       const expected = attachmentPose(parent, child, c)
@@ -248,7 +262,7 @@ export function createStarterProject(template: 'shelf' | 'desk' | 'display' | 'b
     position: [0, template === 'desk' ? 740 : 28, 0], rotation: [-Math.PI / 2, 0, 0] })
   let result: Project = { ...project, panels: [base] }
   const opts: AttachmentOptions = { side: 'left', type: '90', offset: 0, inset: 0, flip: template === 'desk', color: '#e75a35', count: 2 }
-  const sideWidth = template === 'desk' ? 700 : template === 'display' ? 950 : 780
+  const sideWidth = template === 'desk' ? 700 : template === 'display' ? 950 : 390
   const left = createPanel({ name: 'Left side', width: sideWidth, height: base.height })
   result = attachPanel(result, base.id, left, opts)
   if (template === 'display') {
@@ -260,12 +274,23 @@ export function createStarterProject(template: 'shelf' | 'desk' | 'display' | 'b
   if (template === 'shelf') {
     const top = createPanel({ name: 'Top shelf', width: 1100, height: 360 })
     const middle = createPanel({ name: 'Middle shelf', width: 1100, height: 360 })
-    result = attachPanel(result, left.id, top, { ...opts, side: 'left' })
-    result = attachPanel(result, left.id, middle, { ...opts, side: 'left', inset: 390 })
+    result = attachPanel(result, left.id, middle, { ...opts, type: 't', side: 'left' })
+    const upperLeftId = result.connections.at(-1)!.childId
+    // The T connects three separate edges. Its 35 mm inline gap replaces the
+    // middle section of each former 780 mm side without moving the shelves.
+    result = { ...result, panels: result.panels.map(panel => panel.id === upperLeftId ? { ...panel, name: 'Left upper side', width: 355 } : panel) }
+    result = attachPanel(result, upperLeftId, top, { ...opts, side: 'left' })
+    const upperRight = createPanel({ name: 'Right upper side', width: 355, height: 360 })
+    // The top panel's local X points left, so its left edge is the right end
+    // of the furniture. Driving this side from the top keeps a simple tree.
+    result = attachPanel(result, top.id, upperRight, { ...opts, side: 'left' })
+    const rightJoint = uid()
     result = { ...result, connections: [...result.connections,
-      { ...opts, id: `${uid()}:0`, parentId: right.id, childId: top.id, side: 'right', role: 'support' },
-      { ...opts, id: `${uid()}:0`, parentId: right.id, childId: middle.id, side: 'right', inset: 390, role: 'support' },
+      { ...opts, id: `${rightJoint}:0`, parentId: right.id, childId: middle.id, type: 't', side: 'right', role: 'support' },
+      { ...opts, id: `${rightJoint}:1`, parentId: right.id, childId: upperRight.id, type: 't', side: 'right', count: 0, role: 'support' },
     ] }
+    const order = [base.id, left.id, right.id, top.id, middle.id, upperLeftId, upperRight.id]
+    result.panels = order.map(id => result.panels.find(panel => panel.id === id)!)
   }
   return result
 }
