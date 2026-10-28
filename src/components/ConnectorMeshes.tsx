@@ -25,7 +25,7 @@ function ConnectorJoint({ connection, parent, child, ghost }: {
   return <group name={`Connector ${connection.type}`}>
     {placements.map((placement, index) => <group key={index}
       name={`Playwood ${connection.type}`} userData={{ connectorType: connection.type, source }}
-      position={new THREE.Vector3(...placement.position).multiplyScalar(0.001)} rotation={placement.rotation}>
+      position={[placement.position[0] * 0.001, placement.position[1] * 0.001, placement.position[2] * 0.001]} rotation={placement.rotation}>
       {parts.map(part => <mesh key={part.name} name={part.name} geometry={part.geometry} material={material}
         castShadow={!ghost} receiveShadow={!ghost} dispose={null} />)}
     </group>)}

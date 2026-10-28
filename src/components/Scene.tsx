@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Component, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
@@ -10,6 +10,8 @@ import { RoomEnvironment, getRoomLayout } from './RoomEnvironment'
 
 const MM = 0.001
 const ACCENT = '#e75a35'
+const EMPTY_PANELS: Panel[] = []
+const EMPTY_CONNECTIONS: Connection[] = []
 
 export interface SceneProps {
   panels: Panel[]
@@ -70,8 +72,8 @@ function woodTexture(material: Panel['material']) {
 }
 
 
-function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, displacement }: {
-  panel: Panel; selected: boolean; ghost?: boolean; interactive?: boolean; onSelect: SceneProps['onSelect']; displacement: THREE.Vector3
+function PanelMesh({ panel, selected, ghost, interactive = true, onSelect }: {
+  panel: Panel; selected: boolean; ghost?: boolean; interactive?: boolean; onSelect: SceneProps['onSelect']
 }) {
   const geometry = useMemo(() => makePanelGeometry(panel), [panel.width, panel.height, panel.thickness, panel.pattern, panel.holeSize, panel.holeSpacing])
   const texture = useMemo(() => panel.material !== 'painted' ? woodTexture(panel.material) : null, [panel.material])
@@ -104,7 +106,7 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, displ
   useEffect(() => () => { face.dispose(); edge.dispose() }, [face, edge])
   useEffect(() => () => { outline.dispose() }, [outline])
   useEffect(() => () => { document.body.style.cursor = '' }, [])
-  const position = vector(panel.position).add(displacement)
+  const position = panel.position.map(value => value * MM) as Vec3
   return <group position={position} rotation={panel.rotation}>
     <mesh name={panel.name} geometry={geometry} material={[face, edge]} castShadow={!ghost} receiveShadow={!ghost}
       onClick={ghost || !interactive ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey) }}
@@ -144,7 +146,7 @@ function CameraController({ bounds, view, fitSignal, zoomSignal, realisticPrevie
   const { camera, size, invalidate } = useThree()
   const boundsRef = useRef(bounds)
   const lastZoomKey = useRef(0)
-  boundsRef.current = bounds
+  useLayoutEffect(() => { boundsRef.current = bounds }, [bounds])
   useEffect(() => {
     const cameraBounds = boundsRef.current.clone().expandByScalar(0.08)
     if (realisticPreview) {
@@ -214,7 +216,7 @@ function CameraController({ bounds, view, fitSignal, zoomSignal, realisticPrevie
 }
 
 function World(props: SceneProps) {
-  const { panels, connections, selectedIds, onSelect, previewPanels = [], previewConnections = [], showGrid, showDimensions, exploded, realisticPreview } = props
+  const { panels, connections, selectedIds, onSelect, previewPanels = EMPTY_PANELS, previewConnections = EMPTY_CONNECTIONS, showGrid, showDimensions, exploded, realisticPreview } = props
   const displayPanels = useMemo(() => {
     if (!exploded) return panels
     const center = boundsOf(panels).getCenter(new THREE.Vector3())
@@ -222,10 +224,11 @@ function World(props: SceneProps) {
   }, [panels, exploded])
   const bounds = useMemo(() => boundsOf(displayPanels), [displayPanels])
   const cameraBounds = useMemo(() => boundsOf([...displayPanels, ...previewPanels]), [displayPanels, previewPanels])
-  const center = bounds.getCenter(new THREE.Vector3())
+  const center = useMemo(() => bounds.getCenter(new THREE.Vector3()), [bounds])
   const shownPanels = displayPanels.filter(panel => panel.visible)
   const floorY = bounds.min.y - 0.012
-  const extent = Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5)
+  const extent = useMemo(() => Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5), [bounds])
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
   return <>
     {props.view === 'perspective'
       ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
@@ -243,9 +246,9 @@ function World(props: SceneProps) {
     {showGrid && <Grid position={[0, floorY, 0]} args={[extent, extent]} cellSize={0.1} sectionSize={0.5} cellThickness={0.5} sectionThickness={0.7}
       cellColor="#cccfc5" sectionColor="#b9bdb2" fadeDistance={extent * 0.65} fadeStrength={2} fadeFrom={0} infiniteGrid />}
     </>}
-    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIds.includes(panel.id)} interactive={!realisticPreview} onSelect={onSelect} displacement={new THREE.Vector3()} />)}
+    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} interactive={!realisticPreview} onSelect={onSelect} />)}
     {!exploded && <ConnectorMeshes panels={panels} connections={connections} />}
-    {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} displacement={new THREE.Vector3()} />)}
+    {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     <CameraController bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />

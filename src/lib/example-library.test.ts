@@ -1,13 +1,14 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { Euler, Vector3 } from 'three'
 import { createExampleProject, EXAMPLE_LIBRARY } from './example-library'
 import { getProjectBounds, parseProject, projectToCsv, resolvePanels, validateProject } from './model'
 
 describe('resource example library', () => {
   it('offers each distinct connector build once, alongside the original starters', () => {
-    expect(EXAMPLE_LIBRARY).toHaveLength(25)
-    expect(new Set(EXAMPLE_LIBRARY.map(example => example.id)).size).toBe(25)
+    expect(EXAMPLE_LIBRARY).toHaveLength(26)
+    expect(new Set(EXAMPLE_LIBRARY.map(example => example.id)).size).toBe(26)
     expect(EXAMPLE_LIBRARY.filter(example => example.source)).toHaveLength(22)
     expect(EXAMPLE_LIBRARY.some(example => /bizu|lean table|nordic|beechwood chair/i.test(example.name))).toBe(false)
     for (const example of EXAMPLE_LIBRARY) if (example.source) {
@@ -35,6 +36,7 @@ describe('resource example library', () => {
   })
 
   it.each([
+    ['diamond-shelf', 16, 16, 0, 8],
     ['totem', 18, 16, 8, 6],
     ['corner-booth', 3, 5, 0, 0],
     ['counter-with-doors', 10, 8, 8, 0],
@@ -85,5 +87,24 @@ describe('resource example library', () => {
   it('keeps blank projects available and rejects unknown example IDs', () => {
     expect(createExampleProject('blank')).toMatchObject({ panels: [], connections: [] })
     expect(() => createExampleProject('missing')).toThrow('Unknown library example')
+  })
+
+  it('opens the photo-inspired diamond shelf already tilted, with white panels and black connectors', () => {
+    const project = createExampleProject('diamond-shelf')
+    const panels = resolvePanels(project)
+    for (const panel of panels) {
+      expect([panel.width, panel.height, panel.thickness]).toEqual([350, 350, 18])
+      expect(panel.material).toBe('painted')
+      expect(panel.color).toBe('#eeede7')
+      const normal = new Vector3(0, 0, 1).applyEuler(new Euler(...panel.rotation))
+      expect(Math.abs(normal.x)).toBeCloseTo(Math.SQRT1_2, 6)
+      expect(Math.abs(normal.y)).toBeCloseTo(Math.SQRT1_2, 6)
+      expect(normal.z).toBeCloseTo(0, 6)
+    }
+    expect(project.connections.every(connection => connection.color === '#292b27')).toBe(true)
+    const bounds = getProjectBounds(panels)
+    expect(bounds.min[1]).toBeCloseTo(0, 3)
+    expect(bounds.width).toBeCloseTo(bounds.height, 3)
+    expect(bounds.depth).toBeCloseTo(350, 3)
   })
 })

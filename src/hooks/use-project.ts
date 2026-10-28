@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createStarterProject, parseProject } from '@/lib/model'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
@@ -22,7 +22,7 @@ export function useProject() {
   })
   const [saveStatus, setSaveStatus] = useState('Saved on this device')
   const latest = useRef(history.present)
-  latest.current = history.present
+  useLayoutEffect(() => { latest.current = history.present }, [history.present])
   const commit = useCallback((next:Project|((current:Project)=>Project)) => {
     setHistory(h=>{ const present = typeof next === 'function' ? next(h.present) : next; if (JSON.stringify(present) === JSON.stringify(h.present)) return h; return {...h,past:[...h.past.slice(-59),h.present],present,future:[]} })
   },[])

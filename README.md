@@ -24,6 +24,7 @@ Open the local URL printed by Vite. No accounts, API keys, backend, or external 
 - T and cross joints add the complete set of branches. Changes to a parent propagate to its connected descendants. Detaching preserves world positions.
 - The Everyday shelf uses eight 90° connectors at its corners and four T connectors at the middle shelf. Each side has separate lower and upper panels with the 35 mm gap required by the T body. Recognized copies of the former five-panel template are repaired on load/import while preserving finishes, names, shelf positions, and overall dimensions; the load repair supports Undo.
 - Thickness, shared-edge, and embedded edge-joint errors block new attachments. Panel overlaps, inaccessible face clamp positions, and supports that have moved out of alignment appear as review notes. The inspector and parts list identify the actual connector types.
+- Use **Rotate creation** above the canvas to rotate the whole assembly by ±90° or ±45°. Choose Z to tilt sideways into a diagonal layout, X to tip forward/backward, or Y to turn left/right. Every panel (including hidden panels and separate pieces) and connector moves together around the assembly center; its lowest panel height stays unchanged. Rotation autosaves, supports undo/redo, and is preserved in exported projects and the room preview.
 - Orbit, pan, zoom, inspect orthographic views, show dimensions, and explore the exploded view. Export editable JSON or a CSV cutting/parts list.
 - Choose **Realistic preview** to see your assembled furniture at its actual scale in a modern room with daylight, oak flooring, and familiar furnishings. The 165 cm floor lamp provides a size reference; dimensions describe the visible assembly. Orbit and zoom to explore, press **F** to reset the room view, and return to **Studio** (or press **Escape**) to resume editing with your selection and view settings preserved. The room renders locally without external assets or API keys.
 
@@ -33,7 +34,9 @@ In the panel list, **F2** edits a focused name. Focus a thumbnail and press **Sp
 
 ## Resource examples
 
-The Library and Templates chooser include 22 resource examples alongside the three original starters. Search or filter by category to find editable assemblies from `resources/library-3d`. Numbered CAD resources supply the totem, corner, shelf with doors, H-table 180, and promotional desk. The collection PDFs add shelves, tables, counters, a bench, a trade fair display, an island display, and individual exhibition plinths. Each thumbnail is generated from the assembly it opens; switching examples supports Undo.
+The Library and Templates chooser include 22 resource examples alongside the three original starters and a photo-inspired Diamond shelf. Search or filter by category to find editable assemblies from `resources/library-3d`. Numbered CAD resources supply the totem, corner, shelf with doors, H-table 180, and promotional desk. The collection PDFs add shelves, tables, counters, a bench, a trade fair display, an island display, and individual exhibition plinths. Each thumbnail is generated from the assembly it opens; switching examples supports Undo.
+
+The **Diamond shelf** recreates the reference photo’s five compartments with white panels and black connectors. Its five-cell cross is rotated 45° around Z using the same `rotateProject` operation as the editor. It uses sixteen 350 × 350 × 18 mm panels, sixteen 90° connectors, and eight cross connectors. These dimensions are an editable approximation from the photo, not measured source dimensions. The library thumbnail shows the actual rotated build.
 
 Repeated plans across room collections appear once. The workshop-table PDF's H-table and cube are separate examples, as are the three closed plinths and the open tall and wide plinths. The open cube uses the same example as the standalone cube. The workshop table with shelves and Organizer Workstation 08 are the same build. The shelf with six doors and reception counter with four doors remain separate variants.
 
@@ -59,11 +62,14 @@ Asset generation is a development step; Vercel serves the committed files withou
 ## Verification
 
 ```sh
+npm run doctor
 npm test
 npm run build
 npx playwright install chromium
 npm run test:e2e
 ```
+
+React Doctor is installed as a development dependency. Run `npm run doctor -- --verbose` for all findings or `npm run doctor -- --scope changed` to check changes against the detected base branch. The scan skips the remote score and crash reporting. See the [CLI reference](https://www.react.doctor/docs/reference/cli-reference).
 
 The browser suite starts/reuses port 5174. An existing Chromium binary can be selected through `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Tests cover attachment transforms, all six sides, offsets and angles, shared joints, existing-panel reattachment, import validation, actual hole/slot geometry, browser persistence, exports, undo/redo, and fixed-viewport layouts.
 

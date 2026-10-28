@@ -1,6 +1,6 @@
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
-import type { AttachmentOptions, Connection, Panel, Project, ValidationIssue, Vec3 } from './types'
+import type { AttachmentOptions, Connection, Panel, Project, RotationAxis, ValidationIssue, Vec3 } from './types'
 import { CONNECTOR_PROFILES } from './connector-profile'
 
 const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', painted: '#e8e7df' }
@@ -187,6 +187,29 @@ export function getProjectBounds(panels: Panel[]) {
   }
   if (!panels.length) { min.set(0, 0, 0); max.set(0, 0, 0) }
   return { width: max.x - min.x, height: max.y - min.y, depth: max.z - min.z, min: tuple(min), max: tuple(max) }
+}
+
+/** Rotate the entire resolved assembly in world space, retaining its lowest panel height. */
+export function rotateProject(project: Project, axis: RotationAxis, degrees: number): Project {
+  if (!Number.isFinite(degrees)) throw new Error('Rotation must be a finite angle.')
+  if (!project.panels.length || degrees % 360 === 0) return project
+  const panels = resolvePanels(project)
+  const bounds = getProjectBounds(panels)
+  const center = vec(bounds.min).add(vec(bounds.max)).multiplyScalar(0.5)
+  const direction = new Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0)
+  const turn = new Quaternion().setFromAxisAngle(direction, (degrees % 360) * Math.PI / 180)
+  const rotated = panels.map(panel => ({
+    ...panel,
+    position: tuple(vec(panel.position).sub(center).applyQuaternion(turn).add(center)),
+    rotation: rotationTuple(turn.clone().multiply(quaternion(panel))),
+  }))
+  const lift = bounds.min[1] - getProjectBounds(rotated).min[1]
+  const next = { ...project, panels: rotated.map(panel => ({
+    ...panel, position: [panel.position[0], panel.position[1] + lift, panel.position[2]] as Vec3,
+  })) }
+  // Connections remain in panel-local coordinates. Resolve once more so stored
+  // child poses agree with the roots, including multi-branch and support joints.
+  return { ...next, panels: resolvePanels(next) }
 }
 
 function panelObb(p: Panel) {

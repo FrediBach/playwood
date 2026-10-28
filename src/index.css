@@ -68,3 +68,4 @@
 @media(max-width:600px){.status-bar .status-help{display:none}}
 
 .workspace-top{flex-wrap:wrap;align-items:center;gap:12px}.workspace-options{margin-left:auto}
+.rotation-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.rotation-actions .button-ghost{grid-column:1/-1;grid-row:2}

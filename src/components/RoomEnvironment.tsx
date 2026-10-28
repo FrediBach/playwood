@@ -195,7 +195,8 @@ export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
   useEffect(() => () => { oak.dispose(); linen.dispose(); art.dispose() }, [oak, linen, art])
   useEffect(() => { oak.repeat.set(width / 2.4, depth / 2.4) }, [oak, width, depth])
   const lightTarget = useMemo(() => new THREE.Object3D(), [])
-  lightTarget.position.set(layout.centerX, floorY + 0.55, bounds.getCenter(new THREE.Vector3()).z)
+  const furnitureCenterZ = (bounds.min.z + bounds.max.z) / 2
+  useEffect(() => { lightTarget.position.set(layout.centerX, floorY + 0.55, furnitureCenterZ) }, [lightTarget, layout.centerX, floorY, furnitureCenterZ])
   const windowZ = backZ + 2.1
   const windowWidth = 2.4
   const windowHeight = 2.25
@@ -239,7 +240,7 @@ export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
     <Curtain position={[leftX + 0.14, floorY + 1.41, windowZ - windowWidth / 2 - 0.12]} height={2.72} />
     <Curtain position={[leftX + 0.14, floorY + 1.41, windowZ + windowWidth / 2 + 0.12]} height={2.72} />
 
-    <mesh position={[layout.centerX + 0.12, floorY + 0.004, bounds.getCenter(new THREE.Vector3()).z + 0.16]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+    <mesh position={[layout.centerX + 0.12, floorY + 0.004, furnitureCenterZ + 0.16]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[rugWidth, rugDepth]} /><meshStandardMaterial map={linen} roughness={1} bumpMap={linen} bumpScale={0.004} color="#ded5c2" />
     </mesh>
     <Box position={[layout.centerX - 0.05, floorY + artY, backZ + 0.035]} size={[0.85, 1.05, 0.045]} color="#66543f" />
