@@ -1,3 +1,4 @@
+import { ASSEMBLY_LIBRARY } from './assembly-library'
 import { createStarterProject } from './model'
 import { CAD_EXAMPLES } from './cad-examples'
 import { PDF_EXAMPLES } from './pdf-examples'
@@ -26,7 +27,7 @@ export const EXAMPLE_LIBRARY: readonly ExampleDefinition[] = [
 
 export function createExampleProject(id: string): Project {
   if (id === 'blank') return createStarterProject('blank')
-  const example = EXAMPLE_LIBRARY.find(item => item.id === id)
+  const example = [...EXAMPLE_LIBRARY, ...ASSEMBLY_LIBRARY].find(item => item.id === id)
   if (!example) throw new Error(`Unknown library example: ${id}`)
   return example.create()
 }

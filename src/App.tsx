@@ -14,6 +14,7 @@ import { CONNECTORS } from '@/lib/connector-options'
 import { MultiPanelInspector } from '@/components/MultiPanelInspector'
 import { ProjectStatus } from '@/components/ProjectStatus'
 import { ProjectSidebar } from '@/components/ProjectSidebar'
+import { insertLibraryAssembly } from '@/lib/assembly-library'
 import { createExampleProject } from '@/lib/example-library'
 import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
 import { autoConnect } from '@/lib/auto-connect'
@@ -206,6 +207,15 @@ export default function App() {
   const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setExploded(false);setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87'}));setInspectorTab('attach');setRightOpen(true)}
   const applyAttachment=()=>{if(!previewProject||attachmentErrors.length)return;commit(previewProject);setSelectedId(attachTarget==='new'?draft.id:attachTarget);setInspectorTab('panel');setDraft(createPanel());notify(`${previewPanels.length===1?'Panel':`${previewPanels.length} panels`} attached`)}
   const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return;const group=connection.id.replace(/:\d+$/,'');commit(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
+  const insertModule = (id: string) => {
+    try {
+      const next = insertLibraryAssembly(project, id)
+      commit(next); assembly.close()
+      setSelectedIds(Object.values(next.assemblies!.instances.at(-1)!.panelIds))
+      setInspectorTab('panel'); setExploded(false); setFitSignal(v => v + 1)
+      notify('Assembly inserted. Duplicate it or attach it to your build.')
+    } catch (error) { notify(error instanceof Error ? error.message : 'Could not insert assembly.') }
+  }
   const loadTemplate=(template:string)=>{const next=createExampleProject(template);commit(next);assembly.close();const instance=next.assemblies?.instances[0];setSelectedIds(instance?Object.values(instance.panelIds):next.panels.slice(0,1).map(p=>p.id));setInspectorTab('panel');setDialog(null);setExploded(false);setFitSignal(v=>v+1);notify(template==='blank'?'A fresh start. Add your first panel.':'Template loaded. Make it your own.')}
   const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
@@ -231,7 +241,7 @@ export default function App() {
       onToggleVisibility: id=>commit(p=>({...p,panels:p.panels.map(panel=>panel.id===id?{...panel,visible:!panel.visible}:panel)})),
       onReorder: (id,beforeId)=>commit(p=>{const panel=p.panels.find(panel=>panel.id===id);if(!panel)return p;const remaining=p.panels.filter(panel=>panel.id!==id);const index=beforeId===null?remaining.length:remaining.findIndex(panel=>panel.id===beforeId);if(index<0)return p;remaining.splice(index,0,panel);return {...p,panels:remaining}})}} selectedCount={selectedPanels.length} connectorCount={connectorCount} connectorSummary={connectorSummary}
       onSelectAll={()=>{if(selectedPanels.length===panels.length&&!assembly.editingInstance)setSelectedIds([]);else selectAll()}}
-      onCollapse={()=>setLeftOpen(false)} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')} addPanel={addPanel} loadTemplate={loadTemplate}
+      onCollapse={()=>setLeftOpen(false)} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')} addPanel={addPanel} loadTemplate={loadTemplate} onInsertLibraryAssembly={insertModule}
       assemblies={assembly.sidebarAssemblies} selectedAssemblyId={instance?.id} onSelectAssembly={id=>{clipboard.cancel();assembly.select(id)}}
       onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={assembly.insert}/>
 

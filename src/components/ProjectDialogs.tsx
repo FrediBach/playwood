@@ -59,7 +59,7 @@ function AddDialog({draft,setDraft,onClose,onAdd}: Pick<Props, 'draft' | 'setDra
 }
 
 function TemplatesDialog({loadTemplate}: Pick<Props, 'loadTemplate'>) {
-  return <><span className="dialog-eyebrow">A FEW GOOD STARTING POINTS</span><DialogTitle>Simple parts. Endless possibilities.</DialogTitle><DialogDescription>Choose an assembly and make it your own. You can undo switching templates.</DialogDescription><ExampleBrowser onSelect={loadTemplate}/></>
+  return <><span className="dialog-eyebrow">A FEW GOOD STARTING POINTS</span><DialogTitle>Simple parts. Endless possibilities.</DialogTitle><DialogDescription>Choose a full build or reusable assembly and make it your own. You can undo switching templates.</DialogDescription><ExampleBrowser onSelect={loadTemplate}/></>
 }
 
 function ExportDialog({exportProject,onExportParts,onImport,importError}: Pick<Props, 'exportProject' | 'onExportParts' | 'onImport' | 'importError'>) {

@@ -23,3 +23,7 @@
 .example-empty{padding:23px 10px;text-align:center;background:#f1f2e9;border-radius:6px;color:#6a755d;font-size:12px;line-height:1.6}
 .example-empty button{padding:8px 2px 0;background:none;color:#9b4c2e;text-decoration:underline;text-underline-offset:3px}
 @media(max-width:680px){.example-filters{flex-direction:column;align-items:stretch}.example-search{flex:none}.example-category select{width:100%}}
+.example-collection{display:flex;gap:4px;padding:4px;margin-bottom:16px;border:1px solid #d7dccd;border-radius:7px;background:#eef0e6}
+.example-collection button{flex:1;padding:9px 10px;border-radius:4px;background:transparent;color:#68745b;font-size:12px;font-weight:600;cursor:pointer}
+.example-collection button[aria-pressed=true]{background:#fffef8;color:#3e4a32;box-shadow:0 1px 3px #38472b20}
+.example-collection button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}

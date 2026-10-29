@@ -1,6 +1,7 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useMemo, useState, type ReactNode } from 'react'
 import { ArrowRight, Plus, Search } from 'lucide-react'
 import { Color, Euler, Vector3 } from 'three'
+import { ASSEMBLY_LIBRARY } from '@/lib/assembly-library'
 import { EXAMPLE_LIBRARY } from '@/lib/example-library'
 import { getConnectionAnchors, resolvePanels } from '@/lib/model'
 import type { Project } from '@/lib/types'
@@ -73,15 +74,21 @@ const ExampleArt = memo(function ExampleArt({ example }: { example: Example }) {
   </svg></div>
 })
 
-export function ExampleBrowser({ compact = false, onSelect }: { compact?: boolean; onSelect: (id: string) => void }) {
+export function ExampleBrowser({ compact = false, onSelect, onInsertAssembly, myAssemblies }: { compact?: boolean; onSelect: (id: string) => void; onInsertAssembly?: (id: string) => void; myAssemblies?: ReactNode }) {
+  const [collection, setCollection] = useState<'builds' | 'assemblies'>('builds')
+  const library = collection === 'builds' ? EXAMPLE_LIBRARY : ASSEMBLY_LIBRARY
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('all')
-  const categories = useMemo(() => [...new Set(EXAMPLE_LIBRARY.map(example => example.category))], [])
+  const categories = useMemo(() => [...new Set(library.map(example => example.category))], [library])
   const search = query.trim().toLocaleLowerCase()
-  const matches = EXAMPLE_LIBRARY.filter(example => (category === 'all' || example.category === category)
+  const matches = library.filter(example => (category === 'all' || example.category === category)
     && `${example.name} ${example.description} ${example.category}`.toLocaleLowerCase().includes(search))
-  const showBlank = category === 'all' && (!search || 'a blank canvas start with a single panel'.includes(search))
+  const showBlank = collection === 'builds' && category === 'all' && (!search || 'a blank canvas start with a single panel'.includes(search))
   return <div className={`example-browser${compact ? ' example-browser-compact' : ''}`}>
+    <div className="example-collection" role="group" aria-label="Library collection">
+      {(['builds', 'assemblies'] as const).map(value => <button key={value} aria-pressed={collection === value} onClick={() => { setCollection(value); setCategory('all'); setQuery('') }}>{value === 'builds' ? 'Full builds' : 'Assemblies'}</button>)}
+    </div>
+    {collection === 'assemblies' && <>{myAssemblies}<p className="example-count">{onInsertAssembly ? 'Insert a reusable module into your build, then duplicate or connect it.' : 'Start with a reusable module, then duplicate or connect it.'}</p></>}
     <div className="example-filters">
       <label className="example-search"><Search size={15} aria-hidden="true"/><span className="visually-hidden">Search examples</span>
         <input type="search" placeholder="Search examples" value={query} onChange={event => setQuery(event.target.value)} />
@@ -93,7 +100,7 @@ export function ExampleBrowser({ compact = false, onSelect }: { compact?: boolea
     <p className="example-count" aria-live="polite">{matches.length} {matches.length === 1 ? 'example' : 'examples'}{search || category !== 'all' ? ' found' : ' to make your own'}</p>
     <div className={compact ? 'example-list' : 'template-grid'}>
       {matches.map(example => <button key={example.id} className={compact ? 'library-template' : 'template-card'} data-example-id={example.id}
-        aria-label={compact ? example.name : undefined} onClick={() => onSelect(example.id)}>
+        aria-label={compact ? example.name : undefined} onClick={() => (collection === 'assemblies' && onInsertAssembly ? onInsertAssembly : onSelect)(example.id)}>
         <ExampleArt example={example}/>
         {compact ? <span className="example-compact-caption"><span>{example.name}<small>{example.category}</small></span><ArrowRight size={16}/></span>
           : <><strong>{example.name}</strong><span className="example-description">{example.description}<ArrowRight size={16}/></span><small className="example-card-category">{example.category}</small></>}

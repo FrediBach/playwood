@@ -308,6 +308,7 @@ test('disassembling a free copy preserves its finish and hardware as independent
   expect(validateProject(disassembled).filter(issue => issue.severity === 'error' || issue.id.endsWith('-alignment'))).toEqual([])
 
   await page.getByRole('button', { name: 'Library', exact: true }).click()
+  await page.getByRole('button', { name: 'Assemblies', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Insert Box instance', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Assembly', exact: true }).click()
   await page.locator('.panel-list-select').first().click()
