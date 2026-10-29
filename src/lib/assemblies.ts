@@ -1,6 +1,6 @@
 import { Euler, Quaternion, Vector3 } from 'three'
-import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyLoosePort, AssemblyPort, Connection, Panel, Project, Vec3 } from './types'
-import { getConnectorPlacements, getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
+import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyLoosePort, AssemblyPort, AttachmentOptions, Connection, Panel, Project, Vec3 } from './types'
+import { attachPanel, getConnectorPlacements, getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
 import { resizePanels } from './structure-edit'
 
 const uid = () => crypto.randomUUID()
@@ -264,10 +264,10 @@ function withMatchingLinks(data: AssemblyData, instanceId: string): AssemblyData
   return { ...data, links }
 }
 
-export function getAssemblyAttachmentTargets(project: Project, instanceId: string, sourceInstanceId?: string): AssemblyAttachmentTarget[] {
+export function getAssemblyAttachmentTargets(project: Project, instanceId: string, sourceInstanceId?: string, copiedSource?: AssemblyInstance): AssemblyAttachmentTarget[] {
   const target = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, target)
   if (sourceInstanceId === instanceId) return []
-  const source = sourceInstanceId ? instanceFor(project, sourceInstanceId) : newInstance(data, definition, target)
+  const source = sourceInstanceId ? instanceFor(project, sourceInstanceId) : copiedSource ? newInstance(data, definitionFor(data, copiedSource), copiedSource) : newInstance(data, definition, target)
   if (sourceInstanceId && data.links.some(link => link.a.instanceId === sourceInstanceId || link.b.instanceId === sourceInstanceId)) return [{ id: 'connected', label: 'Disconnect first', position: source.position, error: 'Disconnect this instance before attaching it somewhere else.' }]
   const sourceDefinition = definitionFor(data, source)
   const occupied = new Set(data.links.flatMap(link => [endpointKey(link.a), endpointKey(link.b)]))
@@ -292,10 +292,33 @@ export function getAssemblyAttachmentTargets(project: Project, instanceId: strin
   })
 }
 
+/** Place a copied instance by one of its panels while retaining its rigid design. */
+export function attachAssemblyCopyToPanel(project: Project, source: AssemblyInstance, parentId: string, options: AttachmentOptions): Project {
+  const data = project.assemblies!, definition = definitionFor(data, source)
+  let error: unknown = new Error('This assembly cannot fit on this edge.')
+  for (const panel of resolvePanels(flat(definition))) {
+    try {
+      const instance = newInstance(data, definition, source)
+      const child = { ...panel, ...instance.finish, id: instance.panelIds[panel.id] }
+      const attached = attachPanel(project, parentId, child, options)
+      const placed = attached.panels.at(-1)!
+      const rotation = q(placed.rotation).multiply(q(panel.rotation).invert())
+      instance.rotation = angles(rotation)
+      instance.position = tuple(v(placed.position).sub(v(panel.position).applyQuaternion(rotation)))
+      const next = rebuild(project, { ...data, instances: [...data.instances, instance] })
+      next.connections.push({ ...attached.connections.at(-1)!, role: 'support' })
+      return ensureValid(next, project, new Set(Object.values(instance.panelIds)))
+    } catch (reason) { error = reason }
+  }
+  throw error
+}
+
 export function removeAssembly(project: Project, instanceId: string): Project {
-  instanceFor(project, instanceId)
+  const removed = instanceFor(project, instanceId)
   const data = project.assemblies!
-  return rebuild(project, { ...data, instances: data.instances.filter(instance => instance.id !== instanceId), links: data.links.filter(link => link.a.instanceId !== instanceId && link.b.instanceId !== instanceId) })
+  const removedIds = new Set(Object.values(removed.panelIds))
+  const base = { ...project, connections: project.connections.filter(connection => !removedIds.has(connection.parentId) && !removedIds.has(connection.childId)) }
+  return rebuild(base, { ...data, instances: data.instances.filter(instance => instance.id !== instanceId), links: data.links.filter(link => link.a.instanceId !== instanceId && link.b.instanceId !== instanceId) })
 }
 
 export function disconnectAssembly(project: Project, instanceId: string): Project {

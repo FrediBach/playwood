@@ -379,7 +379,7 @@ export default function Scene(props: SceneProps) {
         onPointerEnter={() => props.onAttachmentPreview?.(handle.id)}
         onPointerLeave={event => { if (document.activeElement !== event.currentTarget) props.onAttachmentPreview?.(null) }}
         onFocus={() => props.onAttachmentPreview?.(handle.id)} onBlur={() => props.onAttachmentPreview?.(null)}
-        onKeyDown={event => { if (event.key !== 'Escape') event.stopPropagation() }}
+        onKeyDown={event => { if (event.key !== 'Escape' && !event.ctrlKey && !event.metaKey) event.stopPropagation() }}
         onClick={event => { event.stopPropagation(); props.onAttachmentCommit?.(handle.id) }}><Plus size={17}/></button>
     </div>)}</div>
     </div>
