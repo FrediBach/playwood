@@ -102,3 +102,42 @@ for (const selection of ['panel', 'multiple panels', 'assembly'] as const) {
     expect(await saved(page, next.panels.length)).toEqual(next)
   })
 }
+
+for (const selection of ['panel', 'multiple panels', 'assembly', 'none'] as const) {
+  test(`new panel uses preview placement with ${selection} selected`, async ({ page }) => {
+    const project: Project = selection === 'assembly' ? createExampleProject('assembly-cube') : {
+      version: 1, name: 'New panel attachment', connections: [], panels: [
+        createPanel({ name: 'Target one', position: [-800, 700, 0] }),
+        createPanel({ name: 'Target two', position: [800, 700, 0] }),
+      ],
+    }
+    await load(page, project)
+    if (selection === 'multiple panels' || selection === 'none') await page.getByRole('button', { name: 'Select all', exact: true }).click()
+    if (selection === 'none') await page.getByRole('button', { name: 'Clear', exact: true }).click()
+    const openForm = async () => {
+      await page.getByRole('button', { name: 'Add a panel', exact: false }).first().click()
+      const dialog = page.getByRole('dialog')
+      await dialog.getByRole('textbox', { name: 'Panel name', exact: true }).fill('Custom shelf')
+      await dialog.getByRole('button', { name: selection === 'none' ? 'Add to workspace' : 'Choose attachment point', exact: true }).click()
+    }
+    await openForm()
+    const handles = page.getByRole('button', { name: /^Attach panel at / })
+    if (selection !== 'none') {
+      await expect(handles.first()).toBeVisible()
+      expect(await saved(page, project.panels.length)).toEqual(project)
+      await handles.first().hover()
+      expect(await saved(page, project.panels.length)).toEqual(project)
+      await page.keyboard.press('Escape')
+      await expect(handles).toHaveCount(0)
+      await openForm()
+      await handles.first().click()
+    } else await expect(handles).toHaveCount(0)
+    const next = await saved(page, project.panels.length + 1)
+    expect(next.panels.at(-1)!.name).toBe('Custom shelf')
+    expect(next.connections.length).toBe(project.connections.length + (selection === 'none' ? 0 : 1))
+    await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+    expect(await saved(page, project.panels.length)).toEqual(project)
+    await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+    expect(await saved(page, next.panels.length)).toEqual(next)
+  })
+}

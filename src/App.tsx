@@ -204,7 +204,15 @@ export default function App() {
     }
     assembly.clearPlacement();setSelectedIds(ids=>selectPanelIds(ids,id,additive));if(additive||!id)setInspectorTab('panel');if(id)setRightOpen(true)
   }
-  const addPanel=()=>{assembly.close();setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:600,height:360,thickness:18,position:[0,500,0]}));setDialog('add')}
+  const addPanel=()=>{clipboard.cancel();assembly.close();setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:600,height:360,thickness:18,position:[0,500,0]}));setDialog('add')}
+  const addDraftPanel = () => {
+    const panel = { ...draft, name: draft.name.trim() || 'My panel' }
+    setDialog(null)
+    if (selectedIds.length) { clipboard.insert({ kind: 'panel', panel }); return }
+    commit(p => ({ ...p, panels: [...p.panels, panel] }))
+    setSelectedId(panel.id); setInspectorTab('panel'); setRightOpen(true)
+    setFitSignal(v => v + 1); notify('Your panel is ready')
+  }
   const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setExploded(false);setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87'}));setInspectorTab('attach');setRightOpen(true)}
   const applyAttachment=()=>{if(!previewProject||attachmentErrors.length)return;commit(previewProject);setSelectedId(attachTarget==='new'?draft.id:attachTarget);setInspectorTab('panel');setDraft(createPanel());notify(`${previewPanels.length===1?'Panel':`${previewPanels.length} panels`} attached`)}
   const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return;const group=connection.id.replace(/:\d+$/,'');commit(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
@@ -213,7 +221,7 @@ export default function App() {
       if (selectedIds.length) {
         const source = createExampleProject(id)
         const item = copySelection(source, source.panels.map(panel => panel.id))
-        if (item.kind === 'assembly') clipboard.insertAssembly(item)
+        if (item.kind === 'assembly') clipboard.insert(item)
         return
       }
       clipboard.cancel()
@@ -228,7 +236,7 @@ export default function App() {
     if (!selectedIds.length) { clipboard.cancel(); assembly.insert(id); return }
     const definition = assembly.definitions.find(item => item.id === id)
     if (!definition) return
-    clipboard.insertAssembly({ kind: 'assembly', definition, instance: {
+    clipboard.insert({ kind: 'assembly', definition, instance: {
       id: crypto.randomUUID(), definitionId: id, name: definition.name,
       position: [0, 0, 0], rotation: [0, 0, 0], panelIds: {},
     } })
@@ -239,7 +247,7 @@ export default function App() {
   const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=repairLegacyShelf(imported);const repaired=repairLegacyExampleInserts(shelf);commit(repaired);assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
   const instance=assembly.selectedInstance
   const validTargets=assembly.targets.filter(target=>target.project)
-  const assemblyHint=clipboard.active?`Hover a + to preview the ${clipboard.inserting?'assembly':'copy'}. Click to attach · Esc to cancel.`:instance&&!exploded&&!realisticPreview
+  const assemblyHint=clipboard.active?`Hover a + to preview the ${clipboard.inserting||'copy'}. Click to attach · Esc to cancel.`:instance&&!exploded&&!realisticPreview
     ?validTargets.length?'Hover a + to preview. Click to attach.':assembly.targets.find(target=>target.error)?.error??'This assembly has no compatible corner attachments. Duplicate it to place another instance.'
     :undefined
   const attachmentSummary=assembly.target?.error??(assembly.preview?'Corner connectors replaced with shared cross connectors.':undefined)
@@ -271,7 +279,7 @@ export default function App() {
       setShowDimensions={setShowDimensions} setShowGrid={setShowGrid} setView={setView} setZoomSignal={setZoomSignal} setFitSignal={setFitSignal}
       setExploded={setExploded} onRotate={()=>setDialog('rotate')} addPanel={addPanel} isAttaching={inspectorTab==='attach'&&!!selected}
       attachmentSide={attachment.side} visibleBounds={visibleBounds} hasVisiblePanels={hasVisiblePanels}
-      attachmentHandles={!dialog?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?(clipboard.inserting?'Attach assembly at':'Paste at'):'Attach'} ${target.label}`,position:target.position,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
+      attachmentHandles={!dialog?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?(clipboard.inserting?`Attach ${clipboard.inserting} at`:'Paste at'):'Attach'} ${target.label}`,position:target.position,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
       onAttachmentPreview={clipboard.active?clipboard.hover:assembly.hover} onAttachmentCommit={clipboard.active?clipboard.attach:assembly.attach} suppressedConnectionIds={clipboard.active?clipboard.suppressedConnectionIds:assembly.suppressedConnectionIds}
       attachmentBoundsPanels={clipboard.active?clipboard.boundsPanels:assembly.attachmentBoundsPanels}
       onDrillIn={assembly.drillIn} assemblyHint={assemblyHint} attachmentSummary={attachmentSummary}
@@ -282,7 +290,7 @@ export default function App() {
       canAttach={!!previewProject&&!attachmentErrors.length} attachmentType={attachment.type}
       contextLabel={assembly.editingInstance?'Shared assembly':assembly.hasMembers?'Assembly':undefined}
       onDoneEditing={assembly.editingInstance?assembly.done:undefined}>
-        {clipboard.inserting&&<section className="inspector-section"><p>Choose a + in the preview to attach the assembly.</p><Button variant="outline" onClick={clipboard.cancel}>Cancel placement</Button></section>}
+        {clipboard.inserting&&<section className="inspector-section"><p>Choose a + in the preview to attach the {clipboard.inserting}.</p><Button variant="outline" onClick={clipboard.cancel}>Cancel placement</Button></section>}
         {!assembly.editingInstance&&<section className="inspector-section"><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2}><Link2 size={15}/>Auto-add connectors</Button><p className="field-note">{selectedIds.length>1?'Connect matching edges between selected panels.':selectedIds.length===1?'Connect this panel to matching nearby edges.':'Connect matching edges throughout the design.'} Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p></section>}
         {assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
           panels={assembly.editingDefinition.panels.filter(panel=>selectedIds.includes(assembly.editingInstance!.panelIds[panel.id]))}
@@ -312,7 +320,7 @@ export default function App() {
       exportProject={exportProject} onExportParts={()=>{download(projectToCsv(project),`${exportName}-parts.csv`,'text/csv');notify('Parts list exported')}}
       onImport={()=>importRef.current?.click()} importError={importError} project={project} panels={panels} connectorCount={connectorCount} issues={issues}
       onRotate={(axis,degrees)=>{commit(p=>rotateProject(p,axis,degrees));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify(`Creation rotated ${degrees}° around ${axis.toUpperCase()}. Undo is available.`)}}
-      onAdd={()=>{commit(p=>({...p,panels:[...p.panels,{...draft,name:draft.name.trim()||'My panel'}]}));setSelectedId(draft.id);setInspectorTab('panel');setRightOpen(true);setDialog(null);setFitSignal(v=>v+1);notify('Your panel is ready')}}/>
+      attachNewPanel={selectedIds.length>0} onAdd={addDraftPanel}/>
     <input ref={importRef} type="file" accept=".json,.playwood.json" className="visually-hidden" aria-label="Import project file" onChange={e=>{const file=e.target.files?.[0];if(file)void importProject(file);e.target.value=''}}/>
   </div></TooltipProvider>
 }

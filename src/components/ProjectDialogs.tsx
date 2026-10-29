@@ -15,6 +15,7 @@ interface Props {
   dialog: ProjectDialog
   onClose: () => void
   onAdd: () => void
+  attachNewPanel: boolean
   onRotate: ComponentProps<typeof RotateCreation>['onRotate']
   draft: Panel
   setDraft: Dispatch<SetStateAction<Panel>>
@@ -54,8 +55,8 @@ function RotateDialog({onClose,onRotate}: Pick<Props, 'onClose' | 'onRotate'>) {
   return <RotateCreation onCancel={onClose} onRotate={onRotate}/>
 }
 
-function AddDialog({draft,setDraft,onClose,onAdd}: Pick<Props, 'draft' | 'setDraft' | 'onClose' | 'onAdd'>) {
-  return <><span className="dialog-eyebrow">YOUR MATERIAL, YOUR POSSIBILITIES</span><DialogTitle>Bring your own panel.</DialogTitle><DialogDescription>Start with what you have. Every detail can be changed later.</DialogDescription><div className="dialog-form"><label className="field"><span>Panel name</span><input value={draft.name} maxLength={60} onChange={e=>setDraft(p=>({...p,name:e.target.value}))}/></label><PanelFields panel={draft} onChange={patch=>setDraft(p=>({...p,...patch}))}/><SelectField label="Orientation" value={draft.rotation[0]===-Math.PI/2?'horizontal':draft.rotation[1]===Math.PI/2?'side':'vertical'} onChange={v=>setDraft(p=>({...p,rotation:v==='horizontal'?[-Math.PI/2,0,0]:v==='side'?[0,Math.PI/2,0]:[0,0,0]}))}><option value="vertical">Vertical · front facing</option><option value="horizontal">Horizontal · flat</option><option value="side">Vertical · side facing</option></SelectField></div><div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={onAdd}><Plus size={17}/>Add to workspace</Button></div></>
+function AddDialog({draft,setDraft,onClose,onAdd,attachNewPanel}: Pick<Props, 'draft' | 'setDraft' | 'onClose' | 'onAdd' | 'attachNewPanel'>) {
+  return <><span className="dialog-eyebrow">YOUR MATERIAL, YOUR POSSIBILITIES</span><DialogTitle>Bring your own panel.</DialogTitle><DialogDescription>Start with what you have. Every detail can be changed later.</DialogDescription><div className="dialog-form"><label className="field"><span>Panel name</span><input value={draft.name} maxLength={60} onChange={e=>setDraft(p=>({...p,name:e.target.value}))}/></label><PanelFields panel={draft} onChange={patch=>setDraft(p=>({...p,...patch}))}/><SelectField label="Orientation" value={draft.rotation[0]===-Math.PI/2?'horizontal':draft.rotation[1]===Math.PI/2?'side':'vertical'} onChange={v=>setDraft(p=>({...p,rotation:v==='horizontal'?[-Math.PI/2,0,0]:v==='side'?[0,Math.PI/2,0]:[0,0,0]}))}><option value="vertical">Vertical · front facing</option><option value="horizontal">Horizontal · flat</option><option value="side">Vertical · side facing</option></SelectField></div><div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={onAdd}><Plus size={17}/>{attachNewPanel?'Choose attachment point':'Add to workspace'}</Button></div></>
 }
 
 function TemplatesDialog({loadTemplate}: Pick<Props, 'loadTemplate'>) {

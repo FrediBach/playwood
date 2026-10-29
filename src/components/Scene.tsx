@@ -296,6 +296,7 @@ function AttachmentHandlePositions({ handles, elements }: { handles: AssemblyAtt
   useLayoutEffect(() => { invalidate() }, [handles, camera, size, invalidate])
   useFrame(() => {
     camera.updateMatrixWorld()
+    const placed: { x: number; y: number }[] = []
     for (const handle of handles) {
       const element = elements.current.get(handle.id)
       if (!element) continue
@@ -304,7 +305,24 @@ function AttachmentHandlePositions({ handles, elements }: { handles: AssemblyAtt
       const y = (1 - projected.y) * size.height / 2
       const visible = projected.z >= -1 && projected.z <= 1 && x >= 0 && x <= size.width && y >= 0 && y <= size.height
       element.style.visibility = visible ? 'visible' : 'hidden'
-      element.style.transform = `translate3d(${x}px,${y}px,0) translate(-50%,-50%)`
+      let screenX = x, screenY = y
+      if (visible) {
+        // Opposite faces can project onto the same spot. Keep both choices
+        // reachable, including the extra space used by the hover outline.
+        const fits = (cx: number, cy: number) => placed.every(other => Math.hypot(cx - other.x, cy - other.y) >= 38)
+        if (!fits(x, y)) {
+          search: for (let ring = 1; ring <= handles.length; ring++) {
+            for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+              const cx = x + dx * ring * 38, cy = y + dy * ring * 38
+              if (cx >= 19 && cx <= size.width - 19 && cy >= 19 && cy <= size.height - 19 && fits(cx, cy)) {
+                screenX = cx; screenY = cy; break search
+              }
+            }
+          }
+        }
+        placed.push({ x: screenX, y: screenY })
+      }
+      element.style.transform = `translate3d(${screenX}px,${screenY}px,0) translate(-50%,-50%)`
     }
   })
   return null

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { copySelection, getPasteTargets, getAssemblyInsertionTargets } from './clipboard'
+import { copySelection, getPasteTargets, getInsertionTargets } from './clipboard'
 import { createAssembly, materializeAssemblies, removeAssembly, updateAssemblyFinish } from './assemblies'
 import { createExampleProject } from './example-library'
 import { createPanel, parseProject, validateProject } from './model'
@@ -75,7 +75,7 @@ describe('library insertion targets', () => {
     const source = createExampleProject('assembly-cube')
     const copied = copySelection(source, source.panels.map(panel => panel.id))
     if (copied.kind !== 'assembly') throw new Error('Expected assembly')
-    const targets = getAssemblyInsertionTargets(project, project.panels.map(panel => panel.id), copied).filter(target => target.project)
+    const targets = getInsertionTargets(project, project.panels.map(panel => panel.id), copied).filter(target => target.project)
     for (const panel of project.panels) expect(targets.some(target => target.id.startsWith(panel.id))).toBe(true)
     expect(new Set(targets.map(target => target.id)).size).toBe(targets.length)
     expect(project).toEqual(before)
@@ -91,12 +91,31 @@ describe('library insertion targets', () => {
     const ids = project.panels.map(panel => panel.id)
     const copied = copySelection(project, ids)
     if (copied.kind !== 'assembly') throw new Error('Expected assembly')
-    const targets = getAssemblyInsertionTargets(project, ids, copied).filter(target => target.project)
+    const targets = getInsertionTargets(project, ids, copied).filter(target => target.project)
     expect(targets).toHaveLength(4)
     for (const target of targets) {
       expect(target.project!.assemblies!.definitions).toHaveLength(1)
       expect(target.project!.assemblies!.instances).toHaveLength(2)
       expect(target.project!.assemblies!.links).toHaveLength(1)
+    }
+  })
+})
+
+describe('new panel insertion targets', () => {
+  it.each(['panels', 'assembly'] as const)('preserves the new panel properties across selected %s', kind => {
+    const project = kind === 'assembly' ? boxProject() : looseProject()
+    const before = structuredClone(project)
+    const panel = createPanel({ name: 'Custom shelf', width: 250, height: 250, color: '#123456', pattern: 'pegboard' })
+    const targets = getInsertionTargets(project, project.panels.map(part => part.id), { kind: 'panel', panel }).filter(target => target.project)
+    expect(targets.length).toBeGreaterThan(0)
+    expect(project).toEqual(before)
+    for (const target of targets) {
+      const next = target.project!
+      expect(next.panels).toHaveLength(project.panels.length + 1)
+      expect(next.panels.at(-1)).toMatchObject({ name: panel.name, width: 250, height: 250, color: panel.color, pattern: panel.pattern })
+      expect(next.connections.at(-1)!.parentId).toSatisfy((id: string) => project.panels.some(part => part.id === id))
+      const serialized = JSON.parse(JSON.stringify(next))
+      expect(parseProject(serialized)).toEqual(serialized)
     }
   })
 })

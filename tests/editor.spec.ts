@@ -9,6 +9,8 @@ test('editor renders, creates panels, previews attachments, saves and undoes', a
   await expect.poll(()=>page.locator('canvas').evaluate(canvas=>(canvas as HTMLCanvasElement).toDataURL().length),{timeout:15000}).toBeGreaterThan(30000)
   await page.screenshot({ path: 'test-results/studio-desktop.png' })
   const initialCount = await page.locator('.panel-list-row').count()
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await page.getByRole('button', { name: 'Clear', exact: true }).click()
   await page.getByRole('button', { name: 'Add a panel', exact: false }).first().click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.getByRole('dialog').getByText('Pegboard', { exact: true }).click()
@@ -62,6 +64,8 @@ test('existing panels can attach and invalid thickness is blocked', async ({ pag
   await expect(page.locator('.panel-list-row').first()).toBeVisible()
   const initialCount = await page.locator('.panel-list-row').count()
   const addedPanelName = `Panel ${initialCount + 1}`
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await page.getByRole('button', { name: 'Clear', exact: true }).click()
   await page.getByRole('button', { name: 'Add a panel', exact: false }).first().click()
   await page.getByRole('button', { name: 'Add to workspace' }).click()
   await expect(page.locator('.panel-list-row')).toHaveCount(initialCount + 1)

@@ -15,7 +15,7 @@ export function copySelection(project: Project, ids: string[]): CopiedItem {
   throw new Error('Select one panel or one assembly to copy.')
 }
 
-export function getPasteTargets(project: Project, ids: string[], copied: CopiedItem): AssemblyAttachmentTarget[] {
+export function getPasteTargets(project: Project, ids: string[], copied: CopiedItem, preservePanelName = false): AssemblyAttachmentTarget[] {
   const owner = ids.length ? getAssemblyInstance(project, ids[0]) : undefined
   const instance = owner && ids.length === Object.keys(owner.panelIds).length && Object.values(owner.panelIds).every(id => ids.includes(id)) ? owner : undefined
   if (!instance && ids.length !== 1) throw new Error('Select a target panel or assembly, then paste.')
@@ -28,7 +28,7 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
   }
   const parents = resolvePanels(project).filter(panel => ids.includes(panel.id))
   const oldErrors = new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id))
-  const child = copied.kind === 'panel' ? createPanel({ ...copied.panel, id: crypto.randomUUID(), name: `${copied.panel.name} copy`, visible: true }) : undefined
+  const child = copied.kind === 'panel' ? createPanel({ ...copied.panel, id: crypto.randomUUID(), name: preservePanelName ? copied.panel.name : `${copied.panel.name} copy`, visible: true }) : undefined
   const edges: { side: Side; position: (panel: Panel) => Vec3 }[] = [
     { side: 'left', position: p => [-p.width / 2, 0, 0] },
     { side: 'right', position: p => [p.width / 2, 0, 0] },
@@ -55,14 +55,14 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
 }
 
 /** Offer every selected target, keeping whole-instance corner joins where possible. */
-export function getAssemblyInsertionTargets(project: Project, ids: string[], copied: Extract<CopiedItem, { kind: 'assembly' }>): AssemblyAttachmentTarget[] {
+export function getInsertionTargets(project: Project, ids: string[], copied: CopiedItem): AssemblyAttachmentTarget[] {
   const selected = new Set(ids)
   const handled = new Set<string>()
   return ids.flatMap(id => {
     if (handled.has(id)) return []
     const owner = getAssemblyInstance(project, id)
     const members = owner ? Object.values(owner.panelIds) : []
-    if (owner && members.every(member => selected.has(member))) {
+    if (copied.kind === 'assembly' && owner && members.every(member => selected.has(member))) {
       members.forEach(member => handled.add(member))
       const corners = getPasteTargets(project, members, copied)
       if (corners.some(target => target.project)) return corners.map(target => ({ ...target, label: `${owner.name} · ${target.label}` }))
@@ -70,6 +70,6 @@ export function getAssemblyInsertionTargets(project: Project, ids: string[], cop
       return members.flatMap(member => getPasteTargets(project, [member], copied).map(target => ({ ...target, label: `${owner.name} · ${project.panels.find(panel => panel.id === member)?.name} · ${target.label}` })))
     }
     handled.add(id)
-    return getPasteTargets(project, [id], copied).map(target => ({ ...target, label: `${project.panels.find(panel => panel.id === id)?.name} · ${target.label}` }))
+    return getPasteTargets(project, [id], copied, true).map(target => ({ ...target, label: `${project.panels.find(panel => panel.id === id)?.name} · ${target.label}` }))
   })
 }
