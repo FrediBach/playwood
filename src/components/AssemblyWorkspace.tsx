@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { Box, ChevronDown, Expand, Grid2X2, House, Maximize, Minus, MousePointer2, PanelLeftOpen, Plus, RotateCw, Ruler, SlidersHorizontal, Sun } from 'lucide-react'
+import { Box, ChevronDown, Expand, Grid2X2, House, Link2, Maximize, Minus, MousePointer2, PanelLeftOpen, Plus, RotateCw, Ruler, SlidersHorizontal, Sun } from 'lucide-react'
 import Scene, { type SceneProps } from './Scene'
 import { IconButton } from './editor-controls'
 import { Tooltip } from './ui/tooltip'
@@ -26,6 +26,8 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
   setExploded: Setter<boolean>
   onRotate: () => void
   addPanel: () => void
+  onAutoConnect: () => void
+  autoConnectDisabled: boolean
   isAttaching: boolean
   attachmentSide: Side
   visibleBounds: ReturnType<typeof getProjectBounds>
@@ -37,14 +39,14 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
 }
 const number = (n:number)=>Math.round(n).toLocaleString()
 
-export function AssemblyWorkspace({panels,connections,selectedIds,choosePanel,onMove,movementEnabled,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,frameSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels,onDrillIn,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,suppressedConnectionIds=[],editingAssembly,assemblyHint,attachmentSummary}: Props) {
+export function AssemblyWorkspace({panels,connections,selectedIds,choosePanel,onMove,movementEnabled,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,frameSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,onAutoConnect,autoConnectDisabled,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels,onDrillIn,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,suppressedConnectionIds=[],editingAssembly,assemblyHint,attachmentSummary}: Props) {
   const previewIds = new Set(previewPanels.map(panel => panel.id))
   const replacedConnectionIds = new Set([...suppressedConnectionIds,...previewConnections.map(connection=>connection.id)])
   const sceneProps: SceneProps = realisticPreview
     ? { panels, connections, selectedIds, onSelect: choosePanel, view: 'perspective', showGrid: false, showDimensions, exploded: false, realisticPreview, fitSignal, frameSignal, zoomSignal }
     : { panels: panels.filter(panel => !previewIds.has(panel.id)), connections: connections.filter(connection => !replacedConnectionIds.has(connection.id) && !previewIds.has(connection.childId) && !previewIds.has(connection.parentId)), selectedIds, onSelect: choosePanel, onDrillIn, attachmentHandles, onAttachmentPreview, onAttachmentCommit, attachmentBoundsPanels, previewPanels, previewConnections, view, showGrid, showDimensions, exploded, realisticPreview, fitSignal, frameSignal, zoomSignal }
   return <main className="workspace" aria-label="3D assembly workspace">
-      <WorkspaceToolbar panels={panels} realisticPreview={realisticPreview} setRealisticPreview={setRealisticPreview} onRotate={onRotate} leftOpen={leftOpen} setLeftOpen={setLeftOpen} rightOpen={rightOpen} setRightOpen={setRightOpen} showDimensions={showDimensions} setShowDimensions={setShowDimensions} showGrid={showGrid} setShowGrid={setShowGrid}/>
+      <WorkspaceToolbar onAutoConnect={onAutoConnect} autoConnectDisabled={autoConnectDisabled} panels={panels} realisticPreview={realisticPreview} setRealisticPreview={setRealisticPreview} onRotate={onRotate} leftOpen={leftOpen} setLeftOpen={setLeftOpen} rightOpen={rightOpen} setRightOpen={setRightOpen} showDimensions={showDimensions} setShowDimensions={setShowDimensions} showGrid={showGrid} setShowGrid={setShowGrid}/>
       <div className="scene-container"><Scene {...sceneProps} onMove={onMove} movementEnabled={movementEnabled}/></div>
       {!realisticPreview&&editingAssembly&&<div className="assembly-edit-breadcrumb"><Box size={15}/><strong>Editing {editingAssembly.name}</strong><span>Updates {editingAssembly.instanceCount} {editingAssembly.instanceCount===1?'instance':'instances'}</span><button className={rightOpen?'assembly-desktop-done':undefined} onClick={editingAssembly.onDone}>Done editing</button></div>}
       {!realisticPreview&&(assemblyHint||attachmentSummary)&&<div className={`assembly-workspace-hint ${editingAssembly?'has-breadcrumb':''}`} role="status">{assemblyHint}{attachmentSummary&&<strong>{attachmentSummary}</strong>}</div>}
@@ -74,13 +76,14 @@ function ViewControls({realisticPreview,view,setView,setZoomSignal,setFitSignal,
       </div>
 }
 
-function WorkspaceToolbar({panels,realisticPreview,setRealisticPreview,onRotate,leftOpen,setLeftOpen,rightOpen,setRightOpen,showDimensions,setShowDimensions,showGrid,setShowGrid}: Pick<Props, 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onRotate' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
+function WorkspaceToolbar({onAutoConnect,autoConnectDisabled,panels,realisticPreview,setRealisticPreview,onRotate,leftOpen,setLeftOpen,rightOpen,setRightOpen,showDimensions,setShowDimensions,showGrid,setShowGrid}: Pick<Props, 'onAutoConnect' | 'autoConnectDisabled' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onRotate' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
   return <div className="workspace-top">
         <div className="preview-mode-switch" role="group" aria-label="Preview mode">
           <button aria-pressed={!realisticPreview} onClick={()=>setRealisticPreview(false)}><Box size={15}/>Studio</button>
           <button aria-pressed={realisticPreview} onClick={()=>setRealisticPreview(true)}><House size={15}/>Realistic preview</button>
         </div>
         <div className="workspace-options">
+          <IconButton label="Auto-add connectors" disabled={autoConnectDisabled} onClick={onAutoConnect}><Link2 size={18}/></IconButton>
           <IconButton label="Rotate creation" disabled={!panels.length} onClick={onRotate}><RotateCw size={18}/></IconButton>
           {!realisticPreview&&!leftOpen&&<IconButton label="Open panel list" onClick={()=>setLeftOpen(true)}><PanelLeftOpen size={18}/></IconButton>}
           <Tooltip label="Show dimensions"><button className={`canvas-toggle ${showDimensions?'active':''}`} aria-label="Show dimensions" aria-pressed={showDimensions} onClick={()=>setShowDimensions(v=>!v)}><Ruler size={18}/></button></Tooltip>

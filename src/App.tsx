@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Box, CheckCheck, Copy, MousePointer2, Plus, Trash2 } from 'lucide-react'
+import { Box, CheckCheck, Copy, Link2, MousePointer2, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ProjectHeader } from '@/components/ProjectHeader'
 import { ProjectDialogs, type ProjectDialog } from '@/components/ProjectDialogs'
@@ -16,6 +16,7 @@ import { ProjectStatus } from '@/components/ProjectStatus'
 import { ProjectSidebar } from '@/components/ProjectSidebar'
 import { createExampleProject } from '@/lib/example-library'
 import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
+import { autoConnect } from '@/lib/auto-connect'
 import { movePanels, resizePanels } from '@/lib/structure-edit'
 import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
 import { useProject } from '@/hooks/use-project'
@@ -139,6 +140,15 @@ export default function App() {
       commit(next);assembly.close();setSelectedIds(copies);if(copied.size)setFrameSignal(v=>v+1);notify(copied.size?'Linked instances duplicated':'Panels duplicated')
     }catch(error){notify(error instanceof Error?error.message:'This selection could not be duplicated.')}
   }
+  const addAutoConnectors=()=>{
+    try {
+      const result=autoConnect(project,selectedIds)
+      if(!result.joints){notify('No compatible unconnected edges found. Check panel angles, edge alignment, and connector clearance.');return}
+      commit(result.project);clipboard.cancel();assembly.clearPlacement();setInspectorTab('panel');setExploded(false)
+      if(result.splits&&selectedIds.length>1)setSelectedIds(ids=>[...ids,...result.addedPanelIds])
+      notify(`${result.connectors} connectors added at ${result.joints} ${result.joints===1?'joint':'joints'}. ${result.splits?`${result.splits} panel ${result.splits===1?'split':'splits'} for T joints; outer dimensions kept.`:'Panel positions kept.'} Undo is available.`)
+    } catch(error){notify(error instanceof Error?error.message:'Connectors could not be added.')}
+  }
   const selectAll=()=>{
     const ids=assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):project.panels.map(p=>p.id)
     setSelectedIds(ids);assembly.clearPlacement();setInspectorTab('panel');setRightOpen(true)
@@ -226,6 +236,7 @@ export default function App() {
       onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={assembly.insert}/>
 
     <AssemblyWorkspace panels={panels} connections={project.connections} selectedIds={selectedIds} choosePanel={choosePanel}
+      onAutoConnect={addAutoConnectors} autoConnectDisabled={!!dialog||!!assembly.editingInstance||panels.length<2}
       onMove={moveSelection} movementEnabled={!clipboard.active&&!dialog&&!assembly.editingInstance&&!(assembly.memberInstance&&!instance)&&!assembly.preview&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))}
       previewPanels={clipboard.active?clipboard.previewPanels:assembly.preview?assembly.previewPanels:previewPanels} previewConnections={clipboard.active?clipboard.previewConnections:assembly.preview?assembly.previewConnections:previewConnections} view={view} showGrid={showGrid} showDimensions={showDimensions}
       exploded={exploded} realisticPreview={realisticPreview} fitSignal={fitSignal} frameSignal={frameSignal} zoomSignal={zoomSignal}
@@ -244,6 +255,7 @@ export default function App() {
       canAttach={!!previewProject&&!attachmentErrors.length} attachmentType={attachment.type}
       contextLabel={assembly.editingInstance?'Shared assembly':assembly.hasMembers?'Assembly':undefined}
       onDoneEditing={assembly.editingInstance?assembly.done:undefined}>
+        {!assembly.editingInstance&&<section className="inspector-section"><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2}><Link2 size={15}/>Auto-add connectors</Button><p className="field-note">{selectedIds.length>1?'Connect matching edges between selected panels.':selectedIds.length===1?'Connect this panel to matching nearby edges.':'Connect matching edges throughout the design.'} Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p></section>}
         {assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
           panels={assembly.editingDefinition.panels.filter(panel=>selectedIds.includes(assembly.editingInstance!.panelIds[panel.id]))}
           name={assembly.editingDefinition.name} count={assemblyCount(assembly.editingDefinition.id)} onChange={assembly.updateDefinition}/>
