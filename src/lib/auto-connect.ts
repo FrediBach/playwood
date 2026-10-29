@@ -1,3 +1,4 @@
+import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { createPanel, getConnectorPlacements, resolvePanels, validateProject } from './model'
 import { isPanelConnectedToAssembly } from './assemblies'
@@ -43,7 +44,7 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
       if (existingPairs.has(pairKey(parent.id, child.id))) continue
       const offset = side === 'left' || side === 'right' ? relative.y : relative.x
       const id = crypto.randomUUID()
-      const first: Connection = { id: `${id}:0`, parentId: parent.id, childId: child.id, type, side, flip, offset, inset: 0, color: '#e86536', count: 2, role: 'support' }
+      const first: Connection = { id: `${id}:0`, parentId: parent.id, childId: child.id, type, side, flip, offset, inset: 0, color: DEFAULT_CONNECTOR_COLOR, count: 2, role: 'support' }
       if (!fits(parent, child, first)) continue
       const group = [first]
       const count = type === 'cross' ? 3 : type === 't' ? 2 : 1
@@ -103,7 +104,7 @@ function splitInteriorTJoints(original: Project, selectedIds: readonly string[])
         const right = createPanel({ ...shelf, id: crypto.randomUUID(), name: `${shelf.name.slice(0, 108)} (section)`, [dimension]: rightLength, position: new Vector3(...shelf.position).addScaledVector(worldAxis, (length - rightLength) / 2).toArray() })
         for (const flip of [false, true]) {
           const id = crypto.randomUUID()
-          const first: Connection = { id: `${id}:0`, parentId: left.id, childId: divider.id, type: 't', side: dimension === 'width' ? 'right' : 'top', flip, offset: 0, inset: 0, color: '#e86536', count: 2, role: 'support' }
+          const first: Connection = { id: `${id}:0`, parentId: left.id, childId: divider.id, type: 't', side: dimension === 'width' ? 'right' : 'top', flip, offset: 0, inset: 0, color: DEFAULT_CONNECTOR_COLOR, count: 2, role: 'support' }
           if (!fits(left, divider, first)) continue
           const second: Connection = { ...first, id: `${id}:1`, childId: right.id, count: 0 }
           if (!fits(left, right, second)) continue

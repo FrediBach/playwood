@@ -123,7 +123,7 @@ for (const [type, label, branches] of [
     await page.getByRole('button', { name: 'Attach a panel', exact: true }).click()
     await page.getByRole('button', { name: 'Left', exact: true }).click()
     await page.getByRole('button', { name: `${label} connector`, exact: true }).click()
-    await page.getByLabel('Connector color', { exact: true }).fill('#286c72')
+    await page.getByRole('button', { name: 'Green connector color', exact: true }).click()
     await expect.poll(async () => (await renderedConnectors(page)).length).toBe(2)
     const preview = await renderedConnectors(page)
     for (const connector of preview) {
@@ -150,7 +150,7 @@ for (const [type, label, branches] of [
     expect(committed.map(connector => connector.parts.map(part => part.name))).toEqual(
       preview.map(connector => connector.parts.map(part => part.name)))
     for (const connector of committed) for (const part of connector.parts) {
-      expect(part.color).toBe('286c72')
+      expect(part.color).toBe('008002')
       expect(part.depthWrite).toBe(true)
     }
     await page.getByRole('button', { name: 'Fit assembly (F)', exact: true }).click()

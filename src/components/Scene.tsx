@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import type { CameraView, Connection, Panel, Vec3 } from '@/lib/types'
+import type { CameraView, Connection, Panel, Project, Vec3 } from '@/lib/types'
 import { ConnectorMeshes } from './ConnectorMeshes'
 import { makePanelGeometry } from './scene-geometry'
 import { RoomEnvironment } from './RoomEnvironment'
@@ -29,6 +29,9 @@ export interface AssemblyAttachmentHandle {
 export interface SceneProps {
   panels: Panel[]
   connections: Connection[]
+  connectorOverrides?: Project['connectorOverrides']
+  selectedConnectorIds?: readonly string[]
+  onSelectConnector?: (id: string, additive?: boolean) => void
   selectedIds: readonly string[]
   onSelect: (id: string | null, additive?: boolean) => void
   onMove?: (delta: Vec3, repeat: boolean) => void
@@ -370,7 +373,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
       cellColor="#cccfc5" sectionColor="#b9bdb2" fadeDistance={extent * 0.65} fadeStrength={2} fadeFrom={0} infiniteGrid />}
     </>}
     {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
-    {!exploded && <ConnectorMeshes panels={panels} connections={connections} />}
+    {!exploded && <ConnectorMeshes panels={panels} connections={connections} connectorOverrides={props.connectorOverrides} selectedConnectorIds={props.selectedConnectorIds} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}

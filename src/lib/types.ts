@@ -33,7 +33,13 @@ export interface AssemblyEndpoint { instanceId?: string; portId: string }
 export interface AssemblyLoosePort { id: string; connection: Connection }
 export interface AssemblyLink { id: string; a: AssemblyEndpoint; b: AssemblyEndpoint }
 export interface AssemblyData { definitions: AssemblyDefinition[]; instances: AssemblyInstance[]; links: AssemblyLink[]; loosePorts?: AssemblyLoosePort[] }
-export interface Project { version: 1; name: string; panels: Panel[]; connections: Connection[]; assemblies?: AssemblyData }
+export interface ConnectorOverride { color?: string; type?: ConnectorType; removed?: boolean }
+export interface Project {
+  version: 1; name: string; panels: Panel[]; connections: Connection[]; assemblies?: AssemblyData;
+  /** Per-piece hardware edits, keyed by serialized [connectionId, placementIndex].
+   * Joint connections retain the layout independently of the installed hardware. */
+  connectorOverrides?: Record<string, ConnectorOverride>;
+}
 export interface AttachmentOptions { side: Side; type: ConnectorType; offset: number; inset: number; flip: boolean; color: string; count: number }
 export interface ValidationIssue { id: string; severity: 'warning' | 'error'; message: string; panelIds: string[] }
 export type CameraView = 'perspective' | 'front' | 'top' | 'right'

@@ -1,3 +1,4 @@
+import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { attachAssemblyCopyToPanel, getAssemblyAttachmentTargets, getAssemblyInstance, type AssemblyAttachmentTarget } from './assemblies'
 import { attachPanel, createPanel, resolvePanels, validateProject } from './model'
@@ -42,7 +43,7 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
     const position = new Vector3(...local).applyQuaternion(rotation).add(new Vector3(...parent.position)).toArray() as Vec3
     const id = `${parent.id}/${edge.side}/${flip}`
     const label = `${instance ? `${parent.name} · ` : ''}${edge.side}${flip ? ' · reverse' : ''}`
-    const options: AttachmentOptions = { side: edge.side, flip, type: '90', offset: 0, inset: 0, color: '#e86536', count: 2 }
+    const options: AttachmentOptions = { side: edge.side, flip, type: '90', offset: 0, inset: 0, color: DEFAULT_CONNECTOR_COLOR, count: 2 }
     try {
       const next = copied.kind === 'assembly' ? attachAssemblyCopyToPanel(base, copied.instance, parent.id, options) : attachPanel(base, parent.id, child!, options)
       const newIds = new Set(next.panels.filter(panel => !project.panels.some(old => old.id === panel.id)).map(panel => panel.id))

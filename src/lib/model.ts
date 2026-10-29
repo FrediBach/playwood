@@ -1,3 +1,4 @@
+import { getPhysicalConnectors } from './connector-selection'
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import type { AttachmentOptions, Connection, Panel, Project, RotationAxis, ValidationIssue, Vec3 } from './types'
@@ -405,6 +406,20 @@ export function parseProject(input: unknown): Project {
   }
   const project: Project = { version: 1, name: stringIn(input.name, 'project name'), panels, connections }
   if (input.assemblies !== undefined) project.assemblies = parseAssemblyData(input.assemblies, project)
+  if (input.connectorOverrides !== undefined) {
+    if (!object(input.connectorOverrides) || Object.keys(input.connectorOverrides).length > 8000) throw new Error('Invalid connector overrides.')
+    project.connectorOverrides = Object.fromEntries(Object.entries(input.connectorOverrides).map(([id, raw]) => {
+      let key: unknown
+      try { key = JSON.parse(id) } catch { throw new Error('Invalid connector selection ID.') }
+      if (!Array.isArray(key) || key.length !== 2 || typeof key[0] !== 'string' || !Number.isInteger(key[1]) || key[1] < 0 || key[1] >= 20 || !object(raw)) throw new Error('Invalid connector override.')
+      if (raw.removed !== undefined && typeof raw.removed !== 'boolean') throw new Error('Invalid connector removal.')
+      return [id, {
+        ...(raw.color !== undefined ? { color: colorIn(raw.color) } : {}),
+        ...(raw.type !== undefined ? { type: enumIn(raw.type, ['90', '105', '150', 't', 'cross'] as const, 'connector type') } : {}),
+        ...(raw.removed !== undefined ? { removed: raw.removed as boolean } : {}),
+      }]
+    }))
+  }
   return project
 }
 
@@ -416,7 +431,7 @@ export function projectToCsv(project: Project): string {
   const rows: (string | number)[][] = [['Item', 'Quantity', 'Width (mm)', 'Height (mm)', 'Thickness (mm)', 'Material', 'Color', 'Pattern', 'Hole size (mm)', 'Hole pitch (mm)']]
   for (const panel of project.panels) rows.push([panel.name, 1, panel.width, panel.height, panel.thickness, panel.material, panel.color, panel.pattern, panel.pattern === 'solid' ? '' : panel.holeSize, panel.pattern === 'solid' ? '' : panel.holeSpacing])
   const connectors = new Map<string, number>()
-  for (const c of project.connections) if (c.count > 0) { const key = `${c.type}|${c.color}`; connectors.set(key, (connectors.get(key) ?? 0) + c.count) }
+  for (const c of getPhysicalConnectors(project)) { const key = `${c.type}|${c.color}`; connectors.set(key, (connectors.get(key) ?? 0) + 1) }
   for (const [key, count] of connectors) { const [type, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', 'Reinforced plastic', color, '', '', '']) }
   return '\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n')
 }

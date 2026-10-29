@@ -1,3 +1,4 @@
+import { ConnectorColorField } from './ConnectorColorField'
 import type { Dispatch, SetStateAction } from 'react'
 import { Check, CircleHelp, Layers, Link2 } from 'lucide-react'
 import { NumberField, PanelFields, SelectField } from './fields'
@@ -29,7 +30,8 @@ export function AttachmentInspector({selected,panels,draft,setDraft,attachment,s
           <div className="field"><span>Connector</span><div className="connector-options">{CONNECTORS.map(c=><Tooltip key={c.id} label={c.description}><button className={attachment.type===c.id?'selected':''} aria-label={`${c.name} connector`} aria-pressed={attachment.type===c.id} onClick={()=>setAttachment(a=>({...a,type:c.id}))}><ConnectorGlyph type={c.id}/><span>{c.name}</span></button></Tooltip>)}</div></div>
           <div className="field-row"><NumberField label="Offset" value={attachment.offset} onChange={offset=>setAttachment(a=>({...a,offset}))}/><NumberField label="Inset" value={attachment.inset} onChange={inset=>setAttachment(a=>({...a,inset}))}/></div><p className="field-note">Offset slides along the joint. Inset moves it across the panel.</p>
           <label className="checkbox-label"><input type="checkbox" checked={attachment.flip} onChange={e=>setAttachment(a=>({...a,flip:e.target.checked}))}/>Flip joint direction</label>
-          <div className="field-row"><NumberField label="Connectors" value={attachment.count} min={1} max={8} unit="pcs" onChange={count=>setAttachment(a=>({...a,count:Math.round(count)}))}/><label className="field"><span>Connector color</span><input className="connector-color-input" type="color" aria-label="Connector color" value={attachment.color} onChange={e=>setAttachment(a=>({...a,color:e.target.value}))}/></label></div>
+          <NumberField label="Connectors" value={attachment.count} min={1} max={8} unit="pcs" onChange={count=>setAttachment(a=>({...a,count:Math.round(count)}))}/>
+          <ConnectorColorField color={attachment.color} onChange={color=>setAttachment(a=>({...a,color}))}/>
           <section className="inspector-section"><div className="section-title"><h2>{attachment.type==='t'?'2 new panels':attachment.type==='cross'?'3 new panels':attachTarget==='new'?'New panel':'Your panel'}</h2><Layers size={16}/></div><PanelFields panel={draft} onChange={patch=>setDraft(p=>({...p,...patch}))} compact/></section>
           {previewError&&<div className="validation-note error" role="alert"><CircleHelp size={16}/><span>{previewError}</span></div>}
           {previewIssues.length?previewIssues.map(i=><div className={`validation-note ${i.severity}`} key={i.id}><CircleHelp size={16}/><span>{i.message}</span></div>):hasPreview?<div className="compatibility-note"><Check size={16}/><span>Panel thickness is compatible</span></div>:null}
