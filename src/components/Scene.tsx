@@ -9,6 +9,7 @@ import { makePanelGeometry } from './scene-geometry'
 import { RoomEnvironment } from './RoomEnvironment'
 import { getRoomLayout } from './room-layout'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
+import { PreviewDragMovement, type PreviewDragProps } from './PreviewDragMovement'
 import { Plus } from 'lucide-react'
 import './assemblies.css'
 
@@ -26,7 +27,7 @@ export interface AssemblyAttachmentHandle {
   active?: boolean
 }
 
-export interface SceneProps {
+export interface SceneProps extends PreviewDragProps {
   panels: Panel[]
   connections: Connection[]
   connectorOverrides?: Project['connectorOverrides']
@@ -36,6 +37,8 @@ export interface SceneProps {
   onSelect: (id: string | null, additive?: boolean) => void
   onMove?: (delta: Vec3, repeat: boolean) => void
   movementEnabled?: boolean
+  dragging?: boolean
+  dragSnap?: { position: Vec3; label: string } | null
   onDrillIn?: (panelId: string) => void
   attachmentHandles?: AssemblyAttachmentHandle[]
   onAttachmentPreview?: (id: string | null) => void
@@ -135,7 +138,7 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDri
   useEffect(() => () => { document.body.style.cursor = '' }, [])
   const position = panel.position.map(value => value * MM) as Vec3
   return <group position={position} rotation={panel.rotation}>
-    <mesh name={panel.name} geometry={geometry} material={[face, edge]} castShadow={!ghost} receiveShadow={!ghost}
+    <mesh name={panel.name} userData={ghost || !interactive ? undefined : { panelId: panel.id }} geometry={geometry} material={[face, edge]} castShadow={!ghost} receiveShadow={!ghost}
       onClick={ghost || !interactive ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey) }}
       onDoubleClick={ghost || !interactive || !onDrillIn ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onDrillIn(panel.id) }}
       onPointerOver={ghost || !interactive ? undefined : event => { event.stopPropagation(); document.body.style.cursor = 'pointer' }}
@@ -355,7 +358,8 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
   const extent = useMemo(() => Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5), [bounds])
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
   return <>
-    <PanelKeyboardMovement {...props}/>
+    <PanelKeyboardMovement {...props} movementEnabled={props.movementEnabled && !props.dragging}/>
+    <PreviewDragMovement {...props}/>
     {props.view === 'perspective'
       ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
       : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
@@ -377,6 +381,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
+    {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className="preview-drag-snap">Snapped · {props.dragSnap.label}</span></Html>}
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
     <CameraController panMode={props.panMode} bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
@@ -393,10 +398,10 @@ class ViewportBoundary extends Component<{ children: ReactNode }, { error: boole
 
 export default function Scene(props: SceneProps) {
   const attachmentElements = useRef(new Map<string, HTMLDivElement>())
-  const attachmentHandles = !props.exploded && !props.realisticPreview ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
+  const attachmentHandles = !props.exploded && !props.realisticPreview && !props.dragging ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
   return <ViewportBoundary>
     <div className="scene-surface">
-    <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
+    <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
       style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.panMode ? 'grab' : undefined }}
       onPointerMissed={event => { if (event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}

@@ -26,6 +26,7 @@ import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
 import { useProject } from '@/hooks/use-project'
 import { useCopyPaste } from '@/hooks/use-copy-paste'
 import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
+import { usePreviewDrag } from '@/hooks/use-preview-drag'
 import { duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, isPanelConnectedToAssembly, moveAssemblies, removeAssembly } from '@/lib/assemblies'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
@@ -74,6 +75,7 @@ export default function App() {
   const connectorCount=physicalConnectors.length
   const connectorSummary=CONNECTORS.map(type=>({name:type.name,count:physicalConnectors.filter(c=>c.type===type.id).length})).filter(type=>type.count>0).map(type=>`${type.count} × ${type.name}`).join(' · ')
   const notify=useCallback((message:string)=>setToast(message),[])
+  const drag=usePreviewDrag({project,selectedIds,commit,notify})
   const assembly=useAssemblyEditor({project,selectedIds,setSelectedIds,commit,notify,
     prepareSelection:()=>{setInspectorTab('panel');setRightOpen(true);setExploded(false);if(window.innerWidth<=900)setLeftOpen(false)},fit:()=>setFrameSignal(v=>v+1)})
   const clipboard=useCopyPaste({project,selectedIds,commit,notify,
@@ -294,7 +296,8 @@ export default function App() {
       assemblies={assembly.sidebarAssemblies} selectedAssemblyId={instance?.id} onSelectAssembly={id=>{clipboard.cancel();assembly.select(id)}}
       onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={insertSavedAssembly}/>
 
-    <AssemblyWorkspace connectorOverrides={project.connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={panels} connections={project.connections} selectedIds={selectedIds} choosePanel={choosePanel}
+    <AssemblyWorkspace connectorOverrides={(drag.project??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={drag.panels??panels} connections={(drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
+      onDragStart={drag.start} onDragMove={drag.move} onDragEnd={drag.end} dragging={drag.active} dragSnap={drag.snap}
       onAutoConnect={addAutoConnectors} autoConnectDisabled={!!dialog||!!assembly.editingInstance||panels.length<2}
       onMove={moveSelection} movementEnabled={!clipboard.active&&!dialog&&!assembly.editingInstance&&!(assembly.memberInstance&&!instance)&&!assembly.preview&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))}
       previewPanels={clipboard.active?clipboard.previewPanels:assembly.preview?assembly.previewPanels:previewPanels} previewConnections={clipboard.active?clipboard.previewConnections:assembly.preview?assembly.previewConnections:previewConnections} view={view} showGrid={showGrid} showDimensions={showDimensions}
