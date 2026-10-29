@@ -65,3 +65,40 @@ test('pastes a copied assembly through corner handles and cancels stale previews
   await expect(handles).toHaveCount(0)
   expect((await saved(page, 4)).assemblies!.instances).toHaveLength(1)
 })
+
+for (const selection of ['panel', 'multiple panels', 'assembly'] as const) {
+  test(`library insertion waits for preview placement on ${selection}`, async ({ page }) => {
+    const project: Project = selection === 'assembly' ? createExampleProject('assembly-cube') : {
+      version: 1, name: 'Library attachment', connections: [], panels: [
+        createPanel({ name: 'Target one', position: [-800, 700, 0] }),
+        createPanel({ name: 'Target two', position: [800, 700, 0] }),
+      ],
+    }
+    await load(page, project)
+    if (selection === 'multiple panels') await page.getByRole('button', { name: 'Select all', exact: true }).click()
+    await page.getByRole('button', { name: 'Library', exact: true }).click()
+    await page.getByRole('button', { name: 'Assemblies', exact: true }).click()
+    const card = page.getByRole('button', { name: selection === 'assembly' ? 'Insert Cube module instance' : 'Cube module', exact: true })
+    await card.click()
+    const handles = page.getByRole('button', { name: /^Attach assembly at / })
+    await expect(handles.first()).toBeVisible()
+    expect(await saved(page, project.panels.length)).toEqual(project)
+    await handles.first().hover()
+    expect(await saved(page, project.panels.length)).toEqual(project)
+    await page.getByRole('button', { name: 'Cancel placement', exact: true }).click()
+    await expect(handles).toHaveCount(0)
+    await card.click()
+    await expect(handles.first()).toBeVisible()
+    await handles.first().click()
+    const next = await saved(page, project.panels.length + 4)
+    expect(next.assemblies!.instances).toHaveLength(selection === 'assembly' ? 2 : 1)
+    if (selection === 'assembly') {
+      expect(next.assemblies!.definitions).toHaveLength(1)
+      expect(next.assemblies!.links).toHaveLength(1)
+    }
+    await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+    expect(await saved(page, project.panels.length)).toEqual(project)
+    await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+    expect(await saved(page, next.panels.length)).toEqual(next)
+  })
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { copySelection, getPasteTargets, type CopiedItem } from '@/lib/clipboard'
+import { copySelection, getPasteTargets, getAssemblyInsertionTargets, type CopiedItem } from '@/lib/clipboard'
 import type { AssemblyAttachmentTarget } from '@/lib/assemblies'
 import type { Project } from '@/lib/types'
 
@@ -14,7 +14,7 @@ interface Options {
 
 export function useCopyPaste({ project, selectedIds, commit, select, prepare, notify }: Options) {
   const [clipboard, setClipboard] = useState<CopiedItem | null>(null)
-  const [placement, setPlacement] = useState<{ project: Project; selection: string; targets: AssemblyAttachmentTarget[] } | null>(null)
+  const [placement, setPlacement] = useState<{ project: Project; selection: string; insertion?: boolean; targets: AssemblyAttachmentTarget[] } | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const selection = selectedIds.join('/')
   useEffect(() => {
@@ -30,9 +30,23 @@ export function useCopyPaste({ project, selectedIds, commit, select, prepare, no
   const cancel = () => { setPlacement(null); setHoverId(null) }
   return {
     active, targets, hovered, preview, previewPanels, previewConnections,
+    inserting: active && placement.insertion,
     suppressedConnectionIds: preview ? project.connections.filter(connection => !preview.connections.some(item => item.id === connection.id)).map(connection => connection.id) : [],
     boundsPanels: targets.flatMap(target => target.project ? addedPanels(target.project) : []),
     cancel, hover: setHoverId,
+    insertAssembly: (item: Extract<CopiedItem, { kind: 'assembly' }>) => {
+      cancel()
+      try {
+        const candidates = getAssemblyInsertionTargets(project, selectedIds, item)
+        const valid = candidates.filter(target => target.project)
+        if (!valid.length) {
+          notify('No compatible attachment points on this selection. Clear the selection to insert the assembly freely.')
+          return
+        }
+        prepare(); setPlacement({ project, selection, targets: valid, insertion: true })
+        notify('Choose a + in the preview to attach the assembly. Escape cancels.')
+      } catch (error) { notify((error as Error).message) }
+    },
     copy: () => {
       try {
         const item = copySelection(project, selectedIds)
@@ -55,7 +69,7 @@ export function useCopyPaste({ project, selectedIds, commit, select, prepare, no
       if (!next) return
       const ids = addedPanels(next).map(panel => panel.id)
       commit(next); cancel(); select(ids)
-      notify('Copy attached. Undo is available.')
+      notify(placement?.insertion ? 'Assembly attached. Undo is available.' : 'Copy attached. Undo is available.')
     },
   }
 }

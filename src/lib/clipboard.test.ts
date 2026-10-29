@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { copySelection, getPasteTargets } from './clipboard'
+import { copySelection, getPasteTargets, getAssemblyInsertionTargets } from './clipboard'
 import { createAssembly, materializeAssemblies, removeAssembly, updateAssemblyFinish } from './assemblies'
 import { createExampleProject } from './example-library'
 import { createPanel, parseProject, validateProject } from './model'
@@ -64,5 +64,39 @@ describe('copy and paste attachments', () => {
     expect(() => copySelection(project, [])).toThrow('Select one')
     expect(() => copySelection(project, project.panels.map(panel => panel.id))).toThrow('Select one')
     expect(() => getPasteTargets(project, [], copySelection(project, [project.panels[0].id]))).toThrow('Select a target')
+  })
+})
+
+
+describe('library insertion targets', () => {
+  it('offers multiple selected panels without mutating the project', () => {
+    const project = looseProject()
+    const before = structuredClone(project)
+    const source = createExampleProject('assembly-cube')
+    const copied = copySelection(source, source.panels.map(panel => panel.id))
+    if (copied.kind !== 'assembly') throw new Error('Expected assembly')
+    const targets = getAssemblyInsertionTargets(project, project.panels.map(panel => panel.id), copied).filter(target => target.project)
+    for (const panel of project.panels) expect(targets.some(target => target.id.startsWith(panel.id))).toBe(true)
+    expect(new Set(targets.map(target => target.id)).size).toBe(targets.length)
+    expect(project).toEqual(before)
+    for (const target of targets) {
+      expect(target.project!.assemblies!.instances).toHaveLength(1)
+      const serialized = JSON.parse(JSON.stringify(target.project))
+      expect(parseProject(serialized)).toEqual(serialized)
+    }
+  })
+
+  it('offers each selected assembly once and keeps saved-source inserts linked', () => {
+    const project = boxProject()
+    const ids = project.panels.map(panel => panel.id)
+    const copied = copySelection(project, ids)
+    if (copied.kind !== 'assembly') throw new Error('Expected assembly')
+    const targets = getAssemblyInsertionTargets(project, ids, copied).filter(target => target.project)
+    expect(targets).toHaveLength(4)
+    for (const target of targets) {
+      expect(target.project!.assemblies!.definitions).toHaveLength(1)
+      expect(target.project!.assemblies!.instances).toHaveLength(2)
+      expect(target.project!.assemblies!.links).toHaveLength(1)
+    }
   })
 })

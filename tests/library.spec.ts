@@ -165,6 +165,8 @@ test('diamond shelf loads from its own preview, keeps the 45-degree build, and s
 
 test('assembly collection inserts reusable modules without replacing the build', async ({ page }) => {
   await page.goto('/')
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await page.getByRole('button', { name: 'Clear', exact: true }).click()
   await page.getByRole('button', { name: 'Library', exact: true }).click()
   const library = page.getByRole('complementary', { name: 'Project panels' })
   await library.getByRole('combobox', { name: 'Example category' }).selectOption('Shelving')
@@ -202,6 +204,8 @@ test('angled assembly modules filter, preview, insert, and persist', async ({ pa
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await page.getByRole('button', { name: 'Clear', exact: true }).click()
   await page.getByRole('button', { name: 'Library', exact: true }).click()
   const library = page.getByRole('complementary', { name: 'Project panels' })
   await library.getByRole('button', { name: 'Assemblies', exact: true }).click()

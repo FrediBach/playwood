@@ -14,6 +14,7 @@ import { CONNECTORS } from '@/lib/connector-options'
 import { MultiPanelInspector } from '@/components/MultiPanelInspector'
 import { ProjectStatus } from '@/components/ProjectStatus'
 import { ProjectSidebar } from '@/components/ProjectSidebar'
+import { copySelection } from '@/lib/clipboard'
 import { insertLibraryAssembly } from '@/lib/assembly-library'
 import { createExampleProject } from '@/lib/example-library'
 import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
@@ -209,6 +210,13 @@ export default function App() {
   const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return;const group=connection.id.replace(/:\d+$/,'');commit(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
   const insertModule = (id: string) => {
     try {
+      if (selectedIds.length) {
+        const source = createExampleProject(id)
+        const item = copySelection(source, source.panels.map(panel => panel.id))
+        if (item.kind === 'assembly') clipboard.insertAssembly(item)
+        return
+      }
+      clipboard.cancel()
       const next = insertLibraryAssembly(project, id)
       commit(next); assembly.close()
       setSelectedIds(Object.values(next.assemblies!.instances.at(-1)!.panelIds))
@@ -216,13 +224,22 @@ export default function App() {
       notify('Assembly inserted. Duplicate it or attach it to your build.')
     } catch (error) { notify(error instanceof Error ? error.message : 'Could not insert assembly.') }
   }
+  const insertSavedAssembly = (id: string) => {
+    if (!selectedIds.length) { clipboard.cancel(); assembly.insert(id); return }
+    const definition = assembly.definitions.find(item => item.id === id)
+    if (!definition) return
+    clipboard.insertAssembly({ kind: 'assembly', definition, instance: {
+      id: crypto.randomUUID(), definitionId: id, name: definition.name,
+      position: [0, 0, 0], rotation: [0, 0, 0], panelIds: {},
+    } })
+  }
   const loadTemplate=(template:string)=>{const next=createExampleProject(template);commit(next);assembly.close();const instance=next.assemblies?.instances[0];setSelectedIds(instance?Object.values(instance.panelIds):next.panels.slice(0,1).map(p=>p.id));setInspectorTab('panel');setDialog(null);setExploded(false);setFitSignal(v=>v+1);notify(template==='blank'?'A fresh start. Add your first panel.':'Template loaded. Make it your own.')}
   const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
   const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=repairLegacyShelf(imported);const repaired=repairLegacyExampleInserts(shelf);commit(repaired);assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
   const instance=assembly.selectedInstance
   const validTargets=assembly.targets.filter(target=>target.project)
-  const assemblyHint=clipboard.active?'Hover a + to preview the copy. Click to attach · Esc to cancel.':instance&&!exploded&&!realisticPreview
+  const assemblyHint=clipboard.active?`Hover a + to preview the ${clipboard.inserting?'assembly':'copy'}. Click to attach · Esc to cancel.`:instance&&!exploded&&!realisticPreview
     ?validTargets.length?'Hover a + to preview. Click to attach.':assembly.targets.find(target=>target.error)?.error??'This assembly has no compatible corner attachments. Duplicate it to place another instance.'
     :undefined
   const attachmentSummary=assembly.target?.error??(assembly.preview?'Corner connectors replaced with shared cross connectors.':undefined)
@@ -243,7 +260,7 @@ export default function App() {
       onSelectAll={()=>{if(selectedPanels.length===panels.length&&!assembly.editingInstance)setSelectedIds([]);else selectAll()}}
       onCollapse={()=>setLeftOpen(false)} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')} addPanel={addPanel} loadTemplate={loadTemplate} onInsertLibraryAssembly={insertModule}
       assemblies={assembly.sidebarAssemblies} selectedAssemblyId={instance?.id} onSelectAssembly={id=>{clipboard.cancel();assembly.select(id)}}
-      onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={assembly.insert}/>
+      onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={insertSavedAssembly}/>
 
     <AssemblyWorkspace panels={panels} connections={project.connections} selectedIds={selectedIds} choosePanel={choosePanel}
       onAutoConnect={addAutoConnectors} autoConnectDisabled={!!dialog||!!assembly.editingInstance||panels.length<2}
@@ -254,7 +271,7 @@ export default function App() {
       setShowDimensions={setShowDimensions} setShowGrid={setShowGrid} setView={setView} setZoomSignal={setZoomSignal} setFitSignal={setFitSignal}
       setExploded={setExploded} onRotate={()=>setDialog('rotate')} addPanel={addPanel} isAttaching={inspectorTab==='attach'&&!!selected}
       attachmentSide={attachment.side} visibleBounds={visibleBounds} hasVisiblePanels={hasVisiblePanels}
-      attachmentHandles={!dialog?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?'Paste at':'Attach'} ${target.label}`,position:target.position,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
+      attachmentHandles={!dialog?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?(clipboard.inserting?'Attach assembly at':'Paste at'):'Attach'} ${target.label}`,position:target.position,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
       onAttachmentPreview={clipboard.active?clipboard.hover:assembly.hover} onAttachmentCommit={clipboard.active?clipboard.attach:assembly.attach} suppressedConnectionIds={clipboard.active?clipboard.suppressedConnectionIds:assembly.suppressedConnectionIds}
       attachmentBoundsPanels={clipboard.active?clipboard.boundsPanels:assembly.attachmentBoundsPanels}
       onDrillIn={assembly.drillIn} assemblyHint={assemblyHint} attachmentSummary={attachmentSummary}
@@ -265,6 +282,7 @@ export default function App() {
       canAttach={!!previewProject&&!attachmentErrors.length} attachmentType={attachment.type}
       contextLabel={assembly.editingInstance?'Shared assembly':assembly.hasMembers?'Assembly':undefined}
       onDoneEditing={assembly.editingInstance?assembly.done:undefined}>
+        {clipboard.inserting&&<section className="inspector-section"><p>Choose a + in the preview to attach the assembly.</p><Button variant="outline" onClick={clipboard.cancel}>Cancel placement</Button></section>}
         {!assembly.editingInstance&&<section className="inspector-section"><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2}><Link2 size={15}/>Auto-add connectors</Button><p className="field-note">{selectedIds.length>1?'Connect matching edges between selected panels.':selectedIds.length===1?'Connect this panel to matching nearby edges.':'Connect matching edges throughout the design.'} Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p></section>}
         {assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
           panels={assembly.editingDefinition.panels.filter(panel=>selectedIds.includes(assembly.editingInstance!.panelIds[panel.id]))}

@@ -53,3 +53,23 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
     } catch (error) { return { id, label, position, error: error instanceof Error ? error.message : 'This copy cannot fit here.' } }
   })))
 }
+
+/** Offer every selected target, keeping whole-instance corner joins where possible. */
+export function getAssemblyInsertionTargets(project: Project, ids: string[], copied: Extract<CopiedItem, { kind: 'assembly' }>): AssemblyAttachmentTarget[] {
+  const selected = new Set(ids)
+  const handled = new Set<string>()
+  return ids.flatMap(id => {
+    if (handled.has(id)) return []
+    const owner = getAssemblyInstance(project, id)
+    const members = owner ? Object.values(owner.panelIds) : []
+    if (owner && members.every(member => selected.has(member))) {
+      members.forEach(member => handled.add(member))
+      const corners = getPasteTargets(project, members, copied)
+      if (corners.some(target => target.project)) return corners.map(target => ({ ...target, label: `${owner.name} · ${target.label}` }))
+      // Angled modules may have no cross-compatible corners; offer their panel edges.
+      return members.flatMap(member => getPasteTargets(project, [member], copied).map(target => ({ ...target, label: `${owner.name} · ${project.panels.find(panel => panel.id === member)?.name} · ${target.label}` })))
+    }
+    handled.add(id)
+    return getPasteTargets(project, [id], copied).map(target => ({ ...target, label: `${project.panels.find(panel => panel.id === id)?.name} · ${target.label}` }))
+  })
+}
