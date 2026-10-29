@@ -46,6 +46,7 @@ export interface SceneProps {
   showDimensions: boolean
   exploded: boolean
   realisticPreview?: boolean
+  panMode?: boolean
   fitSignal: number
   frameSignal?: number
   zoomSignal: { direction: number; key: number }
@@ -164,7 +165,7 @@ function Dimensions({ bounds }: { bounds: THREE.Box3 }) {
   </group>
 }
 
-function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, realisticPreview }: Pick<SceneProps, 'view' | 'fitSignal' | 'frameSignal' | 'zoomSignal' | 'realisticPreview'> & { bounds: THREE.Box3 }) {
+function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, realisticPreview, panMode }: Pick<SceneProps, 'view' | 'fitSignal' | 'frameSignal' | 'zoomSignal' | 'realisticPreview' | 'panMode'> & { bounds: THREE.Box3 }) {
   const controls = useRef<OrbitControlsImpl>(null)
   const [roomMaxDistance, setRoomMaxDistance] = useState(100)
   const { camera, size, invalidate } = useThree()
@@ -174,6 +175,12 @@ function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, re
   const lastFitSignal = useRef(fitSignal)
   useLayoutEffect(() => { boundsRef.current = bounds }, [bounds])
   useEffect(() => {
+    // Clear pending inertia before fitting, so the view stays centered after a pan.
+    if (controls.current) {
+      controls.current.enableDamping = false
+      controls.current.update()
+      controls.current.enableDamping = true
+    }
     const preserveDirection = frameSignal !== undefined && frameSignal !== lastFrameSignal.current && fitSignal === lastFitSignal.current && !!controls.current
     lastFrameSignal.current = frameSignal
     lastFitSignal.current = fitSignal
@@ -242,7 +249,9 @@ function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, re
   }, [camera, zoomSignal.key, zoomSignal.direction, invalidate, realisticPreview, roomMaxDistance])
   return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.12} minZoom={25} maxZoom={4000}
     minDistance={realisticPreview ? 0.6 : 0.08} maxDistance={realisticPreview ? roomMaxDistance : 100} minPolarAngle={realisticPreview ? 0.25 : 0} maxPolarAngle={Math.PI * (realisticPreview ? 0.49 : 0.94)}
-    minAzimuthAngle={realisticPreview ? 0 : -Infinity} maxAzimuthAngle={realisticPreview ? Math.PI / 3 : Infinity} enableRotate={view === 'perspective'} enablePan={!realisticPreview} screenSpacePanning />
+    minAzimuthAngle={realisticPreview ? 0 : -Infinity} maxAzimuthAngle={realisticPreview ? Math.PI / 3 : Infinity} enableRotate={view === 'perspective'} enablePan screenSpacePanning
+    mouseButtons={{ LEFT: panMode || view !== 'perspective' ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
+    touches={{ ONE: panMode || view !== 'perspective' ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }} />
 }
 
 /** Read the live camera on every keypress, including during orbit damping. */
@@ -366,7 +375,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
-    <CameraController bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
+    <CameraController panMode={props.panMode} bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
 }
 
@@ -384,9 +393,9 @@ export default function Scene(props: SceneProps) {
   const attachmentHandles = !props.exploded && !props.realisticPreview ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
   return <ViewportBoundary>
     <div className="scene-surface">
-    <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit and scroll to zoom.' : 'Interactive 3D furniture design. Drag to orbit, scroll to zoom, click a panel to select it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
+    <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
-      style={{ width: '100%', height: '100%', touchAction: 'none' }}
+      style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.panMode ? 'grab' : undefined }}
       onPointerMissed={event => { if (event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}
       fallback={<div style={{ padding: 32 }}>Your browser needs WebGL to display this 3D workspace.</div>}>
       <World {...props} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
