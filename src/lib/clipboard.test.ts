@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { copySelection, getPasteTargets, getInsertionTargets } from './clipboard'
-import { createAssembly, materializeAssemblies, removeAssembly, updateAssemblyFinish } from './assemblies'
+import { createAssembly, materializeAssemblies, removeAssembly, updateAssemblyFinish, updateAssemblyParameters, updateAssemblyParameterValues } from './assemblies'
 import { createExampleProject } from './example-library'
 import { createPanel, parseProject, validateProject } from './model'
 import type { Project } from './types'
@@ -57,6 +57,53 @@ describe('copy and paste attachments', () => {
     const deleted = removeAssembly(next!, next!.assemblies!.instances[0].id)
     expect(deleted.connections).toHaveLength(0)
     expect(deleted.panels).toEqual([panel])
+  })
+
+  it('keeps configured dimensions when pasting an assembly onto a corner or a loose panel', () => {
+    const initial = createExampleProject('assembly-wide-box')
+    const source = initial.assemblies!.instances[0]
+    const values = { width: 900, height: 400, depth: 300 }
+    const configured = updateAssemblyParameterValues(initial, source.id, values)
+    const copied = copySelection(configured, Object.values(source.panelIds))
+    const panel = createPanel({ width: 200, height: 200, position: [3000, 1000, 0] })
+    const project = { ...configured, panels: [...configured.panels, panel] }
+    const before = structuredClone(project)
+    for (const selection of [Object.values(source.panelIds), [panel.id]]) {
+      const next = getPasteTargets(project, selection, copied).find(target => target.project)?.project
+      expect(next).toBeDefined()
+      const pasted = next!.assemblies!.instances.at(-1)!
+      expect(pasted.parameterValues).toEqual(values)
+      expect(pasted.definitionId).toBe(source.definitionId)
+      const panels = next!.panels.filter(item => Object.values(pasted.panelIds).includes(item.id))
+      expect(panels.filter(item => item.name.startsWith('Shelf')).every(item => item.width === 900 && item.height === 300)).toBe(true)
+      expect(panels.filter(item => item.name.startsWith('Upright')).every(item => item.width === 400 && item.height === 300)).toBe(true)
+      expect(validateProject(next!).filter(issue => issue.severity === 'error' || issue.id.startsWith('collision'))).toEqual([])
+      expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    }
+    expect(project).toEqual(before)
+  })
+
+  it.each(['removed', 'recreated'] as const)('pastes a copied instance after its width control is %s in the shared source', change => {
+    const initial = createExampleProject('assembly-wide-box')
+    const source = initial.assemblies!.instances[0]
+    const configured = updateAssemblyParameterValues(initial, source.id, { width: 900, height: 400, depth: 300 })
+    const copied = copySelection(configured, Object.values(source.panelIds))
+    const parameters = configured.assemblies!.definitions[0].parameters!
+    const edited = updateAssemblyParameters(configured, source.id, change === 'removed'
+      ? parameters.filter(parameter => parameter.id !== 'width')
+      : parameters.map(parameter => parameter.id === 'width' ? { ...parameter, id: 'new-width' } : parameter))
+    const panel = createPanel({ width: 200, height: 200, position: [3000, 1000, 0] })
+    const project = { ...edited, panels: [...edited.panels, panel] }
+    for (const selection of [Object.values(source.panelIds), [panel.id]]) {
+      const next = getPasteTargets(project, selection, copied).find(target => target.project)?.project
+      expect(next).toBeDefined()
+      const pasted = next!.assemblies!.instances.at(-1)!
+      expect(pasted.parameterValues).toEqual({ height: 400, depth: 300 })
+      const shelves = next!.panels.filter(item => Object.values(pasted.panelIds).includes(item.id) && item.name.startsWith('Shelf'))
+      expect(shelves).toHaveLength(2)
+      expect(shelves.every(item => item.width === 700 && item.height === 300)).toBe(true)
+      expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    }
   })
 
   it('rejects ambiguous selections', () => {

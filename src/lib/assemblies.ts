@@ -1,7 +1,8 @@
 import { Euler, Quaternion, Vector3 } from 'three'
-import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyLoosePort, AssemblyPort, AttachmentOptions, Connection, Panel, Project, Vec3 } from './types'
+import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyLoosePort, AssemblyParameter, AssemblyPort, AttachmentOptions, Connection, Panel, Project, Vec3 } from './types'
 import { attachPanel, getConnectorPlacements, getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
 import { resizePanels } from './structure-edit'
+import { evaluateAssemblyDefinition, parseAssemblyParameters, parseAssemblyParameterValues } from './assembly-parameters'
 
 const uid = () => crypto.randomUUID()
 const v = (value: Vec3) => new Vector3(...value)
@@ -19,6 +20,10 @@ function definitionFor(data: AssemblyData, instance: AssemblyInstance): Assembly
   const definition = data.definitions.find(item => item.id === instance.definitionId)
   if (!definition) throw new Error('This assembly has no source definition.')
   return definition
+}
+
+function evaluatedFor(data: AssemblyData, instance: AssemblyInstance): AssemblyDefinition {
+  return evaluateAssemblyDefinition(definitionFor(data, instance), instance.parameterValues)
 }
 
 function instanceFor(project: Project, instanceId: string): AssemblyInstance {
@@ -92,13 +97,13 @@ function worldPort(data: AssemblyData, endpoint: AssemblyEndpoint, panels: Panel
   }
   const instance = data.instances.find(item => item.id === endpoint.instanceId)
   if (!instance) throw new Error('This connection refers to a missing instance.')
-  const port = localPort(definitionFor(data, instance), endpoint.portId)
+  const port = localPort(evaluatedFor(data, instance), endpoint.portId)
   const rotation = q(instance.rotation)
   return { ...port, position: tuple(v(port.position).applyQuaternion(rotation).add(v(instance.position))), rotation: angles(rotation.multiply(q(port.rotation))) }
 }
 
 function placeAtPort(data: AssemblyData, source: AssemblyInstance, sourcePortId: string, target: AssemblyEndpoint): AssemblyInstance {
-  const sourcePort = localPort(definitionFor(data, source), sourcePortId)
+  const sourcePort = localPort(evaluatedFor(data, source), sourcePortId)
   const targetPort = worldPort(data, target)
   const rotation = q(targetPort.rotation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI)).multiply(q(sourcePort.rotation).invert())
   return { ...source, rotation: angles(rotation), position: tuple(v(targetPort.position).sub(v(sourcePort.position).applyQuaternion(rotation))) }
@@ -159,7 +164,7 @@ function rebuild(project: Project, data: AssemblyData, oldData = project.assembl
     && !connections.some(connection => connection.id === port.connection.id)) connections.push({ ...port.connection, role: 'support' })
   if (data.loosePorts !== undefined) data = { ...data, loosePorts: data.loosePorts.filter(port => activeLoose.has(port.id)) }
   for (const instance of data.instances) {
-    const definition = definitionFor(data, instance)
+    const definition = evaluatedFor(data, instance)
     const rotation = q(instance.rotation)
     for (const panel of resolvePanels(flat(definition))) panels.push({ ...panel, ...instance.finish, id: instance.panelIds[panel.id],
       position: tuple(v(panel.position).applyQuaternion(rotation).add(v(instance.position))), rotation: angles(rotation.clone().multiply(q(panel.rotation))) })
@@ -185,7 +190,7 @@ function ensureValid(next: Project, previous?: Project, collisionIds?: Set<strin
   return next
 }
 
-export function createAssembly(project: Project, selectedPanelIds: readonly string[], name = 'Box'): Project {
+export function createAssembly(project: Project, selectedPanelIds: readonly string[], name = 'Box', parameters: AssemblyParameter[] = []): Project {
   const ids = new Set(selectedPanelIds)
   const panels = resolvePanels(project).filter(panel => ids.has(panel.id))
   if (panels.length < 2) throw new Error('Select at least two connected panels to create an assembly.')
@@ -199,11 +204,12 @@ export function createAssembly(project: Project, selectedPanelIds: readonly stri
   if (reached.size !== panels.length) throw new Error('An assembly must be one connected set of panels.')
   const bounds = getProjectBounds(panels), center = tuple(v(bounds.min).add(v(bounds.max)).multiplyScalar(0.5))
   const local = panels.map(panel => ({ ...panel, position: tuple(v(panel.position).sub(v(center))) }))
-  const definition: AssemblyDefinition = { id: uid(), name: name.trim().slice(0, 120) || 'Assembly', panels: local, connections: connections.map(connection => ({ ...connection })), ports: inferPorts(local, connections) }
+  let definition: AssemblyDefinition = { id: uid(), name: name.trim().slice(0, 120) || 'Assembly', panels: local, connections: connections.map(connection => ({ ...connection })), ports: inferPorts(local, connections) }
+  if (parameters.length) definition = evaluateAssemblyDefinition({ ...definition, parameters: parseAssemblyParameters(parameters, local) })
   const instance: AssemblyInstance = { id: uid(), definitionId: definition.id, name: definition.name, position: center, rotation: [0, 0, 0], panelIds: Object.fromEntries(local.map(panel => [panel.id, panel.id])), connectionIds: Object.fromEntries(connections.map(connection => [connection.id, connection.id])) }
   const data = project.assemblies ?? empty()
   const base = { ...project, panels: project.panels.filter(panel => !ids.has(panel.id)), connections: project.connections.filter(connection => !ids.has(connection.parentId)) }
-  return ensureValid(rebuild(base, { ...data, definitions: [...data.definitions, definition], instances: [...data.instances, instance] }), project, new Set())
+  return ensureValid(rebuild(base, { ...data, definitions: [...data.definitions, definition], instances: [...data.instances, instance] }), project, parameters.length ? ids : new Set())
 }
 
 function newInstance(data: AssemblyData, definition: AssemblyDefinition, source?: AssemblyInstance): AssemblyInstance {
@@ -214,13 +220,17 @@ function newInstance(data: AssemblyData, definition: AssemblyDefinition, source?
     if (!jointIds.has(joint)) jointIds.set(joint, uid())
     return [connection.id, `${jointIds.get(joint)}:${connection.id.match(/:(\d+)$/)?.[1] ?? '0'}`]
   }))
+  // A clipboard copy may outlive a source control that was removed meanwhile.
+  const parameterValues = source?.parameterValues && Object.fromEntries(Object.entries(source.parameterValues)
+    .filter(([id]) => definition.parameters?.some(parameter => parameter.id === id)))
   return { id: uid(), definitionId: definition.id, name: `${definition.name} ${number}`, position: source ? [...source.position] : [0, 0, 0], rotation: source ? [...source.rotation] : [0, 0, 0],
-    panelIds: Object.fromEntries(definition.panels.map(panel => [panel.id, uid()])), connectionIds, ...(source?.finish ? { finish: { ...source.finish } } : {}) }
+    panelIds: Object.fromEntries(definition.panels.map(panel => [panel.id, uid()])), connectionIds, ...(source?.finish ? { finish: { ...source.finish } } : {}),
+    ...(parameterValues && Object.keys(parameterValues).length ? { parameterValues } : {}) }
 }
 
 function separateInstance(project: Project, data: AssemblyData, instanceId: string): AssemblyData {
   const instance = data.instances.find(item => item.id === instanceId)!
-  const definition = definitionFor(data, instance)
+  const definition = evaluatedFor(data, instance)
   const panelBounds = getProjectBounds(resolvePanels(project).filter(panel => !Object.values(instance.panelIds).includes(panel.id)))
   const ownPanels = resolvePanels(flat(definition)).map(panel => ({ ...panel, position: tuple(v(panel.position).applyQuaternion(q(instance.rotation)).add(v(instance.position))), rotation: angles(q(instance.rotation).multiply(q(panel.rotation))) }))
   const ownBounds = getProjectBounds(ownPanels)
@@ -232,7 +242,7 @@ export function instantiateAssembly(project: Project, definitionId: string): Pro
   const data = project.assemblies ?? empty(), definition = data.definitions.find(item => item.id === definitionId)
   if (!definition) throw new Error('Choose an assembly source.')
   const instance = newInstance(data, definition)
-  instance.position[1] = -getProjectBounds(resolvePanels(flat(definition))).min[1]
+  instance.position[1] = -getProjectBounds(resolvePanels(flat(evaluateAssemblyDefinition(definition)))).min[1]
   const nextData = separateInstance(project, { ...data, instances: [...data.instances, instance] }, instance.id)
   return ensureValid(rebuild(project, nextData), project, new Set(Object.values(instance.panelIds)))
 }
@@ -294,7 +304,11 @@ export function getAssemblyAttachmentTargets(project: Project, instanceId: strin
 
 /** Place a copied instance by one of its panels while retaining its rigid design. */
 export function attachAssemblyCopyToPanel(project: Project, source: AssemblyInstance, parentId: string, options: AttachmentOptions): Project {
-  const data = project.assemblies!, definition = definitionFor(data, source)
+  const data = project.assemblies!, currentDefinition = definitionFor(data, source)
+  const parameterValues = Object.fromEntries(Object.entries(source.parameterValues ?? {})
+    .filter(([id]) => currentDefinition.parameters?.some(parameter => parameter.id === id)))
+  source = { ...source, parameterValues }
+  const definition = evaluatedFor(data, source)
   let error: unknown = new Error('This assembly cannot fit on this edge.')
   for (const panel of resolvePanels(flat(definition))) {
     try {
@@ -331,7 +345,7 @@ export function disconnectAssembly(project: Project, instanceId: string): Projec
 
 /** Bake only this instance; mixed corner joints retain their existing hardware. */
 export function disassembleAssembly(project: Project, instanceId: string): Project {
-  const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
+  const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = evaluatedFor(data, instance)
   const loosePorts = [...(data.loosePorts ?? [])]
   const convert = (endpoint: AssemblyEndpoint): AssemblyEndpoint => {
     if (endpoint.instanceId !== instanceId) return endpoint
@@ -362,7 +376,7 @@ export function releaseAssemblyLinksForPanels(project: Project, panelIds: readon
 
 export function makeAssemblyIndependent(project: Project, instanceId: string): Project {
   const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
-  const copy: AssemblyDefinition = { ...definition, id: uid(), name: `${definition.name.slice(0, 108)} independent`, panels: definition.panels.map(panel => ({ ...panel })), connections: definition.connections.map(connection => ({ ...connection })), ports: definition.ports.map(port => ({ ...port })) }
+  const copy: AssemblyDefinition = { ...structuredClone(definition), id: uid(), name: `${definition.name.slice(0, 108)} independent` }
   return rebuild(project, { ...data, definitions: [...data.definitions, copy], instances: data.instances.map(item => item.id === instanceId ? { ...item, definitionId: copy.id } : item) })
 }
 
@@ -409,6 +423,46 @@ function solveInstancePlacements(data: AssemblyData): AssemblyData {
   return { ...data, instances }
 }
 
+/** Author the shared controls; existing instances retain their own overrides. */
+export function updateAssemblyParameters(project: Project, instanceId: string, parameters: AssemblyParameter[]): Project {
+  const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
+  const parsed = parseAssemblyParameters(parameters, definition.panels)
+  if (JSON.stringify(parsed) === JSON.stringify(definition.parameters ?? [])) return project
+  const nextDefinition = evaluateAssemblyDefinition({ ...definition, parameters: parsed })
+  const allowed = new Set(parsed.map(parameter => parameter.id))
+  const instances = data.instances.map(item => {
+    if (item.definitionId !== definition.id || !item.parameterValues) return item
+    const { parameterValues: previous, ...rest } = item
+    const parameterValues = Object.fromEntries(Object.entries(previous).filter(([id]) => allowed.has(id)))
+    return Object.keys(parameterValues).length ? { ...rest, parameterValues } : rest
+  })
+  const nextData = solveInstancePlacements({ ...data, instances, definitions: data.definitions.map(item => item.id === definition.id ? nextDefinition : item) })
+  return ensureValid(rebuild(project, nextData), project)
+}
+
+/** Change only this instance. An undefined entry restores its source default. */
+export function updateAssemblyParameterValues(project: Project, instanceId: string, values: Record<string, number | undefined>): Project {
+  const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
+  const parameters = definition.parameters ?? []
+  const parameterValues: Record<string, number> = Object.assign(Object.create(null), instance.parameterValues)
+  for (const [id, value] of Object.entries(values)) {
+    if (!parameters.some(parameter => parameter.id === id)) throw new Error('Choose a configurable value from this assembly source.')
+    if (value === undefined) delete parameterValues[id]
+    else parameterValues[id] = value
+  }
+  const checked = parseAssemblyParameterValues(parameterValues, parameters)
+  if (JSON.stringify(checked) === JSON.stringify(instance.parameterValues ?? {})) return project
+  const { parameterValues: _previous, ...rest } = instance
+  const nextInstance = Object.keys(checked).length ? { ...rest, parameterValues: checked } : rest
+  const nextData = solveInstancePlacements({ ...data, instances: data.instances.map(item => item.id === instanceId ? nextInstance : item) })
+  return ensureValid(rebuild(project, nextData), project)
+}
+
+export function resetAssemblyParameterValues(project: Project, instanceId: string): Project {
+  const instance = instanceFor(project, instanceId)
+  return updateAssemblyParameterValues(project, instanceId, Object.fromEntries(Object.keys(instance.parameterValues ?? {}).map(id => [id, undefined])))
+}
+
 export function updateAssemblyDefinition(project: Project, instanceId: string, patch: Partial<Panel>, partIds?: readonly string[]): Project {
   const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
   const ids = new Set(partIds ?? definition.panels.map(panel => panel.id))
@@ -418,11 +472,20 @@ export function updateAssemblyDefinition(project: Project, instanceId: string, p
   // A restored field can commit again on blur after a rejected edit. Preserve
   // the exact project and undo history rather than solving unchanged geometry.
   if (definition.panels.filter(panel => ids.has(panel.id)).every(panel => entries.every(([key, value]) => panel[key] === value))) return project
+  const controlled = definition.parameters?.flatMap(parameter => parameter.bindings) ?? []
+  if (controlled.some(binding => ids.has(binding.panelId) && patch[binding.dimension] !== undefined
+    && definition.panels.find(panel => panel.id === binding.panelId)![binding.dimension] !== patch[binding.dimension])) {
+    throw new Error('This dimension is controlled by an editable value. Edit its default in Editable values, or remove that dimension from the value first.')
+  }
   const { width, height, ...properties } = Object.fromEntries(entries) as Partial<Panel>
   let edited: Project = { ...flat(definition), panels: definition.panels.map(panel => ids.has(panel.id) ? { ...panel, ...properties } : panel) }
   if (width !== undefined || height !== undefined) edited = resizePanels(edited, [...ids], { width, height })
   edited = parseProject({ ...edited, panels: resolvePanels(edited) })
   ensureValid(edited)
+  if (controlled.some(binding => Math.abs(edited.panels.find(panel => panel.id === binding.panelId)![binding.dimension]
+    - definition.panels.find(panel => panel.id === binding.panelId)![binding.dimension]) > 1e-6)) {
+    throw new Error('This edit would change a dimension controlled by a configurable value. Edit the configurable value instead.')
+  }
   const nextDefinition = { ...definition, panels: edited.panels, connections: edited.connections }
   const nextData = solveInstancePlacements({ ...data, definitions: data.definitions.map(item => item.id === definition.id ? nextDefinition : item) })
   return ensureValid(rebuild(project, nextData), project)
@@ -459,7 +522,8 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
       return result
     })
     if (new Set(ports.map(port => port.id)).size !== ports.length || new Set(ports.map(port => port.connectionId)).size !== ports.length) throw new Error('Assembly corners must be unique.')
-    return { id: text(raw.id), name: parsed.name, panels: parsed.panels, connections: parsed.connections, ports }
+    return { id: text(raw.id), name: parsed.name, panels: parsed.panels, connections: parsed.connections, ports,
+      ...(raw.parameters === undefined ? {} : { parameters: parseAssemblyParameters(raw.parameters, parsed.panels) }) }
   })
   if (new Set(definitions.map(definition => definition.id)).size !== definitions.length) throw new Error('Assembly source IDs must be unique.')
   const allPanelIds = new Set<string>()
@@ -491,6 +555,7 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
       if (raw.finish.material !== undefined) { if (typeof raw.finish.material !== 'string' || !['birch', 'oak', 'walnut', 'mdf', 'painted'].includes(raw.finish.material)) throw new Error('Invalid assembly material.'); finish.material = raw.finish.material as AssemblyFinish['material'] }
       instance.finish = finish
     }
+    if (raw.parameterValues !== undefined) instance.parameterValues = parseAssemblyParameterValues(raw.parameterValues, definition.parameters ?? [])
     return instance
   })
   if (new Set(instances.map(instance => instance.id)).size !== instances.length) throw new Error('Assembly instance IDs must be unique.')

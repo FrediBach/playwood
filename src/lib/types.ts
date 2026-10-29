@@ -18,7 +18,10 @@ export interface Connection {
   color: string; count: number;
 }
 export interface AssemblyPort { id: string; connectionId: string; label: string }
-export interface AssemblyDefinition { id: string; name: string; panels: Panel[]; connections: Connection[]; ports: AssemblyPort[] }
+export type AssemblyDimension = 'width' | 'height' | 'thickness'
+export interface AssemblyParameterBinding { panelId: string; dimension: AssemblyDimension; scale: number; offset: number }
+export interface AssemblyParameter { id: string; name: string; defaultValue: number; bindings: AssemblyParameterBinding[] }
+export interface AssemblyDefinition { id: string; name: string; panels: Panel[]; connections: Connection[]; ports: AssemblyPort[]; parameters?: AssemblyParameter[] }
 export interface AssemblyFinish { color?: string; material?: Material }
 export interface AssemblyInstance {
   id: string; definitionId: string; name: string; position: Vec3; rotation: Vec3;
@@ -27,6 +30,8 @@ export interface AssemblyInstance {
   /** Stable local-connection to materialized-connection IDs, including suppressed corners. */
   connectionIds?: Record<string, string>;
   finish?: AssemblyFinish;
+  /** Per-instance values; absent entries inherit the source default. */
+  parameterValues?: Record<string, number>;
 }
 /** Without an instanceId, portId refers to a baked corner on ordinary panels. */
 export interface AssemblyEndpoint { instanceId?: string; portId: string }

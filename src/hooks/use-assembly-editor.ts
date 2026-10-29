@@ -3,9 +3,9 @@ import {
   createAssembly, duplicateAssembly, getAssemblyAttachmentTargets, getAssemblyInstance,
   instantiateAssembly, removeAssembly, disconnectAssembly, makeAssemblyIndependent,
   updateAssemblyDefinition, updateAssemblyFinish, resetAssemblyFinish, renameAssembly,
-  disassembleAssembly,
+  disassembleAssembly, updateAssemblyParameters, updateAssemblyParameterValues, resetAssemblyParameterValues,
 } from '@/lib/assemblies'
-import type { Panel, Project } from '@/lib/types'
+import type { AssemblyParameter, Panel, Project } from '@/lib/types'
 
 interface Options {
   project: Project
@@ -117,7 +117,10 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
     placementActive: !!placement && placement.targetId === targetInstanceId,
     select, edit, drillIn, updateDefinition, close, clearPlacement,
     done: () => { if (editingInstance) select(editingInstance.id); else close() },
-    create: (name: string) => run(() => createAssembly(project, selectedIds, name), 'Reusable assembly created. Use a + to attach a linked copy.', true),
+    create: (name: string, parameters: AssemblyParameter[] = []) => run(() => createAssembly(project, selectedIds, name, parameters), 'Reusable assembly created. Use a + to attach a linked copy.', true),
+    parameters: (parameters: AssemblyParameter[]) => editingInstance ? run(() => updateAssemblyParameters(project, editingInstance.id, parameters), 'Editable values saved for this assembly.') : false,
+    parameter: (id: string, parameterId: string, value: number) => run(() => updateAssemblyParameterValues(project, id, { [parameterId]: value })),
+    resetParameters: (id: string) => run(() => resetAssemblyParameterValues(project, id)),
     insert: (id: string) => run(() => instantiateAssembly(project, id), 'Linked instance added.', true),
     duplicate: (id: string) => run(() => duplicateAssembly(project, id), 'Linked instance duplicated.', true),
     remove: (id: string) => run(() => removeAssembly(project, id), 'Instance removed. Neighboring connectors restored.'),

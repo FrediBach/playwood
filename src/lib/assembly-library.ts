@@ -2,12 +2,26 @@ import { ANGLED_ASSEMBLIES } from './angled-assemblies'
 import { createAssembly, instantiateAssembly } from './assemblies'
 import { gridProject } from './example-geometry'
 import type { ExampleDefinition } from './example-library'
-import type { Project } from './types'
+import type { AssemblyParameter, Panel, Project } from './types'
+
+/** Grid panels use their width for the cut span and height for the shared depth. */
+function moduleParameters(id: string, panels: Panel[], columns: number[], rows: number[], depth: number): AssemblyParameter[] {
+  const bind = (panel: Panel, dimension: 'width' | 'height') => ({ panelId: panel.id, dimension, scale: 1, offset: 0 })
+  if (id === 'cube') return [{ id: 'side-length', name: 'Side length', defaultValue: columns[0],
+    bindings: panels.flatMap(panel => [bind(panel, 'width'), bind(panel, 'height')]) }]
+  return [
+    ...columns.map((length, index) => ({ id: columns.length === 1 ? 'width' : `width-${index + 1}`, name: columns.length === 1 ? 'Width' : `Column ${index + 1} width`, defaultValue: length,
+      bindings: panels.filter(panel => panel.name.startsWith(`Shelf ${index + 1}.`)).map(panel => bind(panel, 'width')) })),
+    ...rows.map((length, index) => ({ id: rows.length === 1 ? 'height' : `height-${index + 1}`, name: rows.length === 1 ? 'Height' : `Row ${index + 1} height`, defaultValue: length,
+      bindings: panels.filter(panel => panel.name.startsWith('Upright ') && panel.name.endsWith(`.${index + 1}`)).map(panel => bind(panel, 'width')) })),
+    { id: 'depth', name: 'Depth', defaultValue: depth, bindings: panels.map(panel => bind(panel, 'height')) },
+  ]
+}
 
 function module(id: string, name: string, description: string, category: string, columns: number[], rows: number[], depth = 350, cells?: [number, number][]): ExampleDefinition {
   return { id: `assembly-${id}`, name, description, category, create: () => {
     const project = gridProject(name, columns, rows, { depth, cells })
-    return createAssembly(project, project.panels.map(panel => panel.id), name)
+    return createAssembly(project, project.panels.map(panel => panel.id), name, moduleParameters(id, project.panels, columns, rows, depth))
   } }
 }
 

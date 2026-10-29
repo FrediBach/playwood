@@ -12,7 +12,7 @@ type Dimensions = Partial<Pick<Panel, 'width' | 'height'>>
 type Row = { entries: Map<number, number>; value: number }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions }
+type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, Dimensions> }
 
 const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 const position = (panel: Panel) => new Vector3(...panel.position)
@@ -253,7 +253,11 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   for (const item of selected) {
     const index = indices.get(item.panel.id)!
     for (const [dimension, field] of (['width', 'height'] as const).entries()) {
-      const target = row(edit.kind === 'resize' && edit.patch[field] !== undefined ? edit.patch[field]! - item.panel[field] : 0)
+      const patch = edit.kind === 'resize' ? edit.patches?.[item.panel.id] ?? edit.patch : undefined
+      // A parameter can drive any mixture of local panel axes. Keep every
+      // bound value exact in the same solve, including unchanged controls.
+      if (edit.kind === 'resize' && edit.patches && patch?.[field] === undefined) continue
+      const target = row(patch?.[field] !== undefined ? patch[field]! - item.panel[field] : 0)
       add(target, index * 5 + 3 + dimension, 1)
     }
     if (edit.kind === 'move') worldAxes.forEach((axis, dimension) => center(row(edit.delta[dimension]), index, axis))
@@ -366,4 +370,14 @@ export function resizePanels(project: Project, ids: readonly string[], patch: Di
   const wanted = new Set(ids)
   if (!project.panels.some(panel => wanted.has(panel.id) && (['width', 'height'] as const).some(field => patch[field] !== undefined && Math.abs(panel[field] - patch[field]!) > EPSILON))) return project
   return editStructure(project, ids, { kind: 'resize', patch })
+}
+
+/** Simultaneous independent targets, used by assembly instance parameters. */
+export function resizePanelDimensions(project: Project, patches: Record<string, Dimensions>): Project {
+  for (const patch of Object.values(patches)) if (Object.values(patch).some(value => value !== undefined && (!Number.isFinite(value) || value < 40 || value > 4000))) throw new Error(LIMIT_MESSAGE)
+  const ids = Object.keys(patches)
+  if (ids.some(id => !project.panels.some(panel => panel.id === id))) throw new Error('A configurable dimension refers to a missing panel.')
+  const ownPatches: Record<string, Dimensions> = Object.assign(Object.create(null), patches)
+  if (!project.panels.some(panel => (['width', 'height'] as const).some(field => ownPatches[panel.id]?.[field] !== undefined && Math.abs(panel[field] - ownPatches[panel.id][field]!) > EPSILON))) return project
+  return editStructure(project, ids, { kind: 'resize', patch: {}, patches: ownPatches })
 }
