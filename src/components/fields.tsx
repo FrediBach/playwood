@@ -4,8 +4,8 @@ import type { Panel, Pattern } from '@/lib/types'
 import { getSharedPanelFields } from '@/lib/selection'
 import { MATERIALS, COLORS } from '@/lib/materials'
 
-export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false}: {
-  label:string;value:number;onChange:(v:number)=>void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean
+export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false,commitOnBlur=false}: {
+  label:string;value:number;onChange:(v:number)=>boolean|void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean;commitOnBlur?:boolean
 }) {
   const [text,setText] = useState(String(Math.round(value*10)/10))
   const id=useId()
@@ -15,7 +15,7 @@ export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,un
     if(unavailable)return
     const n=Number(text)
     if(text.trim()&&Number.isFinite(n)){
-      const v=Math.max(min,Math.min(max,n));onChange(v);setText(String(Math.round(v*10)/10))
+      const v=Math.max(min,Math.min(max,n));const accepted=onChange(v)!==false;setText(String(Math.round((accepted?v:value)*10)/10))
     }else setText(String(value))
   }
   return <label className={`field ${unavailable?'field-disabled':''}`} htmlFor={id}>
@@ -23,7 +23,7 @@ export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,un
     <div className="number-wrap">
       <input id={id} aria-label={label} type="number" value={mixed?'':text} placeholder={mixed?'Mixed':undefined}
         title={mixed?'Different values in the selection':undefined} min={min} max={max} step={step} disabled={unavailable}
-        onChange={e=>{if(unavailable)return;const text=e.target.value;setText(text);const n=Number(text);if(text.trim()&&Number.isFinite(n)&&n>=min&&n<=max)onChange(n)}}
+        onChange={e=>{if(unavailable)return;const text=e.target.value;setText(text);const n=Number(text);if(!commitOnBlur&&text.trim()&&Number.isFinite(n)&&n>=min&&n<=max&&onChange(n)===false)setText(String(Math.round(value*10)/10))}}
         onBlur={commit} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/>
       {!mixed&&<span className="input-unit">{unit}</span>}
     </div>
@@ -66,8 +66,8 @@ function FinishField({color,mixed,disabled,onChange}: {color:string;mixed:boolea
     </div>
 }
 
-export function PanelFields({panel,panels,onChange:applyChange,compact=false,disabledFields=[]}: {
-  panel:Panel;panels?:Panel[];onChange:(v:Partial<Panel>)=>void;compact?:boolean;disabledFields?:readonly (keyof Panel)[]
+export function PanelFields({panel,panels,onChange:applyChange,compact=false,disabledFields=[],resizeOnCommit=false}: {
+  panel:Panel;panels?:Panel[];onChange:(v:Partial<Panel>)=>boolean|void;compact?:boolean;resizeOnCommit?:boolean;disabledFields?:readonly (keyof Panel)[]
 }) {
   const selection=panels?.length?panels:[panel]
   const shared=getSharedPanelFields(selection)
@@ -86,7 +86,7 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
       }))
       if(minPitch>selection[0].holeSpacing)patch.holeSpacing=minPitch
     }
-    applyChange(patch)
+    return applyChange(patch)
   }
   const numberProps=(key:keyof Panel)=>({mixed:mixed(key),disabled:disabledFields.includes(key)})
   const showPerforations=selection.some(p=>p.pattern!=='solid')
@@ -95,8 +95,8 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
   const minSpacing=Math.max(...selection.map(p=>Math.max(15,p.holeSize+6,Math.ceil(Math.sqrt(p.width*p.height/4500)))))
   return <>
     <div className="field-row">
-      <NumberField label="Width" value={panel.width} min={80} max={3000} {...numberProps('width')} onChange={width=>onChange({width})}/>
-      <NumberField label="Height" value={panel.height} min={80} max={3000} {...numberProps('height')} onChange={height=>onChange({height})}/>
+      <NumberField label="Width" commitOnBlur={resizeOnCommit} value={panel.width} min={80} max={3000} {...numberProps('width')} onChange={width=>onChange({width})}/>
+      <NumberField label="Height" commitOnBlur={resizeOnCommit} value={panel.height} min={80} max={3000} {...numberProps('height')} onChange={height=>onChange({height})}/>
       <NumberField label="Thickness" value={panel.thickness} min={3} max={60} {...numberProps('thickness')} onChange={thickness=>onChange({thickness})}/>
     </div>
     <SelectField label="Material" value={panel.material} mixed={mixed('material')} disabled={disabledFields.includes('material')}

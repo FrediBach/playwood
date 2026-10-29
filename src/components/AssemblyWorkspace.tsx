@@ -33,14 +33,15 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
 }
 const number = (n:number)=>Math.round(n).toLocaleString()
 
-export function AssemblyWorkspace({panels,connections,selectedIds,choosePanel,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels}: Props) {
+export function AssemblyWorkspace({panels,connections,selectedIds,choosePanel,onMove,movementEnabled,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels}: Props) {
   const previewIds = new Set(previewPanels.map(panel => panel.id))
   const sceneProps: SceneProps = realisticPreview
-    ? { panels, connections, selectedIds: [], onSelect: () => {}, view: 'perspective', showGrid: false, showDimensions, exploded: false, realisticPreview, fitSignal, zoomSignal }
+    ? { panels, connections, selectedIds, onSelect: choosePanel, view: 'perspective', showGrid: false, showDimensions, exploded: false, realisticPreview, fitSignal, zoomSignal }
     : { panels: panels.filter(panel => !previewIds.has(panel.id)), connections: connections.filter(connection => !previewIds.has(connection.childId) && !previewIds.has(connection.parentId)), selectedIds, onSelect: choosePanel, previewPanels, previewConnections, view, showGrid, showDimensions, exploded, realisticPreview, fitSignal, zoomSignal }
   return <main className="workspace" aria-label="3D assembly workspace">
       <WorkspaceToolbar panels={panels} realisticPreview={realisticPreview} setRealisticPreview={setRealisticPreview} onRotate={onRotate} leftOpen={leftOpen} setLeftOpen={setLeftOpen} rightOpen={rightOpen} setRightOpen={setRightOpen} showDimensions={showDimensions} setShowDimensions={setShowDimensions} showGrid={showGrid} setShowGrid={setShowGrid}/>
-      <div className="scene-container"><Scene {...sceneProps}/></div>
+      <div className="scene-container"><Scene {...sceneProps} onMove={onMove} movementEnabled={movementEnabled}/></div>
+      {selectedIds.length>0&&<div className="movement-hint" aria-live="polite">{movementEnabled?<><span>Move selection</span><kbd>↑ ↓ ← →</kbd><span>1 cm</span><span>·</span><kbd>Shift</kbd><span>10 cm</span></>:<span>{isAttaching?'Finish attaching to move panels':exploded?'Close exploded view to move panels':'Select a panel in the preview to move it'}</span>}</div>}
       {!realisticPreview&&isAttaching&&<div className="preview-badge"><span className="pulsing-dot"/>Attachment preview <span>·</span> {attachmentSide} side</div>}
       {!realisticPreview&&!panels.length&&<div className="canvas-empty"><h2>Something good starts here.</h2><p>Bring a panel. Build an idea.</p><Button onClick={addPanel}><Plus size={18}/>Add your first panel</Button></div>}
       {realisticPreview&&<div className="room-details" aria-label="Room scale reference">

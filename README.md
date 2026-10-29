@@ -17,7 +17,8 @@ Open the local URL printed by Vite. No accounts, API keys, backend, or external 
 
 - Start with a shelf, desk, display, a resource example from the Library, or a blank project.
 - Add your own panels with dimensions in millimeters, material, finish color, and thickness. Choose solid, pegboard, or rounded slots; holes are real openings through the mesh.
-- Select a panel in the model or panel list. Change dimensions, position, and orientation in the inspector.
+- Select a panel in the model or panel list. Change dimensions, position, and orientation in the inspector. Width and height edits apply on Enter or when leaving the field; connected panels adjust together to keep their joints aligned.
+- Click a panel in the Studio or Realistic preview and use **arrow keys** to move it **1 cm**, or **Shift + arrow keys** for **10 cm**. Movement follows the current view and the panel’s rotated axes, including after orbiting behind or above the assembly. Connected panels resize while connector angles, thicknesses, and hardware sizes stay fixed. A move that cannot preserve the joints or panel limits leaves the project unchanged and explains why. Free panels and fully selected assemblies translate together. Holding a key forms one undo step. Arrow shortcuts are active only while the canvas has focus; fields and panel-list controls retain their own keys. Finish an attachment or close exploded view before moving panels.
 - Drag a panel thumbnail to reorder the list. Hover or focus a row for rename, visibility, and remove controls; double-click a name to rename it in place. Amber markers identify overlaps and name the other panels on hover or focus. These changes autosave and support undo.
 - Shift-click, Ctrl/⌘-click, or use the panel checkboxes to select multiple panels. Shared parameters stay editable and apply to the entire selection; differing values show **Mixed** and are disabled. Related edits preserve mixed finishes and perforation spacing. Select all with **⌘/Ctrl A**.
 - Choose **Attach** to connect a new or existing panel to any of six sides. Explore 90°, 105°, 150°, T, and cross joints, offsets, insets, flip direction, connector color, and quantity. Ghost previews update as settings change.
@@ -26,9 +27,9 @@ Open the local URL printed by Vite. No accounts, API keys, backend, or external 
 - Thickness, shared-edge, and embedded edge-joint errors block new attachments. Panel overlaps, inaccessible face clamp positions, and supports that have moved out of alignment appear as review notes. The inspector and parts list identify the actual connector types.
 - Use **Rotate creation** above the canvas to rotate the whole assembly by ±90° or ±45°. Choose Z to tilt sideways into a diagonal layout, X to tip forward/backward, or Y to turn left/right. Every panel (including hidden panels and separate pieces) and connector moves together around the assembly center; its lowest panel height stays unchanged. Rotation autosaves, supports undo/redo, and is preserved in exported projects and the room preview.
 - Orbit, pan, zoom, inspect orthographic views, show dimensions, and explore the exploded view. Export editable JSON or a CSV cutting/parts list.
-- Choose **Realistic preview** to see your assembled furniture at its actual scale in a modern room with daylight, oak flooring, and familiar furnishings. The 165 cm floor lamp provides a size reference; dimensions describe the visible assembly. Orbit and zoom to explore, press **F** to reset the room view, and return to **Studio** (or press **Escape**) to resume editing with your selection and view settings preserved. The room renders locally without external assets or API keys.
+- Choose **Realistic preview** to see your assembled furniture at its actual scale in a modern room with daylight, oak flooring, and familiar furnishings. The 165 cm floor lamp provides a size reference; dimensions describe the visible assembly. Orbit and zoom to explore, press **F** to reset the room view, Click a panel and use arrow keys to adjust it here, or return to **Studio** (or press **Escape**) for the full inspector with your selection and view settings preserved. The room renders locally without external assets or API keys.
 
-Keyboard: **F** fits the view; **⌘/Ctrl Z** undoes; **⌘/Ctrl Shift Z** redoes; **⌘/Ctrl D** duplicates; **Delete** removes a panel; **Escape** cancels selection/preview. Text fields retain normal editing shortcuts.
+Keyboard: **Arrows** move the preview selection 1 cm; **Shift + arrows** move 10 cm; **F** fits the view; **⌘/Ctrl Z** undoes; **⌘/Ctrl Shift Z** redoes; **⌘/Ctrl D** duplicates; **Delete** removes a panel; **Escape** cancels selection/preview. Text fields retain normal editing shortcuts.
 
 In the panel list, **F2** edits a focused name. Focus a thumbnail and press **Space** to pick it up, **↑/↓** (or **Home/End**) to choose its position, then **Space/Enter** to drop or **Escape** to cancel. Renaming accepts **Enter** to save and **Escape** to cancel.
 
@@ -91,6 +92,8 @@ The app stores panels in local XY coordinates, with thickness on local Z. Projec
 
 - `src/App.tsx`: workspace and editing flows.
 - `src/lib/model.ts`: attachment geometry, validation, templates, imports, and parts export.
+- `src/lib/structure-edit.ts`: constrained panel movement and connected resizing.
+- `src/lib/panel-movement-direction.ts`: live camera projection and keyboard movement directions.
 - `src/lib/example-library.ts`: shared example catalog and resource references.
 - `src/lib/cad-examples.ts`: editable assemblies based on the numbered CAD resources.
 - `src/lib/pdf-examples.ts`: editable assemblies based on the collection plans.

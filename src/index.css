@@ -69,3 +69,5 @@
 
 .workspace-top{flex-wrap:wrap;align-items:center;gap:12px}.workspace-options{margin-left:auto}
 .rotation-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.rotation-actions .button-ghost{grid-column:1/-1;grid-row:2}
+
+.movement-hint{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;max-width:calc(100% - 24px);border:1px solid #d6d9cf;border-radius:6px;background:#fbfaf7ee;color:#626b59;font-size:11px;white-space:nowrap;pointer-events:none}.movement-hint kbd{font-size:11px;line-height:1.2}.scene-container canvas:focus-visible{outline:2px solid #c97649;outline-offset:-3px}.room-preview .movement-hint{bottom:123px;left:auto;right:28px;transform:none}@media(max-width:680px){.movement-hint{bottom:114px;font-size:10px;gap:4px}.movement-hint>span:first-child{display:none}.room-preview .movement-hint{left:50%;right:auto;transform:translateX(-50%);bottom:112px}}

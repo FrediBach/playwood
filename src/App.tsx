@@ -13,13 +13,14 @@ import { MultiPanelInspector } from '@/components/MultiPanelInspector'
 import { ProjectStatus } from '@/components/ProjectStatus'
 import { ProjectSidebar } from '@/components/ProjectSidebar'
 import { createExampleProject } from '@/lib/example-library'
-import { selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
+import { getSharedPanelFields, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
+import { movePanels, resizePanels } from '@/lib/structure-edit'
 import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
 import { useProject } from '@/hooks/use-project'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, rotateProject, validateProject } from '@/lib/model'
-import type { AttachmentOptions, CameraView, Panel } from '@/lib/types'
+import type { AttachmentOptions, CameraView, Panel, Vec3 } from '@/lib/types'
 
 const INITIAL_ATTACHMENT: AttachmentOptions = {side:'right',type:'90',offset:0,inset:0,flip:false,color:'#e86536',count:2}
 function download(content:string,name:string,type:string) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
@@ -56,10 +57,33 @@ export default function App() {
   useEffect(()=>{if(repairNotice)notify(repairNotice)},[repairNotice,notify])
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(''),3500);return()=>clearTimeout(t)}},[toast])
   useEffect(()=>{setSelectedIds(ids=>{const remaining=ids.filter(id=>project.panels.some(p=>p.id===id));return remaining.length===ids.length?ids:remaining})},[project.panels])
-  const updatePanel=useCallback((patch:Partial<Panel>)=>{if(selectedId)commit(p=>({...p,panels:p.panels.map(panel=>panel.id===selectedId?{...panel,...patch}:panel)}))},[commit,selectedId])
+  const updatePanel=(patch:Partial<Panel>)=>{
+    if(!selectedId)return false
+    try {
+      const {width,height,...rest}=patch
+      const base={...project,panels:project.panels.map(panel=>panel.id===selectedId?{...panel,...rest}:panel)}
+      commit(width!==undefined||height!==undefined?resizePanels(base,[selectedId],{width,height}):base)
+      return true
+    } catch(error) {notify(error instanceof Error?error.message:'This panel size cannot keep the joints aligned.');return false}
+  }
+  const updateMultiplePanels=(patch:Partial<Panel>)=>{
+    try {
+      const {width,height,...rest}=patch
+      const shared=getSharedPanelFields(selectedPanels)
+      const dimensions={width:shared.has('width')?width:undefined,height:shared.has('height')?height:undefined}
+      const base=updateSelectedPanels(project,selectedIds,rest)
+      commit(dimensions.width!==undefined||dimensions.height!==undefined?resizePanels(base,selectedIds,dimensions):base)
+      return true
+    } catch(error) {notify(error instanceof Error?error.message:'These panel sizes cannot keep the joints aligned.');return false}
+  }
+  const moveSelection=(delta:Vec3,repeat:boolean)=>{
+    try {
+      commit(current=>movePanels(current,selectedIds,delta),{group:'panel-move',repeat})
+    } catch(error) {notify(error instanceof Error?error.message:'This move cannot keep the joints aligned.')}
+  }
   const deleteSelected=useCallback(()=>{if(selectedIds.length){commit(p=>selectedIds.reduce((current,id)=>removePanel(current,id),p));notify(`${selectedIds.length===1?'Panel':'Panels'} removed. Undo to bring them back.`)}},[selectedIds,commit,notify])
   const duplicateSelected=useCallback(()=>{if(selectedIds.length){let next=project;const copies:string[]=[];for(const id of selectedIds){const duplicate=duplicatePanel(next,id);if(duplicate!==next)copies.push(duplicate.panels.at(-1)!.id);next=duplicate}commit(next);setSelectedIds(copies);notify(`${copies.length===1?'Panel':'Panels'} duplicated`)}},[selectedIds,project,commit,notify])
-  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{const target=e.target as HTMLElement;if(target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||dialog)return;if(realisticPreview){if(e.metaKey||e.ctrlKey){if(['a','d','z'].includes(e.key.toLowerCase()))e.preventDefault();return}if(e.key.toLowerCase()==='f')setFitSignal(v=>v+1);if(e.key==='Escape')setRealisticPreview(false);return}if(e.metaKey||e.ctrlKey){if(e.key.toLowerCase()==='a'){e.preventDefault();setSelectedIds(project.panels.map(p=>p.id));setInspectorTab('panel');setRightOpen(true)}else if(e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}else if(e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected()}}else if(!dialog){if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected()}if(e.key.toLowerCase()==='f')setFitSignal(v=>v+1);if(e.key==='Escape'){setInspectorTab('panel');setSelectedId(null)}}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[undo,redo,deleteSelected,duplicateSelected,dialog,project.panels,setSelectedId,realisticPreview])
+  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{const target=e.target as HTMLElement;if(target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||dialog)return;if(realisticPreview){if(e.metaKey||e.ctrlKey){if(['a','d','z'].includes(e.key.toLowerCase()))e.preventDefault();if(e.key.toLowerCase()==='z')e.shiftKey?redo():undo();return}if(e.key.toLowerCase()==='f')setFitSignal(v=>v+1);if(e.key==='Escape')setRealisticPreview(false);return}if(e.metaKey||e.ctrlKey){if(e.key.toLowerCase()==='a'){e.preventDefault();setSelectedIds(project.panels.map(p=>p.id));setInspectorTab('panel');setRightOpen(true)}else if(e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}else if(e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected()}}else if(!dialog){if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected()}if(e.key.toLowerCase()==='f')setFitSignal(v=>v+1);if(e.key==='Escape'){setInspectorTab('panel');setSelectedId(null)}}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[undo,redo,deleteSelected,duplicateSelected,dialog,project.panels,setSelectedId,realisticPreview])
   const {previewResult,previewProject,previewPanels,previewConnections,previewIssues,attachmentErrors}=useAttachmentPreview({project,selected,panels,draft,attachment,inspectorTab,attachTarget})
   const choosePanel=(id:string|null,additive=false)=>{setSelectedIds(ids=>selectPanelIds(ids,id,additive));if(additive||!id)setInspectorTab('panel');if(id)setRightOpen(true)}
   const addPanel=()=>{setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:600,height:360,thickness:18,position:[0,500,0]}));setDialog('add')}
@@ -87,6 +111,7 @@ export default function App() {
       onCollapse={()=>setLeftOpen(false)} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')} addPanel={addPanel} loadTemplate={loadTemplate}/>
 
     <AssemblyWorkspace panels={panels} connections={project.connections} selectedIds={selectedIds} choosePanel={choosePanel}
+      onMove={moveSelection} movementEnabled={!dialog&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))}
       previewPanels={previewPanels} previewConnections={previewConnections} view={view} showGrid={showGrid} showDimensions={showDimensions}
       exploded={exploded} realisticPreview={realisticPreview} fitSignal={fitSignal} zoomSignal={zoomSignal}
       setRealisticPreview={setRealisticPreview} leftOpen={leftOpen} rightOpen={rightOpen} setLeftOpen={setLeftOpen} setRightOpen={setRightOpen}
@@ -97,7 +122,7 @@ export default function App() {
     <InspectorSidebar inspectorTab={inspectorTab} selectedCount={selectedPanels.length} hasSelection={!!selected}
       onCollapse={()=>setRightOpen(false)} onPanel={()=>setInspectorTab('panel')} startAttach={startAttach} applyAttachment={applyAttachment}
       canAttach={!!previewProject&&!attachmentErrors.length} attachmentType={attachment.type}>
-        {selectedPanels.length>1&&<MultiPanelInspector panels={selectedPanels} connections={project.connections} issues={issues} onChange={patch=>commit(p=>updateSelectedPanels(p,selectedIds,patch))} onConnectionChange={patch=>commit(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected}/>}
+        {selectedPanels.length>1&&<MultiPanelInspector panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commit(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected}/>}
         {selected&&(inspectorTab==='panel'?<SinglePanelInspector selected={selected} panels={panels} connection={connection} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={()=>{commit(p=>detachPanel(p,selected.id));notify('Panel detached. Its position is unchanged.')}} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={panels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewError={previewResult.error} previewIssues={previewIssues} hasPreview={!!previewProject}/>)}
         {!selectedPanels.length&&<div className="no-selection"><MousePointer2 size={28}/><h2>A little more detail.</h2><p>Select a panel in the workspace<br/>to make it your own.</p><Button variant="outline" onClick={addPanel}><Plus size={16}/>Add a panel</Button></div>}
     </InspectorSidebar>

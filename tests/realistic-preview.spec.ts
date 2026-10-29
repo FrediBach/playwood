@@ -40,7 +40,8 @@ test('room preview preserves the assembly, selection and studio controls', async
   await expectRenderedRoom(page)
   await page.screenshot({ path: 'test-results/realistic-preview-desktop.png' })
 
-  await page.locator('canvas').click()
+  // Keyboard focus preserves selection; clicking a room panel now selects it.
+  await page.locator('canvas').focus()
   await page.keyboard.press('Delete')
   await page.keyboard.press('ControlOrMeta+d')
   await page.getByRole('button', { name: 'Zoom in', exact: true }).click()

@@ -1,4 +1,4 @@
-import { Component, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Component, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
@@ -8,6 +8,7 @@ import { ConnectorMeshes } from './ConnectorMeshes'
 import { makePanelGeometry } from './scene-geometry'
 import { RoomEnvironment } from './RoomEnvironment'
 import { getRoomLayout } from './room-layout'
+import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
 
 const MM = 0.001
 const ACCENT = '#e75a35'
@@ -19,6 +20,8 @@ export interface SceneProps {
   connections: Connection[]
   selectedIds: readonly string[]
   onSelect: (id: string | null, additive?: boolean) => void
+  onMove?: (delta: Vec3, repeat: boolean) => void
+  movementEnabled?: boolean
   previewPanels?: Panel[]
   previewConnections?: Connection[]
   view: CameraView
@@ -217,6 +220,48 @@ function CameraController({ bounds, view, fitSignal, zoomSignal, realisticPrevie
     minAzimuthAngle={realisticPreview ? 0 : -Infinity} maxAzimuthAngle={realisticPreview ? Math.PI / 3 : Infinity} enableRotate={view === 'perspective'} enablePan={!realisticPreview} screenSpacePanning />
 }
 
+/** Read the live camera on every keypress, including during orbit damping. */
+function PanelKeyboardMovement({panels, selectedIds, onMove, movementEnabled}: SceneProps) {
+  const {camera, gl, size} = useThree()
+  const gesture = useRef('')
+  const move = useEffectEvent((event: KeyboardEvent) => {
+    if (!movementEnabled || !onMove || event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    const wanted = new Set(selectedIds)
+    const selected = panels.filter(panel => panel.visible && wanted.has(panel.id))
+    if (!selected.length) return
+    const position = selected.reduce((center, panel) => center.map((value, axis) => value + panel.position[axis] / selected.length) as Vec3, [0, 0, 0] as Vec3)
+    camera.updateWorldMatrix(true, false)
+    const delta = getPanelMovementDelta({camera, key:event.key, shiftKey:event.shiftKey, position, rotation:selected[0].rotation, viewport:size})
+    if (!delta) return
+    event.preventDefault()
+    event.stopPropagation()
+    const key = `${event.key}:${event.shiftKey}:${selected.map(panel=>panel.id).join(',')}`
+    onMove(delta, event.repeat && gesture.current === key)
+    gesture.current = key
+  })
+  useEffect(() => {
+    const canvas = gl.domElement
+    canvas.tabIndex = 0
+    canvas.setAttribute('aria-label', '3D preview canvas')
+    canvas.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight')
+    const reset = () => { gesture.current = '' }
+    const focus = () => canvas.focus({preventScroll:true})
+    canvas.addEventListener('pointerdown', focus)
+    canvas.addEventListener('keydown', move)
+    canvas.addEventListener('blur', reset)
+    window.addEventListener('keyup', reset)
+    window.addEventListener('blur', reset)
+    return () => {
+      canvas.removeEventListener('pointerdown', focus)
+      canvas.removeEventListener('keydown', move)
+      canvas.removeEventListener('blur', reset)
+      window.removeEventListener('keyup', reset)
+      window.removeEventListener('blur', reset)
+    }
+  }, [gl])
+  return null
+}
+
 function World(props: SceneProps) {
   const { panels, connections, selectedIds, onSelect, previewPanels = EMPTY_PANELS, previewConnections = EMPTY_CONNECTIONS, showGrid, showDimensions, exploded, realisticPreview } = props
   const displayPanels = useMemo(() => {
@@ -232,6 +277,7 @@ function World(props: SceneProps) {
   const extent = useMemo(() => Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5), [bounds])
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
   return <>
+    <PanelKeyboardMovement {...props}/>
     {props.view === 'perspective'
       ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
       : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
@@ -248,7 +294,7 @@ function World(props: SceneProps) {
     {showGrid && <Grid position={[0, floorY, 0]} args={[extent, extent]} cellSize={0.1} sectionSize={0.5} cellThickness={0.5} sectionThickness={0.7}
       cellColor="#cccfc5" sectionColor="#b9bdb2" fadeDistance={extent * 0.65} fadeStrength={2} fadeFrom={0} infiniteGrid />}
     </>}
-    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} interactive={!realisticPreview} onSelect={onSelect} />)}
+    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} />)}
     {!exploded && <ConnectorMeshes panels={panels} connections={connections} />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} ghost />}

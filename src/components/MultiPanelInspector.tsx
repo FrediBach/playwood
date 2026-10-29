@@ -9,7 +9,7 @@ interface Props {
   panels: Panel[]
   connections: Connection[]
   issues: ValidationIssue[]
-  onChange: (patch: Partial<Panel>) => void
+  onChange: (patch: Partial<Panel>) => boolean | void
   onConnectionChange: (patch: ConnectionPatch) => void
   onDuplicate: () => void
   onDelete: () => void
@@ -46,9 +46,9 @@ export function MultiPanelInspector({ panels, connections, issues, onChange, onC
     <div className="selected-heading"><span className="selection-indicator"/><span>MULTIPLE PANELS</span><Layers size={15} className="selected-index"/></div>
     <div className="multi-selection-heading"><h2>{panels.length} panels selected</h2><p>Shared values apply to every selected panel. Mixed values are disabled.</p></div>
     <label className={`field ${shared.has('name') ? '' : 'is-mixed'}`}><span>Name</span><input key={`${panels.map(p=>p.id).join(',')}-${first.name}`} defaultValue={shared.has('name') ? first.name : ''} placeholder="Mixed" disabled={!shared.has('name')} aria-label="Panel name" maxLength={60} onBlur={e=>{if(shared.has('name'))onChange({name:e.target.value.trim()||'Untitled panel'})}} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/></label>
-    <section className="inspector-section"><div className="section-title"><h2>Make them yours</h2><span>mm</span></div><PanelFields panel={first} panels={panels} onChange={onChange}/></section>
+    <section className="inspector-section"><div className="section-title"><h2>Make them yours</h2><span>mm</span></div><PanelFields resizeOnCommit panel={first} panels={panels} onChange={onChange}/></section>
     <section className="inspector-section"><div className="section-title"><h2>Placement</h2><Move3D size={16}/></div>
-      {anyAttached&&<p className="field-note">Connected panels follow their joints. Select a free panel to move it independently.</p>}
+      {anyAttached&&<p className="field-note">Click the preview and use arrow keys to move 1 cm, or Shift for 10 cm. Connected panels resize to keep their joints aligned.</p>}
       <SelectField label="Orientation" value={orientation} mixed={!shared.has('rotation')} disabled={anyAttached} onChange={value=>onChange({rotation:value==='horizontal'?[-Math.PI/2,0,0]:value==='side'?[0,Math.PI/2,0]:[0,0,0]})}><option value="vertical">Vertical · front facing</option><option value="horizontal">Horizontal · flat</option><option value="side">Vertical · side facing</option><option value="custom" disabled>Custom rotation</option></SelectField>
       <div className="field-row">{AXES.map((axis,i)=><NumberField key={axis} label={`Position ${axis}`} value={first.position[i]} mixed={!axisShared('position',i)} disabled={anyAttached} onChange={value=>changeAxis('position',i,value)}/>)}</div>
       <div className="field-row">{AXES.map((axis,i)=><NumberField key={axis} label={`Rotate ${axis}`} value={first.rotation[i]*180/Math.PI} mixed={!axisShared('rotation',i)} disabled={anyAttached} min={-360} max={360} unit="°" onChange={value=>changeAxis('rotation',i,value*Math.PI/180)}/>)}</div>
