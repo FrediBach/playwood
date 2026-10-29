@@ -91,6 +91,9 @@ describe('resource example library', () => {
 
   it('opens the photo-inspired diamond shelf already tilted, with white panels and black connectors', () => {
     const project = createExampleProject('diamond-shelf')
+    expect(project.assemblies?.definitions).toHaveLength(1)
+    expect(project.assemblies?.instances).toHaveLength(4)
+    expect(project.assemblies?.links).toHaveLength(4)
     const panels = resolvePanels(project)
     for (const panel of panels) {
       expect([panel.width, panel.height, panel.thickness]).toEqual([350, 350, 18])

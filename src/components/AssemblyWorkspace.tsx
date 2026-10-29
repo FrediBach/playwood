@@ -30,18 +30,25 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
   attachmentSide: Side
   visibleBounds: ReturnType<typeof getProjectBounds>
   hasVisiblePanels: boolean
+  suppressedConnectionIds?: string[]
+  editingAssembly?: { name: string; instanceCount: number; onDone: () => void }
+  assemblyHint?: string
+  attachmentSummary?: string
 }
 const number = (n:number)=>Math.round(n).toLocaleString()
 
-export function AssemblyWorkspace({panels,connections,selectedIds,choosePanel,onMove,movementEnabled,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels}: Props) {
+export function AssemblyWorkspace({panels,connections,selectedIds,choosePanel,onMove,movementEnabled,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,frameSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels,onDrillIn,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,suppressedConnectionIds=[],editingAssembly,assemblyHint,attachmentSummary}: Props) {
   const previewIds = new Set(previewPanels.map(panel => panel.id))
+  const replacedConnectionIds = new Set([...suppressedConnectionIds,...previewConnections.map(connection=>connection.id)])
   const sceneProps: SceneProps = realisticPreview
-    ? { panels, connections, selectedIds, onSelect: choosePanel, view: 'perspective', showGrid: false, showDimensions, exploded: false, realisticPreview, fitSignal, zoomSignal }
-    : { panels: panels.filter(panel => !previewIds.has(panel.id)), connections: connections.filter(connection => !previewIds.has(connection.childId) && !previewIds.has(connection.parentId)), selectedIds, onSelect: choosePanel, previewPanels, previewConnections, view, showGrid, showDimensions, exploded, realisticPreview, fitSignal, zoomSignal }
+    ? { panels, connections, selectedIds, onSelect: choosePanel, view: 'perspective', showGrid: false, showDimensions, exploded: false, realisticPreview, fitSignal, frameSignal, zoomSignal }
+    : { panels: panels.filter(panel => !previewIds.has(panel.id)), connections: connections.filter(connection => !replacedConnectionIds.has(connection.id) && !previewIds.has(connection.childId) && !previewIds.has(connection.parentId)), selectedIds, onSelect: choosePanel, onDrillIn, attachmentHandles, onAttachmentPreview, onAttachmentCommit, attachmentBoundsPanels, previewPanels, previewConnections, view, showGrid, showDimensions, exploded, realisticPreview, fitSignal, frameSignal, zoomSignal }
   return <main className="workspace" aria-label="3D assembly workspace">
       <WorkspaceToolbar panels={panels} realisticPreview={realisticPreview} setRealisticPreview={setRealisticPreview} onRotate={onRotate} leftOpen={leftOpen} setLeftOpen={setLeftOpen} rightOpen={rightOpen} setRightOpen={setRightOpen} showDimensions={showDimensions} setShowDimensions={setShowDimensions} showGrid={showGrid} setShowGrid={setShowGrid}/>
       <div className="scene-container"><Scene {...sceneProps} onMove={onMove} movementEnabled={movementEnabled}/></div>
-      {selectedIds.length>0&&<div className="movement-hint" aria-live="polite">{movementEnabled?<><span>Move selection</span><kbd>↑ ↓ ← →</kbd><span>1 cm</span><span>·</span><kbd>Shift</kbd><span>10 cm</span></>:<span>{isAttaching?'Finish attaching to move panels':exploded?'Close exploded view to move panels':'Select a panel in the preview to move it'}</span>}</div>}
+      {!realisticPreview&&editingAssembly&&<div className="assembly-edit-breadcrumb"><Box size={15}/><strong>Editing {editingAssembly.name}</strong><span>Updates {editingAssembly.instanceCount} {editingAssembly.instanceCount===1?'instance':'instances'}</span><button className={rightOpen?'assembly-desktop-done':undefined} onClick={editingAssembly.onDone}>Done editing</button></div>}
+      {!realisticPreview&&(assemblyHint||attachmentSummary)&&<div className={`assembly-workspace-hint ${editingAssembly?'has-breadcrumb':''}`} role="status">{assemblyHint}{attachmentSummary&&<strong>{attachmentSummary}</strong>}</div>}
+      {selectedIds.length>0&&!editingAssembly&&(!assemblyHint||movementEnabled)&&<div className="movement-hint" aria-live="polite">{movementEnabled?<><span>Move selection</span><kbd>↑ ↓ ← →</kbd><span>1 cm</span><span>·</span><kbd>Shift</kbd><span>10 cm</span></>:<span>{isAttaching?'Finish attaching to move panels':exploded?'Close exploded view to move panels':'Select a panel in the preview to move it'}</span>}</div>}
       {!realisticPreview&&isAttaching&&<div className="preview-badge"><span className="pulsing-dot"/>Attachment preview <span>·</span> {attachmentSide} side</div>}
       {!realisticPreview&&!panels.length&&<div className="canvas-empty"><h2>Something good starts here.</h2><p>Bring a panel. Build an idea.</p><Button onClick={addPanel}><Plus size={18}/>Add your first panel</Button></div>}
       {realisticPreview&&<div className="room-details" aria-label="Room scale reference">

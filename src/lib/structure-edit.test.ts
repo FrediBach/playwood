@@ -5,6 +5,7 @@ import { gridProject } from './example-geometry'
 import { workstationProject } from './platform-examples'
 import { EXAMPLE_LIBRARY } from './example-library'
 import { movePanels, resizePanels } from './structure-edit'
+import { getAssemblyInstance, updateAssemblyDefinition } from './assemblies'
 import type { AttachmentOptions, Panel, Project, Vec3 } from './types'
 
 const named = (project: Project, name: string) => resolvePanels(project).find(panel => panel.name === name)!
@@ -155,7 +156,10 @@ describe('connected panel resizing', () => {
   it.each(EXAMPLE_LIBRARY)('keeps the $name example connected when its first panel grows', example => {
     const before = example.create()
     const selected = before.panels[0]
-    const next = resizePanels(before, [selected.id], { width: selected.width + 10, height: selected.height + 10 })
+    const instance = getAssemblyInstance(before, selected.id)
+    const next = instance
+      ? updateAssemblyDefinition(before, instance.id, { width: selected.width + 10, height: selected.height + 10 })
+      : resizePanels(before, [selected.id], { width: selected.width + 10, height: selected.height + 10 })
     expectValid(next)
   })
 

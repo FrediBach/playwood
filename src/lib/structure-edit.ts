@@ -300,6 +300,19 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
 
 function editStructure(project: Project, ids: readonly string[], edit: Edit): Project {
   const wanted = new Set(ids)
+  if (project.assemblies?.instances.length) {
+    const managed = new Set(project.assemblies.instances.flatMap(instance => Object.values(instance.panelIds)))
+    if ([...wanted].some(id => managed.has(id))) throw new Error('Edit the assembly source to change its panels, or move the assembly as a whole.')
+    // Instances are rigid objects. Incidental surface contacts must never let
+    // the loose-panel solver deform their materialized, linked source panels.
+    const looseConnections = project.connections.filter(connection => !managed.has(connection.parentId) && !managed.has(connection.childId))
+    if (project.connections.some(connection => managed.has(connection.parentId) !== managed.has(connection.childId))) throw new Error('Disconnect the loose panel from the assembly before editing it.')
+    const loose: Project = { version: 1, name: project.name, panels: project.panels.filter(panel => !managed.has(panel.id)), connections: looseConnections }
+    const edited = editStructure(loose, ids, edit)
+    const byId = new Map(edited.panels.map(panel => [panel.id, panel]))
+    const connectionById = new Map(edited.connections.map(connection => [connection.id, connection]))
+    return { ...project, panels: project.panels.map(panel => byId.get(panel.id) ?? panel), connections: project.connections.map(connection => connectionById.get(connection.id) ?? connection) }
+  }
   const panels = resolvePanels(project)
   if (!panels.some(panel => wanted.has(panel.id))) return project
   const frames = panels.map(frame)

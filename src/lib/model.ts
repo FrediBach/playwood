@@ -2,6 +2,7 @@ import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import type { AttachmentOptions, Connection, Panel, Project, RotationAxis, ValidationIssue, Vec3 } from './types'
 import { CONNECTOR_PROFILES } from './connector-profile'
+import { parseAssemblyData } from './assemblies'
 
 const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', painted: '#e8e7df' }
 const uid = () => globalThis.crypto?.randomUUID?.() ?? `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
@@ -204,7 +205,10 @@ export function rotateProject(project: Project, axis: RotationAxis, degrees: num
     rotation: rotationTuple(turn.clone().multiply(quaternion(panel))),
   }))
   const lift = bounds.min[1] - getProjectBounds(rotated).min[1]
-  const next = { ...project, panels: rotated.map(panel => ({
+  const next = { ...project, ...(project.assemblies ? { assemblies: { ...project.assemblies, instances: project.assemblies.instances.map(instance => ({ ...instance,
+    position: tuple(vec(instance.position).sub(center).applyQuaternion(turn).add(center).add(new Vector3(0, lift, 0))),
+    rotation: rotationTuple(turn.clone().multiply(new Quaternion().setFromEuler(new Euler(...instance.rotation, 'XYZ')))),
+  })) } } : {}), panels: rotated.map(panel => ({
     ...panel, position: [panel.position[0], panel.position[1] + lift, panel.position[2]] as Vec3,
   })) }
   // Connections remain in panel-local coordinates. Resolve once more so stored
@@ -390,7 +394,9 @@ export function parseProject(input: unknown): Project {
     const visited = new Set<string>(); let current: string | undefined = id
     while (current) { if (visited.has(current)) throw new Error('Circular attachments are not supported.'); visited.add(current); current = parents.get(current) }
   }
-  return { version: 1, name: stringIn(input.name, 'project name'), panels, connections }
+  const project: Project = { version: 1, name: stringIn(input.name, 'project name'), panels, connections }
+  if (input.assemblies !== undefined) project.assemblies = parseAssemblyData(input.assemblies, project)
+  return project
 }
 
 export function projectToCsv(project: Project): string {

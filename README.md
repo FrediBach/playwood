@@ -33,11 +33,25 @@ Keyboard: **Arrows** move the preview selection 1 cm; **Shift + arrows** move 10
 
 In the panel list, **F2** edits a focused name. Focus a thumbnail and press **Space** to pick it up, **↑/↓** (or **Home/End**) to choose its position, then **Space/Enter** to drop or **Escape** to cancel. Renaming accepts **Enter** to save and **Escape** to cancel.
 
+## Reusable assemblies
+
+Build a box once and reuse its construction as linked instances. Select the box's panels, enter an **Assembly name**, and choose **Create assembly**. The selected panels become its first instance, and the reusable design appears under **My assemblies** in the Library. The **Cube** library example is a four-panel starting point.
+
+- Select an instance as a whole from the canvas or the Assembly list. Expand its row to inspect individual panels. **Duplicate** (or **⌘/Ctrl D**) creates a linked copy; inserting from **My assemblies** uses the same definition.
+- Choose **Attach a copy**, then hover or focus a **+** in the workspace to preview its placement and resulting hardware. Click the handle to attach. **Attach an existing instance** connects a copy already in the project. **Escape** cancels placement. The complete placement, including connector replacements and any additional matching corners, is one undo step.
+- Compatible box corners automatically share cross connectors. Their original 90° hardware is replaced in the assembled creation without changing the reusable box definition. Removing or disconnecting an instance restores the affected corner hardware on its neighbors.
+- **Edit assembly** enters an explicit shared editing mode. The breadcrumb identifies the assembly and how many instances will change. Edit its panels, then choose **Done editing**. Structural edits update every linked instance and keep valid attachments aligned; an incompatible edit leaves the last valid construction unchanged.
+- **Instance panel color** is a local finish override. **Reset** restores the shared assembly colors. **Make independent** gives the selected instance its own construction while preserving its panels and physical connections. **Disconnect from neighbors** removes its physical links and places that instance beside the creation; its neighbors stay in place.
+
+The four-box Diamond arrangement has sixteen panels. Four separate boxes use thirty-two 90° connectors; joining their four shared corners replaces those with sixteen 90° and eight cross connectors. The middle compartment is the space enclosed between the four boxes. The final box can close two matching corners in the same placement.
+
+Instances move as rigid units. Automatic assembly attachment currently handles compatible 90° corner pairs; it does not merge overlapping walls or remove duplicate panels. Definitions, instances, overrides, and physical links are saved with the project and survive undo, reload, JSON export, and import. The parts list counts the resulting physical panels and connectors once.
+
 ## Resource examples
 
 The Library and Templates chooser include 22 resource examples alongside the three original starters and a photo-inspired Diamond shelf. Search or filter by category to find editable assemblies from `resources/library-3d`. Numbered CAD resources supply the totem, corner, shelf with doors, H-table 180, and promotional desk. The collection PDFs add shelves, tables, counters, a bench, a trade fair display, an island display, and individual exhibition plinths. Each thumbnail is generated from the assembly it opens; switching examples supports Undo.
 
-The **Diamond shelf** recreates the reference photo’s five compartments with white panels and black connectors. Its five-cell cross is rotated 45° around Z using the same `rotateProject` operation as the editor. It uses sixteen 350 × 350 × 18 mm panels, sixteen 90° connectors, and eight cross connectors. These dimensions are an editable approximation from the photo, not measured source dimensions. The library thumbnail shows the actual rotated build.
+The **Diamond shelf** recreates the reference photo’s five compartments with four linked **Box** instances, white panels, and black connectors. The middle compartment is enclosed by the four boxes. Its five-cell cross is rotated 45° around Z using the same `rotateProject` operation as the editor. It uses sixteen 350 × 350 × 18 mm panels, sixteen 90° connectors, and eight cross connectors. Select any box and choose **Edit assembly** to update all four. These dimensions are an editable approximation from the photo, not measured source dimensions. The library thumbnail shows the actual rotated build.
 
 Repeated plans across room collections appear once. The workshop-table PDF's H-table and cube are separate examples, as are the three closed plinths and the open tall and wide plinths. The open cube uses the same example as the standalone cube. The workshop table with shelves and Organizer Workstation 08 are the same build. The shelf with six doors and reception counter with four doors remain separate variants.
 
@@ -92,6 +106,7 @@ The app stores panels in local XY coordinates, with thickness on local Z. Projec
 
 - `src/App.tsx`: workspace and editing flows.
 - `src/lib/model.ts`: attachment geometry, validation, templates, imports, and parts export.
+- `src/lib/assemblies.ts`: reusable definitions, linked instances, corner attachment, shared hardware, and metadata validation.
 - `src/lib/structure-edit.ts`: constrained panel movement and connected resizing.
 - `src/lib/panel-movement-direction.ts`: live camera projection and keyboard movement directions.
 - `src/lib/example-library.ts`: shared example catalog and resource references.

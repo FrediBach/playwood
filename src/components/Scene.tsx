@@ -1,5 +1,5 @@
-import { Component, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
+import { Component, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -9,11 +9,22 @@ import { makePanelGeometry } from './scene-geometry'
 import { RoomEnvironment } from './RoomEnvironment'
 import { getRoomLayout } from './room-layout'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
+import { Plus } from 'lucide-react'
+import './assemblies.css'
 
 const MM = 0.001
 const ACCENT = '#e75a35'
 const EMPTY_PANELS: Panel[] = []
 const EMPTY_CONNECTIONS: Connection[] = []
+const EMPTY_ATTACHMENT_HANDLES: AssemblyAttachmentHandle[] = []
+
+export interface AssemblyAttachmentHandle {
+  id: string
+  /** Position in project millimeters. */
+  position: Vec3
+  label: string
+  active?: boolean
+}
 
 export interface SceneProps {
   panels: Panel[]
@@ -22,14 +33,21 @@ export interface SceneProps {
   onSelect: (id: string | null, additive?: boolean) => void
   onMove?: (delta: Vec3, repeat: boolean) => void
   movementEnabled?: boolean
+  onDrillIn?: (panelId: string) => void
+  attachmentHandles?: AssemblyAttachmentHandle[]
+  onAttachmentPreview?: (id: string | null) => void
+  onAttachmentCommit?: (id: string) => void
   previewPanels?: Panel[]
   previewConnections?: Connection[]
+  /** Attachment candidates included in fitting, without rendering them. */
+  attachmentBoundsPanels?: Panel[]
   view: CameraView
   showGrid: boolean
   showDimensions: boolean
   exploded: boolean
   realisticPreview?: boolean
   fitSignal: number
+  frameSignal?: number
   zoomSignal: { direction: number; key: number }
 }
 
@@ -76,8 +94,8 @@ function woodTexture(material: Panel['material']) {
 }
 
 
-function PanelMesh({ panel, selected, ghost, interactive = true, onSelect }: {
-  panel: Panel; selected: boolean; ghost?: boolean; interactive?: boolean; onSelect: SceneProps['onSelect']
+function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDrillIn }: {
+  panel: Panel; selected: boolean; ghost?: boolean; interactive?: boolean; onSelect: SceneProps['onSelect']; onDrillIn?: SceneProps['onDrillIn']
 }) {
   const { width, height, thickness, pattern, holeSize, holeSpacing } = panel
   const geometry = useMemo(() => makePanelGeometry({ width, height, thickness, pattern, holeSize, holeSpacing }), [width, height, thickness, pattern, holeSize, holeSpacing])
@@ -115,6 +133,7 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect }: {
   return <group position={position} rotation={panel.rotation}>
     <mesh name={panel.name} geometry={geometry} material={[face, edge]} castShadow={!ghost} receiveShadow={!ghost}
       onClick={ghost || !interactive ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey) }}
+      onDoubleClick={ghost || !interactive || !onDrillIn ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onDrillIn(panel.id) }}
       onPointerOver={ghost || !interactive ? undefined : event => { event.stopPropagation(); document.body.style.cursor = 'pointer' }}
       onPointerOut={ghost || !interactive ? undefined : () => { document.body.style.cursor = 'auto' }}>
     </mesh>
@@ -145,14 +164,20 @@ function Dimensions({ bounds }: { bounds: THREE.Box3 }) {
   </group>
 }
 
-function CameraController({ bounds, view, fitSignal, zoomSignal, realisticPreview }: Pick<SceneProps, 'view' | 'fitSignal' | 'zoomSignal' | 'realisticPreview'> & { bounds: THREE.Box3 }) {
+function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, realisticPreview }: Pick<SceneProps, 'view' | 'fitSignal' | 'frameSignal' | 'zoomSignal' | 'realisticPreview'> & { bounds: THREE.Box3 }) {
   const controls = useRef<OrbitControlsImpl>(null)
   const [roomMaxDistance, setRoomMaxDistance] = useState(100)
   const { camera, size, invalidate } = useThree()
   const boundsRef = useRef(bounds)
   const lastZoomKey = useRef(0)
+  const lastFrameSignal = useRef(frameSignal)
+  const lastFitSignal = useRef(fitSignal)
   useLayoutEffect(() => { boundsRef.current = bounds }, [bounds])
   useEffect(() => {
+    const preserveDirection = frameSignal !== undefined && frameSignal !== lastFrameSignal.current && fitSignal === lastFitSignal.current && !!controls.current
+    lastFrameSignal.current = frameSignal
+    lastFitSignal.current = fitSignal
+    const previousDirection = preserveDirection ? camera.position.clone().sub(controls.current!.target).normalize() : undefined
     const cameraBounds = boundsRef.current.clone().expandByScalar(0.08)
     if (realisticPreview) {
       const room = getRoomLayout(boundsRef.current)
@@ -161,7 +186,7 @@ function CameraController({ bounds, view, fitSignal, zoomSignal, realisticPrevie
       cameraBounds.expandByPoint(new THREE.Vector3(room.chairX + 0.55, Math.max(room.floorY + 1.9, boundsRef.current.max.y + 0.25), room.chairZ + 0.5))
     }
     const center = cameraBounds.getCenter(new THREE.Vector3())
-    const direction = realisticPreview ? new THREE.Vector3(0.33, size.width < size.height ? 0.1 : 0.22, 1).normalize() : view === 'front' ? new THREE.Vector3(0, 0, 1) : view === 'top' ? new THREE.Vector3(0, 1, 0.0001) : view === 'right' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(1.35, 0.9, 1.6).normalize()
+    const direction = previousDirection ?? (realisticPreview ? new THREE.Vector3(0.33, size.width < size.height ? 0.1 : 0.22, 1).normalize() : view === 'front' ? new THREE.Vector3(0, 0, 1) : view === 'top' ? new THREE.Vector3(0, 1, 0.0001) : view === 'right' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(1.35, 0.9, 1.6).normalize())
     const extent = cameraBounds.getSize(new THREE.Vector3()).length()
     camera.position.copy(center).addScaledVector(direction, Math.max(3, extent * 2.5))
     camera.up.set(0, 1, 0)
@@ -200,7 +225,7 @@ function CameraController({ bounds, view, fitSignal, zoomSignal, realisticPrevie
     controls.current?.target.copy(center)
     controls.current?.update()
     invalidate()
-  }, [camera, view, fitSignal, size.width, size.height, invalidate, realisticPreview])
+  }, [camera, view, fitSignal, frameSignal, size.width, size.height, invalidate, realisticPreview])
   useEffect(() => {
     if (!zoomSignal.key || zoomSignal.key === lastZoomKey.current) return
     lastZoomKey.current = zoomSignal.key
@@ -262,15 +287,38 @@ function PanelKeyboardMovement({panels, selectedIds, onMove, movementEnabled}: S
   return null
 }
 
-function World(props: SceneProps) {
-  const { panels, connections, selectedIds, onSelect, previewPanels = EMPTY_PANELS, previewConnections = EMPTY_CONNECTIONS, showGrid, showDimensions, exploded, realisticPreview } = props
+type AttachmentElements = RefObject<Map<string, HTMLDivElement>>
+
+/** The buttons belong to the app's DOM root; only their screen positions follow the 3D camera. */
+function AttachmentHandlePositions({ handles, elements }: { handles: AssemblyAttachmentHandle[]; elements: AttachmentElements }) {
+  const { camera, size, invalidate } = useThree()
+  const projected = useMemo(() => new THREE.Vector3(), [])
+  useLayoutEffect(() => { invalidate() }, [handles, camera, size, invalidate])
+  useFrame(() => {
+    camera.updateMatrixWorld()
+    for (const handle of handles) {
+      const element = elements.current.get(handle.id)
+      if (!element) continue
+      projected.set(...handle.position).multiplyScalar(MM).project(camera)
+      const x = (projected.x + 1) * size.width / 2
+      const y = (1 - projected.y) * size.height / 2
+      const visible = projected.z >= -1 && projected.z <= 1 && x >= 0 && x <= size.width && y >= 0 && y <= size.height
+      element.style.visibility = visible ? 'visible' : 'hidden'
+      element.style.transform = `translate3d(${x}px,${y}px,0) translate(-50%,-50%)`
+    }
+  })
+  return null
+}
+
+function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
+  const { panels, connections, selectedIds, onSelect, previewPanels = EMPTY_PANELS, previewConnections = EMPTY_CONNECTIONS, attachmentBoundsPanels = EMPTY_PANELS, showGrid, showDimensions, exploded, realisticPreview } = props
   const displayPanels = useMemo(() => {
     if (!exploded) return panels
     const center = boundsOf(panels).getCenter(new THREE.Vector3())
     return panels.map(panel => ({ ...panel, position: vector(panel.position).sub(center).multiplyScalar(1.45).add(center).multiplyScalar(1 / MM).toArray() as Vec3 }))
   }, [panels, exploded])
   const bounds = useMemo(() => boundsOf(displayPanels), [displayPanels])
-  const cameraBounds = useMemo(() => boundsOf([...displayPanels, ...previewPanels]), [displayPanels, previewPanels])
+  const cameraBounds = useMemo(() => boundsOf([...displayPanels, ...previewPanels, ...attachmentBoundsPanels]), [displayPanels, previewPanels, attachmentBoundsPanels])
   const center = useMemo(() => bounds.getCenter(new THREE.Vector3()), [bounds])
   const shownPanels = displayPanels.filter(panel => panel.visible)
   const floorY = bounds.min.y - 0.012
@@ -294,12 +342,13 @@ function World(props: SceneProps) {
     {showGrid && <Grid position={[0, floorY, 0]} args={[extent, extent]} cellSize={0.1} sectionSize={0.5} cellThickness={0.5} sectionThickness={0.7}
       cellColor="#cccfc5" sectionColor="#b9bdb2" fadeDistance={extent * 0.65} fadeStrength={2} fadeFrom={0} infiniteGrid />}
     </>}
-    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} />)}
+    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
     {!exploded && <ConnectorMeshes panels={panels} connections={connections} />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
-    <CameraController bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
+    <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
+    <CameraController bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
 }
 
@@ -313,13 +362,26 @@ class ViewportBoundary extends Component<{ children: ReactNode }, { error: boole
 }
 
 export default function Scene(props: SceneProps) {
+  const attachmentElements = useRef(new Map<string, HTMLDivElement>())
+  const attachmentHandles = !props.exploded && !props.realisticPreview ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
   return <ViewportBoundary>
+    <div className="scene-surface">
     <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit and scroll to zoom.' : 'Interactive 3D furniture design. Drag to orbit, scroll to zoom, click a panel to select it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
       style={{ width: '100%', height: '100%', touchAction: 'none' }}
       onPointerMissed={event => { if (event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}
       fallback={<div style={{ padding: 32 }}>Your browser needs WebGL to display this 3D workspace.</div>}>
-      <World {...props} />
+      <World {...props} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
     </Canvas>
+    <div className="assembly-attachment-layer">{attachmentHandles.map(handle=><div key={handle.id} className="assembly-attachment-anchor" ref={element=>{if(element)attachmentElements.current.set(handle.id,element);else attachmentElements.current.delete(handle.id)}}>
+      <button className={`assembly-attach-handle ${handle.active ? 'is-active' : ''}`} aria-label={handle.label} title={handle.label} data-attachment-id={handle.id}
+        onPointerDown={event => event.stopPropagation()}
+        onPointerEnter={() => props.onAttachmentPreview?.(handle.id)}
+        onPointerLeave={event => { if (document.activeElement !== event.currentTarget) props.onAttachmentPreview?.(null) }}
+        onFocus={() => props.onAttachmentPreview?.(handle.id)} onBlur={() => props.onAttachmentPreview?.(null)}
+        onKeyDown={event => { if (event.key !== 'Escape') event.stopPropagation() }}
+        onClick={event => { event.stopPropagation(); props.onAttachmentCommit?.(handle.id) }}><Plus size={17}/></button>
+    </div>)}</div>
+    </div>
   </ViewportBoundary>
 }
