@@ -2,7 +2,7 @@ import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import type { AttachmentOptions, Connection, Panel, Project, RotationAxis, ValidationIssue, Vec3 } from './types'
 import { CONNECTOR_PROFILES } from './connector-profile'
-import { parseAssemblyData } from './assemblies'
+import { parseAssemblyData, releaseAssemblyLinksForPanels } from './assemblies'
 
 const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', painted: '#e8e7df' }
 const uid = () => globalThis.crypto?.randomUUID?.() ?? `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
@@ -101,7 +101,13 @@ export function attachPanel(project: Project, parentId: string, panel: Panel, op
 }
 
 export function detachPanel(project: Project, id: string): Project {
+  project = releaseAssemblyLinksForPanels(project, [id])
   const incoming = project.connections.find(c => c.childId === id && c.role !== 'support')
+  const incident = project.connections.filter(connection => connection.parentId === id || connection.childId === id)
+  if (!incoming && incident.length && incident.every(connection => connection.role === 'support')) {
+    const joints = new Set(incident.map(jointId))
+    return { ...project, panels: resolvePanels(project), connections: project.connections.filter(connection => !joints.has(jointId(connection))) }
+  }
   const affectedJoint = incoming && jointId(incoming)
   const detachedChildren = new Set([id, ...project.connections.filter(c => affectedJoint && jointId(c) === affectedJoint).map(c => c.childId)])
   const affectedSupports = new Set(project.connections.filter(c => c.role === 'support' && detachedChildren.has(c.childId)).map(jointId))
@@ -158,10 +164,13 @@ export function getConnectorPlacements(connection: Connection, parent: Panel, ch
 }
 
 export function removePanel(project: Project, id: string): Project {
+  project = releaseAssemblyLinksForPanels(project, [id])
   // Detach surviving panels at their current world position instead of deleting a whole assembly.
   const worldPanels = resolvePanels(project)
   const affectedJointIds = new Set(project.connections.filter(c => c.parentId === id || c.childId === id).map(jointId))
-  const detachedChildren = new Set(project.connections.filter(c => affectedJointIds.has(jointId(c))).map(c => c.childId))
+  // Removing supplemental hardware does not reposition its surviving members.
+  // Only children released from a driving joint lose their other supports.
+  const detachedChildren = new Set(project.connections.filter(c => affectedJointIds.has(jointId(c)) && c.role !== 'support').map(c => c.childId))
   const affectedSupports = new Set(project.connections.filter(c => c.role === 'support' && detachedChildren.has(c.childId)).map(jointId))
   return { ...project,
     panels: worldPanels.filter(p => p.id !== id),

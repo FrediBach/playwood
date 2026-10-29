@@ -42,6 +42,9 @@ Build a box once and reuse its construction as linked instances. Select the box'
 - Compatible box corners automatically share cross connectors. Their original 90° hardware is replaced in the assembled creation without changing the reusable box definition. Removing or disconnecting an instance restores the affected corner hardware on its neighbors.
 - **Edit assembly** enters an explicit shared editing mode. The breadcrumb identifies the assembly and how many instances will change. Edit its panels, then choose **Done editing**. Structural edits update every linked instance and keep valid attachments aligned; an incompatible edit leaves the last valid construction unchanged.
 - **Instance panel color** is a local finish override. **Reset** restores the shared assembly colors. **Make independent** gives the selected instance its own construction while preserving its panels and physical connections. **Disconnect from neighbors** removes its physical links and places that instance beside the creation; its neighbors stay in place.
+- **Disassemble** turns the selected instance back into individually editable panels, retaining their positions, finishes, and physical connectors. Other instances stay linked, and the reusable design remains in **My assemblies**. The panels stay selected after disassembly; one Undo restores the instance.
+
+Disassembled panels retain their physical joints. If a panel still connects to a linked instance, use **Detach for free placement** (or **Detach selected panels**) before changing its geometry independently. Detaching restores the affected corner hardware on the remaining instances.
 
 The four-box Diamond arrangement has sixteen panels. Four separate boxes use thirty-two 90° connectors; joining their four shared corners replaces those with sixteen 90° and eight cross connectors. The middle compartment is the space enclosed between the four boxes. The final box can close two matching corners in the same placement.
 

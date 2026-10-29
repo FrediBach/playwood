@@ -1,5 +1,5 @@
 import { Euler, Quaternion, Vector3 } from 'three'
-import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyPort, Connection, Panel, Project, Vec3 } from './types'
+import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyLoosePort, AssemblyPort, Connection, Panel, Project, Vec3 } from './types'
 import { getConnectorPlacements, getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
 import { resizePanels } from './structure-edit'
 
@@ -11,7 +11,7 @@ const angles = (rotation: Quaternion): Vec3 => { const e = new Euler().setFromQu
 const jointId = (id: string) => id.replace(/:\d+$/, '')
 const empty = (): AssemblyData => ({ definitions: [], instances: [], links: [] })
 const flat = (definition: AssemblyDefinition): Project => ({ version: 1, name: definition.name, panels: definition.panels, connections: definition.connections })
-const endpointKey = (endpoint: AssemblyEndpoint) => `${endpoint.instanceId}/${endpoint.portId}`
+const endpointKey = (endpoint: AssemblyEndpoint) => `${endpoint.instanceId ?? 'loose'}/${endpoint.portId}`
 const internalId = (instance: AssemblyInstance, connectionId: string) => instance.connectionIds?.[connectionId] ?? `assembly/${instance.id}/${connectionId}`
 const linkPrefix = (linkId: string) => `assembly-link/${linkId}`
 
@@ -29,6 +29,34 @@ function instanceFor(project: Project, instanceId: string): AssemblyInstance {
 
 export function getAssemblyInstance(project: Project, panelId: string): AssemblyInstance | undefined {
   return project.assemblies?.instances.find(instance => Object.values(instance.panelIds).includes(panelId))
+}
+
+function connectedPanelIds(project: Project, ids: Iterable<string>): Set<string> {
+  const reached = new Set(ids)
+  for (let changed = true; changed;) {
+    changed = false
+    for (const connection of project.connections) if (reached.has(connection.parentId) || reached.has(connection.childId)) {
+      for (const id of [connection.parentId, connection.childId]) if (!reached.has(id)) { reached.add(id); changed = true }
+    }
+    for (const instance of project.assemblies?.instances ?? []) if (Object.values(instance.panelIds).some(id => reached.has(id))) {
+      for (const id of Object.values(instance.panelIds)) if (!reached.has(id)) { reached.add(id); changed = true }
+    }
+  }
+  return reached
+}
+
+export function isAssemblyConnected(project: Project, instanceId: string): boolean {
+  return !!project.assemblies?.links.some(link => link.a.instanceId === instanceId || link.b.instanceId === instanceId)
+}
+
+export function isPanelConnectedToAssembly(project: Project, panelId: string): boolean {
+  const reached = connectedPanelIds(project, [panelId])
+  return !!project.assemblies?.instances.some(instance => Object.values(instance.panelIds).some(id => reached.has(id)))
+}
+
+export function getAssemblyMovementPanelIds(project: Project, instanceIds: readonly string[]): string[] {
+  const selected = new Set(instanceIds)
+  return [...connectedPanelIds(project, (project.assemblies?.instances ?? []).filter(instance => selected.has(instance.id)).flatMap(instance => Object.values(instance.panelIds)))]
 }
 
 function inferPorts(panels: Panel[], connections: Connection[]): AssemblyPort[] {
@@ -55,7 +83,13 @@ function localPort(definition: AssemblyDefinition, portId: string): PortFrame {
   return { ...getConnectorPlacements({ ...connection, count: 1 }, parent, child)[0], connection, panels: [parent, child] }
 }
 
-function worldPort(data: AssemblyData, endpoint: AssemblyEndpoint): PortFrame {
+function worldPort(data: AssemblyData, endpoint: AssemblyEndpoint, panels: Panel[] = []): PortFrame {
+  if (!endpoint.instanceId) {
+    const connection = data.loosePorts?.find(port => port.id === endpoint.portId)?.connection
+    const parent = connection && panels.find(panel => panel.id === connection.parentId), child = connection && panels.find(panel => panel.id === connection.childId)
+    if (!connection || !parent || !child) throw new Error('This shared corner refers to missing loose panels.')
+    return { ...getConnectorPlacements({ ...connection, count: 1 }, parent, child)[0], connection, panels: [parent, child] }
+  }
   const instance = data.instances.find(item => item.id === endpoint.instanceId)
   if (!instance) throw new Error('This connection refers to a missing instance.')
   const port = localPort(definitionFor(data, instance), endpoint.portId)
@@ -89,10 +123,10 @@ function restoreLoose(project: Project, oldData: AssemblyData): { panels: Panel[
 }
 
 function crossConnections(link: AssemblyLink, data: AssemblyData, panels: Panel[]): Connection[] {
-  const a = worldPort(data, link.a), b = worldPort(data, link.b)
+  const a = worldPort(data, link.a, panels), b = worldPort(data, link.b, panels)
   if (!complementary(a, b)) throw new Error('The connected assembly corners no longer align. Keep matching dimensions or disconnect this instance first.')
-  const aInstance = data.instances.find(instance => instance.id === link.a.instanceId)!, bInstance = data.instances.find(instance => instance.id === link.b.instanceId)!
-  const ids = [...a.panels.map(panel => aInstance.panelIds[panel.id]), ...b.panels.map(panel => bInstance.panelIds[panel.id])]
+  const aInstance = data.instances.find(instance => instance.id === link.a.instanceId), bInstance = data.instances.find(instance => instance.id === link.b.instanceId)
+  const ids = [...a.panels.map(panel => aInstance ? aInstance.panelIds[panel.id] : panel.id), ...b.panels.map(panel => bInstance ? bInstance.panelIds[panel.id] : panel.id)]
   const members = ids.map(id => panels.find(panel => panel.id === id)!)
   if (members.some(panel => panel.thickness < 18 || panel.thickness > 19)) throw new Error('Cross connectors at assembly corners need 18–19 mm panels.')
   const parent = members[0]
@@ -118,6 +152,12 @@ function rebuild(project: Project, data: AssemblyData, oldData = project.assembl
   const panels = [...loose.panels]
   const connections = [...loose.connections]
   const occupied = new Set(data.links.flatMap(link => [endpointKey(link.a), endpointKey(link.b)]))
+  const activeLoose = new Set(data.links.flatMap(link => [link.a, link.b].filter(endpoint => !endpoint.instanceId).map(endpoint => endpoint.portId)))
+  const loosePorts = new Map([...(oldData.loosePorts ?? []), ...(data.loosePorts ?? [])].map(port => [port.id, port]))
+  for (const port of loosePorts.values()) if (!activeLoose.has(port.id)
+    && [port.connection.parentId, port.connection.childId].every(id => panels.some(panel => panel.id === id))
+    && !connections.some(connection => connection.id === port.connection.id)) connections.push({ ...port.connection, role: 'support' })
+  if (data.loosePorts !== undefined) data = { ...data, loosePorts: data.loosePorts.filter(port => activeLoose.has(port.id)) }
   for (const instance of data.instances) {
     const definition = definitionFor(data, instance)
     const rotation = q(instance.rotation)
@@ -163,7 +203,7 @@ export function createAssembly(project: Project, selectedPanelIds: readonly stri
   const instance: AssemblyInstance = { id: uid(), definitionId: definition.id, name: definition.name, position: center, rotation: [0, 0, 0], panelIds: Object.fromEntries(local.map(panel => [panel.id, panel.id])), connectionIds: Object.fromEntries(connections.map(connection => [connection.id, connection.id])) }
   const data = project.assemblies ?? empty()
   const base = { ...project, panels: project.panels.filter(panel => !ids.has(panel.id)), connections: project.connections.filter(connection => !ids.has(connection.parentId)) }
-  return ensureValid(rebuild(base, { definitions: [...data.definitions, definition], instances: [...data.instances, instance], links: data.links }), project, new Set())
+  return ensureValid(rebuild(base, { ...data, definitions: [...data.definitions, definition], instances: [...data.instances, instance] }), project, new Set())
 }
 
 function newInstance(data: AssemblyData, definition: AssemblyDefinition, source?: AssemblyInstance): AssemblyInstance {
@@ -266,6 +306,37 @@ export function disconnectAssembly(project: Project, instanceId: string): Projec
   return rebuild(project, separateInstance(project, { ...data, links }, instanceId))
 }
 
+/** Bake only this instance; mixed corner joints retain their existing hardware. */
+export function disassembleAssembly(project: Project, instanceId: string): Project {
+  const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
+  const loosePorts = [...(data.loosePorts ?? [])]
+  const convert = (endpoint: AssemblyEndpoint): AssemblyEndpoint => {
+    if (endpoint.instanceId !== instanceId) return endpoint
+    const original = localPort(definition, endpoint.portId).connection
+    const port: AssemblyLoosePort = { id: uid(), connection: { ...original, id: internalId(instance, original.id),
+      parentId: instance.panelIds[original.parentId], childId: instance.panelIds[original.childId], role: 'support' } }
+    loosePorts.push(port)
+    return { portId: port.id }
+  }
+  const links = data.links.map(link => ({ ...link, a: convert(link.a), b: convert(link.b) }))
+    // A joint between two ordinary corners is now ordinary project hardware.
+    // Leaving its materialized connections in place makes every panel editable.
+    .filter(link => link.a.instanceId || link.b.instanceId)
+  const used = new Set(links.flatMap(link => [link.a, link.b].filter(endpoint => !endpoint.instanceId).map(endpoint => endpoint.portId)))
+  return { ...project, assemblies: { ...data, instances: data.instances.filter(item => item.id !== instanceId), links,
+    loosePorts: loosePorts.filter(port => used.has(port.id)) } }
+}
+
+/** Explicit detach/remove restores both ordinary corners before editing panels. */
+export function releaseAssemblyLinksForPanels(project: Project, panelIds: readonly string[]): Project {
+  const data = project.assemblies
+  if (!data?.loosePorts?.length) return project
+  const selected = new Set(panelIds)
+  const ports = new Set(data.loosePorts.filter(port => selected.has(port.connection.parentId) || selected.has(port.connection.childId)).map(port => port.id))
+  const links = data.links.filter(link => ![link.a, link.b].some(endpoint => !endpoint.instanceId && ports.has(endpoint.portId)))
+  return links.length === data.links.length ? project : rebuild(project, { ...data, links })
+}
+
 export function makeAssemblyIndependent(project: Project, instanceId: string): Project {
   const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
   const copy: AssemblyDefinition = { ...definition, id: uid(), name: `${definition.name.slice(0, 108)} independent`, panels: definition.panels.map(panel => ({ ...panel })), connections: definition.connections.map(connection => ({ ...connection })), ports: definition.ports.map(port => ({ ...port })) }
@@ -304,6 +375,7 @@ function solveInstancePlacements(data: AssemblyData): AssemblyData {
         const target = link.a.instanceId === current ? link.a : link.b.instanceId === current ? link.b : undefined
         if (!target) continue
         const source = target === link.a ? link.b : link.a
+        if (!source.instanceId) continue
         if (visited.has(source.instanceId)) continue
         const index = instances.findIndex(instance => instance.id === source.instanceId)
         instances[index] = placeAtPort({ ...data, instances }, instances[index], source.portId, target)
@@ -337,12 +409,12 @@ export function moveAssemblies(project: Project, instanceIds: readonly string[],
   if (!delta.every(Number.isFinite)) throw new Error('Assembly movement must be finite.')
   const data = project.assemblies
   if (!data) return project
-  const ids = new Set(instanceIds)
-  for (let changed = true; changed;) { changed = false; for (const link of data.links) if (ids.has(link.a.instanceId) || ids.has(link.b.instanceId)) {
-    for (const id of [link.a.instanceId, link.b.instanceId]) if (!ids.has(id)) { ids.add(id); changed = true }
-  } }
-  const nextData = { ...data, instances: data.instances.map(instance => ids.has(instance.id) ? { ...instance, position: tuple(v(instance.position).add(v(delta))) } : instance) }
-  const next = rebuild(project, nextData)
+  if (delta.every(number => number === 0)) return project
+  const panelIds = new Set(getAssemblyMovementPanelIds(project, instanceIds))
+  const managed = new Set(data.instances.flatMap(instance => Object.values(instance.panelIds)))
+  const base = { ...project, panels: project.panels.map(panel => panelIds.has(panel.id) && !managed.has(panel.id) ? { ...panel, position: tuple(v(panel.position).add(v(delta))) } : panel) }
+  const nextData = { ...data, instances: data.instances.map(instance => Object.values(instance.panelIds).some(id => panelIds.has(id)) ? { ...instance, position: tuple(v(instance.position).add(v(delta))) } : instance) }
+  const next = rebuild(base, nextData)
   if (next.panels.some(panel => panel.position.some(value => Math.abs(value) > 100000))) throw new Error('This move exceeds the project placement limits.')
   return next
 }
@@ -399,21 +471,38 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
     return instance
   })
   if (new Set(instances.map(instance => instance.id)).size !== instances.length) throw new Error('Assembly instance IDs must be unique.')
+  let loosePorts: AssemblyLoosePort[] | undefined
+  if (value.loosePorts !== undefined) {
+    if (!Array.isArray(value.loosePorts) || value.loosePorts.length > 400) throw new Error('Invalid loose assembly corners.')
+    loosePorts = value.loosePorts.map(raw => {
+      if (!record(raw) || !record(raw.connection)) throw new Error('Invalid loose assembly corner.')
+      const parsed = parseProject({ version: 1, name: 'Loose corner', panels: project.panels, connections: [raw.connection] })
+      const connection = parsed.connections[0]
+      if (connection.type !== '90' || connection.role !== 'support' || connection.side === 'front' || connection.side === 'back'
+        || allPanelIds.has(connection.parentId) || allPanelIds.has(connection.childId) || project.connections.some(item => item.id === connection.id)) throw new Error('A loose corner must reference two ordinary panels and its suppressed corner connector.')
+      return { id: text(raw.id), connection }
+    })
+    if (new Set(loosePorts.map(port => port.id)).size !== loosePorts.length || new Set(loosePorts.map(port => port.connection.id)).size !== loosePorts.length) throw new Error('Loose assembly corners must be unique.')
+  }
   const usedPorts = new Set<string>()
   const endpoint = (raw: unknown): AssemblyEndpoint => {
     if (!record(raw)) throw new Error('Invalid assembly connection endpoint.')
-    const result = { instanceId: text(raw.instanceId), portId: text(raw.portId) }, instance = instances.find(item => item.id === result.instanceId)
-    if (!instance || !definitions.find(item => item.id === instance.definitionId)!.ports.some(port => port.id === result.portId) || usedPorts.has(endpointKey(result))) throw new Error('An assembly corner is missing or connected more than once.')
+    const result: AssemblyEndpoint = { ...(raw.instanceId === undefined ? {} : { instanceId: text(raw.instanceId) }), portId: text(raw.portId) }
+    const instance = instances.find(item => item.id === result.instanceId)
+    const found = result.instanceId ? instance && definitions.find(item => item.id === instance.definitionId)!.ports.some(port => port.id === result.portId)
+      : loosePorts?.some(port => port.id === result.portId)
+    if (!found || usedPorts.has(endpointKey(result))) throw new Error('An assembly corner is missing or connected more than once.')
     usedPorts.add(endpointKey(result)); return result
   }
   const links: AssemblyLink[] = value.links.map(raw => {
     if (!record(raw)) throw new Error('Invalid assembly connection.')
     const link = { id: text(raw.id), a: endpoint(raw.a), b: endpoint(raw.b) }
-    if (link.a.instanceId === link.b.instanceId) throw new Error('An assembly cannot connect to itself.')
+    if (link.a.instanceId === link.b.instanceId) throw new Error('A shared assembly connection needs distinct endpoints and at least one instance.')
     return link
   })
   if (new Set(links.map(link => link.id)).size !== links.length) throw new Error('Assembly connection IDs must be unique.')
-  const data = { definitions, instances, links }
+  if (loosePorts?.some(port => !usedPorts.has(endpointKey({ portId: port.id })))) throw new Error('A loose assembly corner has no shared connection.')
+  const data: AssemblyData = { definitions, instances, links, ...(loosePorts ? { loosePorts } : {}) }
   const rebuilt = rebuild({ ...project, assemblies: data }, data)
   const sameNumber = (a: number, b: number) => Math.abs(a - b) < 0.001
   for (const panel of rebuilt.panels) {

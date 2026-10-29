@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Box, Copy, Link2, Pencil, Plus, RotateCcw, Trash2, Unlink } from 'lucide-react'
+import { Box, Copy, Link2, Pencil, Plus, RotateCcw, Trash2, Ungroup, Unlink } from 'lucide-react'
 import { Button } from './ui/button'
 import './assemblies.css'
 
@@ -24,11 +24,12 @@ export interface AssemblyInspectorProps {
   onEdit: () => void
   onDisconnect: () => void
   onMakeIndependent: () => void
+  onDisassemble: () => void
   onDelete: () => void
   onCancelAttach?: () => void
 }
 
-export function AssemblyInspector({ name, definitionName, instanceCount, panelCount, color, hasColorOverride, connected, attachmentTargets = [], attachmentActive, canAttachCopy = true, attachmentMessage, onRename, onColorChange, onResetColor, onDuplicate, onAttachCopy, onAttachExisting, onEdit, onDisconnect, onMakeIndependent, onDelete, onCancelAttach }: AssemblyInspectorProps) {
+export function AssemblyInspector({ name, definitionName, instanceCount, panelCount, color, hasColorOverride, connected, attachmentTargets = [], attachmentActive, canAttachCopy = true, attachmentMessage, onRename, onColorChange, onResetColor, onDuplicate, onAttachCopy, onAttachExisting, onEdit, onDisconnect, onMakeIndependent, onDisassemble, onDelete, onCancelAttach }: AssemblyInspectorProps) {
   return <>
     <div className="selected-heading"><Box size={15}/><span>ASSEMBLY INSTANCE</span></div>
     <label className="field panel-name-field"><span>Instance name</span><input key={name} aria-label="Instance name" defaultValue={name} maxLength={120}
@@ -55,6 +56,8 @@ export function AssemblyInspector({ name, definitionName, instanceCount, panelCo
     <div className="panel-actions assembly-primary-actions"><Button variant="outline" size="sm" onClick={onDuplicate}><Copy size={15}/>Duplicate</Button><Button variant="ghost" size="icon" aria-label="Delete assembly instance" className="delete-button" onClick={onDelete}><Trash2 size={16}/></Button></div>
     <div className="assembly-secondary-actions">{connected && <button onClick={onDisconnect}><Unlink size={13}/>Disconnect from neighbors</button>}<button onClick={onMakeIndependent}><Box size={13}/>Make independent</button></div>
     <p className="assembly-help">Make independent gives this instance its own assembly design. Its panels and physical connections stay in place.</p>
+    <div className="assembly-secondary-actions"><button onClick={onDisassemble}><Ungroup size={13}/>Disassemble</button></div>
+    <p className="assembly-help">Turn this instance into separate, editable panels. Panels and connectors stay in place.</p>
   </>
 }
 

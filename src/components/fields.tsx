@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import type { Panel, Pattern } from '@/lib/types'
 import { getSharedPanelFields } from '@/lib/selection'
@@ -8,11 +8,15 @@ export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,un
   label:string;value:number;onChange:(v:number)=>boolean|void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean;commitOnBlur?:boolean
 }) {
   const [text,setText] = useState(String(Math.round(value*10)/10))
+  const edited=useRef(false)
   const id=useId()
   const unavailable=disabled||mixed
-  useEffect(()=>setText(mixed?'':String(Math.round(value*10)/10)),[value,mixed])
+  useEffect(()=>{setText(mixed?'':String(Math.round(value*10)/10));edited.current=false},[value,mixed])
   const commit=()=>{
-    if(unavailable)return
+    // Display precision must not become a model edit just because a user tabs
+    // through the field. In particular, rotated coordinates retain their value.
+    if(unavailable||!edited.current)return
+    edited.current=false
     const n=Number(text)
     if(text.trim()&&Number.isFinite(n)){
       const v=Math.max(min,Math.min(max,n));const accepted=onChange(v)!==false;setText(String(Math.round((accepted?v:value)*10)/10))
@@ -23,7 +27,7 @@ export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,un
     <div className="number-wrap">
       <input id={id} aria-label={label} type="number" value={mixed?'':text} placeholder={mixed?'Mixed':undefined}
         title={mixed?'Different values in the selection':undefined} min={min} max={max} step={step} disabled={unavailable}
-        onChange={e=>{if(unavailable)return;const text=e.target.value;setText(text);const n=Number(text);if(!commitOnBlur&&text.trim()&&Number.isFinite(n)&&n>=min&&n<=max&&onChange(n)===false)setText(String(Math.round(value*10)/10))}}
+        onChange={e=>{if(unavailable)return;const text=e.target.value;edited.current=true;setText(text);const n=Number(text);if(!commitOnBlur&&text.trim()&&Number.isFinite(n)&&n>=min&&n<=max){edited.current=false;if(onChange(n)===false)setText(String(Math.round(value*10)/10))}}}
         onBlur={commit} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/>
       {!mixed&&<span className="input-unit">{unit}</span>}
     </div>

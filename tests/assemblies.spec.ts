@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { Euler, Quaternion } from 'three'
 import { createExampleProject } from '../src/lib/example-library'
 import { validateProject } from '../src/lib/model'
 import type { Project } from '../src/lib/types'
@@ -35,6 +36,18 @@ function connectorCounts(project: Project) {
     counts[connection.type] = (counts[connection.type] ?? 0) + connection.count
     return counts
   }, {})
+}
+
+function expectPanelsPreserved(before: Project, after: Project) {
+  for (const panel of before.panels) {
+    const current = after.panels.find(candidate => candidate.id === panel.id)!
+    const { position, rotation, ...properties } = panel
+    expect(current).toMatchObject(properties)
+    position.forEach((coordinate, axis) => expect(current.position[axis]).toBeCloseTo(coordinate, 6))
+    const previousRotation = new Quaternion().setFromEuler(new Euler(...rotation))
+    const currentRotation = new Quaternion().setFromEuler(new Euler(...current.rotation))
+    expect(Math.abs(previousRotation.dot(currentRotation))).toBeCloseTo(1, 10)
+  }
 }
 
 test('reusable box copies share construction while finish overrides stay local', async ({ page }) => {
@@ -267,5 +280,184 @@ test('corner handles build the four-box Diamond, reconcile hardware, and restore
   expect(await exportedProject(page)).toEqual(diamond)
   await importProject(page, tilted)
   expect(await exportedProject(page)).toEqual(tilted)
+  expect(errors).toEqual([])
+})
+
+test('disassembling a free copy preserves its finish and hardware as independently editable panels', async ({ page }) => {
+  test.setTimeout(90000)
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.stack ?? error.message))
+  await createBoxAssembly(page)
+  await page.getByRole('button', { name: 'Duplicate', exact: true }).click()
+  await page.getByLabel('Instance panel color', { exact: true }).fill('#6b8f71')
+  const before = await exportedProject(page)
+  const selected = before.assemblies!.instances.find(instance => instance.finish?.color === '#6b8f71')!
+  const looseIds = new Set(Object.values(selected.panelIds))
+
+  await page.getByRole('button', { name: 'Disassemble', exact: true }).click()
+  await expect(page.locator('[data-assembly-id]')).toHaveCount(1)
+  await expect(page.locator('.panel-list-row')).toHaveCount(4)
+  await expect(page.locator('.panel-list-row.selected')).toHaveCount(4)
+  await expect(page.getByRole('heading', { name: '4 panels selected', exact: true })).toBeVisible()
+  const disassembled = await exportedProject(page)
+  expect(disassembled.assemblies?.instances).toHaveLength(1)
+  expect(disassembled.assemblies!.instances[0].id).not.toBe(selected.id)
+  expect(disassembled.panels).toHaveLength(8)
+  expect(connectorCounts(disassembled)).toEqual({ '90': 16 })
+  expectPanelsPreserved(before, disassembled)
+  expect(validateProject(disassembled).filter(issue => issue.severity === 'error' || issue.id.endsWith('-alignment'))).toEqual([])
+
+  await page.getByRole('button', { name: 'Library', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Insert Box instance', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Assembly', exact: true }).click()
+  await page.locator('.panel-list-select').first().click()
+  await expect(page.getByLabel('Panel name', { exact: true })).toBeEnabled()
+  await page.getByLabel('Panel name', { exact: true }).fill('My loose shelf')
+  await page.getByLabel('Panel name', { exact: true }).press('Enter')
+  await page.getByLabel('Custom finish color', { exact: true }).fill('#775599')
+  const edited = await exportedProject(page)
+  const changed = edited.panels.find(panel => panel.name === 'My loose shelf')!
+  expect(looseIds.has(changed.id)).toBe(true)
+  expect(changed.color).toBe('#775599')
+  for (const panel of edited.panels.filter(panel => !looseIds.has(panel.id))) {
+    expect(panel).toEqual(before.panels.find(original => original.id === panel.id))
+  }
+
+  for (let undo = 0; undo < 2; undo++) await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(disassembled)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(before)
+  await expect(page.locator('[data-assembly-id]')).toHaveCount(2)
+  await expect(page.locator('.panel-list-row')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  expect(await exportedProject(page)).toEqual(disassembled)
+  await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.locator('[data-assembly-id]')).toHaveCount(1)
+  await expect(page.locator('.panel-list-row')).toHaveCount(4)
+  expect(await exportedProject(page)).toEqual(disassembled)
+  await importProject(page, edited)
+  expect(await exportedProject(page)).toEqual(edited)
+  expect(errors).toEqual([])
+})
+
+test('disassembling a rotated Diamond box keeps shared connectors and isolates loose-panel edits from its source', async ({ page }) => {
+  test.setTimeout(90000)
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.stack ?? error.message))
+  await page.goto('/')
+  await importProject(page, createExampleProject('diamond-shelf'))
+  await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
+  await page.getByLabel('Instance panel color', { exact: true }).fill('#4d7f88')
+  const before = await exportedProject(page)
+  const selected = before.assemblies!.instances.find(instance => instance.finish?.color === '#4d7f88')!
+  const looseIds = new Set(Object.values(selected.panelIds))
+
+  await page.getByRole('button', { name: 'Disassemble', exact: true }).click()
+  await expect(page.locator('[data-assembly-id]')).toHaveCount(3)
+  await expect(page.locator('.panel-list-row')).toHaveCount(4)
+  await expect(page.locator('.panel-list-row.selected')).toHaveCount(4)
+  await expect(page.getByRole('heading', { name: '4 panels selected', exact: true })).toBeVisible()
+  const disassembled = await exportedProject(page)
+  expect(disassembled.assemblies?.instances).toHaveLength(3)
+  expect(disassembled.panels).toHaveLength(16)
+  expect(connectorCounts(disassembled)).toEqual({ '90': 16, cross: 8 })
+  expectPanelsPreserved(before, disassembled)
+  expect(validateProject(disassembled).filter(issue => issue.severity === 'error' || issue.id.endsWith('-alignment'))).toEqual([])
+  await page.screenshot({ path: 'test-results/assembly-disassembled-diamond.png' })
+
+  await expect(page.getByLabel('Custom finish color', { exact: true })).toBeEnabled()
+  await page.getByLabel('Custom finish color', { exact: true }).fill('#a76f5a')
+  await page.locator('.panel-list-select').first().click()
+  await expect(page.getByRole('button', { name: 'Detach for free placement', exact: true })).toBeVisible()
+  await expect(page.getByLabel('Position X', { exact: true })).toBeDisabled()
+  await page.getByLabel('Panel name', { exact: true }).fill('Loose diamond panel')
+  await page.getByLabel('Panel name', { exact: true }).press('Enter')
+  const looseEdited = await exportedProject(page)
+  const loosePanels = looseEdited.panels.filter(panel => looseIds.has(panel.id))
+  expect(loosePanels.every(panel => panel.color === '#a76f5a')).toBe(true)
+  expect(loosePanels.some(panel => panel.name === 'Loose diamond panel')).toBe(true)
+
+  await page.locator('[data-assembly-id] .assembly-tree-select').first().click()
+  await page.getByLabel('Instance panel color', { exact: true }).fill('#337788')
+  const instanceEdited = await exportedProject(page)
+  for (const panel of loosePanels) expect(instanceEdited.panels.find(current => current.id === panel.id)).toEqual(panel)
+  await page.getByRole('button', { name: 'Edit assembly', exact: true }).click()
+  await page.getByLabel('Custom finish color', { exact: true }).fill('#bccccc')
+  await page.getByRole('button', { name: 'Done editing', exact: true }).click()
+  const sourceEdited = await exportedProject(page)
+  expect(sourceEdited.assemblies?.instances).toHaveLength(3)
+  expect(sourceEdited.assemblies!.definitions.find(definition => definition.id === selected.definitionId)!.panels.every(panel => panel.color === '#bccccc')).toBe(true)
+  for (const panel of loosePanels) expect(sourceEdited.panels.find(current => current.id === panel.id)).toEqual(panel)
+  expect(connectorCounts(sourceEdited)).toEqual({ '90': 16, cross: 8 })
+  expect(validateProject(sourceEdited).filter(issue => issue.severity === 'error' || issue.id.endsWith('-alignment'))).toEqual([])
+
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(instanceEdited)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(looseEdited)
+  for (let undo = 0; undo < 3; undo++) await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(before)
+  await expect(page.locator('[data-assembly-id]')).toHaveCount(4)
+  await expect(page.locator('.panel-list-row')).toHaveCount(0)
+  for (let redo = 0; redo < 5; redo++) await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  expect(await exportedProject(page)).toEqual(sourceEdited)
+  await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.locator('[data-assembly-id]')).toHaveCount(3)
+  await expect(page.locator('.panel-list-row')).toHaveCount(4)
+  expect(await exportedProject(page)).toEqual(sourceEdited)
+  await importProject(page, before)
+  await importProject(page, sourceEdited)
+  expect(await exportedProject(page)).toEqual(sourceEdited)
+
+  await page.locator('.panel-list-select').filter({ hasText: /^Loose diamond panel$/ }).click()
+  await expect(page.getByLabel('Position X', { exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Detach for free placement', exact: true }).click()
+  await expect(page.getByLabel('Position X', { exact: true })).toBeEnabled()
+  const detached = await exportedProject(page)
+  const detachedPanel = detached.panels.find(panel => panel.name === 'Loose diamond panel')!
+  expect(detached.connections.some(connection => connection.parentId === detachedPanel.id || connection.childId === detachedPanel.id)).toBe(false)
+  expect(detached.assemblies?.instances).toHaveLength(3)
+  const movedX = Number(await page.getByLabel('Position X', { exact: true }).inputValue()) + 2000
+  await page.getByLabel('Position X', { exact: true }).fill(String(movedX))
+  await page.getByLabel('Position X', { exact: true }).press('Tab')
+  const moved = await exportedProject(page)
+  expect(moved.panels.find(panel => panel.id === detachedPanel.id)!.position[0]).toBeCloseTo(movedX, 6)
+  expect(moved.assemblies?.instances).toHaveLength(3)
+  expect(new Set(moved.connections.map(connection => connection.id)).size).toBe(moved.connections.length)
+  expect(moved.connections.reduce((sum, connection) => sum + connection.count, 0)).toBeLessThanOrEqual(24)
+  expect(validateProject(moved).filter(issue => issue.severity === 'error' || issue.id.endsWith('-alignment'))).toEqual([])
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(detached)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(sourceEdited)
+  for (let redo = 0; redo < 2; redo++) await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  expect(await exportedProject(page)).toEqual(moved)
+  await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
+  await page.reload()
+  expect(await exportedProject(page)).toEqual(moved)
+  await importProject(page, moved)
+  expect(await exportedProject(page)).toEqual(moved)
+
+  await importProject(page, sourceEdited)
+  await page.locator('.panel-list-select').filter({ hasText: /^Loose diamond panel$/ }).click()
+  await page.getByRole('button', { name: 'Delete selected panel', exact: true }).click()
+  await expect(page.locator('.panel-list-row')).toHaveCount(3)
+  await expect(page.locator('[data-assembly-id]')).toHaveCount(3)
+  const removed = await exportedProject(page)
+  expect(removed.panels).toHaveLength(15)
+  expect(removed.panels.some(panel => panel.id === detachedPanel.id)).toBe(false)
+  expect(removed.assemblies?.instances).toHaveLength(3)
+  expect(validateProject(removed).filter(issue => issue.severity === 'error' || issue.id.endsWith('-alignment'))).toEqual([])
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(sourceEdited)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  expect(await exportedProject(page)).toEqual(removed)
+  await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
+  await page.reload()
+  expect(await exportedProject(page)).toEqual(removed)
+  await importProject(page, removed)
+  expect(await exportedProject(page)).toEqual(removed)
   expect(errors).toEqual([])
 })

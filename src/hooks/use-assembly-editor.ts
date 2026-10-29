@@ -3,6 +3,7 @@ import {
   createAssembly, duplicateAssembly, getAssemblyAttachmentTargets, getAssemblyInstance,
   instantiateAssembly, removeAssembly, disconnectAssembly, makeAssemblyIndependent,
   updateAssemblyDefinition, updateAssemblyFinish, resetAssemblyFinish, renameAssembly,
+  disassembleAssembly,
 } from '@/lib/assemblies'
 import type { Panel, Project } from '@/lib/types'
 
@@ -122,6 +123,15 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
     remove: (id: string) => run(() => removeAssembly(project, id), 'Instance removed. Neighboring connectors restored.'),
     disconnect: (id: string) => { if (run(() => disconnectAssembly(project, id), 'Instance disconnected and moved clear of its neighbors. Corner connectors restored.')) fit() },
     independent: (id: string) => run(() => makeAssemblyIndependent(project, id), 'Instance now has its own assembly design. Physical connections kept.'),
+    disassemble: (id: string) => {
+      const instance = instances.find(item => item.id === id)
+      if (!instance) return
+      if (run(() => disassembleAssembly(project, id), 'Assembly disassembled. Its panels are editable separately. Undo to restore the instance.')) {
+        close()
+        setSelectedIds(Object.values(instance.panelIds))
+        prepareSelection()
+      }
+    },
     rename: (id: string, name: string) => run(() => renameAssembly(project, id, name)),
     finish: (id: string, color: string) => run(() => updateAssemblyFinish(project, id, { color })),
     resetFinish: (id: string) => run(() => resetAssemblyFinish(project, id)),

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { gridProject } from './example-geometry'
 import { Euler, Vector3 } from 'three'
-import { createPanel, getProjectBounds, parseProject, rotateProject, validateProject } from './model'
-import { createAssembly, disconnectAssembly, duplicateAssembly, getAssemblyAttachmentTargets, instantiateAssembly, makeAssemblyIndependent, materializeAssemblies, moveAssemblies, removeAssembly, resetAssemblyFinish, updateAssemblyDefinition, updateAssemblyFinish } from './assemblies'
+import { attachExistingPanel, createPanel, detachPanel, getProjectBounds, parseProject, removePanel, rotateProject, validateProject } from './model'
+import { createAssembly, disassembleAssembly, disconnectAssembly, duplicateAssembly, getAssemblyAttachmentTargets, getAssemblyInstance, getAssemblyMovementPanelIds, instantiateAssembly, isPanelConnectedToAssembly, makeAssemblyIndependent, materializeAssemblies, moveAssemblies, removeAssembly, renameAssembly, resetAssemblyFinish, updateAssemblyDefinition, updateAssemblyFinish } from './assemblies'
 import { movePanels, resizePanels } from './structure-edit'
 import type { Project } from './types'
 
@@ -23,6 +23,131 @@ function diamond(): Project { return add(add(add(box(), 'Top right'), 'Bottom ri
 function count(project: Project, type: string) { return project.connections.filter(connection => connection.type === type).reduce((sum, connection) => sum + connection.count, 0) }
 
 describe('reusable assemblies', () => {
+  it('disassembles only the selected instance, baking its finish and retaining the source', () => {
+    const initial = box()
+    let project = duplicateAssembly(initial, initial.assemblies!.instances[0].id)
+    const selected = project.assemblies!.instances[1]
+    project = updateAssemblyFinish(project, selected.id, { color: '#123456', material: 'oak' })
+    const next = disassembleAssembly(project, selected.id)
+    expect(next.panels).toBe(project.panels)
+    expect(next.connections).toBe(project.connections)
+    expect(next.assemblies!.instances).toEqual([project.assemblies!.instances[0]])
+    expect(next.assemblies!.definitions).toEqual(project.assemblies!.definitions)
+    expect(Object.values(selected.panelIds).every(id => !getAssemblyInstance(next, id))).toBe(true)
+    expect(next.panels.filter(panel => Object.values(selected.panelIds).includes(panel.id)).every(panel => panel.color === '#123456' && panel.material === 'oak')).toBe(true)
+    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    const grown = resizePanels(next, [Object.values(selected.panelIds)[0]], { width: 400 })
+    expect(validateProject(grown)).toEqual([])
+    expect(grown.assemblies!.instances).toEqual(next.assemblies!.instances)
+    expect(parseProject(JSON.parse(JSON.stringify(grown)))).toEqual(grown)
+  })
+
+  it.each([0, 1, 3])('preserves every joint while disassembling Diamond instance %i', index => {
+    const project = rotateProject(diamond(), 'z', 45), selected = project.assemblies!.instances[index]
+    const next = disassembleAssembly(project, selected.id)
+    expect(next.panels).toBe(project.panels)
+    expect(next.connections).toBe(project.connections)
+    expect(next.assemblies!.instances).toHaveLength(3)
+    expect(next.assemblies!.loosePorts).toHaveLength(2)
+    expect(count(next, '90')).toBe(16)
+    expect(count(next, 'cross')).toBe(8)
+    expect(validateProject(next)).toEqual([])
+    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    const renamed = renameAssembly(next, next.assemblies!.instances[0].id, 'Still linked')
+    const painted = updateAssemblyDefinition(renamed, renamed.assemblies!.instances[0].id, { color: '#123456' })
+    const looseIds = new Set(Object.values(selected.panelIds))
+    expect(painted.panels.filter(panel => looseIds.has(panel.id))).toEqual(project.panels.filter(panel => looseIds.has(panel.id)))
+    expect(painted.panels.filter(panel => !looseIds.has(panel.id)).every(panel => panel.color === '#123456')).toBe(true)
+    expect(parseProject(JSON.parse(JSON.stringify(painted)))).toEqual(painted)
+    expect(validateProject(painted)).toEqual([])
+  })
+
+  it('turns joints between fully disassembled boxes into ordinary editable cross joints', () => {
+    const project = rotateProject(diamond(), 'z', 45)
+    const next = project.assemblies!.instances.reduce((current, instance) => disassembleAssembly(current, instance.id), project)
+    expect(next.assemblies!.instances).toEqual([])
+    expect(next.assemblies!.links).toEqual([])
+    expect(next.assemblies!.loosePorts).toEqual([])
+    expect(next.panels).toBe(project.panels)
+    expect(next.connections).toBe(project.connections)
+    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    const moved = movePanels(next, next.panels.map(panel => panel.id), [100, 20, 0])
+    expect(validateProject(moved)).toEqual([])
+    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(count(moved, 'cross')).toBe(8)
+  })
+
+  it('restores a loose corner when its neighboring instance is removed or disconnected', () => {
+    const project = diamond(), instance = project.assemblies!.instances[0]
+    const loose = disassembleAssembly(project, instance.id)
+    const link = loose.assemblies!.links.find(item => !item.a.instanceId || !item.b.instanceId)!
+    const neighborId = link.a.instanceId ?? link.b.instanceId!
+    const looseEndpoint = link.a.instanceId ? link.b : link.a
+    const originalCorner = loose.assemblies!.loosePorts!.find(port => port.id === looseEndpoint.portId)!.connection
+    for (const next of [removeAssembly(loose, neighborId), disconnectAssembly(loose, neighborId)]) {
+      expect(next.connections.find(connection => connection.id === originalCorner.id)).toEqual(originalCorner)
+      expect(next.assemblies!.loosePorts!.some(port => port.id === looseEndpoint.portId)).toBe(false)
+      expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+      expect(validateProject(next)).toEqual([])
+    }
+  })
+
+  it('supports explicit detach/removal of loose panels without resurrecting mixed hardware', () => {
+    const project = diamond(), selected = project.assemblies!.instances[0]
+    const loose = disassembleAssembly(project, selected.id)
+    const panelId = loose.assemblies!.loosePorts![0].connection.parentId
+    expect(isPanelConnectedToAssembly(loose, panelId)).toBe(true)
+    expect(() => resizePanels(loose, [panelId], { width: 400 })).toThrow(/Disconnect this panel/)
+    expect(() => movePanels(loose, [panelId], [10, 0, 0])).toThrow(/Disconnect this panel/)
+    const detached = detachPanel(loose, panelId)
+    expect(detached.connections.some(connection => connection.parentId === panelId || connection.childId === panelId)).toBe(false)
+    expect(isPanelConnectedToAssembly(detached, panelId)).toBe(false)
+    const moved = movePanels(detached, [panelId], [0, 0, 100])
+    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    for (const changed of [detached, removePanel(loose, panelId)]) {
+      const rebuilt = renameAssembly(changed, changed.assemblies!.instances[0].id, 'Neighbor')
+      expect(validateProject(rebuilt)).toEqual([])
+      expect(parseProject(JSON.parse(JSON.stringify(rebuilt)))).toEqual(rebuilt)
+      expect(rebuilt.connections.some(connection => connection.type === 'cross' && (connection.parentId === panelId || connection.childId === panelId))).toBe(false)
+    }
+    const looseTarget = createPanel({ position: [2000, 1000, 0] })
+    const withTarget = { ...loose, panels: [...loose.panels, looseTarget] }
+    const reattached = attachExistingPanel(withTarget, looseTarget.id, panelId, { type: '90', side: 'right', count: 2, color: '#123456', flip: false, offset: 0, inset: 0 })
+    expect(parseProject(JSON.parse(JSON.stringify(reattached)))).toEqual(reattached)
+    expect(validateProject(reattached)).toEqual([])
+  })
+
+  it.each([0, 1, 2, 3])('keeps neighboring mixed joints consistent when any loose panel in box %i is removed', index => {
+    const project = rotateProject(diamond(), 'z', 45), selected = project.assemblies!.instances[index]
+    const loose = disassembleAssembly(project, selected.id)
+    for (const panelId of Object.values(selected.panelIds)) {
+      const removed = removePanel(loose, panelId)
+      expect(removed.panels).toHaveLength(15)
+      expect(validateProject(removed)).toEqual([])
+      expect(parseProject(JSON.parse(JSON.stringify(removed)))).toEqual(removed)
+      expect(materializeAssemblies(removed).connections).toEqual(removed.connections)
+    }
+  })
+
+  it('moves physically connected loose panels with remaining instances, but leaves unrelated loose edits available', () => {
+    const project = rotateProject(diamond(), 'z', 45), selected = project.assemblies!.instances[0]
+    const loose = disassembleAssembly(project, selected.id)
+    const remaining = loose.assemblies!.instances[0]
+    expect(getAssemblyMovementPanelIds(loose, [remaining.id])).toHaveLength(16)
+    const moved = moveAssemblies(loose, [remaining.id], [100, 20, -30])
+    for (const panel of moved.panels) {
+      const before = loose.panels.find(item => item.id === panel.id)!
+      panel.position.forEach((number, axis) => expect(number).toBeCloseTo(before.position[axis] + [100, 20, -30][axis]))
+    }
+    expect(validateProject(moved)).toEqual([])
+    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    const separate = createPanel({ position: [3000, 1000, 0] })
+    const unrelated = { ...loose, panels: [...loose.panels, separate] }
+    const resized = resizePanels(unrelated, [separate.id], { width: 800 })
+    expect(resized.panels.find(panel => panel.id === separate.id)!.width).toBe(800)
+    expect(resized.panels.filter(panel => panel.id !== separate.id)).toEqual(loose.panels)
+    expect(parseProject(JSON.parse(JSON.stringify(resized)))).toEqual(resized)
+  })
   it('creates linked copies and joins the final box at both matching corners', () => {
     const initial = box()
     expect(initial.assemblies!.definitions[0].ports).toHaveLength(4)

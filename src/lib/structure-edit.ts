@@ -1,5 +1,6 @@
 import { Euler, Quaternion, Vector3 } from 'three'
 import { resolvePanels, validateProject } from './model'
+import { isPanelConnectedToAssembly } from './assemblies'
 import type { Connection, Panel, Project, Vec3 } from './types'
 
 const EPSILON = 1e-6
@@ -303,11 +304,13 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit): Pr
   if (project.assemblies?.instances.length) {
     const managed = new Set(project.assemblies.instances.flatMap(instance => Object.values(instance.panelIds)))
     if ([...wanted].some(id => managed.has(id))) throw new Error('Edit the assembly source to change its panels, or move the assembly as a whole.')
+    if ([...wanted].some(id => isPanelConnectedToAssembly(project, id))) throw new Error('Disconnect this panel from neighboring assemblies before changing its dimensions or position.')
     // Instances are rigid objects. Incidental surface contacts must never let
     // the loose-panel solver deform their materialized, linked source panels.
     const looseConnections = project.connections.filter(connection => !managed.has(connection.parentId) && !managed.has(connection.childId))
-    if (project.connections.some(connection => managed.has(connection.parentId) !== managed.has(connection.childId))) throw new Error('Disconnect the loose panel from the assembly before editing it.')
-    const loose: Project = { version: 1, name: project.name, panels: project.panels.filter(panel => !managed.has(panel.id)), connections: looseConnections }
+    const boundary = new Set(project.panels.filter(panel => !managed.has(panel.id) && isPanelConnectedToAssembly(project, panel.id)).map(panel => panel.id))
+    const loose: Project = { version: 1, name: project.name, panels: project.panels.filter(panel => !managed.has(panel.id) && !boundary.has(panel.id)),
+      connections: looseConnections.filter(connection => !boundary.has(connection.parentId) && !boundary.has(connection.childId)) }
     const edited = editStructure(loose, ids, edit)
     const byId = new Map(edited.panels.map(panel => [panel.id, panel]))
     const connectionById = new Map(edited.connections.map(connection => [connection.id, connection]))

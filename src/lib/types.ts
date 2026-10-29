@@ -28,9 +28,11 @@ export interface AssemblyInstance {
   connectionIds?: Record<string, string>;
   finish?: AssemblyFinish;
 }
-export interface AssemblyEndpoint { instanceId: string; portId: string }
+/** Without an instanceId, portId refers to a baked corner on ordinary panels. */
+export interface AssemblyEndpoint { instanceId?: string; portId: string }
+export interface AssemblyLoosePort { id: string; connection: Connection }
 export interface AssemblyLink { id: string; a: AssemblyEndpoint; b: AssemblyEndpoint }
-export interface AssemblyData { definitions: AssemblyDefinition[]; instances: AssemblyInstance[]; links: AssemblyLink[] }
+export interface AssemblyData { definitions: AssemblyDefinition[]; instances: AssemblyInstance[]; links: AssemblyLink[]; loosePorts?: AssemblyLoosePort[] }
 export interface Project { version: 1; name: string; panels: Panel[]; connections: Connection[]; assemblies?: AssemblyData }
 export interface AttachmentOptions { side: Side; type: ConnectorType; offset: number; inset: number; flip: boolean; color: string; count: number }
 export interface ValidationIssue { id: string; severity: 'warning' | 'error'; message: string; panelIds: string[] }

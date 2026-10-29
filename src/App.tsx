@@ -15,12 +15,12 @@ import { MultiPanelInspector } from '@/components/MultiPanelInspector'
 import { ProjectStatus } from '@/components/ProjectStatus'
 import { ProjectSidebar } from '@/components/ProjectSidebar'
 import { createExampleProject } from '@/lib/example-library'
-import { getSharedPanelFields, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
+import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
 import { movePanels, resizePanels } from '@/lib/structure-edit'
 import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
 import { useProject } from '@/hooks/use-project'
 import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
-import { duplicateAssembly, getAssemblyInstance, moveAssemblies, removeAssembly } from '@/lib/assemblies'
+import { duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, isPanelConnectedToAssembly, moveAssemblies, removeAssembly } from '@/lib/assemblies'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, rotateProject, validateProject } from '@/lib/model'
@@ -70,10 +70,16 @@ export default function App() {
   useEffect(()=>{if(repairNotice)notify(repairNotice)},[repairNotice,notify])
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(''),3500);return()=>clearTimeout(t)}},[toast])
   useEffect(()=>{setSelectedIds(ids=>{const remaining=ids.filter(id=>project.panels.some(p=>p.id===id));return remaining.length===ids.length?ids:remaining})},[project.panels])
+  const checkLoosePanelPatch=(patch:Partial<Panel>)=>{
+    if(selectedPanels.some(panel=>isPanelConnectedToAssembly(project,panel.id)&&(['position','rotation','thickness'] as const).some(key=>patch[key]!==undefined&&!panelValuesEqual(panel[key],patch[key])))) {
+      throw new Error('These panels still connect to an assembly. Detach the panels before changing their placement or thickness.')
+    }
+  }
   const updatePanel=(patch:Partial<Panel>)=>{
     if(!selectedId)return false
     if(assembly.hasMembers)return assembly.editingInstance?assembly.updateDefinition(patch):false
     try {
+      checkLoosePanelPatch(patch)
       const {width,height,...rest}=patch
       const base={...project,panels:project.panels.map(panel=>panel.id===selectedId?{...panel,...rest}:panel)}
       commit(width!==undefined||height!==undefined?resizePanels(base,[selectedId],{width,height}):base)
@@ -83,6 +89,7 @@ export default function App() {
   const updateMultiplePanels=(patch:Partial<Panel>)=>{
     if(assembly.hasMembers)return assembly.editingInstance?assembly.updateDefinition(patch):false
     try {
+      checkLoosePanelPatch(patch)
       const {width,height,...rest}=patch
       const shared=getSharedPanelFields(selectedPanels)
       const dimensions={width:shared.has('width')?width:undefined,height:shared.has('height')?height:undefined}
@@ -96,11 +103,16 @@ export default function App() {
       if(assembly.editingInstance)return
       commit(current=>{
         const instanceIds=[...new Set(selectedIds.map(id=>getAssemblyInstance(current,id)?.id).filter((id):id is string=>!!id))]
-        const looseIds=selectedIds.filter(id=>!getAssemblyInstance(current,id))
+        const carriedIds=new Set(getAssemblyMovementPanelIds(current,instanceIds))
+        const looseIds=selectedIds.filter(id=>!getAssemblyInstance(current,id)&&!carriedIds.has(id))
         const next=instanceIds.length?moveAssemblies(current,instanceIds,delta):current
         return looseIds.length?movePanels(next,looseIds,delta):next
       },{group:'panel-move',repeat})
     } catch(error) {notify(error instanceof Error?error.message:'This move cannot keep the joints aligned.')}
+  }
+  const detachSelection=()=>{
+    try{commit(current=>selectedIds.reduce((next,id)=>detachPanel(next,id),current));setInspectorTab('panel');notify('Panels detached. Their positions are unchanged.')}
+    catch(error){notify(error instanceof Error?error.message:'These panels could not be detached.')}
   }
   const deleteSelected=()=>{
     if(assembly.editingInstance||assembly.memberInstance&&!assembly.selectedInstance){notify('Select the whole instance to remove it.');return}
@@ -233,13 +245,13 @@ export default function App() {
           attachmentActive={assembly.placementActive} attachmentMessage={assemblyHint} onCancelAttach={assembly.clearPlacement} canAttachCopy={validTargets.length>0}
           onRename={name=>assembly.rename(instance.id,name)} onColorChange={color=>assembly.finish(instance.id,color)} onResetColor={()=>assembly.resetFinish(instance.id)}
           onDuplicate={duplicateSelected} onAttachCopy={()=>assembly.startAttach()} onAttachExisting={assembly.startAttach}
-          onEdit={()=>assembly.edit(instance.id)} onDisconnect={()=>assembly.disconnect(instance.id)} onMakeIndependent={()=>assembly.independent(instance.id)} onDelete={deleteSelected}/>
+          onEdit={()=>assembly.edit(instance.id)} onDisconnect={()=>assembly.disconnect(instance.id)} onMakeIndependent={()=>assembly.independent(instance.id)} onDisassemble={()=>assembly.disassemble(instance.id)} onDelete={deleteSelected}/>
         :assembly.memberInstance&&selected&&assembly.definition?<AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={()=>assembly.select(assembly.memberInstance!.id)} onEdit={()=>assembly.edit(assembly.memberInstance!.id)}/>
         :assembly.hasMembers?<><div className="selected-heading"><Box size={15}/><span>MULTIPLE OBJECTS</span></div><p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p><div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15}/>Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15}/>Remove</Button></div></>
         :<>
           {selectedPanels.length>1&&<CreateAssemblyForm panelCount={selectedPanels.length} onCreate={assembly.create}/>}
-          {selectedPanels.length>1&&<MultiPanelInspector panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commit(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected}/>}
-          {selected&&(inspectorTab==='panel'?<SinglePanelInspector selected={selected} panels={panels} connection={connection} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={()=>{commit(p=>detachPanel(p,selected.id));notify('Panel detached. Its position is unchanged.')}} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewError={previewResult.error} previewIssues={previewIssues} hasPreview={!!previewProject}/>)}
+          {selectedPanels.length>1&&<MultiPanelInspector panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commit(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
+          {selected&&(inspectorTab==='panel'?<SinglePanelInspector selected={selected} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewError={previewResult.error} previewIssues={previewIssues} hasPreview={!!previewProject}/>)}
           {!selectedPanels.length&&<div className="no-selection"><MousePointer2 size={28}/><h2>A little more detail.</h2><p>Select a panel in the workspace<br/>to make it your own.</p><Button variant="outline" onClick={addPanel}><Plus size={16}/>Add a panel</Button></div>}
         </>}
     </InspectorSidebar>
