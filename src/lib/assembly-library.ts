@@ -1,3 +1,4 @@
+import { ANGLED_ASSEMBLIES } from './angled-assemblies'
 import { createAssembly, instantiateAssembly } from './assemblies'
 import { gridProject } from './example-geometry'
 import type { ExampleDefinition } from './example-library'
@@ -12,6 +13,7 @@ function module(id: string, name: string, description: string, category: string,
 
 /** Cut lengths are in millimeters; the grid adds connector clearances. */
 export const ASSEMBLY_LIBRARY: readonly ExampleDefinition[] = [
+  ...ANGLED_ASSEMBLIES,
   module('cube', 'Cube module', 'A versatile open box for stacking and linking at its corners.', 'Boxes', [350], [350]),
   module('wide-box', 'Wide shelf module', 'A low, wide compartment for books, media, or display.', 'Boxes', [700], [250]),
   module('tall-box', 'Tall box module', 'An upright compartment for tall books and display objects.', 'Boxes', [350], [700]),
