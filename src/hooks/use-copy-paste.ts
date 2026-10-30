@@ -32,6 +32,7 @@ export function useCopyPaste({ project, selectedIds, commit, select, prepare, no
     active, targets, hovered, preview, previewPanels, previewConnections,
     inserting: active && placement.insertion,
     suppressedConnectionIds: preview ? project.connections.filter(connection => !preview.connections.some(item => item.id === connection.id)).map(connection => connection.id) : [],
+    suppressedPanelIds: preview ? project.panels.filter(panel => !preview.panels.some(item => item.id === panel.id)).map(panel => panel.id) : [],
     boundsPanels: targets.flatMap(target => target.project ? addedPanels(target.project) : []),
     cancel, hover: setHoverId,
     insert: (item: CopiedItem) => {
@@ -65,11 +66,13 @@ export function useCopyPaste({ project, selectedIds, commit, select, prepare, no
       } catch (error) { cancel(); notify((error as Error).message) }
     },
     attach: (id: string) => {
-      const next = targets.find(target => target.id === id)?.project
+      const candidate = targets.find(target => target.id === id)
+      const next = candidate?.project
       if (!next) return
-      const ids = addedPanels(next).map(panel => panel.id)
+      const ids = candidate.panelIds ?? addedPanels(next).map(panel => panel.id)
       commit(next); cancel(); select(ids)
-      notify(placement?.insertion ? `${placement.insertion === 'panel' ? 'Panel' : 'Assembly'} attached. Undo is available.` : 'Copy attached. Undo is available.')
+      const message = placement?.insertion ? `${placement.insertion === 'panel' ? 'Panel' : 'Assembly'} attached.` : 'Copy attached.'
+      notify(`${message}${candidate.warning ? ` ${candidate.warning.replace(/^Requires disassembly:/, 'Disassembled:')}` : ''} Undo is available.`)
     },
   }
 }

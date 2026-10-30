@@ -23,6 +23,82 @@ function diamond(): Project { return add(add(add(box(), 'Top right'), 'Bottom ri
 function count(project: Project, type: string) { return project.connections.filter(connection => connection.type === type).reduce((sum, connection) => sum + connection.count, 0) }
 
 describe('reusable assemblies', () => {
+  it.each([0, 35])('offers shared-panel placement with a disassembly warning at %i degrees', degrees => {
+    const initial = box()
+    const project = degrees ? rotateProject(initial, 'z', degrees) : initial
+    const before = structuredClone(project)
+    const targets = getAssemblyAttachmentTargets(project, project.assemblies!.instances[0].id)
+    const shared = targets.filter(target => target.project && target.warning)
+    expect(shared.length).toBeGreaterThan(0)
+    for (const target of shared) {
+      const next = target.project!
+      expect(target.warning).toMatch(/disassembl/i)
+      expect(next.panels).toHaveLength(7)
+      expect(next.assemblies!.instances).toHaveLength(0)
+      expect(next.assemblies!.definitions).toEqual(project.assemblies!.definitions)
+      expect(next.assemblies!.links).toEqual([])
+      expect(next.connections.filter(connection => connection.type === 't' && connection.count > 0)).toHaveLength(2)
+      expect(target.panelIds).toHaveLength(4)
+      expect(target.panelIds!.every(id => next.panels.some(panel => panel.id === id))).toBe(true)
+      for (const panel of project.panels) {
+        const retained = next.panels.find(item => item.id === panel.id)!
+        expect(retained).toBeDefined()
+        retained.position.forEach((value, axis) => expect(value).toBeCloseTo(panel.position[axis], 6))
+      }
+      expect(validateProject(next)).toEqual([])
+      const serialized = JSON.parse(JSON.stringify(next))
+      expect(parseProject(serialized)).toEqual(serialized)
+      expect(materializeAssemblies(next)).toEqual(next)
+    }
+    expect(project).toEqual(before)
+  })
+
+  it('keeps partially intersecting panels out of shared-panel attachment targets', () => {
+    const project = box()
+    const instanceId = project.assemblies!.instances[0].id
+    const target = getAssemblyAttachmentTargets(project, instanceId).find(candidate => candidate.project && candidate.warning)!
+    const added = target.project!.panels.find(panel => !project.panels.some(existing => existing.id === panel.id))!
+    const obstacle = createPanel({ ...added, id: 'partial-obstacle', name: 'Partial obstacle', width: added.width * 0.8 })
+    const blocked = { ...project, panels: [...project.panels, obstacle] }
+    expect(validateProject(blocked)).toEqual([])
+    const candidates = getAssemblyAttachmentTargets(blocked, instanceId).filter(candidate => candidate.project)
+    expect(candidates.some(candidate => candidate.placement?.position.every((value, axis) => Math.abs(value - target.placement!.position[axis]) < 0.05)
+      && candidate.placement?.rotation.every((value, axis) => Math.abs(value - target.placement!.rotation[axis]) < 0.001))).toBe(false)
+    for (const candidate of candidates) expect(validateProject(candidate.project!)).toEqual([])
+    expect(blocked.panels.find(panel => panel.id === obstacle.id)).toEqual(obstacle)
+  })
+
+  it.each([0, 35])('offers rectangular shared-wall copies without rotating or resizing their panels at %i degrees', degrees => {
+    const panels = gridProject('Wide box', [700], [350], { depth: 300 })
+    const original = createAssembly(panels, panels.panels.map(panel => panel.id), 'Wide box')
+    const project = degrees ? rotateProject(original, 'z', degrees) : original
+    const before = structuredClone(project)
+    const source = project.assemblies!.instances[0]
+    const dimensions = (parts: Project['panels']) => parts.map(panel => [panel.width, panel.height, panel.thickness].join('/')).sort()
+    const shared = getAssemblyAttachmentTargets(project, source.id).filter(target => target.warning && target.project?.panels.length === 7
+      && target.placement?.rotation.every((value, axis) => Math.abs(value - source.rotation[axis]) < 0.000001))
+    expect(shared).toHaveLength(4)
+    for (const target of shared) {
+      const next = target.project!
+      expect(target.warning).toMatch(/disassembl/i)
+      expect(next.assemblies!.instances).toHaveLength(0)
+      expect(next.assemblies!.definitions).toEqual(project.assemblies!.definitions)
+      const placed = next.panels.filter(panel => target.panelIds!.includes(panel.id))
+      expect(dimensions(placed)).toEqual(dimensions(project.panels))
+      for (const panel of project.panels) {
+        const retained = next.panels.find(item => item.id === panel.id)!
+        expect({ ...retained, position: panel.position, rotation: panel.rotation }).toEqual(panel)
+        retained.position.forEach((value, axis) => expect(value).toBeCloseTo(panel.position[axis], 6))
+        retained.rotation.forEach((value, axis) => expect(value).toBeCloseTo(panel.rotation[axis], 6))
+      }
+      expect(validateProject(next)).toEqual([])
+      const serialized = JSON.parse(JSON.stringify(next))
+      expect(parseProject(serialized)).toEqual(serialized)
+      expect(materializeAssemblies(next)).toEqual(next)
+    }
+    expect(project).toEqual(before)
+  })
+
   it('disassembles only the selected instance, baking its finish and retaining the source', () => {
     const initial = box()
     let project = duplicateAssembly(initial, initial.assemblies!.instances[0].id)

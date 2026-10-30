@@ -25,6 +25,7 @@ export interface AssemblyAttachmentHandle {
   position: Vec3
   label: string
   active?: boolean
+  warning?: string
 }
 
 export interface SceneProps extends PreviewDragProps {
@@ -38,7 +39,7 @@ export interface SceneProps extends PreviewDragProps {
   onMove?: (delta: Vec3, repeat: boolean) => void
   movementEnabled?: boolean
   dragging?: boolean
-  dragSnap?: { position: Vec3; label: string } | null
+  dragSnap?: { position: Vec3; label: string; warning?: string } | null
   onDrillIn?: (panelId: string) => void
   attachmentHandles?: AssemblyAttachmentHandle[]
   onAttachmentPreview?: (id: string | null) => void
@@ -379,9 +380,9 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
     {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
     {!exploded && <ConnectorMeshes panels={panels} connections={connections} connectorOverrides={props.connectorOverrides} selectedConnectorIds={props.selectedConnectorIds} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
-    {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} ghost />}
+    {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
-    {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className="preview-drag-snap">Snapped · {props.dragSnap.label}</span></Html>}
+    {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
     <CameraController panMode={props.panMode} bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
@@ -398,7 +399,24 @@ class ViewportBoundary extends Component<{ children: ReactNode }, { error: boole
 
 export default function Scene(props: SceneProps) {
   const attachmentElements = useRef(new Map<string, HTMLDivElement>())
-  const attachmentHandles = !props.exploded && !props.realisticPreview && !props.dragging ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
+  const [controlHeld, setControlHeld] = useState(false)
+  const clearAttachmentPreview = useEffectEvent(() => props.onAttachmentPreview?.(null))
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+      if (event.key === 'Control') { setControlHeld(true); clearAttachmentPreview() }
+    }
+    const up = (event: KeyboardEvent) => { if (event.key === 'Control') setControlHeld(false) }
+    const blur = () => setControlHeld(false)
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', blur)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', blur)
+    }
+  }, [])
+  const attachmentHandles = !controlHeld && !props.exploded && !props.realisticPreview && !props.dragging ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
   return <ViewportBoundary>
     <div className="scene-surface">
     <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
@@ -409,7 +427,7 @@ export default function Scene(props: SceneProps) {
       <World {...props} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
     </Canvas>
     <div className="assembly-attachment-layer">{attachmentHandles.map(handle=><div key={handle.id} className="assembly-attachment-anchor" ref={element=>{if(element)attachmentElements.current.set(handle.id,element);else attachmentElements.current.delete(handle.id)}}>
-      <button className={`assembly-attach-handle ${handle.active ? 'is-active' : ''}`} aria-label={handle.label} title={handle.label} data-attachment-id={handle.id}
+      <button className={`assembly-attach-handle ${handle.active ? 'is-active' : ''} ${handle.warning ? 'has-warning' : ''}`} aria-label={handle.label} title={handle.label} data-attachment-id={handle.id}
         onPointerDown={event => event.stopPropagation()}
         onPointerEnter={() => props.onAttachmentPreview?.(handle.id)}
         onPointerLeave={event => { if (document.activeElement !== event.currentTarget) props.onAttachmentPreview?.(null) }}

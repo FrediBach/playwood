@@ -56,6 +56,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
     return !old || JSON.stringify(old) !== JSON.stringify(connection) || previewIds.has(connection.parentId) || previewIds.has(connection.childId)
   }) ?? []
   const suppressedConnectionIds = preview ? project.connections.filter(connection => !preview.connections.some(item => item.id === connection.id)).map(connection => connection.id) : []
+  const suppressedPanelIds = preview ? project.panels.filter(panel => !preview.panels.some(item => item.id === panel.id)).map(panel => panel.id) : []
   const clearPlacement = () => { setPlacement(null); setHover(null) }
   const close = () => { setEditingId(null); clearPlacement() }
   const select = (id: string, next = project) => {
@@ -105,15 +106,21 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
     const candidate = targets.find(item => item.id === id)
     if (!candidate?.project) { if (candidate?.error) notify(candidate.error); return }
     const next = candidate.project
-    const placedId = sourceInstanceId ?? next.assemblies!.instances.at(-1)!.id
+    const placed = sourceInstanceId ? next.assemblies?.instances.find(instance => instance.id === sourceInstanceId)
+      : next.assemblies?.instances.find(instance => !instances.some(previous => previous.id === instance.id))
     commit(next)
-    select(placedId, next)
+    if (placed) select(placed.id, next)
+    else {
+      close()
+      setSelectedIds(candidate.panelIds ?? next.panels.filter(panel => sourceIds.has(panel.id) || !existingIds.has(panel.id)).map(panel => panel.id))
+      prepareSelection()
+    }
     fit()
-    notify('Instance attached. Shared connectors fitted automatically.')
+    notify(candidate.warning ? `Attached. ${candidate.warning.replace(/^Requires disassembly:/, 'Disassembled:')} Undo is available.` : 'Instance attached. Shared connectors fitted automatically.')
   }
   return {
     instances, definitions, selectedInstance, memberInstance, hasMembers, definition,
-    editingInstance, editingDefinition, targets, target, preview, previewPanels, previewConnections, suppressedConnectionIds, attachmentBoundsPanels,
+    editingInstance, editingDefinition, targets, target, preview, previewPanels, previewConnections, suppressedConnectionIds, suppressedPanelIds, attachmentBoundsPanels,
     placementActive: !!placement && placement.targetId === targetInstanceId,
     select, edit, drillIn, updateDefinition, close, clearPlacement,
     done: () => { if (editingInstance) select(editingInstance.id); else close() },

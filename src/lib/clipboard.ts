@@ -1,6 +1,6 @@
 import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
 import { Euler, Quaternion, Vector3 } from 'three'
-import { attachAssemblyCopyToPanel, getAssemblyAttachmentTargets, getAssemblyInstance, type AssemblyAttachmentTarget } from './assemblies'
+import { getAssemblyCopyPanelPlacement, getAssemblyAttachmentTargets, getAssemblyInstance, type AssemblyAttachmentTarget } from './assemblies'
 import { attachPanel, createPanel, resolvePanels, validateProject } from './model'
 import type { AssemblyDefinition, AssemblyInstance, AttachmentOptions, Panel, Project, Side, Vec3 } from './types'
 
@@ -36,7 +36,7 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
     { side: 'top', position: p => [0, p.height / 2, 0] },
     { side: 'bottom', position: p => [0, -p.height / 2, 0] },
   ]
-  return parents.flatMap(parent => edges.flatMap(edge => [false, true].map(flip => {
+  const targets: AssemblyAttachmentTarget[] = parents.flatMap(parent => edges.flatMap(edge => [false, true].map(flip => {
     const rotation = new Quaternion().setFromEuler(new Euler(...parent.rotation))
     const local = edge.position(parent)
     local[2] = (flip ? -1 : 1) * 35
@@ -45,14 +45,16 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
     const label = `${instance ? `${parent.name} · ` : ''}${edge.side}${flip ? ' · reverse' : ''}`
     const options: AttachmentOptions = { side: edge.side, flip, type: '90', offset: 0, inset: 0, color: DEFAULT_CONNECTOR_COLOR, count: 2 }
     try {
-      const next = copied.kind === 'assembly' ? attachAssemblyCopyToPanel(base, copied.instance, parent.id, options) : attachPanel(base, parent.id, child!, options)
+      const placement = copied.kind === 'assembly' ? getAssemblyCopyPanelPlacement(base, copied.instance, parent.id, options) : { project: attachPanel(base, parent.id, child!, options) }
+      const next = placement.project
       const newIds = new Set(next.panels.filter(panel => !project.panels.some(old => old.id === panel.id)).map(panel => panel.id))
       const issue = validateProject(next).find(item => item.severity === 'error' && !oldErrors.has(item.id) || item.id.startsWith('collision-') && item.panelIds.some(panelId => newIds.has(panelId)))
       if (issue) throw new Error(issue.message)
       if (next.panels.length > 200 || next.connections.length > 400) throw new Error('Projects support up to 200 panels and 400 connections.')
-      return { id, label, position, project: next }
+      return { id, label, position, ...placement }
     } catch (error) { return { id, label, position, error: error instanceof Error ? error.message : 'This copy cannot fit here.' } }
   })))
+  return targets.sort((a, b) => Number(!!a.warning) - Number(!!b.warning))
 }
 
 /** Offer every selected target, keeping whole-instance corner joins where possible. */

@@ -152,7 +152,7 @@ test('making an attached instance independent preserves its joints; disconnectin
   await createBoxAssembly(page)
   const initial = await exportedProject(page)
   await page.getByRole('button', { name: 'Attach a copy', exact: true }).click()
-  const corner = page.locator('.scene-container').getByRole('button', { name: /Top right/ })
+  const corner = page.locator('.scene-container').getByRole('button', { name: 'Attach Top right', exact: true })
   await corner.focus()
   await corner.press('Escape')
   await expect(page.getByRole('button', { name: 'Attach a copy', exact: true })).toBeVisible()

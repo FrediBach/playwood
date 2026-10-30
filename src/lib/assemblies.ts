@@ -3,12 +3,13 @@ import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish
 import { attachPanel, getConnectorPlacements, getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
 import { resizePanels } from './structure-edit'
 import { evaluateAssemblyDefinition, parseAssemblyParameters, parseAssemblyParameterValues } from './assembly-parameters'
+import { reconcileAssemblyPlacement, samePanelPlacement } from './assembly-placement'
 
 const uid = () => crypto.randomUUID()
 const v = (value: Vec3) => new Vector3(...value)
 const tuple = (value: Vector3): Vec3 => [value.x, value.y, value.z]
 const q = (rotation: Vec3) => new Quaternion().setFromEuler(new Euler(...rotation))
-const angles = (rotation: Quaternion): Vec3 => { const e = new Euler().setFromQuaternion(rotation); return [e.x, e.y, e.z] }
+const angles = (rotation: Quaternion): Vec3 => { const e = new Euler().setFromQuaternion(rotation); return [e.x || 0, e.y || 0, e.z || 0] }
 const jointId = (id: string) => id.replace(/:\d+$/, '')
 const empty = (): AssemblyData => ({ definitions: [], instances: [], links: [] })
 const flat = (definition: AssemblyDefinition): Project => ({ version: 1, name: definition.name, panels: definition.panels, connections: definition.connections })
@@ -102,10 +103,10 @@ function worldPort(data: AssemblyData, endpoint: AssemblyEndpoint, panels: Panel
   return { ...port, position: tuple(v(port.position).applyQuaternion(rotation).add(v(instance.position))), rotation: angles(rotation.multiply(q(port.rotation))) }
 }
 
-function placeAtPort(data: AssemblyData, source: AssemblyInstance, sourcePortId: string, target: AssemblyEndpoint): AssemblyInstance {
+function placeAtPort(data: AssemblyData, source: AssemblyInstance, sourcePortId: string, target: AssemblyEndpoint, turn = Math.PI): AssemblyInstance {
   const sourcePort = localPort(evaluatedFor(data, source), sourcePortId)
   const targetPort = worldPort(data, target)
-  const rotation = q(targetPort.rotation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI)).multiply(q(sourcePort.rotation).invert())
+  const rotation = q(targetPort.rotation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), turn)).multiply(q(sourcePort.rotation).invert())
   return { ...source, rotation: angles(rotation), position: tuple(v(targetPort.position).sub(v(sourcePort.position).applyQuaternion(rotation))) }
 }
 
@@ -254,7 +255,14 @@ export function duplicateAssembly(project: Project, instanceId: string): Project
   return ensureValid(rebuild(project, nextData), project, new Set(Object.values(instance.panelIds)))
 }
 
-export interface AssemblyAttachmentTarget { id: string; label: string; position: Vec3; project?: Project; error?: string }
+export interface AssemblyAttachmentTarget {
+  id: string; label: string; position: Vec3; project?: Project; error?: string; warning?: string
+  /** Surviving placed panels, including retained panels shared with the target. */
+  panelIds?: string[]
+  /** Original port and rigid pose remain available after an instance is baked. */
+  anchorId?: string
+  placement?: Pick<AssemblyInstance, 'position' | 'rotation'>
+}
 
 function withMatchingLinks(data: AssemblyData, instanceId: string): AssemblyData {
   const instance = data.instances.find(item => item.id === instanceId)!, definition = definitionFor(data, instance)
@@ -281,35 +289,98 @@ export function getAssemblyAttachmentTargets(project: Project, instanceId: strin
   if (sourceInstanceId && data.links.some(link => link.a.instanceId === sourceInstanceId || link.b.instanceId === sourceInstanceId)) return [{ id: 'connected', label: 'Disconnect first', position: source.position, error: 'Disconnect this instance before attaching it somewhere else.' }]
   const sourceDefinition = definitionFor(data, source)
   const occupied = new Set(data.links.flatMap(link => [endpointKey(link.a), endpointKey(link.b)]))
-  return definition.ports.filter(port => !occupied.has(endpointKey({ instanceId, portId: port.id }))).map(port => {
+  const targets: AssemblyAttachmentTarget[] = []
+  const sharedPlacements: AssemblyInstance[] = []
+  // A shared wall keeps rectangular modules in their current orientation.
+  // Corner frames alone can require a quarter turn, swapping width and height.
+  const targetPanels = resolvePanels(project).filter(panel => Object.values(target.panelIds).includes(panel.id))
+  const sourcePanels = resolvePanels(flat(evaluatedFor(data, source))).map(panel => ({ ...panel,
+    position: tuple(v(panel.position).applyQuaternion(q(source.rotation)).add(v(source.position))),
+    rotation: angles(q(source.rotation).multiply(q(panel.rotation))) }))
+  for (const parent of targetPanels) for (const child of sourcePanels) {
+    if (!samePanelPlacement(parent, { ...child, position: parent.position })) continue
+    const placed = { ...source, position: tuple(v(source.position).add(v(parent.position).sub(v(child.position)))) }
+    if (sharedPlacements.some(other => v(other.position).distanceTo(v(placed.position)) < 0.05)) continue
+    sharedPlacements.push(placed)
+    try {
+      const nextData = { ...data, instances: sourceInstanceId ? data.instances.map(item => item.id === source.id ? placed : item) : [...data.instances, placed] }
+      const ids = Object.values(placed.panelIds)
+      const result = reconcileAssemblyPlacement(rebuild(project, nextData), ids)
+      if (!result.warning || !result.project.panels.some(panel => ids.includes(panel.id))) continue
+      targets.push({ id: `${instanceId}/shared-panel/${parent.id}/${child.id}`, label: `${parent.name} · shared panel`, position: parent.position,
+        ...result, placement: { position: placed.position, rotation: placed.rotation } })
+    } catch { /* Matching one panel can leave the rest of a module intersecting. */ }
+  }
+  for (const port of definition.ports) {
     const endpoint = { instanceId, portId: port.id }, position = worldPort(data, endpoint).position
-    const options = sourceDefinition.ports.map(sourcePort => {
-      const placed = placeAtPort(data, source, sourcePort.id, endpoint)
-      const score = Math.abs(q(placed.rotation).dot(q(source.rotation)))
-      return { placed, score }
-    }).sort((a, b) => b.score - a.score)
-    let error = 'This assembly has no compatible corner.'
-    for (const { placed } of options) {
-      try {
-        let nextData = { ...data, instances: sourceInstanceId ? data.instances.map(item => item.id === source.id ? placed : item) : [...data.instances, placed] }
-        nextData = withMatchingLinks(nextData, placed.id)
-        if (!nextData.links.some(link => endpointKey(link.a) === endpointKey(endpoint) || endpointKey(link.b) === endpointKey(endpoint))) continue
-        const next = ensureValid(rebuild(project, nextData), project, new Set(Object.values(placed.panelIds)))
-        return { id: `${instanceId}/${port.id}`, label: port.label, position, project: next }
-      } catch (reason) { error = reason instanceof Error ? reason.message : 'This corner cannot be connected.' }
+    for (const turn of [Math.PI, Math.PI / 2, -Math.PI / 2]) {
+      const shared = turn !== Math.PI
+      if (!shared && occupied.has(endpointKey(endpoint))) continue
+      const options = sourceDefinition.ports.map(sourcePort => {
+        const placed = placeAtPort(data, source, sourcePort.id, endpoint, turn)
+        const score = Math.abs(q(placed.rotation).dot(q(source.rotation)))
+        return { placed, score }
+      }).sort((a, b) => b.score - a.score)
+      let error = 'This assembly has no compatible corner.'
+      let candidate: AssemblyAttachmentTarget | undefined
+      for (const { placed } of options) {
+        if (shared && sharedPlacements.some(other => v(other.position).distanceTo(v(placed.position)) < 0.05
+          && Math.abs(q(other.rotation).dot(q(placed.rotation))) > 0.999999)) break
+        try {
+          const nextData = { ...data, instances: sourceInstanceId ? data.instances.map(item => item.id === source.id ? placed : item) : [...data.instances, placed] }
+          const ids = Object.values(placed.panelIds)
+          let result: ReturnType<typeof reconcileAssemblyPlacement>
+          if (!shared) {
+            try {
+              const linked = withMatchingLinks(nextData, placed.id)
+              if (!linked.links.some(link => endpointKey(link.a) === endpointKey(endpoint) || endpointKey(link.b) === endpointKey(endpoint))) continue
+              result = { project: ensureValid(rebuild(project, linked), project, new Set(ids)), panelIds: ids }
+            } catch {
+              result = reconcileAssemblyPlacement(rebuild(project, nextData), ids)
+              if (!result.warning) continue
+            }
+          } else {
+            result = reconcileAssemblyPlacement(rebuild(project, nextData), ids)
+            if (!result.warning || !result.project.panels.some(panel => ids.includes(panel.id))) continue
+          }
+          const merged = ids.filter(id => !result.project.panels.some(panel => panel.id === id))
+          const placedPanels = resolvePanels(flat(evaluatedFor(nextData, placed)))
+          const sharedPanel = placedPanels.find(panel => merged.includes(placed.panelIds[panel.id]))
+          const handlePosition = shared && sharedPanel ? tuple(v(sharedPanel.position).applyQuaternion(q(placed.rotation)).add(v(placed.position)))
+            : shared ? tuple(v(position).lerp(v(placed.position), 0.35)) : position
+          candidate = { id: `${instanceId}/${port.id}${shared ? `/shared-${turn > 0 ? 'left' : 'right'}` : ''}`,
+            anchorId: `${instanceId}/${port.id}`, label: `${port.label}${shared ? ' · shared panel' : ''}`, position: handlePosition,
+            ...result, placement: { position: placed.position, rotation: placed.rotation } }
+          if (shared) sharedPlacements.push(placed)
+          break
+        } catch (reason) { error = reason instanceof Error ? reason.message : 'This corner cannot be connected.' }
+      }
+      if (candidate) targets.push(candidate)
+      else if (!shared) targets.push({ id: `${instanceId}/${port.id}`, label: port.label, position, error })
     }
-    return { id: `${instanceId}/${port.id}`, label: port.label, position, error }
-  })
+  }
+  // Keep ordinary corner attachments first for keyboard navigation and existing workflows.
+  return targets.filter((candidate, index) => !candidate.warning || !targets.slice(0, index).some(other => {
+    if (!other.warning || !other.project || !candidate.project) return false
+    const a = other.project.panels.filter(panel => other.panelIds?.includes(panel.id))
+    const b = candidate.project.panels.filter(panel => candidate.panelIds?.includes(panel.id))
+    return a.length === b.length && a.every(panel => b.some(item => samePanelPlacement(panel, item)))
+  })).sort((a, b) => Number(!!a.warning) - Number(!!b.warning))
 }
 
 /** Place a copied instance by one of its panels while retaining its rigid design. */
 export function attachAssemblyCopyToPanel(project: Project, source: AssemblyInstance, parentId: string, options: AttachmentOptions): Project {
+  return getAssemblyCopyPanelPlacement(project, source, parentId, options).project
+}
+
+export function getAssemblyCopyPanelPlacement(project: Project, source: AssemblyInstance, parentId: string, options: AttachmentOptions): ReturnType<typeof reconcileAssemblyPlacement> {
   const data = project.assemblies!, currentDefinition = definitionFor(data, source)
   const parameterValues = Object.fromEntries(Object.entries(source.parameterValues ?? {})
     .filter(([id]) => currentDefinition.parameters?.some(parameter => parameter.id === id)))
   source = { ...source, parameterValues }
   const definition = evaluatedFor(data, source)
   let error: unknown = new Error('This assembly cannot fit on this edge.')
+  let fallback: ReturnType<typeof reconcileAssemblyPlacement> | undefined
   for (const panel of resolvePanels(flat(definition))) {
     try {
       const instance = newInstance(data, definition, source)
@@ -321,9 +392,12 @@ export function attachAssemblyCopyToPanel(project: Project, source: AssemblyInst
       instance.position = tuple(v(placed.position).sub(v(panel.position).applyQuaternion(rotation)))
       const next = rebuild(project, { ...data, instances: [...data.instances, instance] })
       next.connections.push({ ...attached.connections.at(-1)!, role: 'support' })
-      return ensureValid(next, project, new Set(Object.values(instance.panelIds)))
+      const result = reconcileAssemblyPlacement(next, Object.values(instance.panelIds))
+      if (!result.warning) return result
+      fallback ??= result
     } catch (reason) { error = reason }
   }
+  if (fallback) return fallback
   throw error
 }
 

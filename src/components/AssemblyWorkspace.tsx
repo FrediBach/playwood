@@ -33,15 +33,17 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
   visibleBounds: ReturnType<typeof getProjectBounds>
   hasVisiblePanels: boolean
   suppressedConnectionIds?: string[]
+  suppressedPanelIds?: string[]
   editingAssembly?: { name: string; instanceCount: number; onDone: () => void }
   assemblyHint?: string
   attachmentSummary?: string
+  attachmentWarning?: boolean
 }
 const number = (n:number)=>Math.round(n).toLocaleString()
 
-export function AssemblyWorkspace({connectorOverrides,selectedConnectorIds,onSelectConnector,panels,connections,selectedIds,choosePanel,onMove,movementEnabled,onDragStart,onDragMove,onDragEnd,dragging,dragSnap,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,frameSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,onAutoConnect,autoConnectDisabled,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels,onDrillIn,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,suppressedConnectionIds=[],editingAssembly,assemblyHint,attachmentSummary}: Props) {
+export function AssemblyWorkspace({connectorOverrides,selectedConnectorIds,onSelectConnector,panels,connections,selectedIds,choosePanel,onMove,movementEnabled,onDragStart,onDragMove,onDragEnd,dragging,dragSnap,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,frameSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,onAutoConnect,autoConnectDisabled,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels,onDrillIn,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,suppressedConnectionIds=[],suppressedPanelIds=[],editingAssembly,assemblyHint,attachmentSummary,attachmentWarning}: Props) {
   const [panMode, setPanMode] = useState(false)
-  const previewIds = new Set(previewPanels.map(panel => panel.id))
+  const previewIds = new Set([...suppressedPanelIds, ...previewPanels.map(panel => panel.id)])
   const replacedConnectionIds = new Set([...suppressedConnectionIds,...previewConnections.map(connection=>connection.id)])
   const sceneProps: SceneProps = realisticPreview
     ? { panels, connections, selectedIds, onSelect: choosePanel, view: 'perspective', showGrid: false, showDimensions, exploded: false, realisticPreview, fitSignal, frameSignal, zoomSignal }
@@ -50,7 +52,8 @@ export function AssemblyWorkspace({connectorOverrides,selectedConnectorIds,onSel
       <WorkspaceToolbar onAutoConnect={onAutoConnect} autoConnectDisabled={autoConnectDisabled} panels={panels} realisticPreview={realisticPreview} setRealisticPreview={setRealisticPreview} onRotate={onRotate} leftOpen={leftOpen} setLeftOpen={setLeftOpen} rightOpen={rightOpen} setRightOpen={setRightOpen} showDimensions={showDimensions} setShowDimensions={setShowDimensions} showGrid={showGrid} setShowGrid={setShowGrid}/>
       <div className="scene-container"><Scene {...sceneProps} connectorOverrides={connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={onSelectConnector} panMode={panMode} onMove={onMove} movementEnabled={movementEnabled} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} dragging={dragging} dragSnap={dragSnap}/></div>
       {!realisticPreview&&editingAssembly&&<div className="assembly-edit-breadcrumb"><Box size={15}/><strong>Editing {editingAssembly.name}</strong><span>Updates {editingAssembly.instanceCount} {editingAssembly.instanceCount===1?'instance':'instances'}</span><button className={rightOpen?'assembly-desktop-done':undefined} onClick={editingAssembly.onDone}>Done editing</button></div>}
-      {!dragging&&!realisticPreview&&(assemblyHint||attachmentSummary)&&<div className={`assembly-workspace-hint ${editingAssembly?'has-breadcrumb':''}`} role="status">{assemblyHint}{attachmentSummary&&<strong>{attachmentSummary}</strong>}</div>}
+      {!dragging&&!realisticPreview&&(assemblyHint||attachmentSummary)&&<div className={`assembly-workspace-hint ${editingAssembly?'has-breadcrumb':''} ${attachmentWarning?'has-warning':''}`} role="status">{assemblyHint}{attachmentSummary&&<strong>{attachmentSummary}</strong>}</div>}
+      {dragging&&dragSnap?.warning&&<div className="assembly-workspace-hint has-warning" role="status"><strong>{dragSnap.warning}</strong>Release to attach · Esc to cancel</div>}
       {selectedIds.length>0&&!editingAssembly&&(!assemblyHint||movementEnabled)&&<div className="movement-hint" aria-live="polite">{movementEnabled?(dragging?<><span>{dragSnap?"Snapped · release to attach":"Moving selection · release to place"}</span><kbd>Esc</kbd><span>Cancel</span></>:<><kbd>Ctrl + drag</kbd><span>Move & snap</span><span>·</span><kbd>↑ ↓ ← →</kbd><span>1 cm</span><span>·</span><kbd>Shift</kbd><span>10 cm</span></>):<span>{isAttaching?'Finish attaching to move panels':exploded?'Close exploded view to move panels':'Select a panel in the preview to move it'}</span>}</div>}
       {!realisticPreview&&isAttaching&&<div className="preview-badge"><span className="pulsing-dot"/>Attachment preview <span>·</span> {attachmentSide} side</div>}
       {!realisticPreview&&!panels.length&&<div className="canvas-empty"><h2>Something good starts here.</h2><p>Bring a panel. Build an idea.</p><Button onClick={addPanel}><Plus size={18}/>Add your first panel</Button></div>}

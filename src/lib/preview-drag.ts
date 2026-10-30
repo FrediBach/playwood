@@ -1,5 +1,6 @@
 import { Euler, Quaternion, Vector3 } from 'three'
 import { getAssemblyAttachmentTargets, materializeAssemblies } from './assemblies'
+import { reconcileAssemblyPlacement, samePanelPlacement } from './assembly-placement'
 import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { getConnectorPlacements, resolvePanels, validateProject } from './model'
@@ -14,6 +15,7 @@ export interface PreviewDragSnap {
   label: string
   position: Vec3
   panelIds: string[]
+  warning?: string
 }
 
 interface PanelTarget {
@@ -110,22 +112,42 @@ export function preparePreviewDrag(original: Project, selectedIds: readonly stri
     const existingLinks = new Set(data.links.map(link => link.id))
     for (const target of data.instances.filter(instance => instance.id !== source.id && Object.values(instance.panelIds).some(id => visiblePanels.has(id)))) {
       for (const candidate of getAssemblyAttachmentTargets(project, target.id, source.id)) {
-        if (!candidate.project || !visiblePorts.has(candidate.id)) continue
+        if (!candidate.project || !visiblePorts.has(candidate.anchorId ?? candidate.id)) continue
         // A placement may match several corners. Every newly shared corner must
         // use visible panels on both instances, including the moving instance.
         if (candidate.project.assemblies!.links.some(link => !existingLinks.has(link.id)
           && [link.a, link.b].some(endpoint => !visiblePorts.has(`${endpoint.instanceId}/${endpoint.portId}`)))) continue
-        const placed = candidate.project.assemblies!.instances.find(instance => instance.id === source.id)!
+        const placed = candidate.placement ?? candidate.project.assemblies!.instances.find(instance => instance.id === source.id)!
         if (Math.abs(rotation(source.rotation).dot(rotation(placed.rotation))) < 0.999999) continue
         assemblyTargets.push({ project: candidate.project, delta: vector(placed.position).sub(vector(source.position)).toArray(),
-          snap: { label: `${target.name} · ${candidate.label}`, position: candidate.position, panelIds: [...moving.map(panel => panel.id), ...Object.values(target.panelIds)] },
+          snap: { label: `${target.name} · ${candidate.label}`, position: candidate.position, panelIds: candidate.panelIds ?? moving.map(panel => panel.id), warning: candidate.warning },
         })
       }
     }
   }
-  return { original, project, movingIds: moving.map(panel => panel.id), instanceIds, panelTargets, assemblyTargets,
+  const session: PreviewDragSession = { original, project, movingIds: moving.map(panel => panel.id), instanceIds, panelTargets, assemblyTargets,
     previousErrors: new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id)),
   }
+  // Shared walls can be aligned by translation even when corner-frame matching
+  // would rotate the source. Keep dragging rigid and fit the resulting T joints.
+  if (movingInstances.length) {
+    const tried: Vec3[] = []
+    for (const source of panels.filter(panel => wanted.has(panel.id) && panel.visible)) {
+      for (const target of panels.filter(panel => !wanted.has(panel.id) && panel.visible)) {
+        if (!samePanelPlacement({ ...source, position: target.position }, target)) continue
+        const delta = vector(target.position).sub(vector(source.position)).toArray() as Vec3
+        if (tried.some(previous => vector(previous).distanceTo(vector(delta)) < 0.05)) continue
+        tried.push(delta)
+        try {
+          const result = reconcileAssemblyPlacement(translate(session, delta), session.movingIds)
+          if (!result.warning) continue
+          assemblyTargets.push({ project: result.project, delta,
+            snap: { label: `${target.name} · shared panel`, position: target.position, panelIds: result.panelIds, warning: result.warning } })
+        } catch { /* An exact wall match can still leave other panels intersecting. */ }
+      }
+    }
+  }
+  return session
 }
 
 function translate(session: PreviewDragSession, delta: Vec3): Project {
@@ -166,7 +188,8 @@ export function movePreviewDrag(session: PreviewDragSession, delta: Vec3, snapDi
     const distance = correction.length()
     if (distance <= snapDistance) options.push({ distance, target, offset, correction: correction.toArray() })
   }
-  options.sort((a, b) => a.distance - b.distance || Number(!!b.assembly) - Number(!!a.assembly))
+  options.sort((a, b) => Math.abs(a.distance - b.distance) > 1e-5 ? a.distance - b.distance
+    : Number(!!b.assembly) - Number(!!a.assembly) || Number(!!a.assembly?.snap.warning) - Number(!!b.assembly?.snap.warning))
   for (const option of options) {
     if (option.assembly) return { project: option.assembly.project, snap: option.assembly.snap }
     const target = option.target!
@@ -183,12 +206,23 @@ export function movePreviewDrag(session: PreviewDragSession, delta: Vec3, snapDi
       const a = nextById.get(item.parentId), b = nextById.get(item.childId)
       return a && b && getConnectorPlacements(item, a, b).some(existing => placements.some(placed => vector(existing.position).distanceTo(vector(placed.position)) < 40))
     })
-    if (occupied || next.connections.length >= 400) continue
-    const snapped = { ...next, connections: [...next.connections, connection] }
+    const touchesAssembly = next.assemblies?.instances.some(instance => Object.values(instance.panelIds).some(id => wanted.has(id) || id === parent.id || id === child.id))
+    if ((occupied && !touchesAssembly) || next.connections.length >= 400) continue
+    let snapped = { ...next, connections: [...next.connections, connection] }
+    let warning: string | undefined
+    let panelIds = session.movingIds
+    if (touchesAssembly) {
+      try {
+        const result = reconcileAssemblyPlacement(snapped, session.movingIds)
+        snapped = result.project
+        warning = result.warning
+        panelIds = result.panelIds
+      } catch { continue }
+    }
     if (validateProject(snapped).some(issue => (issue.severity === 'error' && !session.previousErrors.has(issue.id))
       || (issue.id.startsWith('collision-') && issue.panelIds.some(id => wanted.has(id)) && issue.panelIds.some(id => !wanted.has(id))))) continue
     return { project: snapped, snap: { label: wanted.has(parent.id) ? child.name : parent.name,
-      position: getConnectorPlacements({ ...connection, count: 1 }, parent, child)[0].position, panelIds: [parent.id, child.id] } }
+      position: getConnectorPlacements({ ...connection, count: 1 }, parent, child)[0].position, panelIds, warning } }
   }
   return { project, snap: null }
 }

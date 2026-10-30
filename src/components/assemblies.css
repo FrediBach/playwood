@@ -6,6 +6,12 @@
 .scene-surface{position:relative;width:100%;height:100%}.assembly-attachment-layer{position:absolute;inset:0;pointer-events:none;z-index:1}.assembly-attachment-anchor{position:absolute;top:0;left:0;visibility:hidden;pointer-events:auto}
 
 .assembly-instance-values{margin-top:22px}
+.assembly-attach-handle.has-warning{border-color:#c49b55;color:#8b631e;background:#fff6e2}
+.assembly-attach-handle.has-warning:hover,.assembly-attach-handle.has-warning:focus-visible,.assembly-attach-handle.has-warning.is-active{border-color:#a87b34;color:#fff;background:#a87b34}
+.assembly-workspace-hint.has-warning{border-color:#d7bb86;background:#fff6e7f5;color:#856120}
+.assembly-workspace-hint.has-warning strong{color:#856120}
+.preview-drag-snap.has-warning{border-color:#c49b55;background:#fff6e7f5;color:#856120;white-space:normal;width:max-content;max-width:300px;line-height:1.5}
+.preview-drag-snap.has-warning strong{display:block;font-size:11px;font-weight:500;margin-top:3px}
 .assembly-instance-value{margin-bottom:15px}
 .assembly-instance-value>.field{margin-bottom:5px}
 .assembly-instance-value>p{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#78816e}

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAttachmentTargets, makeAssemblyIndependent, updateAssemblyDefinition } from './assemblies'
+import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAttachmentTargets, makeAssemblyIndependent, materializeAssemblies, updateAssemblyDefinition } from './assemblies'
 import { gridProject } from './example-geometry'
 import { attachPanel, createPanel, parseProject, resolvePanels, validateProject } from './model'
 import { movePreviewDrag, preparePreviewDrag } from './preview-drag'
+import { getPhysicalConnectors } from './connector-selection'
 import type { AttachmentOptions, Project, Vec3 } from './types'
 
 const options: AttachmentOptions = { type: '90', side: 'right', flip: false, offset: 0, inset: 0, color: '#e75a35', count: 2 }
@@ -102,6 +103,51 @@ describe('preview dragging', () => {
     expect(errors(moved)).toEqual([])
     expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
     expect(preparePreviewDrag(original, [selected[0]])).toBeNull()
+  })
+
+  it('snaps onto a shared panel with a warning, and restores the instances when dragged away', () => {
+    const initial = box()
+    const project = duplicateAssembly(initial, initial.assemblies!.instances[0].id)
+    const before = structuredClone(project)
+    const source = project.assemblies!.instances[1]
+    const selected = Object.values(source.panelIds)
+    const session = preparePreviewDrag(project, selected)!
+    const target = session.assemblyTargets.find(candidate => candidate.snap.warning && candidate.project.panels.length === 7)
+    expect(target).toBeDefined()
+    const snapped = movePreviewDrag(session, target!.delta, 20)
+    expect(snapped.snap?.warning).toMatch(/disassembl/i)
+    expect(snapped.project.panels).toHaveLength(7)
+    expect(snapped.project.assemblies!.instances).toHaveLength(0)
+    expect(snapped.project.assemblies!.definitions).toEqual(project.assemblies!.definitions)
+    expect(snapped.snap!.panelIds).toHaveLength(4)
+    expect(snapped.snap!.panelIds.every(id => snapped.project.panels.some(panel => panel.id === id))).toBe(true)
+    expect(validateProject(snapped.project)).toEqual([])
+    expect(parseProject(JSON.parse(JSON.stringify(snapped.project)))).toEqual(snapped.project)
+    expect(materializeAssemblies(snapped.project)).toEqual(snapped.project)
+    const released = movePreviewDrag(session, [1000, 200, 1000], 20)
+    expect(released.snap).toBeNull()
+    expect(released.project.panels).toHaveLength(8)
+    expect(released.project.assemblies!.instances.map(instance => instance.id)).toEqual(project.assemblies!.instances.map(instance => instance.id))
+    expect(parseProject(JSON.parse(JSON.stringify(released.project)))).toEqual(released.project)
+    expect(project).toEqual(before)
+  })
+
+  it('merges a fully overlapping assembly without retaining duplicate panels or hardware', () => {
+    const initial = box()
+    const project = duplicateAssembly(initial, initial.assemblies!.instances[0].id)
+    const source = project.assemblies!.instances[1]
+    const fixed = project.assemblies!.instances[0]
+    const session = preparePreviewDrag(project, Object.values(source.panelIds))!
+    const delta = fixed.position.map((value, axis) => value - source.position[axis]) as Vec3
+    const snapped = movePreviewDrag(session, delta, 20)
+    expect(snapped.snap?.warning).toMatch(/disassembl/i)
+    expect(snapped.project.panels).toHaveLength(4)
+    expect(new Set(snapped.project.panels.map(panel => panel.id))).toEqual(new Set(Object.values(fixed.panelIds)))
+    expect(getPhysicalConnectors(snapped.project)).toHaveLength(getPhysicalConnectors(initial).length)
+    expect(snapped.project.assemblies!.definitions).toEqual(initial.assemblies!.definitions)
+    expect(validateProject(snapped.project)).toEqual([])
+    expect(parseProject(JSON.parse(JSON.stringify(snapped.project)))).toEqual(snapped.project)
+    expect(materializeAssemblies(snapped.project)).toEqual(snapped.project)
   })
 
   it('disconnects linked assemblies in place, then snaps back to their shared corners', () => {

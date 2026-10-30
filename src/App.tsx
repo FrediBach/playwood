@@ -75,7 +75,7 @@ export default function App() {
   const connectorCount=physicalConnectors.length
   const connectorSummary=CONNECTORS.map(type=>({name:type.name,count:physicalConnectors.filter(c=>c.type===type.id).length})).filter(type=>type.count>0).map(type=>`${type.count} × ${type.name}`).join(' · ')
   const notify=useCallback((message:string)=>setToast(message),[])
-  const drag=usePreviewDrag({project,selectedIds,commit,notify})
+  const drag=usePreviewDrag({project,selectedIds,commit,notify,select:setSelectedIds})
   const assembly=useAssemblyEditor({project,selectedIds,setSelectedIds,commit,notify,
     prepareSelection:()=>{setInspectorTab('panel');setRightOpen(true);setExploded(false);if(window.innerWidth<=900)setLeftOpen(false)},fit:()=>setFrameSignal(v=>v+1)})
   const clipboard=useCopyPaste({project,selectedIds,commit,notify,
@@ -276,7 +276,8 @@ export default function App() {
   const assemblyHint=clipboard.active?`Hover a + to preview the ${clipboard.inserting||'copy'}. Click to attach · Esc to cancel.`:instance&&!exploded&&!realisticPreview
     ?validTargets.length?'Hover a + to preview. Click to attach.':assembly.targets.find(target=>target.error)?.error??'This assembly has no compatible corner attachments. Duplicate it to place another instance.'
     :undefined
-  const attachmentSummary=assembly.target?.error??(assembly.preview?'Corner connectors replaced with shared cross connectors.':undefined)
+  const attachmentWarning=clipboard.active?clipboard.hovered?.warning:assembly.target?.warning
+  const attachmentSummary=attachmentWarning??(clipboard.active?clipboard.hovered?.error:assembly.target?.error??(assembly.preview?'Corner connectors replaced with shared cross connectors.':undefined))
   const loosePanels=panels.filter(panel=>!getAssemblyInstance(project,panel.id))
 
   return <TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
@@ -296,20 +297,21 @@ export default function App() {
       assemblies={assembly.sidebarAssemblies} selectedAssemblyId={instance?.id} onSelectAssembly={id=>{clipboard.cancel();assembly.select(id)}}
       onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={insertSavedAssembly}/>
 
-    <AssemblyWorkspace connectorOverrides={(drag.project??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={drag.panels??panels} connections={(drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
+    <AssemblyWorkspace connectorOverrides={(drag.project??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={drag.panels??panels} connections={(drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
       onDragStart={drag.start} onDragMove={drag.move} onDragEnd={drag.end} dragging={drag.active} dragSnap={drag.snap}
       onAutoConnect={addAutoConnectors} autoConnectDisabled={!!dialog||!!assembly.editingInstance||panels.length<2}
-      onMove={moveSelection} movementEnabled={!clipboard.active&&!dialog&&!assembly.editingInstance&&!(assembly.memberInstance&&!instance)&&!assembly.preview&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))}
+      onMove={moveSelection} movementEnabled={!clipboard.active&&!dialog&&!assembly.editingInstance&&!(assembly.memberInstance&&!instance)&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))}
       previewPanels={clipboard.active?clipboard.previewPanels:assembly.preview?assembly.previewPanels:previewPanels} previewConnections={clipboard.active?clipboard.previewConnections:assembly.preview?assembly.previewConnections:previewConnections} view={view} showGrid={showGrid} showDimensions={showDimensions}
       exploded={exploded} realisticPreview={realisticPreview} fitSignal={fitSignal} frameSignal={frameSignal} zoomSignal={zoomSignal}
       setRealisticPreview={setRealisticPreview} leftOpen={leftOpen} rightOpen={rightOpen} setLeftOpen={setLeftOpen} setRightOpen={setRightOpen}
       setShowDimensions={setShowDimensions} setShowGrid={setShowGrid} setView={setView} setZoomSignal={setZoomSignal} setFitSignal={setFitSignal}
       setExploded={setExploded} onRotate={()=>setDialog('rotate')} addPanel={addPanel} isAttaching={inspectorTab==='attach'&&!!selected}
       attachmentSide={attachment.side} visibleBounds={visibleBounds} hasVisiblePanels={hasVisiblePanels}
-      attachmentHandles={!dialog?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?(clipboard.inserting?`Attach ${clipboard.inserting} at`:'Paste at'):'Attach'} ${target.label}`,position:target.position,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
+      attachmentHandles={!dialog?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?(clipboard.inserting?`Attach ${clipboard.inserting} at`:'Paste at'):'Attach'} ${target.label}${target.warning?` · ${target.warning}`:''}`,position:target.position,warning:target.warning,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
       onAttachmentPreview={clipboard.active?clipboard.hover:assembly.hover} onAttachmentCommit={clipboard.active?clipboard.attach:assembly.attach} suppressedConnectionIds={clipboard.active?clipboard.suppressedConnectionIds:assembly.suppressedConnectionIds}
+      suppressedPanelIds={clipboard.active?clipboard.suppressedPanelIds:assembly.suppressedPanelIds}
       attachmentBoundsPanels={clipboard.active?clipboard.boundsPanels:assembly.attachmentBoundsPanels}
-      onDrillIn={assembly.drillIn} assemblyHint={assemblyHint} attachmentSummary={attachmentSummary}
+      onDrillIn={assembly.drillIn} assemblyHint={assemblyHint} attachmentSummary={attachmentSummary} attachmentWarning={!!attachmentWarning}
       editingAssembly={assembly.editingDefinition?{name:assembly.editingDefinition.name,instanceCount:assemblyCount(assembly.editingDefinition.id),onDone:assembly.done}:undefined}/>
 
     <InspectorSidebar inspectorTab={inspectorTab} selectedCount={selectedPanels.length} hasSelection={!!selected}

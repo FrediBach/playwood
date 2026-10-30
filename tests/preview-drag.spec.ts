@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createAssembly } from '../src/lib/assemblies'
+import { createAssembly, duplicateAssembly } from '../src/lib/assemblies'
+import { createExampleProject } from '../src/lib/example-library'
+import { preparePreviewDrag } from '../src/lib/preview-drag'
 import { attachPanel, createPanel, resolvePanels, validateProject } from '../src/lib/model'
 import type { Project, Vec3 } from '../src/lib/types'
 
@@ -202,4 +204,37 @@ test('dropping near a compatible edge snaps the panel and creates an aligned att
   await expect.poll(() => savedProject(page)).toEqual(project)
   await page.keyboard.press('ControlOrMeta+Shift+z')
   await expect.poll(() => savedProject(page)).toEqual(snapped)
+})
+
+test('assembly snap warns before disassembly, can be cancelled and merges a shared panel on drop', async ({ page }) => {
+  const initial = createExampleProject('assembly-cube')
+  const project = duplicateAssembly(initial, initial.assemblies!.instances[0].id)
+  const moving = project.assemblies!.instances[1]
+  const ids = Object.values(moving.panelIds)
+  const targets = preparePreviewDrag(project, ids)!.assemblyTargets.filter(target => target.snap.warning && Math.abs(target.delta[1]) < 0.01 && Math.abs(target.delta[2]) < 0.01)
+  const target = targets.sort((a, b) => Math.abs(a.delta[0]) - Math.abs(b.delta[0]))[0]
+  expect(target).toBeDefined()
+  const panel = project.panels.find(panel => ids.includes(panel.id) && panel.name.startsWith('Upright'))!
+  const point = panel.position
+  await openProject(page, project)
+  await page.locator('.assembly-tree-select').last().click()
+  const start = await screenPoint(page, point)
+  const destination = await screenPoint(page, point.map((value, axis) => value + target.delta[axis] + (axis === 0 ? 3 : 0)) as Vec3)
+  await beginDrag(page, point, destination.x - start.x, destination.y - start.y)
+  await expect(page.locator('.assembly-workspace-hint')).toContainText('Requires disassembly:')
+  expect(await savedProject(page)).toEqual(project)
+  await page.keyboard.press('Escape')
+  await endDrag(page)
+  expect(await savedProject(page)).toEqual(project)
+
+  await beginDrag(page, point, destination.x - start.x, destination.y - start.y)
+  await expect(page.locator('.assembly-workspace-hint')).toContainText('Requires disassembly:')
+  await endDrag(page)
+  await expect(page.locator('.toast')).toContainText('Disassembled:')
+  await expect.poll(async () => (await savedProject(page)).panels.length).toBe(7)
+  const placed = await savedProject(page)
+  expect(placed.assemblies!.instances).toHaveLength(0)
+  expect(validateProject(placed)).toEqual([])
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
 })

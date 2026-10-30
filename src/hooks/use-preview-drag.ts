@@ -3,11 +3,12 @@ import { movePreviewDrag, preparePreviewDrag, type PreviewDragSession } from '@/
 import { resolvePanels } from '@/lib/model'
 import type { Project, Vec3 } from '@/lib/types'
 
-export function usePreviewDrag({ project, selectedIds, commit, notify }: {
+export function usePreviewDrag({ project, selectedIds, commit, notify, select }: {
   project: Project
   selectedIds: string[]
   commit: (project: Project) => void
   notify: (message: string) => void
+  select?: (ids: string[]) => void
 }) {
   const session = useRef<PreviewDragSession | null>(null)
   const latest = useRef<ReturnType<typeof movePreviewDrag> | null>(null)
@@ -40,7 +41,11 @@ export function usePreviewDrag({ project, selectedIds, commit, notify }: {
     end: (cancel: boolean) => {
       if (!cancel && latest.current && session.current?.original === project) {
         commit(latest.current.project)
-        if (latest.current.snap) notify(`Attached to ${latest.current.snap.label}. Undo is available.`)
+        const snap = latest.current.snap
+        if (snap) {
+          if (snap.warning) select?.(snap.panelIds)
+          notify(`Attached to ${snap.label}.${snap.warning ? ` ${snap.warning.replace(/^Requires disassembly:/, 'Disassembled:')}` : ''} Undo is available.`)
+        }
       }
       session.current = null
       latest.current = null

@@ -46,7 +46,7 @@ describe('copy and paste attachments', () => {
     const mixed = { ...box, panels: [...box.panels, panel] }
     expect(getPasteTargets(mixed, Object.values(source.panelIds), copySelection(mixed, [panel.id])).some(target => target.project)).toBe(true)
     const removed = removeAssembly(mixed, source.id)
-    const next = getPasteTargets(removed, [panel.id], copied).find(target => target.project)?.project
+    const next = getPasteTargets(removed, [panel.id], copied).find(target => target.project && !target.warning)?.project
     expect(next).toBeDefined()
     expect(next!.panels).toHaveLength(5)
     expect(next!.assemblies!.instances).toHaveLength(1)
@@ -127,7 +127,8 @@ describe('library insertion targets', () => {
     expect(new Set(targets.map(target => target.id)).size).toBe(targets.length)
     expect(project).toEqual(before)
     for (const target of targets) {
-      expect(target.project!.assemblies!.instances).toHaveLength(1)
+      expect(target.project!.assemblies!.instances).toHaveLength(target.warning ? 0 : 1)
+      expect(validateProject(target.project!)).toEqual([])
       const serialized = JSON.parse(JSON.stringify(target.project))
       expect(parseProject(serialized)).toEqual(serialized)
     }
@@ -138,13 +139,32 @@ describe('library insertion targets', () => {
     const ids = project.panels.map(panel => panel.id)
     const copied = copySelection(project, ids)
     if (copied.kind !== 'assembly') throw new Error('Expected assembly')
-    const targets = getInsertionTargets(project, ids, copied).filter(target => target.project)
+    const targets = getInsertionTargets(project, ids, copied).filter(target => target.project && !target.warning)
     expect(targets).toHaveLength(4)
     for (const target of targets) {
       expect(target.project!.assemblies!.definitions).toHaveLength(1)
       expect(target.project!.assemblies!.instances).toHaveLength(2)
       expect(target.project!.assemblies!.links).toHaveLength(1)
     }
+  })
+
+  it.each(['paste', 'insert'] as const)('allows a shared-panel %s after warning and keeps the reusable source', operation => {
+    const project = boxProject()
+    const before = structuredClone(project)
+    const ids = project.panels.map(panel => panel.id)
+    const copied = copySelection(project, ids)
+    const targets = operation === 'paste' ? getPasteTargets(project, ids, copied) : getInsertionTargets(project, ids, copied)
+    const target = targets.find(candidate => candidate.project && candidate.warning)
+    expect(target).toBeDefined()
+    expect(target!.warning).toMatch(/disassembl/i)
+    const next = target!.project!
+    expect(next.panels).toHaveLength(7)
+    expect(next.assemblies!.instances).toHaveLength(0)
+    expect(next.assemblies!.definitions).toEqual(project.assemblies!.definitions)
+    expect(validateProject(next)).toEqual([])
+    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(materializeAssemblies(next)).toEqual(next)
+    expect(project).toEqual(before)
   })
 })
 
