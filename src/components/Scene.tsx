@@ -284,7 +284,7 @@ function PanelKeyboardMovement({panels, selectedIds, onMove, movementEnabled}: S
     const canvas = gl.domElement
     canvas.tabIndex = 0
     canvas.setAttribute('aria-label', '3D preview canvas')
-    canvas.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight')
+    canvas.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight X Y Z')
     const reset = () => { gesture.current = '' }
     const focus = () => canvas.focus({preventScroll:true})
     canvas.addEventListener('pointerdown', focus)

@@ -1,0 +1,140 @@
+.viewport-dock {
+  position: absolute;
+  z-index: 3;
+  left: 12px;
+  right: 12px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.viewport-controls-anchor {
+  position: relative;
+  z-index: 2;
+  width: max-content;
+  max-width: 100%;
+  pointer-events: auto;
+}
+
+.viewport-guidance { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 520px; max-width: 100%; }
+.viewport-selection-hints { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 16px; max-width: 100%; padding: 0 4px; color: #626b59; font-size: 11px; line-height: 1.5; }
+.viewport-selection-hints > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.viewport-selection-hints kbd { padding: 2px 4px; background: #fbfaf7ed; border-color: #d8ddd2; color: #68745c; font-size: 10px; line-height: 1.2; }
+
+.viewport-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid #d8dbd1;
+  border-radius: 10px;
+  background: #fbfaf7f2;
+  box-shadow: 0 3px 14px #343c2810;
+  backdrop-filter: blur(12px);
+}
+
+.viewport-bar .button-icon,
+.viewport-shortcuts summary {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 6px;
+  color: #656d59;
+}
+
+.viewport-bar .button-icon:hover,
+.viewport-shortcuts summary:hover { background: #eeefe8; color: #37412e; }
+.viewport-bar [aria-pressed="true"],
+.viewport-shortcuts[open] summary { background: #e7ebdf; color: #3e4d33; }
+
+.viewport-camera {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 72px;
+  padding: 0 7px;
+  color: #69725c;
+}
+
+.viewport-camera select {
+  appearance: none;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  width: 105px;
+  padding: 8px 14px 8px 0;
+  font-size: 12px;
+  color: #454e3d;
+  cursor: pointer;
+}
+
+.viewport-camera > svg:last-child { margin-left: -21px; pointer-events: none; }
+.viewport-divider { flex-shrink: 0; width: 1px; height: 18px; margin: 0 4px; background: #dfe2d8; }
+.viewport-room-label { display: flex; align-items: center; gap: 7px; padding: 0 9px; white-space: nowrap; color: #626a55; font-size: 12px; }
+
+.viewport-status {
+  width: max-content;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #d8dbd1;
+  border-radius: 7px;
+  background: #fbfaf7f2;
+  color: #626b59;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
+}
+
+.viewport-status kbd { margin-left: 8px; }
+.viewport-shortcuts { flex-shrink: 0; }
+.viewport-shortcuts summary { list-style: none; cursor: pointer; outline-offset: 3px; }
+.viewport-shortcuts summary::-webkit-details-marker { display: none; }
+.viewport-shortcuts summary:focus-visible { outline: 2px solid var(--accent); }
+.viewport-shortcuts-panel {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  right: 0;
+  width: 280px;
+  max-width: 100%;
+  max-height: calc(100dvh - 200px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  border: 1px solid #d8dbd1;
+  border-radius: 10px;
+  background: #fbfaf7;
+  box-shadow: 0 6px 24px #343c281a;
+  color: #4f5946;
+}
+
+.viewport-shortcuts-panel h3 { margin: 0 0 10px; font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: #7d8674; }
+.viewport-shortcuts-panel dl { display: grid; gap: 9px; margin: 0; }
+.viewport-shortcuts-panel dl + h3 { margin-top: 15px; padding-top: 14px; border-top: 1px solid #e4e6dd; }
+.viewport-shortcuts-panel dl > div { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 12px; }
+.viewport-shortcuts-panel dd { display: flex; gap: 4px; margin: 0; }
+.viewport-shortcuts-panel kbd { border-color: #dfe2d7; background: #f0f2eb; color: #69735f; font-size: 10px; line-height: 1.2; white-space: nowrap; }
+
+.room-preview .viewport-dock { right: 28px; bottom: 30px; align-items: flex-end; }
+.room-preview .viewport-guidance { align-items: flex-end; }
+
+@media (max-width: 680px) {
+  .viewport-dock,
+  .room-preview .viewport-dock { left: 12px; right: 12px; bottom: 14px; align-items: center; }
+  .room-preview .viewport-guidance { align-items: center; }
+  .viewport-selection-hints { gap: 5px 12px; font-size: 10px; }
+  .viewport-bar { gap: 0; padding: 4px; }
+  .viewport-bar .button-icon,
+  .viewport-shortcuts summary { width: 30px; height: 32px; }
+  .viewport-camera { flex: 1; gap: 0; padding: 0 5px; }
+  .viewport-camera > svg:first-child { display: none; }
+  .viewport-camera select { flex: 1; width: 102px; font-size: 11px; }
+  .viewport-divider { margin: 0 3px; }
+  .viewport-room-label { gap: 5px; padding: 0 6px; font-size: 11px; }
+}

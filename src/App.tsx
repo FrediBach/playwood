@@ -22,6 +22,7 @@ import { createExampleProject } from '@/lib/example-library'
 import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
 import { autoConnect } from '@/lib/auto-connect'
 import { movePanels, resizePanels } from '@/lib/structure-edit'
+import { rotateSelection } from '@/lib/selection-rotation'
 import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
 import { useProject } from '@/hooks/use-project'
 import { useCopyPaste } from '@/hooks/use-copy-paste'
@@ -179,12 +180,24 @@ export default function App() {
     const ids=assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):project.panels.map(p=>p.id)
     setSelectedIds(ids);assembly.clearPlacement();setInspectorTab('panel');setRightOpen(true)
   }
+  const movementEnabled=!clipboard.active&&!dialog&&!assembly.editingInstance&&!(assembly.memberInstance&&!assembly.selectedInstance)&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))
   useEffect(()=>{
     const onKey=(e:KeyboardEvent)=>{
       const target=e.target as HTMLElement
-      if(target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||dialog)return
+      if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||dialog)return
       if((e.metaKey||e.ctrlKey)&&['c','v'].includes(e.key.toLowerCase())){
         e.preventDefault();if(!e.repeat){if(e.key.toLowerCase()==='c')clipboard.copy();else clipboard.paste()}return
+      }
+      const axis=e.key.toLowerCase()
+      if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&(axis==='x'||axis==='y'||axis==='z')){
+        if(movementEnabled&&!drag.active&&!assembly.target&&selectedPanels.length){
+          e.preventDefault()
+          if(!e.repeat){
+            try{commit(current=>rotateSelection(current,selectedIds,axis))}
+            catch(error){notify(error instanceof Error?error.message:'This selection cannot rotate while keeping its joints aligned.')}
+          }
+        }
+        return
       }
       if(realisticPreview){
         if(e.metaKey||e.ctrlKey){if(['a','d','z'].includes(e.key.toLowerCase()))e.preventDefault();if(e.key.toLowerCase()==='z')e.shiftKey?redo():undo();return}
@@ -300,7 +313,7 @@ export default function App() {
     <AssemblyWorkspace connectorOverrides={(drag.project??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={drag.panels??panels} connections={(drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
       onDragStart={drag.start} onDragMove={drag.move} onDragEnd={drag.end} dragging={drag.active} dragSnap={drag.snap}
       onAutoConnect={addAutoConnectors} autoConnectDisabled={!!dialog||!!assembly.editingInstance||panels.length<2}
-      onMove={moveSelection} movementEnabled={!clipboard.active&&!dialog&&!assembly.editingInstance&&!(assembly.memberInstance&&!instance)&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))}
+      onMove={moveSelection} movementEnabled={movementEnabled}
       previewPanels={clipboard.active?clipboard.previewPanels:assembly.preview?assembly.previewPanels:previewPanels} previewConnections={clipboard.active?clipboard.previewConnections:assembly.preview?assembly.previewConnections:previewConnections} view={view} showGrid={showGrid} showDimensions={showDimensions}
       exploded={exploded} realisticPreview={realisticPreview} fitSignal={fitSignal} frameSignal={frameSignal} zoomSignal={zoomSignal}
       setRealisticPreview={setRealisticPreview} leftOpen={leftOpen} rightOpen={rightOpen} setLeftOpen={setLeftOpen} setRightOpen={setRightOpen}
