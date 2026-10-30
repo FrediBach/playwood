@@ -123,7 +123,9 @@ function splitInteriorTJoints(original: Project, selectedIds: readonly string[])
             let match: Connection | undefined
             for (const parent of parents) for (const child of children) {
               const delta = new Vector3(...child.position).sub(new Vector3(...parent.position)).applyQuaternion(rotation(parent).invert())
-              const candidate: Connection = { ...connection, role: 'support', parentId: parent.id, childId: child.id, offset: connection.side === 'left' || connection.side === 'right' ? delta.y : delta.x }
+              const offset = connection.side === 'left' || connection.side === 'right' ? delta.y : delta.x
+              // Retain identical branch metadata when transforms only add floating-point noise.
+              const candidate: Connection = { ...connection, role: 'support', parentId: parent.id, childId: child.id, offset: Math.abs(offset - connection.offset) < 1e-7 ? connection.offset : offset }
               if (fits(parent, child, candidate)) match = candidate
             }
             if (!match) { compatible = false; break }

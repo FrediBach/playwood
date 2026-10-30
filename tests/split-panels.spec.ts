@@ -1,0 +1,28 @@
+import { test, expect } from '@playwright/test'
+import { createStarterProject, validateProject } from '../src/lib/model'
+
+test('splits selected shelves with a center divider, saves, and undoes as one edit', async ({ page }) => {
+  const original = createStarterProject()
+  original.panels.forEach(panel => { panel.cornerRadius = 30 })
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'rounded-shelf.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(original)) })
+  const select = (name: string) => page.locator('.panel-list-row').filter({ has: page.getByText(name, { exact: true }) }).locator('.panel-list-select')
+  await select('Top shelf').click()
+  await select('Middle shelf').click({ modifiers: ['Shift'] })
+  await page.getByRole('button', { name: 'Split in the middle', exact: true }).click()
+  await expect(page.locator('.panel-list-row')).toHaveCount(10)
+  await expect(page.locator('.panel-list-row.selected')).toHaveCount(5)
+  await expect(page.getByText('Center divider', { exact: true })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!).panels.length)).toBe(10)
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+  expect(validateProject(saved).filter(issue => issue.severity === 'error')).toEqual([])
+  expect(saved.connections.length).toBe(original.connections.length + 4)
+  await page.screenshot({ path: 'test-results/split-panels.png' })
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect(page.locator('.panel-list-row')).toHaveCount(7)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect(page.locator('.panel-list-row')).toHaveCount(10)
+  await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.locator('.panel-list-row')).toHaveCount(10)
+})

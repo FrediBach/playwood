@@ -20,6 +20,7 @@ import { copySelection } from '@/lib/clipboard'
 import { insertLibraryAssembly } from '@/lib/assembly-library'
 import { createExampleProject } from '@/lib/example-library'
 import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
+import { parallelPanelCut, splitParallelPanels } from '@/lib/parallel-panels'
 import { autoConnect } from '@/lib/auto-connect'
 import { movePanels, resizePanels } from '@/lib/structure-edit'
 import { rotateSelection } from '@/lib/selection-rotation'
@@ -139,6 +140,13 @@ export default function App() {
         return looseIds.length?movePanels(next,looseIds,delta):next
       },{group:'panel-move',repeat})
     } catch(error) {notify(error instanceof Error?error.message:'This move cannot keep the joints aligned.')}
+  }
+  const splitSelection=()=>{
+    try {
+      const result=splitParallelPanels(project,selectedIds)
+      commit(result.project);setSelectedIds(result.panelIds)
+      notify(`Panels split into four sections with a center divider and ${result.connectors} new connectors. Undo is available.`)
+    } catch(error) {notify(error instanceof Error?error.message:'These panels could not be split.')}
   }
   const detachSelection=()=>{
     try{commit(current=>selectedIds.reduce((next,id)=>detachPanel(next,id),current));setInspectorTab('panel');notify('Panels detached. Their positions are unchanged.')}
@@ -351,6 +359,7 @@ export default function App() {
         :assembly.memberInstance&&selected&&assembly.definition?<AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={()=>assembly.select(assembly.memberInstance!.id)} onEdit={()=>assembly.edit(assembly.memberInstance!.id)}/>
         :assembly.hasMembers?<><div className="selected-heading"><Box size={15}/><span>MULTIPLE OBJECTS</span></div><p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p><div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15}/>Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15}/>Remove</Button></div></>
         :<>
+          {parallelPanelCut(selectedPanels)&&<section className="inspector-section"><Button variant="outline" size="sm" onClick={splitSelection}>Split in the middle</Button><p className="field-note">Create four equal sections and a center divider with T connectors. Keeps the outer dimensions.</p></section>}
           {selectedPanels.length>1&&<CreateAssemblyForm key={selectedIds.join('/')} panelCount={selectedPanels.length} panels={selectedPanels} onCreate={assembly.create}/>}
           {selectedPanels.length>1&&<MultiPanelInspector panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commit(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
           {selected&&(inspectorTab==='panel'?<SinglePanelInspector selected={selected} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewError={previewResult.error} previewIssues={previewIssues} hasPreview={!!previewProject}/>)}
