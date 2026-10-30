@@ -1,0 +1,26 @@
+.list-group-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
+.list-group-tools button{display:flex;align-items:center;gap:5px;padding:4px 3px;background:none;color:#69745c;font-size:10px;border-radius:3px}
+.list-group-tools button:hover{background:#e8ebdf;color:#34432b}
+.grouped-list.is-sorting{user-select:none}
+.list-group{position:relative;margin-bottom:6px;border-radius:5px}
+.named-group{border:1px solid #dfe3d5;background:#f7f8f0;padding:0 3px 4px}
+.list-group-header{display:flex;align-items:center;gap:5px;height:34px;color:#616e50;padding:0 2px}
+.list-group-selection{height:30px;margin-left:0}
+.list-group-selection input:disabled{cursor:default;opacity:.4}
+.list-group-toggle,.list-group-rename{display:grid;place-items:center;flex-shrink:0;width:22px;height:26px;padding:0;background:none;color:inherit;border-radius:3px}
+.list-group-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;background:none;padding:4px 0;color:#4d5b40;font-size:11px;font-weight:600}
+.list-group-count{font-size:10px;font-variant-numeric:tabular-nums;color:#8b937f}
+.list-group-rename:hover,.list-group-toggle:hover{background:#e7ebdd}
+.list-group-header>.panel-inline-name{flex:1}
+.list-ungrouped-label{padding:7px 5px;color:#858c79;font-size:10px}
+.list-group-empty{padding:13px 8px;text-align:center;font-size:10px;color:#929982;border:1px dashed #d4dac9;border-radius:4px;margin:2px}
+.list-group.is-drop-target{outline:1px solid #9aaa86;background:#eff3e5}
+.group-list-item{position:relative;min-width:0}
+.group-list-item.is-dragging{opacity:.4}
+.group-list-item.drop-before:before,.group-list-item.drop-after:after{content:'';position:absolute;left:2px;right:2px;height:2px;background:var(--accent);z-index:2;pointer-events:none}
+.group-list-item.drop-before:before{top:-3px}.group-list-item.drop-after:after{bottom:-3px}
+.list-drag-preview{position:fixed;z-index:100;pointer-events:none;display:flex;align-items:center;gap:8px;height:48px;padding:8px 12px;border:1px solid #b6bea9;border-radius:6px;background:#fcfcf5;box-shadow:0 8px 25px #27351b2b;color:#4b5540;font-size:12px}
+.list-drag-preview span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.connector-drag-handle{display:grid;place-items:center;flex-shrink:0;width:16px;height:38px;padding:0;background:none;color:#8b947d;cursor:grab;touch-action:none;border-radius:3px}
+.connector-list-row{gap:4px}
+.connector-list-select{gap:6px}

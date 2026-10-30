@@ -44,11 +44,16 @@ export interface AssemblyLoosePort { id: string; connection: Connection }
 export interface AssemblyLink { id: string; a: AssemblyEndpoint; b: AssemblyEndpoint }
 export interface AssemblyData { definitions: AssemblyDefinition[]; instances: AssemblyInstance[]; links: AssemblyLink[]; loosePorts?: AssemblyLoosePort[] }
 export interface ConnectorOverride { color?: string; type?: ConnectorType; removed?: boolean; slide?: number }
+export type ListKind = 'panels' | 'connectors'
+/** Flat organizational folders; independent of physical assemblies and joints. */
+export interface ListGroup { id: string; name: string; kind: ListKind; itemIds: string[] }
 export interface Project {
   version: 1; name: string; panels: Panel[]; connections: Connection[]; assemblies?: AssemblyData;
   /** Per-piece hardware edits, keyed by serialized [connectionId, placementIndex].
    * Joint connections retain the layout independently of the installed hardware. */
   connectorOverrides?: Record<string, ConnectorOverride>;
+  listGroups?: ListGroup[];
+  connectorOrder?: string[];
 }
 export interface AttachmentOptions { side: Side; type: ConnectorType; offset: number; inset: number; flip: boolean; color: string; count: number }
 export interface ValidationIssue { id: string; severity: 'warning' | 'error'; message: string; panelIds: string[] }

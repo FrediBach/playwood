@@ -1,8 +1,10 @@
+import { createListGroup, moveListItems, orderedConnectors, renameListGroup, ungroupList } from '@/lib/list-groups'
+import type { ListGroupingProps } from '@/components/GroupedList'
 import { PreviewContextMenu, type PreviewMenuAction } from '@/components/PreviewContextMenu'
 import { ConnectorInspector } from '@/components/ConnectorInspector'
 import { CloseHoles } from '@/components/CloseHoles'
 import { closePanelHole, findPanelHoles } from '@/lib/close-holes'
-import { editConnectors, getPhysicalConnectors } from '@/lib/connector-selection'
+import { editConnectors } from '@/lib/connector-selection'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import { Box, CheckCheck, Copy, Link2, MousePointer2, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -36,7 +38,7 @@ import { duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, is
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, rotateProject, validateProject } from '@/lib/model'
-import type { AttachmentOptions, CameraView, Panel, Vec3 } from '@/lib/types'
+import type { AttachmentOptions, CameraView, Panel, Vec3, ListKind } from '@/lib/types'
 
 const INITIAL_ATTACHMENT: AttachmentOptions = {side:'right',type:'90',offset:0,inset:0,flip:false,color:DEFAULT_CONNECTOR_COLOR,count:2}
 function download(content:string,name:string,type:string) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
@@ -77,7 +79,7 @@ export default function App() {
   const visibleBounds=useMemo(()=>getProjectBounds(panels.filter(panel=>panel.visible)),[panels])
   const hasVisiblePanels=panels.some(panel=>panel.visible)
   const issues=useMemo(()=>validateProject(project),[project])
-  const physicalConnectors=useMemo(()=>getPhysicalConnectors(project),[project])
+  const physicalConnectors=useMemo(()=>orderedConnectors(project),[project])
   const selectedConnectorIdSet=useMemo(()=>new Set(selectedConnectorIds),[selectedConnectorIds])
   const selectedConnectors=physicalConnectors.filter(connector=>selectedConnectorIdSet.has(connector.id))
   const connectorCount=physicalConnectors.length
@@ -326,9 +328,31 @@ export default function App() {
   const attachmentSummary=attachmentWarning??(clipboard.active?clipboard.hovered?.error:assembly.target?.error??(assembly.preview?'Corner connectors replaced with shared cross connectors.':undefined))
   const loosePanels=panels.filter(panel=>!getAssemblyInstance(project,panel.id))
 
+  const listGrouping = (kind: ListKind): ListGroupingProps => ({
+    groups: (project.listGroups ?? []).filter(group => group.kind === kind),
+    onSelectGroup: (ids, selected) => {
+      const members = new Set(ids)
+      const update = (current: string[]) => selected ? [...new Set([...current, ...ids])] : current.filter(id => !members.has(id))
+      if (kind === 'connectors') selectConnectors(update, false)
+      else {
+        clipboard.cancel();assembly.close();setSelectedIds(update)
+        setInspectorTab('panel');setRightOpen(true)
+      }
+    },
+    onCreateGroup: (id, ids) => commit(p => createListGroup(p, kind, ids, id)),
+    onRenameGroup: (id, name) => commit(p => renameListGroup(p, id, name)),
+    onUngroup: id => commit(p => ungroupList(p, id)),
+    onMove: (ids, groupId, beforeId) => commit(p => moveListItems(p, kind, ids, groupId, beforeId)),
+  })
+  const groupSelected = (kind: ListKind, ids: string[]) => {
+    commit(p => createListGroup(p, kind, ids, crypto.randomUUID()))
+    setLeftOpen(true)
+  }
+
   const menuActions: PreviewMenuAction[] = []
   const menuAction = (label: string, run: () => void, danger = false) => menuActions.push({ label, run, danger })
   if (selectedConnectors.length) {
+    menuAction('Group selected',()=>groupSelected('connectors',selectedConnectorIds))
     menuAction('Inspect connectors',()=>setRightOpen(true))
     menuAction('Remove connectors',removeSelectedConnectors,true)
   } else if (assembly.editingInstance) {
@@ -344,6 +368,7 @@ export default function App() {
         menuAction('Make independent',()=>assembly.independent(instance.id))
         menuAction('Disassemble',()=>assembly.disassemble(instance.id))
       } else if (!assembly.hasMembers) {
+        menuAction('Group selected',()=>groupSelected('panels',selectedIds))
         if (selected) menuAction('Attach panel',startAttach)
         if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Disconnect panels',detachSelection)
         if (parallelPanelCut(selectedPanels)) menuAction('Split in the middle',splitSelection)
@@ -364,16 +389,16 @@ export default function App() {
     <ProjectHeader projectName={project.name} saveStatus={saveStatus} canUndo={canUndo} canRedo={canRedo} undo={undo} redo={redo}
       onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')}/>
 
-    <ProjectSidebar panelListProps={{panels: panels,
+    <ProjectSidebar panelListProps={{...listGrouping('panels'),panels: panels,
       selectedIds: selectedIds,
       issues: issues,
       onSelect: choosePanel,
       onRename: (id,name)=>commit(p=>({...p,panels:p.panels.map(panel=>panel.id===id?{...panel,name}:panel)})),
       onRemove: id=>{commit(p=>removePanel(p,id));notify('Panel removed. Undo to bring it back.')},
       onToggleVisibility: id=>commit(p=>({...p,panels:p.panels.map(panel=>panel.id===id?{...panel,visible:!panel.visible}:panel)})),
-      onReorder: (id,beforeId)=>commit(p=>{const panel=p.panels.find(panel=>panel.id===id);if(!panel)return p;const remaining=p.panels.filter(panel=>panel.id!==id);const index=beforeId===null?remaining.length:remaining.findIndex(panel=>panel.id===beforeId);if(index<0)return p;remaining.splice(index,0,panel);return {...p,panels:remaining}})}} selectedCount={selectedPanels.length} connectorCount={connectorCount} connectorSummary={connectorSummary}
+      }} selectedCount={selectedPanels.length} connectorCount={connectorCount} connectorSummary={connectorSummary}
       onSelectAll={()=>{if(selectedPanels.length===panels.length&&!assembly.editingInstance)setSelectedIds([]);else selectAll()}}
-      connectorListProps={{connectors:physicalConnectors,panels,selectedIds:selectedConnectorIds,
+      connectorListProps={{...listGrouping('connectors'),connectors:physicalConnectors,panels,selectedIds:selectedConnectorIds,
         onSelect:(id,additive=false)=>selectConnectors(ids=>selectPanelIds(ids,id,additive),!additive),
         onSelectAll:selected=>selectConnectors(selected?physicalConnectors.map(connector=>connector.id):[],selected)}}
       onCollapse={()=>setLeftOpen(false)} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')} addPanel={addPanel} loadTemplate={loadTemplate} onInsertLibraryAssembly={insertModule}

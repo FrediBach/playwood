@@ -463,6 +463,31 @@ export function parseProject(input: unknown): Project {
       }]
     }))
   }
+  if (input.listGroups !== undefined) {
+    if (!Array.isArray(input.listGroups) || input.listGroups.length > 1000) throw new Error('Invalid list groups.')
+    const groupIds = new Set<string>()
+    const members = { panels: new Set<string>(), connectors: new Set<string>() }
+    const validIds = { panels: panelIds, connectors: new Set(getPhysicalConnectors(project).map(connector => connector.id)) }
+    project.listGroups = input.listGroups.map(raw => {
+      if (!object(raw) || !Array.isArray(raw.itemIds) || raw.itemIds.length > 8000) throw new Error('Invalid list group.')
+      const id = stringIn(raw.id, 'group ID')
+      if (groupIds.has(id)) throw new Error('Group IDs must be unique.')
+      groupIds.add(id)
+      const kind = enumIn(raw.kind, ['panels', 'connectors'] as const, 'group kind')
+      const itemIds = raw.itemIds.map(value => stringIn(value, 'group item ID', 1024)).filter(itemId => {
+        // Deleted pieces may leave metadata behind; never resurrect or duplicate rows.
+        if (!validIds[kind].has(itemId) || members[kind].has(itemId)) return false
+        members[kind].add(itemId)
+        return true
+      })
+      return { id, kind, name: stringIn(raw.name, 'group name').slice(0, 120), itemIds }
+    })
+  }
+  if (input.connectorOrder !== undefined) {
+    if (!Array.isArray(input.connectorOrder) || input.connectorOrder.length > 8000) throw new Error('Invalid connector order.')
+    const valid = new Set(getPhysicalConnectors(project).map(connector => connector.id))
+    project.connectorOrder = [...new Set(input.connectorOrder.map(value => stringIn(value, 'connector order ID', 1024)))].filter(id => valid.has(id))
+  }
   return project
 }
 

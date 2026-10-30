@@ -8,8 +8,8 @@ export interface PreviewMenuAction {
   danger?: boolean
 }
 
-export function PreviewContextMenu({ x, y, title, actions, onClose }: {
-  x: number; y: number; title: string; actions: PreviewMenuAction[]; onClose: () => void
+export function PreviewContextMenu({ x, y, title, actions, onClose, ariaLabel = 'Preview actions' }: {
+  x: number; y: number; title: string; actions: PreviewMenuAction[]; onClose: () => void; ariaLabel?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const close = useEffectEvent(() => onClose())
@@ -32,7 +32,7 @@ export function PreviewContextMenu({ x, y, title, actions, onClose }: {
       if (menu.contains(document.activeElement) || document.activeElement === document.body) previous?.focus({ preventScroll: true })
     }
   }, [x, y])
-  return createPortal(<div ref={ref} className="preview-context-menu" role="menu" aria-label="Preview actions" style={{ left: x, top: y }}
+  return createPortal(<div ref={ref} className="preview-context-menu" role="menu" aria-label={ariaLabel} style={{ left: x, top: y }}
     onContextMenu={event => event.preventDefault()} onKeyDown={event => {
       event.stopPropagation()
       const buttons = [...ref.current!.querySelectorAll('button')]
@@ -44,6 +44,6 @@ export function PreviewContextMenu({ x, y, title, actions, onClose }: {
       }
     }}>
     <div className="preview-context-title">{title}</div>
-    {actions.map(action => <button key={action.label} role="menuitem" className={action.danger ? 'is-destructive' : undefined} onClick={() => { onClose(); action.run() }}>{action.label}</button>)}
+    {actions.map((action, index) => <button key={`${index}-${action.label}`} role="menuitem" className={action.danger ? 'is-destructive' : undefined} onClick={() => { onClose(); action.run() }}>{action.label}</button>)}
   </div>, document.body)
 }
