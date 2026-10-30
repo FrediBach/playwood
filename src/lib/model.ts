@@ -52,7 +52,7 @@ function attachmentPose(parent: Panel, child: Panel, c: Connection): Pick<Panel,
   if (c.type === 'cross' && branch === 1) direction *= -1
   const localRotation = new Quaternion().setFromAxisAngle(seam.tangent, seam.sign * direction * angle)
   const childRadial = seam.radial.clone().applyQuaternion(localRotation)
-  const childLength = seam.horizontalSeam ? child.height : child.width
+  const childLength = seam.horizontalSeam !== !!c.quarterTurn ? child.height : child.width
   const center = seam.edge.clone()
   // Place each panel's leading edge at its CAD shoulder, measured along its
   // own slot. Using a fixed orthogonal gap makes the 105°/150° panels miss
@@ -62,7 +62,7 @@ function attachmentPose(parent: Panel, child: Panel, c: Connection): Pick<Panel,
   const parentRotation = quaternion(parent)
   return {
     position: tuple(center.applyQuaternion(parentRotation).add(vec(parent.position))),
-    rotation: rotationTuple(parentRotation.multiply(localRotation)),
+    rotation: rotationTuple(parentRotation.multiply(localRotation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), c.quarterTurn ? Math.PI / 2 : 0))),
   }
 }
 
@@ -138,7 +138,7 @@ export function attachExistingPanel(project: Project, parentId: string, childId:
 
 export function getConnectionAnchors(connection: Connection, parent: Panel, child: Panel): Vec3[] {
   const seam = seamInfo(parent, connection)
-  const childSeamLength = seam.horizontalSeam ? child.width : child.height
+  const childSeamLength = seam.horizontalSeam !== !!connection.quarterTurn ? child.width : child.height
   const parentRadius = seam.face ? 0 : panelCornerRadius(parent)
   const childRadius = panelCornerRadius(child)
   const lower = Math.max(-seam.seamLength / 2 + parentRadius, connection.offset - childSeamLength / 2 + childRadius)
@@ -276,7 +276,7 @@ export function validateProject(project: Project): ValidationIssue[] {
     const insetMax = seam.face ? parent.height / 2 : parentRadialLength
     if ((c.inset < insetMin || c.inset > insetMax) && c.count > 0) issues.push({ id: `${c.id}-inset`, severity: 'error', message: `The attachment is outside ${parent.name}. Keep inset between ${insetMin} and ${insetMax} mm.`, panelIds: [parent.id, child.id] })
     if (!seam.face && c.inset > 0 && c.inset < parentRadialLength && c.count > 0) issues.push({ id: `${c.id}-edge-access`, severity: 'error', message: `${parent.name} needs an exposed edge for this connector. Use a T joint with separate panels instead of an interior inset.`, panelIds: [parent.id, child.id] })
-    const childLength = seam.horizontalSeam ? child.width : child.height
+    const childLength = seam.horizontalSeam !== !!c.quarterTurn ? child.width : child.height
     const parentRadius = seam.face ? 0 : panelCornerRadius(parent)
     const childRadius = panelCornerRadius(child)
     const overlap = Math.min(seam.seamLength / 2 - parentRadius, c.offset + childLength / 2 - childRadius) - Math.max(-seam.seamLength / 2 + parentRadius, c.offset - childLength / 2 + childRadius)
@@ -396,6 +396,10 @@ export function parseProject(input: unknown): Project {
       flip: raw.flip as boolean, color: colorIn(raw.color), count: numberIn(raw.count, 0, 20, 'connector quantity'),
     }
     if (raw.role !== undefined) c.role = enumIn(raw.role, ['support'] as const, 'connection role')
+    if (raw.quarterTurn !== undefined) {
+      if (typeof raw.quarterTurn !== 'boolean') throw new Error('Invalid child panel orientation.')
+      c.quarterTurn = raw.quarterTurn
+    }
     if (typeof c.flip !== 'boolean' || !Number.isInteger(c.count)) throw new Error('Invalid connector options.')
     if (!panelIds.has(c.parentId) || !panelIds.has(c.childId) || c.parentId === c.childId) throw new Error('Connections must link two different, existing panels.')
     return c

@@ -1,4 +1,6 @@
 import { ConnectorInspector } from '@/components/ConnectorInspector'
+import { CloseHoles } from '@/components/CloseHoles'
+import { closePanelHole, findPanelHoles } from '@/lib/close-holes'
 import { editConnectors, getPhysicalConnectors } from '@/lib/connector-selection'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import { Box, CheckCheck, Copy, Link2, MousePointer2, Plus, Trash2 } from 'lucide-react'
@@ -294,6 +296,16 @@ export default function App() {
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
   const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=repairLegacyShelf(imported);const repaired=repairLegacyExampleInserts(shelf);commit(repaired);assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
   const instance=assembly.selectedInstance
+  const holes=useMemo(()=>findPanelHoles(panels.filter(panel=>selectedIds.includes(panel.id)),panels),[panels,selectedIds])
+  const closeHole=(id:string)=>{
+    try {
+      const result=closePanelHole(project,selectedIds,id)
+      commit(result.project)
+      if(result.instanceId)setSelectedIds(Object.values(result.project.assemblies!.instances.find(item=>item.id===result.instanceId)!.panelIds))
+      else setSelectedIds([...selectedIds,result.panelId])
+      notify(`${result.label} hole closed. Undo to restore the opening.`)
+    } catch(error) { notify(error instanceof Error?error.message:'Could not close this opening.') }
+  }
   const validTargets=assembly.targets.filter(target=>target.project)
   const assemblyHint=clipboard.active?`Hover a + to preview the ${clipboard.inserting||'copy'}. Click to attach · Esc to cancel.`:instance&&!exploded&&!realisticPreview
     ?validTargets.length?'Hover a + to preview. Click to attach.':assembly.targets.find(target=>target.error)?.error??'This assembly has no compatible corner attachments. Duplicate it to place another instance.'
@@ -346,6 +358,7 @@ export default function App() {
       onDoneEditing={assembly.editingInstance?assembly.done:undefined}>
         {selectedConnectors.length?<ConnectorInspector connectors={selectedConnectors} onChange={patch=>commit(current=>editConnectors(current,selectedConnectorIds,patch))} onRemove={removeSelectedConnectors}/>:<>
         {clipboard.inserting&&<section className="inspector-section"><p>Choose a + in the preview to attach the {clipboard.inserting}.</p><Button variant="outline" onClick={clipboard.cancel}>Cancel placement</Button></section>}
+        {!assembly.editingInstance&&!clipboard.active&&!assembly.placementActive&&(instance||!assembly.hasMembers)&&<CloseHoles key={selectedIds.join('/')} holes={holes} assembly={!!instance} onClose={closeHole}/>}
         {!assembly.editingInstance&&<section className="inspector-section"><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2}><Link2 size={15}/>Auto-add connectors</Button><p className="field-note">{selectedIds.length>1?'Connect matching edges between selected panels.':selectedIds.length===1?'Connect this panel to matching nearby edges.':'Connect matching edges throughout the design.'} Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p></section>}
         {assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
           panels={assembly.editingDefinition.panels.filter(panel=>selectedIds.includes(assembly.editingInstance!.panelIds[panel.id]))}

@@ -151,12 +151,13 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     if (edit.kind === 'resize') {
       const horizontal = ['top', 'bottom', 'front', 'back'].includes(connection.side)
       const dimension = horizontal ? 0 : 1
+      const childDimension = connection.quarterTurn ? 1 - dimension : dimension
       const parentLength = dimension === 0 ? parent.width : parent.height
-      const childLength = dimension === 0 ? child.width : child.height
+      const childLength = childDimension === 0 ? child.width : child.height
       for (const side of [-1, 1]) if (Math.abs(side * parentLength / 2 - connection.offset - side * childLength / 2) < CONTACT_TOLERANCE) {
         const constraint = row()
         add(constraint, parentIndex * 5 + 3 + dimension, side / 2)
-        add(constraint, childIndex * 5 + 3 + dimension, -side / 2)
+        add(constraint, childIndex * 5 + 3 + childDimension, -side / 2)
         add(constraint, offsetVariables.get(jointId(connection))!, -1)
       }
     }
