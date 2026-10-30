@@ -1,3 +1,4 @@
+import { panelCornerRadius } from './panel-shape'
 import { getPhysicalConnectors } from './connector-selection'
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
@@ -17,7 +18,7 @@ export function createPanel(overrides: Partial<Panel> = {}): Panel {
   const material = overrides.material ?? 'birch'
   return { id: uid(), name: 'New panel', width: 600, height: 360, thickness: 18, material,
     color: MATERIAL_COLORS[material], pattern: 'solid', position: [0, 400, 0], rotation: [0, 0, 0],
-    visible: true, holeSize: 12, holeSpacing: 48, ...overrides }
+    visible: true, cornerRadius: 0, holeSize: 12, holeSpacing: 48, ...overrides }
 }
 
 function seamInfo(parent: Panel, c: Pick<Connection, 'side' | 'offset' | 'inset'>) {
@@ -138,8 +139,10 @@ export function attachExistingPanel(project: Project, parentId: string, childId:
 export function getConnectionAnchors(connection: Connection, parent: Panel, child: Panel): Vec3[] {
   const seam = seamInfo(parent, connection)
   const childSeamLength = seam.horizontalSeam ? child.width : child.height
-  const lower = Math.max(-seam.seamLength / 2, connection.offset - childSeamLength / 2)
-  const upper = Math.min(seam.seamLength / 2, connection.offset + childSeamLength / 2)
+  const parentRadius = seam.face ? 0 : panelCornerRadius(parent)
+  const childRadius = panelCornerRadius(child)
+  const lower = Math.max(-seam.seamLength / 2 + parentRadius, connection.offset - childSeamLength / 2 + childRadius)
+  const upper = Math.min(seam.seamLength / 2 - parentRadius, connection.offset + childSeamLength / 2 - childRadius)
   const middle = (lower + upper) / 2
   // Connector bodies occupy 40 mm along the seam; keep their centers 20 mm from its ends.
   const reach = Math.max(0, (upper - lower) / 2 - 20)
@@ -274,9 +277,11 @@ export function validateProject(project: Project): ValidationIssue[] {
     if ((c.inset < insetMin || c.inset > insetMax) && c.count > 0) issues.push({ id: `${c.id}-inset`, severity: 'error', message: `The attachment is outside ${parent.name}. Keep inset between ${insetMin} and ${insetMax} mm.`, panelIds: [parent.id, child.id] })
     if (!seam.face && c.inset > 0 && c.inset < parentRadialLength && c.count > 0) issues.push({ id: `${c.id}-edge-access`, severity: 'error', message: `${parent.name} needs an exposed edge for this connector. Use a T joint with separate panels instead of an interior inset.`, panelIds: [parent.id, child.id] })
     const childLength = seam.horizontalSeam ? child.width : child.height
-    const overlap = Math.min(seam.seamLength / 2, c.offset + childLength / 2) - Math.max(-seam.seamLength / 2, c.offset - childLength / 2)
+    const parentRadius = seam.face ? 0 : panelCornerRadius(parent)
+    const childRadius = panelCornerRadius(child)
+    const overlap = Math.min(seam.seamLength / 2 - parentRadius, c.offset + childLength / 2 - childRadius) - Math.max(-seam.seamLength / 2 + parentRadius, c.offset - childLength / 2 + childRadius)
     const quantity = jointQuantities.get(jointId(c)) ?? 1
-    if (overlap < quantity * 40) issues.push({ id: `${c.id}-overlap`, severity: 'error', message: `Not enough shared edge for ${quantity} connector${quantity > 1 ? 's' : ''}. Reduce the offset.`, panelIds: [parent.id, child.id] })
+    if (overlap < quantity * 40) issues.push({ id: `${c.id}-overlap`, severity: 'error', message: `Not enough shared edge for ${quantity} connector${quantity > 1 ? 's' : ''}. Reduce the offset, corner radius, or connector count.`, panelIds: [parent.id, child.id] })
     if (seam.face && c.count > 0) issues.push({ id: `${c.id}-face`, severity: 'warning', message: 'This face attachment needs an accessible panel edge. Check clamp access before making.', panelIds: [parent.id, child.id] })
     if (c.role === 'support') {
       const expected = attachmentPose(parent, child, c)
@@ -371,6 +376,7 @@ export function parseProject(input: unknown): Project {
       material: enumIn(raw.material, ['birch', 'oak', 'walnut', 'mdf', 'painted'], 'material'),
       color: colorIn(raw.color), pattern: enumIn(raw.pattern, ['solid', 'pegboard', 'slots'], 'panel pattern'),
       position: vectorIn(raw.position, 'position', 100000), rotation: vectorIn(raw.rotation, 'rotation', Math.PI * 100),
+      cornerRadius: raw.cornerRadius === undefined ? 0 : numberIn(raw.cornerRadius, 0, 2000, 'corner radius'),
       visible: raw.visible === undefined ? true : raw.visible as boolean,
       holeSize: numberIn(raw.holeSize, 2, 200, 'hole size'), holeSpacing: numberIn(raw.holeSpacing, 10, 500, 'hole spacing'),
     }
@@ -428,10 +434,10 @@ export function projectToCsv(project: Project): string {
     const safe = typeof value === 'string' && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value)
     return `"${safe.replaceAll('"', '""')}"`
   }
-  const rows: (string | number)[][] = [['Item', 'Quantity', 'Width (mm)', 'Height (mm)', 'Thickness (mm)', 'Material', 'Color', 'Pattern', 'Hole size (mm)', 'Hole pitch (mm)']]
-  for (const panel of project.panels) rows.push([panel.name, 1, panel.width, panel.height, panel.thickness, panel.material, panel.color, panel.pattern, panel.pattern === 'solid' ? '' : panel.holeSize, panel.pattern === 'solid' ? '' : panel.holeSpacing])
+  const rows: (string | number)[][] = [['Item', 'Quantity', 'Width (mm)', 'Height (mm)', 'Thickness (mm)', 'Material', 'Color', 'Pattern', 'Hole size (mm)', 'Hole pitch (mm)', 'Corner radius (mm)']]
+  for (const panel of project.panels) rows.push([panel.name, 1, panel.width, panel.height, panel.thickness, panel.material, panel.color, panel.pattern, panel.pattern === 'solid' ? '' : panel.holeSize, panel.pattern === 'solid' ? '' : panel.holeSpacing, panelCornerRadius(panel)])
   const connectors = new Map<string, number>()
   for (const c of getPhysicalConnectors(project)) { const key = `${c.type}|${c.color}`; connectors.set(key, (connectors.get(key) ?? 0) + 1) }
-  for (const [key, count] of connectors) { const [type, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', 'Reinforced plastic', color, '', '', '']) }
+  for (const [key, count] of connectors) { const [type, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', 'Reinforced plastic', color, '', '', '', '']) }
   return '\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n')
 }

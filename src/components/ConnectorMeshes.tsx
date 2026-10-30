@@ -1,3 +1,4 @@
+import { panelCornerRadius } from '@/lib/panel-shape'
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { connectorId, connectorFinish } from '@/lib/connector-selection'
@@ -57,7 +58,7 @@ export function ConnectorMeshes({ panels, connections, ghost, ...selection }: {
     // T and cross hardware is a single assembly shared by all its branches.
     if (!parent?.visible || !child?.visible || branches.some(branch => !byId.get(branch.childId)?.visible)) return null
     const horizontalSeam = connection.side !== 'left' && connection.side !== 'right'
-    const seamLength = (panel: Panel) => horizontalSeam ? panel.width : panel.height
+    const seamLength = (panel: Panel) => (horizontalSeam ? panel.width : panel.height) - 2 * panelCornerRadius(panel)
     const shortestBranch = branches.reduce((shortest, branch) => {
       const panel = byId.get(branch.childId)!
       return seamLength(panel) < seamLength(shortest) ? panel : shortest

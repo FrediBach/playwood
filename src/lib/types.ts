@@ -8,7 +8,7 @@ export interface Panel {
   id: string; name: string; width: number; height: number; thickness: number;
   material: Material; color: string; pattern: Pattern;
   position: Vec3; rotation: Vec3; visible: boolean;
-  holeSize: number; holeSpacing: number;
+  holeSize: number; holeSpacing: number; cornerRadius?: number;
 }
 export interface Connection {
   id: string; parentId: string; childId: string; type: ConnectorType;

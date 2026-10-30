@@ -541,7 +541,7 @@ export function updateAssemblyDefinition(project: Project, instanceId: string, p
   const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
   const ids = new Set(partIds ?? definition.panels.map(panel => panel.id))
   if (![...ids].every(id => definition.panels.some(panel => panel.id === id))) throw new Error('Choose panels from this assembly source.')
-  const editable = ['name', 'width', 'height', 'thickness', 'material', 'color', 'pattern', 'visible', 'holeSize', 'holeSpacing'] as const
+  const editable = ['name', 'width', 'height', 'thickness', 'material', 'color', 'pattern', 'visible', 'holeSize', 'holeSpacing', 'cornerRadius'] as const
   const entries = editable.flatMap(key => patch[key] === undefined ? [] : [[key, patch[key]] as const])
   // A restored field can commit again on blur after a rejected edit. Preserve
   // the exact project and undo history rather than solving unchanged geometry.
@@ -669,7 +669,7 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
   const sameNumber = (a: number, b: number) => Math.abs(a - b) < 0.001
   for (const panel of rebuilt.panels) {
     const actual = project.panels.find(item => item.id === panel.id)
-    if (!actual || ['width', 'height', 'thickness', 'holeSize', 'holeSpacing'].some(key => !sameNumber(actual[key as 'width'], panel[key as 'width']))
+    if (!actual || (actual.cornerRadius ?? 0) !== (panel.cornerRadius ?? 0) || ['width', 'height', 'thickness', 'holeSize', 'holeSpacing'].some(key => !sameNumber(actual[key as 'width'], panel[key as 'width']))
       || actual.position.some((number, i) => !sameNumber(number, panel.position[i])) || Math.abs(q(actual.rotation).dot(q(panel.rotation))) < 0.999999
       || ['color', 'material', 'pattern', 'visible', 'name'].some(key => actual[key as 'color'] !== panel[key as 'color'])) throw new Error('Assembly panels do not match their source and instance transforms.')
   }

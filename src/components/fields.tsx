@@ -1,3 +1,4 @@
+import { panelCornerRadius } from '@/lib/panel-shape'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import type { Panel, Pattern } from '@/lib/types'
@@ -104,6 +105,7 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
       <NumberField label="Height" commitOnBlur={resizeOnCommit} value={panel.height} min={80} max={3000} {...numberProps('height')} onChange={height=>onChange({height})}/>
       <NumberField label="Thickness" value={panel.thickness} min={3} max={60} {...numberProps('thickness')} onChange={thickness=>onChange({thickness})}/>
     </div>
+    <NumberField label="Corner radius" value={panelCornerRadius(panel)} min={0} max={Math.min(...selection.map(p=>Math.min(p.width,p.height)/2))} {...numberProps('cornerRadius')} onChange={cornerRadius=>onChange({cornerRadius})}/>
     <SelectField label="Material" value={panel.material} mixed={mixed('material')} disabled={disabledFields.includes('material')}
       onChange={v=>{const m=MATERIALS.find(m=>m.id===v)!;onChange({material:m.id,...(!disabled('color')?{color:m.color}:{})})}}>
       {MATERIALS.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}

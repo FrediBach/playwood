@@ -34,3 +34,18 @@ describe('rendered panel openings', () => {
     expect(rayHits('slots', 29.7, 40)).toBe(true)
   })
 })
+
+describe('rounded panel outlines', () => {
+  it.each(['solid', 'pegboard', 'slots'] as Pattern[])('cuts away corners on both faces of %s panels', pattern => {
+    const geometry = makePanelGeometry(createPanel({ width: 240, height: 240, cornerRadius: 80, pattern }))
+    const material = new MeshBasicMaterial({ side: DoubleSide })
+    const mesh = new Mesh(geometry, material)
+    for (const back of [false, true]) {
+      const hits = (x: number, y: number) => new Raycaster(new Vector3(x / 1000, y / 1000, back ? -1 : 1), new Vector3(0, 0, back ? 1 : -1)).intersectObject(mesh).length > 0
+      expect(hits(115, 115)).toBe(false)
+      expect(hits(0, 115)).toBe(true)
+      expect(hits(95, 95)).toBe(true)
+    }
+    geometry.dispose(); material.dispose()
+  })
+})
