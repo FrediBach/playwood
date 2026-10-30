@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
-import { Check, Hand, Minus, MousePointer2, Pentagon, Plus, Redo2, RotateCcw, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
+import { Check, FlipHorizontal2, FlipVertical2, Hand, Minus, MousePointer2, Pentagon, Plus, Redo2, RotateCcw, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './ui/dialog'
 import { getOutlineError, panelCornerRadius, panelOutlineSvgPath } from '@/lib/panel-shape'
@@ -95,6 +95,10 @@ function OutlineEditor({ panel, onChange, onClose }: Props & { onClose: () => vo
   const undo = () => updateHistory(h => h.past.length ? { past: h.past.slice(0, -1), draft: h.past[h.past.length - 1], future: [h.draft, ...h.future] } : h)
   const redo = () => updateHistory(h => h.future.length ? { past: [...h.past, h.draft], draft: h.future[0], future: h.future.slice(1) } : h)
   const movePoint = (index: number, point: Partial<OutlinePoint>) => change(current => ({ ...current, points: current.points.map((p, i) => i === index ? { ...p, ...point } : p) }))
+  const flipOutline = (axis: 'x' | 'y') => change(current => ({
+    ...current,
+    points: current.points.map(point => ({ ...point, [axis]: 1 - point[axis] })),
+  }))
   const removePoint = () => {
     if (points.length <= 3) return
     change(current => ({ ...current, points: current.points.filter((_, i) => i !== active) }))
@@ -192,6 +196,10 @@ function OutlineEditor({ panel, onChange, onClose }: Props & { onClose: () => vo
         <button aria-label="Pan outline canvas" aria-pressed={mode === 'pan'} title="Drag to pan" onClick={() => setMode('pan')}><Hand size={16}/></button>
       </div>
       <div className="outline-tool-group"><button aria-label="Undo outline edit" title="Undo (⌘/Ctrl Z)" disabled={!history.past.length} onClick={undo}><Undo2 size={16}/></button><button aria-label="Redo outline edit" title="Redo (⌘/Ctrl Shift Z)" disabled={!history.future.length} onClick={redo}><Redo2 size={16}/></button></div>
+      <div className="outline-tool-group" role="group" aria-label="Flip outline">
+        <button aria-label="Flip outline horizontally" title="Mirror left to right across the panel center" onClick={() => flipOutline('x')}><FlipHorizontal2 size={16}/><span>Flip horizontal</span></button>
+        <button aria-label="Flip outline vertically" title="Mirror top to bottom across the panel center" onClick={() => flipOutline('y')}><FlipVertical2 size={16}/><span>Flip vertical</span></button>
+      </div>
       <div className="outline-snap"><label><input type="checkbox" checked={snap} onChange={e => setSnap(e.target.checked)}/>Snap</label><select aria-label="Snap spacing" value={snapStep} onChange={e => setSnapStep(Number(e.target.value))}>{[1, 5, 10, 25, 50].map(n => <option key={n} value={n}>{n} mm</option>)}</select></div>
     </div>
     <div className="outline-editor-body">
