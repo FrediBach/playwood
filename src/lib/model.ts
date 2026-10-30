@@ -248,7 +248,9 @@ function jointStructureIssues(connections: Connection[]): ValidationIssue[] {
   for (const [id, group] of groups) {
     const first = group[0]
     const expected = first.type === 't' ? 2 : first.type === 'cross' ? 3 : 1
-    const inconsistent = group.some(c => c.parentId !== first.parentId || c.type !== first.type || c.role !== first.role || c.side !== first.side || c.inset !== first.inset || c.offset !== first.offset || c.flip !== first.flip || c.color !== first.color)
+    // Supplemental branches can have different centers along the shared edge.
+    // Their physical clamps use the intersection of all branch spans.
+    const inconsistent = group.some(c => c.parentId !== first.parentId || c.type !== first.type || c.role !== first.role || c.side !== first.side || c.inset !== first.inset || (first.role !== 'support' && c.offset !== first.offset) || c.flip !== first.flip || c.color !== first.color)
     const branchIndices = group.map(branchIndex).sort()
     const invalidShared = expected > 1 && (branchIndices.some((index, i) => index !== i) || group.some(c => branchIndex(c) === 0 ? c.count < 1 : c.count !== 0))
     if (group.length !== expected || inconsistent || invalidShared || (expected === 1 && first.count < 1)) issues.push({
@@ -304,6 +306,22 @@ export function validateProject(project: Project): ValidationIssue[] {
         Math.abs(axis.clone().applyQuaternion(expectedRotation).dot(axis.clone().applyQuaternion(actualRotation))) > 0.9999)
       if (positionError > 1 || !alignedAxes) issues.push({ id: `${c.id}-alignment`, severity: 'error', message: `The support joint between ${parent.name} and ${child.name} no longer aligns. Restore the panel dimensions or detach and rebuild this joint.`, panelIds: [parent.id, child.id] })
     }
+  }
+  // Pairwise overlap alone is insufficient when supplemental T/cross branches
+  // have different offsets: all slots must grip the same straight edge span.
+  for (const first of project.connections.filter(c => c.count > 0 && (c.type === 't' || c.type === 'cross'))) {
+    const parent = byId.get(first.parentId)
+    if (!parent) continue
+    const branches = project.connections.filter(c => jointId(c) === jointId(first))
+    const seams = branches.flatMap(c => {
+      const child = byId.get(c.childId)
+      return child ? [getConnectorSeam(c, parent, child)] : []
+    })
+    if (seams.length !== branches.length) continue
+    const span = Math.min(...seams.map(seam => seam.upper)) - Math.max(...seams.map(seam => seam.lower))
+    if (span < (first.count - 1) * 40 - 1e-7) issues.push({ id: `${jointId(first)}-shared-overlap`, severity: 'error',
+      message: `Not enough shared edge across all panels for ${first.count} connector${first.count > 1 ? 's' : ''}. Reduce the offsets, corner radii, or connector count.`,
+      panelIds: [parent.id, ...branches.map(c => c.childId)] })
   }
   const boxes = panels.map(panelObb)
   for (let i = 0; i < panels.length; i++) for (let j = i + 1; j < panels.length; j++) {

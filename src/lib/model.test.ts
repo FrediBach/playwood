@@ -123,6 +123,19 @@ describe('project safety and feedback', () => {
     expect(validateProject(p).filter(issue => issue.id.endsWith('-overlap'))).toHaveLength(0)
   })
 
+  it('requires a common clamp span across support branches with different offsets', () => {
+    const source = attachPanel(project(), 'parent', createPanel({ width: 120 }), { ...options, type: 't', count: 2 })
+    const shifted = { ...source, connections: source.connections.map((connection, i) => ({ ...connection, offset: i ? 80 : -80 })) }
+    const supports: Project = { ...shifted, panels: resolvePanels(shifted), connections: shifted.connections.map(connection => ({ ...connection, role: 'support' })) }
+    // Both branches individually have 120 mm of parent overlap, but their
+    // straight edges do not meet anywhere that can hold a physical clamp.
+    const issues = validateProject(supports)
+    expect(issues.filter(issue => issue.id.endsWith('-overlap'))).toHaveLength(1)
+    expect(issues[0].id).toContain('-shared-overlap')
+    expect(issues[0].panelIds).toHaveLength(3)
+    expect(parseProject(JSON.parse(JSON.stringify(supports)))).toEqual(supports)
+  })
+
   it('detects actual panel intersections, including rotated panels', () => {
     const p = project()
     p.panels.push(createPanel({ id: 'second', position: [0, 0, 0], rotation: [0, 0, Math.PI / 4] }))

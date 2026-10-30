@@ -183,7 +183,7 @@ export default function App() {
       if(!result.joints){notify('No compatible unconnected edges found. Check panel angles, edge alignment, and connector clearance.');return}
       commit(result.project);clipboard.cancel();assembly.clearPlacement();setInspectorTab('panel');setExploded(false)
       if(result.splits&&selectedIds.length>1)setSelectedIds(ids=>[...ids,...result.addedPanelIds])
-      notify(`${result.connectors} connectors added at ${result.joints} ${result.joints===1?'joint':'joints'}. ${result.splits?`${result.splits} panel ${result.splits===1?'split':'splits'} for T joints; outer dimensions kept.`:'Panel positions kept.'} Undo is available.`)
+      notify(`${result.connectors} connectors ${result.upgrades?'fitted':'added'} at ${result.joints} ${result.joints===1?'joint':'joints'}. ${result.upgrades?`${result.upgrades} existing ${result.upgrades===1?'joint':'joints'} upgraded. `:''}${result.splits?`${result.splits} panel ${result.splits===1?'split':'splits'} for T joints; outer dimensions kept.`:'Panel positions kept.'}${result.disassembledNames.length?` Made independent: ${result.disassembledNames.join(', ')}.`:''} Undo is available.`)
     } catch(error){notify(error instanceof Error?error.message:'Connectors could not be added.')}
   }
   const selectAll=(includeConnectors=false)=>{
