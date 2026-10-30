@@ -37,6 +37,14 @@ Keyboard: **Arrows** move the preview selection 1 cm; **Shift + arrows** move 10
 
 In the panel and connector lists, **F2** edits a focused panel or group name. Focus a thumbnail or connector grip and press **Space** to pick it up, **↑/↓** (or **Home/End**) to choose its position or group, then **Space/Enter** to drop or **Escape** to cancel. Renaming accepts **Enter** to save and **Escape** to cancel.
 
+## Illustrated building guide
+
+Choose **Guide** in the header (the book icon on small screens), or **Shortcuts & help** in the status bar, to open the field guide. Its 24 searchable techniques cover the workspace, panels and finishes, attachment and connector types, automatic joints, closing openings, splitting panels, movement and snapping, rotation, copy/paste, selection and groups, reusable assemblies and their editable controls, review, and project and assembly files.
+
+Every technique has four steps with an illustrated example, exact controls, an explanation, the expected result, and relevant tips. Start with the suggested setup, move through **Next step**, or jump to a numbered step. Related guides connect techniques into longer workflows. The guide remembers your reading position for the current browser session; browsing it never changes the project. **Keyboard shortcuts** remains available as a separate quick reference.
+
+Illustrations project real example panel geometry and connector models into SVG. Only the current step is drawn; help loads on demand and adds no WebGL viewport or continuous rendering loop. Smaller screens use a collapsible technique browser and a stacked lesson layout.
+
 ## Reusable assemblies
 
 Build a box once and reuse its construction as linked instances. Select the box's panels, enter an **Assembly name**, and choose **Create assembly**. The selected panels become its first instance, and the reusable design appears under **My assemblies** in the Library. The **Cube** library example is a four-panel starting point.

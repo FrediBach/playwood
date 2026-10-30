@@ -75,3 +75,5 @@
 .rotation-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.rotation-actions .button-ghost{grid-column:1/-1;grid-row:2}.scene-container canvas:focus-visible{outline:2px solid #c97649;outline-offset:-3px}
 
 .preview-drag-snap{display:block;white-space:nowrap;padding:6px 10px;border:1px solid #789267;border-radius:5px;background:#edf5e9f5;color:#3e5c2d;font-size:12px;box-shadow:0 2px 8px #0001;transform:translateY(-24px)}
+
+@media(max-width:680px){.guide-open-button span{display:none}.header-actions .guide-open-button.button-default{width:30px;padding:0}.header-actions .guide-open-button.button-default svg{width:17px}}

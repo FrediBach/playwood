@@ -1,6 +1,6 @@
 import { getPhysicalConnectors } from '@/lib/connector-selection'
-import type { ComponentProps, Dispatch, SetStateAction } from 'react'
-import { ArrowRight, CircleHelp, Download, FolderOpen, ListChecks, Plus, Upload } from 'lucide-react'
+import { lazy, Suspense, useRef, type ComponentProps, type Dispatch, type SetStateAction } from 'react'
+import { CircleHelp, Download, FolderOpen, ListChecks, Plus, Upload } from 'lucide-react'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import { PanelFields, SelectField } from './fields'
@@ -30,11 +30,14 @@ interface Props {
   connectorCount: number
   issues: ValidationIssue[]
 }
-const SOURCE_URL = 'https://www.playwood.it/site/assets/files/18237/technical_information_playwood_connectors.pdf'
+const BuildGuide = lazy(() => import('./BuildGuide'))
 
 export function ProjectDialogs(props: Props) {
+  const opener = useRef<HTMLElement | null>(null)
   return <Dialog open={props.dialog!==null} onOpenChange={open=>{if(!open)props.onClose()}}>
-    <DialogContent className={props.dialog==='templates'?'wide-dialog':props.dialog==='parts'?'parts-dialog':''}>
+    <DialogContent className={props.dialog==='help'?'build-guide-dialog':props.dialog==='templates'?'wide-dialog':props.dialog==='parts'?'parts-dialog':''}
+      onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
+      onCloseAutoFocus={event => { if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus() } }}>
       <DialogBody {...props}/>
     </DialogContent>
   </Dialog>
@@ -46,7 +49,7 @@ function DialogBody(props: Props) {
     case 'add': return <AddDialog {...props}/>
     case 'templates': return <TemplatesDialog {...props}/>
     case 'export': return <ExportDialog {...props}/>
-    case 'help': return <HelpDialog {...props}/>
+    case 'help': return <Suspense fallback={<><DialogTitle>Building guide</DialogTitle><DialogDescription>Loading illustrated techniques…</DialogDescription></>}><BuildGuide/></Suspense>
     case 'parts': return <PartsDialog {...props}/>
     default: return null
   }
@@ -66,10 +69,6 @@ function TemplatesDialog({loadTemplate}: Pick<Props, 'loadTemplate'>) {
 
 function ExportDialog({exportProject,onExportParts,onImport,importError}: Pick<Props, 'exportProject' | 'onExportParts' | 'onImport' | 'importError'>) {
   return <><span className="dialog-eyebrow">FROM IDEA TO SOMETHING REAL</span><DialogTitle>Take your project with you.</DialogTitle><DialogDescription>Save an editable project or a parts list for your next build.</DialogDescription><div className="export-options"><button onClick={exportProject}><span className="export-icon"><FolderOpen size={23}/></span><span><strong>Project file</strong><small>All panels, connections, and materials · JSON</small></span><Download size={19}/></button><button onClick={onExportParts}><span className="export-icon"><ListChecks size={23}/></span><span><strong>Parts & cutting list</strong><small>Panel dimensions and connector quantities · CSV</small></span><Download size={19}/></button></div><div className="import-area"><span>Picking up where you left off?</span><Button variant="outline" onClick={onImport}><Upload size={16}/>Import project</Button></div>{importError&&<p role="alert" className="error-message">{importError}</p>}<p className="dialog-note">Changes are saved automatically in this browser. Export a project file to keep a separate copy.</p></>
-}
-
-function HelpDialog(_props: Props) {
-  return <><span className="dialog-eyebrow">LESS, BUT BETTER</span><DialogTitle>A space to think with your hands.</DialogTitle><DialogDescription>playwood. APP lets you explore furniture made from your own panels and the Playwood connector system.</DialogDescription><div className="help-steps"><div><span>01</span><p><strong>Bring a panel.</strong> Choose its size, material, finish, and surface. Pegboards and rounded slots are cut through the 3D geometry.</p></div><div><span>02</span><p><strong>Make a connection.</strong> Select a panel, choose Attach, and explore a side, connector angle, and offset. The preview updates before you commit. Already positioned your panels? Select them and choose Auto-add connectors to fill compatible joints. Interior T joints split continuous panels around the connector while keeping their outer dimensions; Undo restores the original panels.</p></div><div><span>03</span><p><strong>Make it yours.</strong> Select a panel or assembly, then hold Control and drag it in the preview. It snaps near compatible attachments; release to place it or press Escape to cancel. Dragging disconnects its previous external joints. Use the arrow keys to move in the direction you see. Connected panels resize together; hold Shift for 10 cm steps. Press X, Y, or Z to rotate the selection 90° around that world axis through its center. Select all connected panels or detach them first. Undo is always available.</p></div></div><div className="shortcut-list"><span>Orbit <kbd>Drag</kbd></span><span>Pan <kbd>Right-drag</kbd></span><span>Context menu <kbd>Right-click / Shift F10</kbd></span><span>Multi-select <kbd>Shift-click</kbd></span><span>Select all <kbd>⌘ / Ctrl A</kbd></span><span>Move &amp; snap <kbd>Ctrl + drag</kbd></span><span>Cancel move <kbd>Esc</kbd></span><span>Move in preview <kbd>↑ ↓ ← → · 1 cm</kbd></span><span>Move further <kbd>Shift + arrows · 10 cm</kbd></span><span>Rotate selection 90° <kbd>X / Y / Z</kbd></span><span>Fit view <kbd>F</kbd></span><span>Copy <kbd>⌘ / Ctrl C</kbd></span><span>Paste, then choose a + <kbd>⌘ / Ctrl V</kbd></span><span>Cancel paste <kbd>Esc</kbd></span><span>Duplicate <kbd>⌘ / Ctrl D</kbd></span><span>Undo <kbd>⌘ / Ctrl Z</kbd></span><span>Delete <kbd>Delete</kbd></span></div><div className="reference-note"><strong>Built around the real system.</strong><p>90°, 105°, and 150° connectors accept 16–19 mm panels. T and cross connectors accept 18–19 mm panels. Connector shapes use the supplied 3D models; this editor is a design study, not a structural or fabrication simulation. Review joint clearances before making.</p><a href={SOURCE_URL} target="_blank" rel="noreferrer">Official technical drawings <ArrowRight size={14}/></a><a href="https://www.playwood.it/en/diy-wooden-projects-connectors/" target="_blank" rel="noreferrer">Explore Playwood connectors <ArrowRight size={14}/></a></div></>
 }
 
 function PartsDialog({project,connectorCount,panels,issues,onExportParts}: Pick<Props, 'project' | 'connectorCount' | 'panels' | 'issues' | 'onExportParts'>) {
