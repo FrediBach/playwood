@@ -1,3 +1,4 @@
+import { PreviewContextMenu, type PreviewMenuAction } from '@/components/PreviewContextMenu'
 import { ConnectorInspector } from '@/components/ConnectorInspector'
 import { CloseHoles } from '@/components/CloseHoles'
 import { closePanelHole, findPanelHoles } from '@/lib/close-holes'
@@ -46,6 +47,8 @@ export default function App() {
   const [selectedIds,setPanelSelection]=useState<string[]>(()=>{const first=project.panels[0];const instance=first&&getAssemblyInstance(project,first.id);return instance?Object.values(instance.panelIds):first?[first.id]:[]})
   const setSelectedIds=useCallback((next:SetStateAction<string[]>)=>{setSelectedConnectorIds([]);setPanelSelection(next)},[])
   const setSelectedId=useCallback((id:string|null)=>setSelectedIds(id?[id]:[]),[])
+  const [contextMenu,setContextMenu]=useState<{x:number;y:number}|null>(null)
+  const closeContextMenu=useCallback(()=>setContextMenu(null),[])
   const [inspectorTab,setInspectorTab]=useState<'panel'|'attach'>('panel')
   const [dialog,setDialog]=useState<ProjectDialog>(null)
   const [draft,setDraft]=useState(()=>createPanel({name:'My panel',width:600,height:360,thickness:18}))
@@ -314,6 +317,40 @@ export default function App() {
   const attachmentSummary=attachmentWarning??(clipboard.active?clipboard.hovered?.error:assembly.target?.error??(assembly.preview?'Corner connectors replaced with shared cross connectors.':undefined))
   const loosePanels=panels.filter(panel=>!getAssemblyInstance(project,panel.id))
 
+  const menuActions: PreviewMenuAction[] = []
+  const menuAction = (label: string, run: () => void, danger = false) => menuActions.push({ label, run, danger })
+  if (selectedConnectors.length) {
+    menuAction('Inspect connectors',()=>setRightOpen(true))
+    menuAction('Remove connectors',removeSelectedConnectors,true)
+  } else if (assembly.editingInstance) {
+    menuAction('Inspect assembly parts',()=>setRightOpen(true))
+    menuAction('Done editing assembly',assembly.done)
+  } else {
+    if (selectedPanels.length) {
+      menuAction('Inspect selection',()=>{setInspectorTab('panel');setRightOpen(true)})
+      if (instance) {
+        menuAction('Edit assembly',()=>assembly.edit(instance.id))
+        if (validTargets.length) menuAction('Attach a copy',()=>{clipboard.cancel();assembly.startAttach()})
+        if (project.assemblies?.links.some(link=>link.a.instanceId===instance.id||link.b.instanceId===instance.id)) menuAction('Disconnect from neighbors',()=>assembly.disconnect(instance.id))
+        menuAction('Make independent',()=>assembly.independent(instance.id))
+        menuAction('Disassemble',()=>assembly.disassemble(instance.id))
+      } else if (!assembly.hasMembers) {
+        if (selected) menuAction('Attach panel',startAttach)
+        if (project.connections.some(c=>selectedIds.includes(c.parentId)||selectedIds.includes(c.childId))) menuAction('Disconnect panels',detachSelection)
+        if (parallelPanelCut(selectedPanels)) menuAction('Split in the middle',splitSelection)
+      }
+      if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`Fill hole · ${hole.label}`,()=>closeHole(hole.id))
+      if (!assembly.memberInstance || instance) {
+        menuAction('Copy',clipboard.copy)
+        menuAction('Duplicate',duplicateSelected)
+        menuAction('Delete selection',deleteSelected,true)
+      }
+    } else menuAction('Add panel',addPanel)
+    if (panels.length>1) menuAction('Auto-connect',addAutoConnectors)
+  }
+  if (panels.length) menuAction('Select all panels',()=>selectAll())
+  menuAction('Fit view',()=>setFitSignal(v=>v+1))
+
   return <TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
     <ProjectHeader projectName={project.name} saveStatus={saveStatus} canUndo={canUndo} canRedo={canRedo} undo={undo} redo={redo}
       onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')}/>
@@ -334,7 +371,12 @@ export default function App() {
       assemblies={assembly.sidebarAssemblies} selectedAssemblyId={instance?.id} onSelectAssembly={id=>{clipboard.cancel();assembly.select(id)}}
       onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={insertSavedAssembly}/>
 
-    <AssemblyWorkspace connectorOverrides={(drag.project??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={drag.panels??panels} connections={(drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
+    {contextMenu&&<PreviewContextMenu {...contextMenu} title={selectedConnectors.length?`${selectedConnectors.length} connectors`:instance?.name??(selectedPanels.length===1?selectedPanels[0].name:selectedPanels.length?`${selectedPanels.length} panels`:'Preview')} actions={menuActions} onClose={closeContextMenu}/>}
+    <AssemblyWorkspace onPreviewContextMenu={dialog||drag.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
+      if(target.connectorId&&!realisticPreview){if(!selectedConnectorIds.includes(target.connectorId))chooseConnector(target.connectorId)}
+      else if(target.panelId!==undefined){if(!target.panelId||!selectedIds.includes(target.panelId))choosePanel(target.panelId||null)}
+      setContextMenu({x,y})
+    }} connectorOverrides={(drag.project??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={drag.panels??panels} connections={(drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
       onDragStart={drag.start} onDragMove={drag.move} onDragEnd={drag.end} dragging={drag.active} dragSnap={drag.snap}
       onAutoConnect={addAutoConnectors} autoConnectDisabled={!!dialog||!!assembly.editingInstance||panels.length<2}
       onMoveConnectors={(slides,repeat)=>commit(current=>{

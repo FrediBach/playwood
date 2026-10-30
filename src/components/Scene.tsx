@@ -34,6 +34,7 @@ export interface SceneProps extends PreviewDragProps {
   connections: Connection[]
   connectorOverrides?: Project['connectorOverrides']
   selectedConnectorIds?: readonly string[]
+  onPreviewContextMenu?: (target: { panelId?: string; connectorId?: string }, x: number, y: number) => void
   onSelectConnector?: (id: string, additive?: boolean) => void
   selectedIds: readonly string[]
   onSelect: (id: string | null, additive?: boolean) => void
@@ -359,6 +360,53 @@ function AttachmentHandlePositions({ handles, elements }: { handles: AssemblyAtt
   return null
 }
 
+/** Open only on a stationary right click, preserving OrbitControls right-drag pan. */
+function PreviewContextGesture({ onOpen, realisticPreview }: Pick<SceneProps, 'realisticPreview'> & { onOpen: SceneProps['onPreviewContextMenu'] }) {
+  const { gl, camera, scene } = useThree()
+  const open = useEffectEvent((event: PointerEvent | KeyboardEvent) => {
+    if (!onOpen) return
+    const rect = gl.domElement.getBoundingClientRect()
+    if (event instanceof KeyboardEvent) { onOpen({}, rect.x + rect.width / 2, rect.y + rect.height / 2); return }
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.x) / rect.width * 2 - 1, -(event.clientY - rect.y) / rect.height * 2 + 1), camera)
+    for (const hit of raycaster.intersectObjects(scene.children, true)) {
+      for (let object: THREE.Object3D | null = hit.object; object; object = object.parent) {
+        if (object.userData.panelId || (!realisticPreview && object.userData.connectorId)) {
+          onOpen(object.userData, event.clientX, event.clientY); return
+        }
+      }
+    }
+    onOpen({ panelId: '' }, event.clientX, event.clientY)
+  })
+  useEffect(() => {
+    const canvas = gl.domElement
+    let start: { x: number; y: number; moved: boolean } | undefined
+    const down = (event: PointerEvent) => { start = event.button === 2 ? { x: event.clientX, y: event.clientY, moved: false } : undefined }
+    const move = (event: PointerEvent) => { if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5) start.moved = true }
+    const up = (event: PointerEvent) => { if (event.button === 2 && start && !start.moved) open(event); start = undefined }
+    const cancel = () => { start = undefined }
+    const context = (event: MouseEvent) => event.preventDefault()
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); open(event) }
+    }
+    canvas.addEventListener('pointerdown', down)
+    canvas.addEventListener('pointermove', move)
+    canvas.addEventListener('pointerup', up)
+    canvas.addEventListener('pointercancel', cancel)
+    canvas.addEventListener('contextmenu', context)
+    canvas.addEventListener('keydown', key)
+    return () => {
+      canvas.removeEventListener('pointerdown', down)
+      canvas.removeEventListener('pointermove', move)
+      canvas.removeEventListener('pointerup', up)
+      canvas.removeEventListener('pointercancel', cancel)
+      canvas.removeEventListener('contextmenu', context)
+      canvas.removeEventListener('keydown', key)
+    }
+  }, [gl])
+  return null
+}
+
 function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
   const { panels, connections, selectedIds, onSelect, previewPanels = EMPTY_PANELS, previewConnections = EMPTY_CONNECTIONS, attachmentBoundsPanels = EMPTY_PANELS, showGrid, showDimensions, exploded, realisticPreview } = props
   const displayPanels = useMemo(() => {
@@ -374,6 +422,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
   const extent = useMemo(() => Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5), [bounds])
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
   return <>
+    <PreviewContextGesture onOpen={props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
     <PanelKeyboardMovement {...props} movementEnabled={props.movementEnabled && !props.dragging}/>
     <PreviewDragMovement {...props}/>
     {props.view === 'perspective'

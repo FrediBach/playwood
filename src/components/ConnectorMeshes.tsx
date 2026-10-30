@@ -24,7 +24,7 @@ function ConnectorPiece({ connection, placement, id, ghost, selected, onSelectCo
     transparent: !!ghost, opacity: ghost ? 0.42 : 1, depthWrite: !ghost,
   }), [connection.color, ghost, selected])
   useEffect(() => () => material.dispose(), [material])
-  return <group name={`Playwood ${connection.type}`} userData={{ connectorType: connection.type, connectorId: id, selected, source }}
+  return <group name={`Playwood ${connection.type}`} userData={{ connectorType: connection.type, connectorId: ghost ? undefined : id, selected, source }}
     position={[placement.position[0] * 0.001, placement.position[1] * 0.001, placement.position[2] * 0.001]} rotation={placement.rotation}
     onClick={ghost || !onSelectConnector ? undefined : event => { event.stopPropagation(); onSelectConnector(id, event.shiftKey || event.metaKey || event.ctrlKey) }}
     onDoubleClick={ghost ? undefined : event => event.stopPropagation()}>
