@@ -136,16 +136,22 @@ export function attachExistingPanel(project: Project, parentId: string, childId:
   return attachPanel({ ...detached, panels: detached.panels.filter(p => p.id !== childId) }, parentId, child, options)
 }
 
-export function getConnectionAnchors(connection: Connection, parent: Panel, child: Panel): Vec3[] {
+/** Connector centers stay 20 mm inside the straight overlap to fit the 40 mm body. */
+export function getConnectorSeam(connection: Connection, parent: Panel, child: Panel) {
   const seam = seamInfo(parent, connection)
   const childSeamLength = seam.horizontalSeam !== !!connection.quarterTurn ? child.width : child.height
   const parentRadius = seam.face ? 0 : panelCornerRadius(parent)
   const childRadius = panelCornerRadius(child)
   const lower = Math.max(-seam.seamLength / 2 + parentRadius, connection.offset - childSeamLength / 2 + childRadius)
   const upper = Math.min(seam.seamLength / 2 - parentRadius, connection.offset + childSeamLength / 2 - childRadius)
+  return { lower: lower + 20, upper: upper - 20, tangent: tuple(seam.tangent.clone().applyQuaternion(quaternion(parent))) }
+}
+
+export function getConnectionAnchors(connection: Connection, parent: Panel, child: Panel): Vec3[] {
+  const seam = seamInfo(parent, connection)
+  const { lower, upper } = getConnectorSeam(connection, parent, child)
   const middle = (lower + upper) / 2
-  // Connector bodies occupy 40 mm along the seam; keep their centers 20 mm from its ends.
-  const reach = Math.max(0, (upper - lower) / 2 - 20)
+  const reach = Math.max(0, (upper - lower) / 2)
   const rotation = quaternion(parent)
   return Array.from({ length: connection.count }, (_, i) => {
     const along = connection.count === 1 ? middle : middle - reach + (2 * reach * i) / (connection.count - 1)
@@ -427,6 +433,7 @@ export function parseProject(input: unknown): Project {
         ...(raw.color !== undefined ? { color: colorIn(raw.color) } : {}),
         ...(raw.type !== undefined ? { type: enumIn(raw.type, ['90', '105', '150', 't', 'cross'] as const, 'connector type') } : {}),
         ...(raw.removed !== undefined ? { removed: raw.removed as boolean } : {}),
+        ...(raw.slide !== undefined ? { slide: numberIn(raw.slide, -10000, 10000, 'connector slide') } : {}),
       }]
     }))
   }

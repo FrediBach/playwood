@@ -23,6 +23,7 @@ export function ConnectorInspector({ connectors, onChange, onRemove }: {
       </SelectField>
       <ConnectorColorField color={first.color} mixed={!sameColor} onChange={color => onChange({ color })}/>
       <p className="field-note">Shift, ⌘ or Ctrl-click connectors to select several. Changes apply to the selected pieces of hardware.</p>
+      <p className="field-note">In the preview, use arrow keys to slide along the joint by 1 cm, or Shift + arrows for 10 cm. Movement stops at panel ends and other connectors.</p>
       <p className="field-note">Panels keep their placement when hardware is changed or removed.</p>
       {connectors.some(connector => connector.type !== connector.connection.type) && <p className="validation-note warning">The replacement type differs from the joint layout. Check that its angle and openings fit the panels.</p>}
     </section>

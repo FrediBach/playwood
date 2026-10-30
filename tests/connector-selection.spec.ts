@@ -83,3 +83,36 @@ test('preview selects individual connectors and supports bulk edits, removal, un
   await expect.poll(async () => (await renderedSelection(page)).length).toBe(9)
   expect(errors).toEqual([])
 })
+
+test('selected connector arrows slide hardware, support Shift, undo, and reload', async ({ page }) => {
+  await page.goto('/')
+  await expect.poll(async () => (await renderedSelection(page)).length).toBe(12)
+  const id = await clickConnector(page)
+  const position = () => page.locator('canvas').evaluate(async (canvas, id) => {
+    const url = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/@react-three_fiber.js'))!
+    const { _roots } = await import(url)
+    let result: number[] = []
+    _roots.get(canvas)?.store.getState().scene.traverse((object: any) => {
+      if (object.userData.connectorId === id) result = object.position.toArray()
+    })
+    return result
+  }, id)
+  const original = await position()
+  const distance = (next: number[]) => Math.hypot(...next.map((value, axis) => value - original[axis]))
+  let direction = ''
+  for (const key of ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown']) {
+    await page.locator('canvas').press(key)
+    await page.waitForTimeout(100)
+    if (distance(await position()) > .001) { direction = key; break }
+  }
+  expect(direction).not.toBe('')
+  expect(distance(await position())).toBeCloseTo(.01, 6)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  await expect.poll(position).toEqual(original)
+  await page.locator('canvas').press(`Shift+${direction}`)
+  await expect.poll(async () => distance(await position())).toBeCloseTo(.1, 6)
+  const moved = await position()
+  await expect.poll(() => page.evaluate(id => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!).connectorOverrides?.[id]?.slide, id)).not.toBeUndefined()
+  await page.reload()
+  await expect.poll(position).toEqual(moved)
+})

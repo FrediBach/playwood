@@ -1,4 +1,4 @@
-import { panelCornerRadius } from '@/lib/panel-shape'
+import { connectorSlide, getConnectorRail } from '@/lib/connector-movement'
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { connectorId, connectorFinish } from '@/lib/connector-selection'
@@ -7,7 +7,6 @@ import { getConnectorPlacements } from '@/lib/model'
 import { getConnectorGeometry } from './connector-geometry'
 
 const source = 'resources/connectors-3d/Connettori sharing.obj'
-const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 
 interface SelectionProps {
   selectedConnectorIds?: readonly string[]
@@ -34,35 +33,21 @@ function ConnectorPiece({ connection, placement, id, ghost, selected, onSelectCo
   </group>
 }
 
-function ConnectorJoint({ connection, parent, child, ghost, selectedConnectorIds = [], onSelectConnector, connectorOverrides }: {
-  connection: Connection; parent: Panel; child: Panel; ghost?: boolean
-} & SelectionProps) {
-  return <group name={`Connector ${connection.type}`}>
-    {getConnectorPlacements(connection, parent, child).map((placement, index) => {
-      const id = connectorId(connection.id, index)
-      const finish = connectorFinish(connection, index, connectorOverrides)
-      return finish?.removed ? null : <ConnectorPiece key={id} id={id} connection={{ ...connection, ...finish }} placement={placement}
-        ghost={ghost} selected={!ghost && selectedConnectorIds.includes(id)} onSelectConnector={onSelectConnector}/>
-    })}
-  </group>
-}
-
-export function ConnectorMeshes({ panels, connections, ghost, ...selection }: {
+export function ConnectorMeshes({ panels, connections, ghost, selectedConnectorIds = [], onSelectConnector, connectorOverrides }: {
   panels: Panel[]; connections: Connection[]; ghost?: boolean
 } & SelectionProps) {
-  const byId = new Map(panels.map(panel => [panel.id, panel]))
   return <>{connections.filter(connection => connection.count > 0).map(connection => {
-    const parent = byId.get(connection.parentId)
-    const child = byId.get(connection.childId)
-    const branches = connections.filter(branch => jointId(branch) === jointId(connection))
-    // T and cross hardware is a single assembly shared by all its branches.
-    if (!parent?.visible || !child?.visible || branches.some(branch => !byId.get(branch.childId)?.visible)) return null
-    const horizontalSeam = connection.side !== 'left' && connection.side !== 'right'
-    const seamLength = (panel: Panel) => (horizontalSeam ? panel.width : panel.height) - 2 * panelCornerRadius(panel)
-    const shortestBranch = branches.reduce((shortest, branch) => {
-      const panel = byId.get(branch.childId)!
-      return seamLength(panel) < seamLength(shortest) ? panel : shortest
-    }, child)
-    return <ConnectorJoint key={connection.id} connection={connection} parent={parent} child={shortestBranch} ghost={ghost} {...selection} />
+    const rail = getConnectorRail(connection, panels, connections)
+    if (!rail) return null
+    return <group key={connection.id} name={`Connector ${connection.type}`}>
+      {rail.placements.map((placement, index) => {
+        const id = connectorId(connection.id, index)
+        const finish = connectorFinish(connection, index, connectorOverrides)
+        const slide = connectorSlide(rail, index, finish?.slide)
+        const position = new THREE.Vector3(...placement.position).addScaledVector(new THREE.Vector3(...rail.tangent), slide).toArray() as Panel['position']
+        return finish?.removed ? null : <ConnectorPiece key={id} id={id} connection={{ ...connection, ...finish }} placement={{ ...placement, position }}
+          ghost={ghost} selected={!ghost && selectedConnectorIds.includes(id)} onSelectConnector={onSelectConnector}/>
+      })}
+    </group>
   })}</>
 }

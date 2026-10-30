@@ -8,6 +8,7 @@ import { ConnectorMeshes } from './ConnectorMeshes'
 import { makePanelGeometry } from './scene-geometry'
 import { RoomEnvironment } from './RoomEnvironment'
 import { getRoomLayout } from './room-layout'
+import { getConnectorKeyboardSlides } from '@/lib/connector-movement'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
 import { PreviewDragMovement, type PreviewDragProps } from './PreviewDragMovement'
 import { Plus } from 'lucide-react'
@@ -36,6 +37,7 @@ export interface SceneProps extends PreviewDragProps {
   onSelectConnector?: (id: string, additive?: boolean) => void
   selectedIds: readonly string[]
   onSelect: (id: string | null, additive?: boolean) => void
+  onMoveConnectors?: (slides: Record<string, number>, repeat: boolean) => void
   onMove?: (delta: Vec3, repeat: boolean) => void
   movementEnabled?: boolean
   dragging?: boolean
@@ -262,11 +264,24 @@ function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, re
 }
 
 /** Read the live camera on every keypress, including during orbit damping. */
-function PanelKeyboardMovement({panels, selectedIds, onMove, movementEnabled}: SceneProps) {
+function PanelKeyboardMovement({panels, connections, connectorOverrides, selectedConnectorIds = [], onMoveConnectors, selectedIds, onMove, movementEnabled}: SceneProps) {
   const {camera, gl, size} = useThree()
   const gesture = useRef('')
   const move = useEffectEvent((event: KeyboardEvent) => {
-    if (!movementEnabled || !onMove || event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    if (!movementEnabled || event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    if (selectedConnectorIds.length && onMoveConnectors) {
+      camera.updateWorldMatrix(true, false)
+      const slides = getConnectorKeyboardSlides({ connections, connectorOverrides }, panels, selectedConnectorIds,
+        { camera, key: event.key, shiftKey: event.shiftKey, viewport: size })
+      if (!Object.keys(slides).length) return
+      event.preventDefault()
+      event.stopPropagation()
+      const key = `connector:${event.key}:${event.shiftKey}:${selectedConnectorIds.join(',')}`
+      onMoveConnectors(slides, event.repeat && gesture.current === key)
+      gesture.current = key
+      return
+    }
+    if (!onMove) return
     const wanted = new Set(selectedIds)
     const selected = panels.filter(panel => panel.visible && wanted.has(panel.id))
     if (!selected.length) return
