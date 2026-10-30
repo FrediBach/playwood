@@ -4,11 +4,14 @@ export type Material = 'birch' | 'oak' | 'walnut' | 'mdf' | 'painted'
 export type Pattern = 'solid' | 'pegboard' | 'slots'
 export type Side = 'left' | 'right' | 'top' | 'bottom' | 'front' | 'back'
 export type ConnectorType = '90' | '105' | '150' | 't' | 'cross'
+/** Panel-relative coordinates, from the top-left corner, in the range 0–1. */
+export interface OutlinePoint { x: number; y: number }
 export interface Panel {
   id: string; name: string; width: number; height: number; thickness: number;
   material: Material; color: string; pattern: Pattern;
   position: Vec3; rotation: Vec3; visible: boolean;
   holeSize: number; holeSpacing: number; cornerRadius?: number;
+  customOutline?: OutlinePoint[];
 }
 export interface Connection {
   id: string; parentId: string; childId: string; type: ConnectorType;

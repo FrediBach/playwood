@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DoubleSide, Mesh, MeshBasicMaterial, Raycaster, Vector3 } from 'three'
 import { createPanel } from '@/lib/model'
 import { makePanelGeometry } from './scene-geometry'
-import type { Pattern } from '@/lib/types'
+import type { OutlinePoint, Panel, Pattern } from '@/lib/types'
 
 function rayHits(pattern: Pattern, x: number, y: number, back = false) {
   const geometry = makePanelGeometry(createPanel({ width: 240, height: 240, thickness: 18, holeSize: 12, holeSpacing: 48, pattern }))
@@ -32,6 +32,41 @@ describe('rendered panel openings', () => {
   it('uses rounded slot ends instead of rectangular cutouts', () => {
     expect(rayHits('slots', 24, 40)).toBe(false)
     expect(rayHits('slots', 29.7, 40)).toBe(true)
+  })
+})
+
+describe('custom panel geometry', () => {
+  const triangle: OutlinePoint[] = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }]
+  const notched: OutlinePoint[] = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0.4 }, { x: 0.4, y: 0.4 }, { x: 0.4, y: 1 }, { x: 0, y: 1 }]
+  function expectHits(panel: Panel, probes: [number, number, boolean][]) {
+    const geometry = makePanelGeometry(panel)
+    const material = new MeshBasicMaterial({ side: DoubleSide })
+    const mesh = new Mesh(geometry, material)
+    for (const back of [false, true]) for (const [x, y, expected] of probes) {
+      const ray = new Raycaster(new Vector3((x - panel.width / 2) / 1000, (panel.height / 2 - y) / 1000, back ? -1 : 1), new Vector3(0, 0, back ? 1 : -1))
+      expect(ray.intersectObject(mesh).length > 0, `probe ${x}, ${y}, back=${back}`).toBe(expected)
+    }
+    expect([...geometry.getAttribute('position').array].every(Number.isFinite)).toBe(true)
+    geometry.dispose(); material.dispose()
+  }
+  it('uses the custom contour on both faces and scales when dimensions change', () => {
+    const panel = createPanel({ width: 200, height: 100, customOutline: triangle })
+    expectHits(panel, [[40, 40, true], [150, 40, false], [190, 90, false]])
+    expectHits({ ...panel, width: 400, height: 200 }, [[80, 80, true], [150, 40, true], [380, 180, false]])
+    expectHits({ ...panel, customOutline: [...triangle].reverse() }, [[40, 40, true], [150, 40, false]])
+  })
+  it('rounds both convex corners and concave notches', () => {
+    const panel = createPanel({ width: 200, height: 200, cornerRadius: 20, customOutline: notched })
+    expectHits(panel, [[1, 1, false], [15, 15, true], [83, 83, true], [90, 90, false], [150, 150, false]])
+    expectHits({ ...panel, cornerRadius: 0 }, [[1, 1, true], [83, 83, false]])
+    expectHits({ ...panel, customOutline: [...notched].reverse() }, [[1, 1, false], [83, 83, true], [90, 90, false]])
+  })
+  it.each(['pegboard', 'slots'] as Pattern[])('keeps %s openings completely within concave cutouts', pattern => {
+    const customOutline = notched.map(p => ({ x: p.x === 0.4 ? 100 / 240 : p.x, y: p.y === 0.4 ? 100 / 240 : p.y }))
+    const panel = createPanel({ width: 240, height: 240, holeSize: 12, holeSpacing: 48, pattern, customOutline })
+    // The opening at (96,96) would breach the notch, so it must be omitted.
+    expectHits(panel, [[48, 48, false], [96, 96, true], [102, 102, false], [144, 144, false]])
+    expectHits({ ...panel, cornerRadius: 18 }, [[1, 1, false], [48, 48, false], [144, 144, false]])
   })
 })
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { attachPanel, createPanel, getConnectionAnchors, parseProject, projectToCsv, validateProject } from './model'
-import { panelCornerRadius } from './panel-shape'
+import { getOutlineError, panelCornerRadius, panelOutlineCorners, panelOutlineSvgPath } from './panel-shape'
 import { updateSelectedPanels } from './selection'
-import type { Project, Side } from './types'
+import type { OutlinePoint, Project, Side } from './types'
 
 const options = { side: 'top' as Side, type: '90' as const, offset: 0, inset: 0, flip: false, color: '#e75a35', count: 2 }
 const base = (): Project => ({ version: 1, name: 'Rounded', panels: [createPanel({ id: 'p', width: 600, height: 600, position: [0, 0, 0] })], connections: [] })
@@ -40,5 +40,46 @@ describe('rounded panels', () => {
     expect(getConnectionAnchors(p.connections[0], p.panels[0], p.panels[1]).map(point => point[0])).toEqual([-100, 220])
     p.panels[0].cornerRadius = 300
     expect(validateProject(p).some(issue => issue.id.endsWith('-overlap'))).toBe(true)
+  })
+})
+
+describe('custom outline helpers', () => {
+  const rectangle: OutlinePoint[] = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]
+  it('accepts both winding orders and collinear inserted points', () => {
+    expect(getOutlineError(rectangle)).toBeNull()
+    expect(getOutlineError([...rectangle].reverse())).toBeNull()
+    expect(getOutlineError([rectangle[0], { x: 0.5, y: 0 }, ...rectangle.slice(1)])).toBeNull()
+  })
+  it('rejects malformed, overlapping, crossing and degenerate polygons', () => {
+    for (const points of [null, [], rectangle.slice(0, 2), [...rectangle, rectangle[0]],
+      [rectangle[0], rectangle[2], rectangle[1], rectangle[3]],
+      [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0.5, y: 0 }],
+      [{ x: NaN, y: 0 }, ...rectangle.slice(1)], [{ x: -0.1, y: 0 }, ...rectangle.slice(1)],
+      [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0.5, y: 0 }, { x: 0.5, y: 1 }], Array.from({ length: 129 }, () => ({ x: 0, y: 0 }))]) {
+      expect(getOutlineError(points)).toBeTypeOf('string')
+    }
+  })
+  it('scales relative points and shares circular rounding with the preview', () => {
+    const panel = createPanel({ width: 200, height: 100, cornerRadius: 10, customOutline: rectangle })
+    const corner = panelOutlineCorners(panel)[0]
+    expect(corner.radius).toBeCloseTo(10)
+    expect(corner.center.x).toBeCloseTo(10)
+    expect(corner.center.y).toBeCloseTo(10)
+    expect(panelOutlineSvgPath(panel)).toContain('A 10 10')
+    expect(panelOutlineSvgPath({ ...panel, width: 400, height: 200, cornerRadius: 0 })).toContain('L 400 200')
+  })
+  it('limits fillets at a narrow neck without losing concave rounding', () => {
+    const customOutline = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0.1 }, { x: 0.1, y: 0.1 }, { x: 0.1, y: 1 }, { x: 0, y: 1 }]
+    const corners = panelOutlineCorners(createPanel({ width: 200, height: 200, cornerRadius: 100, customOutline }))
+    expect(corners[3].sweep).toBe(0)
+    expect(corners[3].radius).toBeGreaterThan(0)
+    expect(corners[3].radius).toBeLessThan(10)
+    for (const corner of corners) {
+      expect(Number.isFinite(corner.radius)).toBe(true)
+      expect(corner.entry.x).toBeGreaterThanOrEqual(0)
+      expect(corner.entry.y).toBeGreaterThanOrEqual(0)
+      expect(corner.exit.x).toBeLessThanOrEqual(200)
+      expect(corner.exit.y).toBeLessThanOrEqual(200)
+    }
   })
 })

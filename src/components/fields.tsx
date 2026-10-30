@@ -4,6 +4,7 @@ import { Check, ChevronDown } from 'lucide-react'
 import type { Panel, Pattern } from '@/lib/types'
 import { getSharedPanelFields } from '@/lib/selection'
 import { MATERIALS, COLORS } from '@/lib/materials'
+import { PanelOutlineControl } from './PanelOutlineEditor'
 
 export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false,commitOnBlur=false,precision=1}: {
   label:string;value:number;onChange:(v:number)=>boolean|void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean;commitOnBlur?:boolean;precision?:number
@@ -106,6 +107,7 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
       <NumberField label="Thickness" value={panel.thickness} min={3} max={60} {...numberProps('thickness')} onChange={thickness=>onChange({thickness})}/>
     </div>
     <NumberField label="Corner radius" value={panelCornerRadius(panel)} min={0} max={Math.min(...selection.map(p=>Math.min(p.width,p.height)/2))} {...numberProps('cornerRadius')} onChange={cornerRadius=>onChange({cornerRadius})}/>
+    {selection.length === 1 && !disabledFields.includes('customOutline') && <PanelOutlineControl key={panel.id} panel={panel} onChange={applyChange}/>}
     <SelectField label="Material" value={panel.material} mixed={mixed('material')} disabled={disabledFields.includes('material')}
       onChange={v=>{const m=MATERIALS.find(m=>m.id===v)!;onChange({material:m.id,...(!disabled('color')?{color:m.color}:{})})}}>
       {MATERIALS.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}

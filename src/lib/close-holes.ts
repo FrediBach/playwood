@@ -65,7 +65,7 @@ export function findPanelHoles(selected: readonly Panel[], obstacles: readonly P
           const boundaryIds = edges.map(edge => edge.panel.id).sort()
           const id = JSON.stringify([boundaryIds, n, sign])
           const panel = createPanel({ ...edges[0].panel, id: `closure:${id}`, name: `${label} panel`, width: highU - lowU - 2 * clearance, height: highV - lowV - 2 * clearance,
-            thickness, pattern: 'solid', cornerRadius: 0, visible: true,
+            thickness, pattern: 'solid', cornerRadius: 0, customOutline: undefined, visible: true,
             position: new Vector3(...center as Vec3).applyQuaternion(frame).toArray(), rotation: [rotation.x || 0, rotation.y || 0, rotation.z || 0] })
           const probe = box(panel)
           const seat = CONNECTOR_PROFILES['90'].seat

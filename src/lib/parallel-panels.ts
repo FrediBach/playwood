@@ -7,7 +7,7 @@ import type { Panel, Project } from './types'
 
 /** Find a centered cut shared by two aligned, separated panel faces. */
 export function parallelPanelCut(panels: readonly Panel[]) {
-  if (panels.length !== 2 || panels.some(panel => !panel.visible)) return undefined
+  if (panels.length !== 2 || panels.some(panel => !panel.visible || panel.customOutline)) return undefined
   const [a, b] = panels
   const rotation = (panel: Panel) => new Quaternion().setFromEuler(new Euler(...panel.rotation))
   const qa = rotation(a), qb = rotation(b)
@@ -23,6 +23,7 @@ export function parallelPanelCut(panels: readonly Panel[]) {
 /** One atomic edit: add the divider, then fit both T joints and remap outer joints. */
 export function splitParallelPanels(project: Project, ids: readonly string[]) {
   const selected = resolvePanels(project).filter(panel => ids.includes(panel.id))
+  if (selected.some(panel => panel.customOutline)) throw new Error('Remove custom outlines before splitting parallel panels.')
   const cut = parallelPanelCut(selected)
   if (!cut || new Set(ids).size !== 2) throw new Error('Select two aligned parallel panels with matching dimensions.')
   if (ids.some(id => isPanelConnectedToAssembly(project, id))) throw new Error('Disassemble these panels before splitting them.')
@@ -36,7 +37,7 @@ export function splitParallelPanels(project: Project, ids: readonly string[]) {
   const angle = direction * (dimension === 'width' ? -1 : 1) * Math.PI / 2
   const dividerRotation = new Euler().setFromQuaternion(rotation.clone().multiply(new Quaternion().setFromAxisAngle(tangent, angle)))
   const divider = createPanel({ ...a, id: crypto.randomUUID(), name: 'Center divider', [dimension]: length,
-    cornerRadius: 0,
+    cornerRadius: 0, customOutline: undefined,
     position: new Vector3(...a.position).add(new Vector3(...b.position)).multiplyScalar(0.5).toArray(),
     rotation: [dividerRotation.x || 0, dividerRotation.y || 0, dividerRotation.z || 0],
   })

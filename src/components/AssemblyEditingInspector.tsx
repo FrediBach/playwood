@@ -2,6 +2,7 @@ import { Box, Pencil } from 'lucide-react'
 import { Button } from './ui/button'
 import { PanelFields } from './fields'
 import { AssemblyParametersSection } from './AssemblyParametersEditor'
+import { OutlinePreview } from './PanelOutlineEditor'
 import type { AssemblyParameter, Panel } from '@/lib/types'
 
 export function AssemblyEditingInspector({ panels, definitionPanels = panels, parameters = [], name, count, onChange, onParametersChange }: {
@@ -28,6 +29,7 @@ export function AssemblyPartInspector({ panel, instanceName, definitionName, cou
     <div className="selected-heading"><Box size={15}/><span>ASSEMBLY PANEL</span></div>
     <div className="multi-selection-heading"><h2>{panel.name}</h2><p>Part of {instanceName}</p></div>
     <p className="field-note">{panel.width} × {panel.height} × {panel.thickness} mm</p>
+    {panel.customOutline && <OutlinePreview panel={panel}/>}
     <p className="assembly-help">Its construction comes from {definitionName}. Editing the assembly updates {count} linked {count === 1 ? 'instance' : 'instances'}.</p>
     <Button variant="outline" className="full-button" onClick={onEdit}><Pencil size={15}/>Edit assembly</Button>
     <button className="text-button" onClick={onSelectInstance}>Select whole instance</button>

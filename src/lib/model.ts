@@ -1,8 +1,8 @@
-import { panelCornerRadius } from './panel-shape'
+import { getOutlineError, panelCornerRadius } from './panel-shape'
 import { getPhysicalConnectors } from './connector-selection'
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
-import type { AttachmentOptions, Connection, Panel, Project, RotationAxis, ValidationIssue, Vec3 } from './types'
+import type { AttachmentOptions, Connection, OutlinePoint, Panel, Project, RotationAxis, ValidationIssue, Vec3 } from './types'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { parseAssemblyData, releaseAssemblyLinksForPanels } from './assemblies'
 
@@ -18,7 +18,8 @@ export function createPanel(overrides: Partial<Panel> = {}): Panel {
   const material = overrides.material ?? 'birch'
   return { id: uid(), name: 'New panel', width: 600, height: 360, thickness: 18, material,
     color: MATERIAL_COLORS[material], pattern: 'solid', position: [0, 400, 0], rotation: [0, 0, 0],
-    visible: true, cornerRadius: 0, holeSize: 12, holeSpacing: 48, ...overrides }
+    visible: true, cornerRadius: 0, holeSize: 12, holeSpacing: 48, ...overrides,
+    ...(overrides.customOutline ? { customOutline: overrides.customOutline.map(point => ({ ...point })) } : {}) }
 }
 
 function seamInfo(parent: Panel, c: Pick<Connection, 'side' | 'offset' | 'inset'>) {
@@ -263,6 +264,8 @@ export function validateProject(project: Project): ValidationIssue[] {
   const byId = new Map(panels.map(p => [p.id, p]))
   const jointQuantities = new Map(project.connections.filter(c => c.count > 0).map(c => [jointId(c), c.count]))
   for (const p of panels) {
+    const outlineError = p.customOutline === undefined ? null : getOutlineError(p.customOutline)
+    if (outlineError) issues.push({ id: `${p.id}-outline`, severity: 'error', message: `${p.name}: ${outlineError}`, panelIds: [p.id] })
     if (p.pattern !== 'solid' && (p.holeSpacing < Math.max(15, p.holeSize + 5) || Math.floor(p.width / p.holeSpacing) * Math.floor(p.height / p.holeSpacing) > 5000)) {
       issues.push({ id: `${p.id}-pattern`, severity: 'error', message: `${p.name}: increase hole spacing. Leave 5 mm between holes and use at most 5,000 holes per panel.`, panelIds: [p.id] })
     }
@@ -386,6 +389,11 @@ export function parseProject(input: unknown): Project {
       visible: raw.visible === undefined ? true : raw.visible as boolean,
       holeSize: numberIn(raw.holeSize, 2, 200, 'hole size'), holeSpacing: numberIn(raw.holeSpacing, 10, 500, 'hole spacing'),
     }
+    if (raw.customOutline !== undefined) {
+      const outlineError = getOutlineError(raw.customOutline)
+      if (outlineError) throw new Error(`Invalid custom outline: ${outlineError}`)
+      p.customOutline = (raw.customOutline as OutlinePoint[]).map(point => ({ x: point.x, y: point.y }))
+    }
     if (typeof p.visible !== 'boolean') throw new Error('Invalid panel visibility.')
     if (p.holeSpacing < Math.max(15, p.holeSize + 5)) throw new Error('Hole spacing must be at least 15 mm and leave 5 mm of material between holes.')
     if (p.pattern !== 'solid' && Math.floor(p.width / p.holeSpacing) * Math.floor(p.height / p.holeSpacing) > 5000) throw new Error('Perforated panels support up to 5,000 holes. Increase hole spacing.')
@@ -445,10 +453,11 @@ export function projectToCsv(project: Project): string {
     const safe = typeof value === 'string' && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value)
     return `"${safe.replaceAll('"', '""')}"`
   }
-  const rows: (string | number)[][] = [['Item', 'Quantity', 'Width (mm)', 'Height (mm)', 'Thickness (mm)', 'Material', 'Color', 'Pattern', 'Hole size (mm)', 'Hole pitch (mm)', 'Corner radius (mm)']]
-  for (const panel of project.panels) rows.push([panel.name, 1, panel.width, panel.height, panel.thickness, panel.material, panel.color, panel.pattern, panel.pattern === 'solid' ? '' : panel.holeSize, panel.pattern === 'solid' ? '' : panel.holeSpacing, panelCornerRadius(panel)])
+  const rows: (string | number)[][] = [['Item', 'Quantity', 'Width (mm)', 'Height (mm)', 'Thickness (mm)', 'Material', 'Color', 'Pattern', 'Hole size (mm)', 'Hole pitch (mm)', 'Corner radius (mm)', 'Custom outline points (mm, x/y from top left)']]
+  for (const panel of project.panels) rows.push([panel.name, 1, panel.width, panel.height, panel.thickness, panel.material, panel.color, panel.pattern, panel.pattern === 'solid' ? '' : panel.holeSize, panel.pattern === 'solid' ? '' : panel.holeSpacing, panelCornerRadius(panel),
+    panel.customOutline?.map(point => `${Number((point.x * panel.width).toFixed(3))}/${Number((point.y * panel.height).toFixed(3))}`).join('; ') ?? ''])
   const connectors = new Map<string, number>()
   for (const c of getPhysicalConnectors(project)) { const key = `${c.type}|${c.color}`; connectors.set(key, (connectors.get(key) ?? 0) + 1) }
-  for (const [key, count] of connectors) { const [type, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', 'Reinforced plastic', color, '', '', '', '']) }
+  for (const [key, count] of connectors) { const [type, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', 'Reinforced plastic', color, '', '', '', '', '']) }
   return '\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n')
 }

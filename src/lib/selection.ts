@@ -9,13 +9,17 @@ export function panelValuesEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((value, index) => panelValuesEqual(value, b[index]))
   }
+  if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
+    const entries = Object.entries(a)
+    return entries.length === Object.keys(b).length && entries.every(([key, value]) => Object.hasOwn(b, key) && panelValuesEqual(value, (b as Record<string, unknown>)[key]))
+  }
   return a === b
 }
 
 export function getSharedPanelFields(panels: Panel[]): Set<keyof Panel> {
   if (!panels.length) return new Set()
   const first = panels[0]
-  return new Set(([...new Set([...Object.keys(first), 'cornerRadius'])] as (keyof Panel)[]).filter(key => {
+  return new Set(([...new Set([...Object.keys(first), 'cornerRadius', 'customOutline'])] as (keyof Panel)[]).filter(key => {
     if (key === 'id' && panels.length > 1) return false
     return panels.every(panel => key === 'color'
       ? panel.color.toLowerCase() === first.color.toLowerCase()
@@ -41,6 +45,8 @@ export function updateSelectedPanels(project: Project, ids: string[], patch: Par
       Object.assign(scalarPatch, { [key]: patch[key] })
     }
   }
+  // An explicitly undefined outline restores the rectangle; omission leaves it alone.
+  if (shared.has('customOutline') && Object.hasOwn(patch, 'customOutline')) scalarPatch.customOutline = patch.customOutline?.map(point => ({ ...point }))
   const freePlacement = !project.connections.some(connection => wanted.has(connection.childId) && connection.role !== 'support')
   const vectorAxes = (['position', 'rotation'] as const).map(key => ({
     key,

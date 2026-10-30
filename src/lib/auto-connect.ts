@@ -89,7 +89,9 @@ function splitInteriorTJoints(original: Project, selectedIds: readonly string[])
     changed = false
     const panels = resolvePanels(project)
     outer: for (const shelf of panels) for (const divider of panels) {
-      if (shelf.id === divider.id || !shelf.visible || !divider.visible) continue
+      // Splitting a polygon can create disconnected pieces; never rescale the
+      // same outline onto both halves of a rectangular stock cut.
+      if (shelf.id === divider.id || !shelf.visible || !divider.visible || shelf.customOutline) continue
       if (selected.size && !(selectedIds.length === 1 ? selected.has(shelf.id) || selected.has(divider.id) : selected.has(shelf.id) && selected.has(divider.id))) continue
       if (project.connections.some(c => [c.parentId, c.childId].includes(shelf.id) && [c.parentId, c.childId].includes(divider.id))) continue
       if (isPanelConnectedToAssembly(project, shelf.id)) continue

@@ -1,14 +1,48 @@
-import { panelCornerRadius } from '@/lib/panel-shape'
+import { outlineSegmentsIntersect, panelCornerRadius, panelOutlineCorners, pointSegmentDistance } from '@/lib/panel-shape'
 import * as THREE from 'three'
-import type { Panel } from '@/lib/types'
+import type { OutlinePoint, Panel } from '@/lib/types'
 
 const MM = 0.001
 
-export function makePanelGeometry(panel: Pick<Panel, 'width' | 'height' | 'thickness' | 'pattern' | 'holeSize' | 'holeSpacing' | 'cornerRadius'>) {
+function insideContour(point: OutlinePoint, contour: OutlinePoint[]) {
+  let inside = false
+  for (let i = 0, j = contour.length - 1; i < contour.length; j = i++) {
+    const a = contour[i], b = contour[j]
+    if ((a.y > point.y) !== (b.y > point.y) && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x) inside = !inside
+  }
+  return inside
+}
+
+/** A circle or vertical capsule must clear every edge, including concave notches. */
+function openingInsideContour(x: number, y: number, radius: number, straight: number, contour: OutlinePoint[]) {
+  const top = { x, y: y + straight }, bottom = { x, y: y - straight }
+  if (!insideContour(top, contour) || !insideContour(bottom, contour)) return false
+  for (let i = 0; i < contour.length; i++) {
+    const a = contour[i], b = contour[(i + 1) % contour.length]
+    if (Math.max(a.x, b.x) < x - radius || Math.min(a.x, b.x) > x + radius
+      || Math.max(a.y, b.y) < bottom.y - radius || Math.min(a.y, b.y) > top.y + radius) continue
+    if (outlineSegmentsIntersect(top, bottom, a, b) || Math.min(pointSegmentDistance(top, a, b), pointSegmentDistance(bottom, a, b),
+      pointSegmentDistance(a, top, bottom), pointSegmentDistance(b, top, bottom)) <= radius + 1e-9) return false
+  }
+  return true
+}
+
+export function makePanelGeometry(panel: Pick<Panel, 'width' | 'height' | 'thickness' | 'pattern' | 'holeSize' | 'holeSpacing' | 'cornerRadius' | 'customOutline'>) {
   const w = panel.width * MM, h = panel.height * MM, t = panel.thickness * MM
   const shape = new THREE.Shape()
   const r = panelCornerRadius(panel) * MM
-  if (r > 0) {
+  if (panel.customOutline) {
+    const corners = panelOutlineCorners(panel)
+    shape.moveTo(corners[0].entry.x * MM - w / 2, h / 2 - corners[0].entry.y * MM)
+    for (const corner of corners) {
+      shape.lineTo(corner.entry.x * MM - w / 2, h / 2 - corner.entry.y * MM)
+      if (corner.radius > 0) {
+        shape.absarc(corner.center.x * MM - w / 2, h / 2 - corner.center.y * MM, corner.radius * MM,
+          Math.atan2(corner.center.y - corner.entry.y, corner.entry.x - corner.center.x),
+          Math.atan2(corner.center.y - corner.exit.y, corner.exit.x - corner.center.x), corner.sweep === 1)
+      }
+    }
+  } else if (r > 0) {
     shape.moveTo(-w / 2 + r, -h / 2)
     shape.lineTo(w / 2 - r, -h / 2)
     shape.absarc(w / 2 - r, -h / 2 + r, r, -Math.PI / 2, 0, false)
@@ -23,6 +57,8 @@ export function makePanelGeometry(panel: Pick<Panel, 'width' | 'height' | 'thick
     shape.lineTo(w / 2, h / 2); shape.lineTo(-w / 2, h / 2)
   }
   shape.closePath()
+  // Match ExtrudeGeometry's tessellation, so openings stay inside the rendered face.
+  const contour = panel.customOutline ? shape.getPoints(8) : null
   if (panel.pattern !== 'solid') {
     const radius = Math.max(1, panel.holeSize) * MM / 2
     const spacing = Math.max(panel.holeSpacing, panel.holeSize + 5, 15) * MM
@@ -39,7 +75,8 @@ export function makePanelGeometry(panel: Pick<Panel, 'width' | 'height' | 'thick
         const extentY = panel.pattern === 'slots' ? Math.max(radius, slotLength / 2) : radius
         const dx = Math.max(0, Math.abs(x) + radius - (w / 2 - r))
         const dy = Math.max(0, Math.abs(y) + extentY - (h / 2 - r))
-        if (r > 0 && dx * dx + dy * dy >= r * r) continue
+        if (contour ? !openingInsideContour(x, y, radius, panel.pattern === 'slots' ? Math.max(0, slotLength / 2 - radius) : 0, contour)
+          : r > 0 && dx * dx + dy * dy >= r * r) continue
         const hole = new THREE.Path()
         if (panel.pattern === 'pegboard') {
           hole.absarc(x, y, radius, 0, Math.PI * 2, true)
