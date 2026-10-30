@@ -26,13 +26,13 @@ function fitJoint(members: Panel[], count: number, color: string): Connection[] 
     const group: Connection[] = []
     const remaining = new Set(children)
     for (let branch = 0; branch < children.length; branch++) {
-      let match: Connection | undefined
+      let match: { connection: Connection; panel: Panel } | undefined
       for (const child of remaining) for (const quarterTurn of [false, true]) {
         const candidate: Connection = { id: `${id}:${branch}`, parentId: parent.id, childId: child.id, type, side, flip, offset, inset: 0, count: branch ? 0 : count, color, role: 'support', ...(quarterTurn ? { quarterTurn } : {}) }
-        if (fits(parent, child, candidate)) { match = candidate; break }
+        if (fits(parent, child, candidate)) { match = { connection: candidate, panel: child }; break }
       }
       if (!match) break
-      group.push(match); remaining.delete(members.find(panel => panel.id === match!.childId)!)
+      group.push(match.connection); remaining.delete(match.panel)
     }
     if (remaining.size) continue
     if (validateProject({ version: 1, name: '', panels: members, connections: group }).some(issue => issue.severity === 'error' || issue.id.startsWith('collision-'))) continue

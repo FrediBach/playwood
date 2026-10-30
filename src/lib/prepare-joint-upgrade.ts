@@ -13,8 +13,10 @@ export function prepareJointUpgrade(project: Project, replacedConnections: reado
   if (!data || !replacedConnections.length) return { project, disassembledNames: [] }
   const replaced = new Set(replacedConnections.map(connection => connection.id))
   const affected = new Set<string>()
+  const definitionsById = new Map(data.definitions.map(definition => [definition.id, definition]))
   for (const instance of data.instances) {
-    const definition = data.definitions.find(item => item.id === instance.definitionId)!
+    const definition = definitionsById.get(instance.definitionId)
+    if (!definition) throw new Error('This assembly has no source definition.')
     if (definition.connections.some(connection => replaced.has(instance.connectionIds?.[connection.id] ?? `assembly/${instance.id}/${connection.id}`))) {
       affected.add(instance.id)
     }
