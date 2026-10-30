@@ -57,6 +57,14 @@
 @media(max-width:680px){.app-shell,.app-shell.left-closed,.app-shell.right-closed,.app-shell.left-closed.right-closed{grid-template-columns:minmax(0,1fr)}.workspace-options{flex-shrink:0;gap:2px}.workspace-top{gap:4px}}
 .selection-tools{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:-3px 4px 12px;font-size:11px;color:#657158}.selection-tools button{background:none;padding:4px 0;font-size:11px;font-weight:550;text-decoration:underline;text-underline-offset:3px;color:#56644b}.panel-selection-toggle{width:24px;min-width:24px;height:40px;display:grid;place-items:center;cursor:pointer;margin-left:2px}.panel-selection-toggle input{width:14px;height:14px;margin:0;accent-color:var(--accent);cursor:pointer}.panel-list-select{gap:9px}.multi-selection-heading{margin-bottom:22px}.multi-selection-heading h2{font-size:19px;font-weight:550;letter-spacing:-.35px;margin:0 0 10px}.multi-selection-heading p{font-size:12px;line-height:1.6;color:#68735d}.multi-selection-footer{display:flex;align-items:center;justify-content:center;gap:9px;font-size:12px;color:#526047}.field input:disabled,.field select:disabled{background:#eeeee8;color:#6e7565;border-color:#dedfd5;cursor:not-allowed;opacity:1}.field input:disabled::placeholder{color:#737969;opacity:1}.is-mixed>.field-hint{margin-left:auto}.custom-color:has(input:disabled){opacity:.5;cursor:not-allowed}.field.is-mixed>span{color:#727969}.is-mixed input,.is-mixed select{cursor:not-allowed}.multi-selection-heading+.field{margin-bottom:23px}
 
+/* Keep inspector descriptions close to their controls without stacking trailing margins. */
+.inspector-scroll .field-note{line-height:1.45;margin-top:0;margin-bottom:10px}
+.inspector-section>.ui-button+.field-note{margin-top:8px}
+.inspector-section>.field-note:last-child,.inspector-section>.field:last-child,.inspector-section>.field-row:last-child>.field{margin-bottom:0}
+.inspector-section+.inspector-section{padding-top:16px;margin-top:16px}
+.inspector-section+.selected-heading{margin-top:16px}
+.inspector-scroll .section-title{margin-bottom:12px}
+
 .connection-type{display:flex;align-items:center;gap:10px;margin-bottom:14px;color:var(--ink)}.connection-type svg{width:28px;height:28px;color:var(--accent)}.connection-type span{display:flex;flex-direction:column;gap:3px}.connection-type strong{font-size:12px;font-weight:550}.connection-type small{font-size:11px;color:var(--muted)}
 
 .copyright{white-space:nowrap;text-decoration:none;text-underline-offset:3px}.copyright:hover{text-decoration:underline;color:var(--accent)}
