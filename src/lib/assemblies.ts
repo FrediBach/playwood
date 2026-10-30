@@ -234,7 +234,8 @@ function newInstance(data: AssemblyData, definition: AssemblyDefinition, source?
 function separateInstance(project: Project, data: AssemblyData, instanceId: string): AssemblyData {
   const instance = data.instances.find(item => item.id === instanceId)!
   const definition = evaluatedFor(data, instance)
-  const panelBounds = getProjectBounds(resolvePanels(project).filter(panel => !Object.values(instance.panelIds).includes(panel.id)))
+  const memberIds = new Set(Object.values(instance.panelIds))
+  const panelBounds = getProjectBounds(resolvePanels(project).filter(panel => !memberIds.has(panel.id)))
   const ownPanels = resolvePanels(flat(definition)).map(panel => ({ ...panel, position: tuple(v(panel.position).applyQuaternion(q(instance.rotation)).add(v(instance.position))), rotation: angles(q(instance.rotation).multiply(q(panel.rotation))) }))
   const ownBounds = getProjectBounds(ownPanels)
   const delta = project.panels.length ? panelBounds.max[0] + 120 - ownBounds.min[0] : 0
@@ -295,7 +296,9 @@ export function getAssemblyAttachmentTargets(project: Project, instanceId: strin
   const sharedPlacements: AssemblyInstance[] = []
   // A shared wall keeps rectangular modules in their current orientation.
   // Corner frames alone can require a quarter turn, swapping width and height.
-  const targetPanels = resolvePanels(project).filter(panel => Object.values(target.panelIds).includes(panel.id))
+  const targetPanelIds = new Set(Object.values(target.panelIds))
+  const sourcePanelIds = new Set(Object.values(source.panelIds))
+  const targetPanels = resolvePanels(project).filter(panel => targetPanelIds.has(panel.id))
   const sourcePanels = resolvePanels(flat(evaluatedFor(data, source))).map(panel => ({ ...panel,
     position: tuple(v(panel.position).applyQuaternion(q(source.rotation)).add(v(source.position))),
     rotation: angles(q(source.rotation).multiply(q(panel.rotation))) }))
@@ -308,7 +311,7 @@ export function getAssemblyAttachmentTargets(project: Project, instanceId: strin
       const nextData = { ...data, instances: sourceInstanceId ? data.instances.map(item => item.id === source.id ? placed : item) : [...data.instances, placed] }
       const ids = Object.values(placed.panelIds)
       const result = reconcileAssemblyPlacement(rebuild(project, nextData), ids)
-      if (!result.warning || !result.project.panels.some(panel => ids.includes(panel.id))) continue
+      if (!result.warning || !result.project.panels.some(panel => sourcePanelIds.has(panel.id))) continue
       targets.push({ id: `${instanceId}/shared-panel/${parent.id}/${child.id}`, label: `${parent.name} · shared panel`, position: parent.position,
         ...result, placement: { position: placed.position, rotation: placed.rotation } })
     } catch { /* Matching one panel can leave the rest of a module intersecting. */ }
@@ -343,11 +346,12 @@ export function getAssemblyAttachmentTargets(project: Project, instanceId: strin
             }
           } else {
             result = reconcileAssemblyPlacement(rebuild(project, nextData), ids)
-            if (!result.warning || !result.project.panels.some(panel => ids.includes(panel.id))) continue
+            if (!result.warning || !result.project.panels.some(panel => sourcePanelIds.has(panel.id))) continue
           }
-          const merged = ids.filter(id => !result.project.panels.some(panel => panel.id === id))
+          const resultPanelIds = new Set(result.project.panels.map(panel => panel.id))
+          const merged = new Set(ids.filter(id => !resultPanelIds.has(id)))
           const placedPanels = resolvePanels(flat(evaluatedFor(nextData, placed)))
-          const sharedPanel = placedPanels.find(panel => merged.includes(placed.panelIds[panel.id]))
+          const sharedPanel = placedPanels.find(panel => merged.has(placed.panelIds[panel.id]))
           const handlePosition = shared && sharedPanel ? tuple(v(sharedPanel.position).applyQuaternion(q(placed.rotation)).add(v(placed.position)))
             : shared ? tuple(v(position).lerp(v(placed.position), 0.35)) : position
           candidate = { id: `${instanceId}/${port.id}${shared ? `/shared-${turn > 0 ? 'left' : 'right'}` : ''}`,
@@ -686,14 +690,16 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
   if (loosePorts?.some(port => !usedPorts.has(endpointKey({ portId: port.id })))) throw new Error('A loose assembly corner has no shared connection.')
   const data: AssemblyData = { definitions, instances, links, ...(loosePorts ? { loosePorts } : {}) }
   const rebuilt = rebuild({ ...project, assemblies: data }, data)
+  const panelsById = new Map(project.panels.map(panel => [panel.id, panel]))
+  const connectionsById = new Map(project.connections.map(connection => [connection.id, connection]))
   const sameNumber = (a: number, b: number) => Math.abs(a - b) < 0.001
   for (const panel of rebuilt.panels) {
-    const actual = project.panels.find(item => item.id === panel.id)
+    const actual = panelsById.get(panel.id)
     if (!actual || (actual.cornerRadius ?? 0) !== (panel.cornerRadius ?? 0) || !panelValuesEqual(actual.customOutline, panel.customOutline) || ['width', 'height', 'thickness', 'holeSize', 'holeSpacing'].some(key => !sameNumber(actual[key as 'width'], panel[key as 'width']))
       || actual.position.some((number, i) => !sameNumber(number, panel.position[i])) || Math.abs(q(actual.rotation).dot(q(panel.rotation))) < 0.999999
       || ['color', 'material', 'pattern', 'visible', 'name'].some(key => actual[key as 'color'] !== panel[key as 'color'])) throw new Error('Assembly panels do not match their source and instance transforms.')
   }
   if (rebuilt.panels.length !== project.panels.length || rebuilt.connections.length !== project.connections.length
-    || rebuilt.connections.some(connection => { const actual = project.connections.find(item => item.id === connection.id); return !actual || Object.entries(connection).some(([key, item]) => actual[key as keyof Connection] !== item) })) throw new Error('Assembly connectors do not match their corner connections.')
+    || rebuilt.connections.some(connection => { const actual = connectionsById.get(connection.id); return !actual || Object.entries(connection).some(([key, item]) => actual[key as keyof Connection] !== item) })) throw new Error('Assembly connectors do not match their corner connections.')
   return data
 }

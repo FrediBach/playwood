@@ -78,7 +78,8 @@ export default function App() {
   const hasVisiblePanels=panels.some(panel=>panel.visible)
   const issues=useMemo(()=>validateProject(project),[project])
   const physicalConnectors=useMemo(()=>getPhysicalConnectors(project),[project])
-  const selectedConnectors=physicalConnectors.filter(connector=>selectedConnectorIds.includes(connector.id))
+  const selectedConnectorIdSet=useMemo(()=>new Set(selectedConnectorIds),[selectedConnectorIds])
+  const selectedConnectors=physicalConnectors.filter(connector=>selectedConnectorIdSet.has(connector.id))
   const connectorCount=physicalConnectors.length
   const connectorSummary=CONNECTORS.map(type=>({name:type.name,count:physicalConnectors.filter(c=>c.type===type.id).length})).filter(type=>type.count>0).map(type=>`${type.count} × ${type.name}`).join(' · ')
   const notify=useCallback((message:string)=>setToast(message),[])
@@ -251,7 +252,15 @@ export default function App() {
       assembly.close()
     }
     if(owner){
-      if(additive){const members=Object.values(owner.panelIds);assembly.clearPlacement();setSelectedIds(ids=>members.every(member=>ids.includes(member))?ids.filter(member=>!members.includes(member)):[...new Set([...ids,...members])]);setInspectorTab('panel');setRightOpen(true)}
+      if(additive){
+        const members=Object.values(owner.panelIds),memberIds=new Set(members)
+        assembly.clearPlacement()
+        setSelectedIds(ids=>{
+          const selected=new Set(ids)
+          return members.every(member=>selected.has(member))?ids.filter(member=>!memberIds.has(member)):[...new Set([...ids,...members])]
+        })
+        setInspectorTab('panel');setRightOpen(true)
+      }
       else assembly.select(owner.id)
       return
     }
@@ -299,7 +308,7 @@ export default function App() {
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
   const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=repairLegacyShelf(imported);const repaired=repairLegacyExampleInserts(shelf);commit(repaired);assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
   const instance=assembly.selectedInstance
-  const holes=useMemo(()=>findPanelHoles(panels.filter(panel=>selectedIds.includes(panel.id)),panels),[panels,selectedIds])
+  const holes=useMemo(()=>findPanelHoles(panels.filter(panel=>selectedIdSet.has(panel.id)),panels),[panels,selectedIdSet])
   const closeHole=(id:string)=>{
     try {
       const result=closePanelHole(project,selectedIds,id)
@@ -336,7 +345,7 @@ export default function App() {
         menuAction('Disassemble',()=>assembly.disassemble(instance.id))
       } else if (!assembly.hasMembers) {
         if (selected) menuAction('Attach panel',startAttach)
-        if (project.connections.some(c=>selectedIds.includes(c.parentId)||selectedIds.includes(c.childId))) menuAction('Disconnect panels',detachSelection)
+        if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Disconnect panels',detachSelection)
         if (parallelPanelCut(selectedPanels)) menuAction('Split in the middle',splitSelection)
       }
       if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`Fill hole · ${hole.label}`,()=>closeHole(hole.id))
@@ -408,7 +417,7 @@ export default function App() {
         {!assembly.editingInstance&&!clipboard.active&&!assembly.placementActive&&(instance||!assembly.hasMembers)&&<CloseHoles key={selectedIds.join('/')} holes={holes} assembly={!!instance} onClose={closeHole}/>}
         {!assembly.editingInstance&&<section className="inspector-section"><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2}><Link2 size={15}/>Auto-add connectors</Button><p className="field-note">{selectedIds.length>1?'Connect matching edges between selected panels.':selectedIds.length===1?'Connect this panel to matching nearby edges.':'Connect matching edges throughout the design.'} Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p></section>}
         {assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
-          panels={assembly.editingDefinition.panels.filter(panel=>selectedIds.includes(assembly.editingInstance!.panelIds[panel.id]))}
+          panels={assembly.editingDefinition.panels.filter(panel=>selectedIdSet.has(assembly.editingInstance!.panelIds[panel.id]))}
           definitionPanels={assembly.editingDefinition.panels} parameters={assembly.editingDefinition.parameters} onParametersChange={assembly.parameters}
           name={assembly.editingDefinition.name} count={assemblyCount(assembly.editingDefinition.id)} onChange={assembly.updateDefinition}/>
         :instance&&assembly.definition?<AssemblyInspector name={instance.name} definitionName={assembly.definition.name}
