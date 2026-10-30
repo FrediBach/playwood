@@ -36,6 +36,7 @@ function ConnectorPiece({ connection, placement, id, ghost, selected, onSelectCo
 export function ConnectorMeshes({ panels, connections, ghost, selectedConnectorIds = [], onSelectConnector, connectorOverrides }: {
   panels: Panel[]; connections: Connection[]; ghost?: boolean
 } & SelectionProps) {
+  const selectedIds = new Set(selectedConnectorIds)
   return <>{connections.filter(connection => connection.count > 0).map(connection => {
     const rail = getConnectorRail(connection, panels, connections)
     if (!rail) return null
@@ -44,9 +45,9 @@ export function ConnectorMeshes({ panels, connections, ghost, selectedConnectorI
         const id = connectorId(connection.id, index)
         const finish = connectorFinish(connection, index, connectorOverrides)
         const slide = connectorSlide(rail, index, finish?.slide)
-        const position = new THREE.Vector3(...placement.position).addScaledVector(new THREE.Vector3(...rail.tangent), slide).toArray() as Panel['position']
+        const position = placement.position.map((value, axis) => value + rail.tangent[axis] * slide) as Panel['position']
         return finish?.removed ? null : <ConnectorPiece key={id} id={id} connection={{ ...connection, ...finish }} placement={{ ...placement, position }}
-          ghost={ghost} selected={!ghost && selectedConnectorIds.includes(id)} onSelectConnector={onSelectConnector}/>
+          ghost={ghost} selected={!ghost && selectedIds.has(id)} onSelectConnector={onSelectConnector}/>
       })}
     </group>
   })}</>

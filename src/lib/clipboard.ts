@@ -7,8 +7,9 @@ import type { AssemblyDefinition, AssemblyInstance, AttachmentOptions, Panel, Pr
 export type CopiedItem = { kind: 'panel'; panel: Panel } | { kind: 'assembly'; instance: AssemblyInstance; definition: AssemblyDefinition }
 
 export function copySelection(project: Project, ids: string[]): CopiedItem {
+  const selected = new Set(ids)
   const instance = ids.length ? getAssemblyInstance(project, ids[0]) : undefined
-  if (instance && ids.length === Object.keys(instance.panelIds).length && Object.values(instance.panelIds).every(id => ids.includes(id))) {
+  if (instance && ids.length === Object.keys(instance.panelIds).length && Object.values(instance.panelIds).every(id => selected.has(id))) {
     return structuredClone({ kind: 'assembly', instance, definition: project.assemblies!.definitions.find(item => item.id === instance.definitionId)! })
   }
   const panel = ids.length === 1 ? resolvePanels(project).find(item => item.id === ids[0]) : undefined
@@ -17,8 +18,9 @@ export function copySelection(project: Project, ids: string[]): CopiedItem {
 }
 
 export function getPasteTargets(project: Project, ids: string[], copied: CopiedItem, preservePanelName = false): AssemblyAttachmentTarget[] {
+  const selected = new Set(ids)
   const owner = ids.length ? getAssemblyInstance(project, ids[0]) : undefined
-  const instance = owner && ids.length === Object.keys(owner.panelIds).length && Object.values(owner.panelIds).every(id => ids.includes(id)) ? owner : undefined
+  const instance = owner && ids.length === Object.keys(owner.panelIds).length && Object.values(owner.panelIds).every(id => selected.has(id)) ? owner : undefined
   if (!instance && ids.length !== 1) throw new Error('Select a target panel or assembly, then paste.')
   let base = project
   if (copied.kind === 'assembly') {
@@ -27,7 +29,7 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
     base = { ...project, assemblies: { ...data, definitions: data.definitions.some(item => item.id === copied.definition.id) ? data.definitions : [...data.definitions, copied.definition] } }
     if (instance) return getAssemblyAttachmentTargets(base, instance.id, undefined, copied.instance)
   }
-  const parents = resolvePanels(project).filter(panel => ids.includes(panel.id))
+  const parents = resolvePanels(project).filter(panel => selected.has(panel.id))
   const oldErrors = new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id))
   const child = copied.kind === 'panel' ? createPanel({ ...copied.panel, id: crypto.randomUUID(), name: preservePanelName ? copied.panel.name : `${copied.panel.name} copy`, visible: true }) : undefined
   const edges: { side: Side; position: (panel: Panel) => Vec3 }[] = [

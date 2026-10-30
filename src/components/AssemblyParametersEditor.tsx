@@ -1,36 +1,13 @@
 import { useRef, useState } from 'react'
 import { ChevronDown, Link2, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react'
 import type { AssemblyParameter, Panel } from '@/lib/types'
+import { assemblyParametersError } from '@/lib/assembly-parameters-validation'
 import { Button } from './ui/button'
 import { NumberField } from './fields'
 
 const DIMENSIONS = ['width', 'height', 'thickness'] as const
 const title = (value: string) => value[0].toUpperCase() + value.slice(1)
 const rounded = (value: number) => Math.round(value * 1000) / 1000
-
-export function assemblyParametersError(parameters: AssemblyParameter[], panels: Panel[]): string | undefined {
-  const names = new Set<string>(), targets = new Set<string>()
-  for (const parameter of parameters) {
-    const name = parameter.name.trim()
-    if (!name) return 'Give each editable value a name.'
-    if (names.has(name.toLowerCase())) return 'Use a different name for each editable value.'
-    names.add(name.toLowerCase())
-    if (!Number.isFinite(parameter.defaultValue) || parameter.defaultValue < 0.01 || parameter.defaultValue > 10000) return `Enter a default between 0.01 and 10,000 mm for ${name}.`
-    if (!parameter.bindings.length) return `Choose at least one panel dimension for ${name}.`
-    for (const binding of parameter.bindings) {
-      const panel = panels.find(item => item.id === binding.panelId)
-      if (!panel) return 'A selected panel is no longer available. Remove its editable value and try again.'
-      const key = `${binding.panelId}/${binding.dimension}`
-      if (targets.has(key)) return 'Each panel dimension can be controlled by only one value.'
-      targets.add(key)
-      const computed = parameter.defaultValue * binding.scale + binding.offset
-      const min = binding.dimension === 'thickness' ? 3 : 40, max = binding.dimension === 'thickness' ? 100 : 4000
-      if (!Number.isFinite(binding.scale) || binding.scale <= 0 || !Number.isFinite(binding.offset) || !Number.isFinite(computed) || computed < min || computed > max) {
-        return `${panel.name} ${binding.dimension} must be ${min}–${max} mm. Adjust the default or relationship.`
-      }
-    }
-  }
-}
 
 /** A controlled draft: changes become model edits only when its enclosing form saves. */
 export function AssemblyParametersEditor({ panels, parameters, onChange }: {
