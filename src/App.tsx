@@ -95,12 +95,13 @@ export default function App() {
     commit(current=>editConnectors(current,selectedConnectorIds,{removed:true}))
     setSelectedConnectorIds([]);notify('Connectors removed. Undo to bring them back.')
   }
-  const chooseConnector=(id:string,additive=false)=>{
+  const selectConnectors=(next:SetStateAction<string[]>,revealInspector=true)=>{
     clipboard.cancel();assembly.close();setPanelSelection([])
-    setSelectedConnectorIds(ids=>selectPanelIds(ids,id,additive))
+    setSelectedConnectorIds(next)
     setInspectorTab('panel');setRightOpen(true)
-    if(window.innerWidth<=900)setLeftOpen(false)
+    if(revealInspector&&window.innerWidth<=900)setLeftOpen(false)
   }
+  const chooseConnector=(id:string,additive=false)=>selectConnectors(ids=>selectPanelIds(ids,id,additive))
   const checkLoosePanelPatch=(patch:Partial<Panel>)=>{
     if(selectedPanels.some(panel=>isPanelConnectedToAssembly(project,panel.id)&&(['position','rotation','thickness'] as const).some(key=>patch[key]!==undefined&&!panelValuesEqual(panel[key],patch[key])))) {
       throw new Error('These panels still connect to an assembly. Detach the panels before changing their placement or thickness.')
@@ -314,6 +315,9 @@ export default function App() {
       onToggleVisibility: id=>commit(p=>({...p,panels:p.panels.map(panel=>panel.id===id?{...panel,visible:!panel.visible}:panel)})),
       onReorder: (id,beforeId)=>commit(p=>{const panel=p.panels.find(panel=>panel.id===id);if(!panel)return p;const remaining=p.panels.filter(panel=>panel.id!==id);const index=beforeId===null?remaining.length:remaining.findIndex(panel=>panel.id===beforeId);if(index<0)return p;remaining.splice(index,0,panel);return {...p,panels:remaining}})}} selectedCount={selectedPanels.length} connectorCount={connectorCount} connectorSummary={connectorSummary}
       onSelectAll={()=>{if(selectedPanels.length===panels.length&&!assembly.editingInstance)setSelectedIds([]);else selectAll()}}
+      connectorListProps={{connectors:physicalConnectors,panels,selectedIds:selectedConnectorIds,
+        onSelect:(id,additive=false)=>selectConnectors(ids=>selectPanelIds(ids,id,additive),!additive),
+        onSelectAll:selected=>selectConnectors(selected?physicalConnectors.map(connector=>connector.id):[],selected)}}
       onCollapse={()=>setLeftOpen(false)} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')} addPanel={addPanel} loadTemplate={loadTemplate} onInsertLibraryAssembly={insertModule}
       assemblies={assembly.sidebarAssemblies} selectedAssemblyId={instance?.id} onSelectAssembly={id=>{clipboard.cancel();assembly.select(id)}}
       onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={insertSavedAssembly}/>
