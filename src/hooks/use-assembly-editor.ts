@@ -51,12 +51,15 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
   const previewPanels = preview?.panels.filter(panel => !existingIds.has(panel.id) || sourceIds.has(panel.id)) ?? []
   const attachmentBoundsPanels = useMemo(() => targets.flatMap(item => item.project?.panels.filter(panel => !existingIds.has(panel.id) || sourceIds.has(panel.id)) ?? []), [targets, existingIds, sourceIds])
   const previewIds = new Set(previewPanels.map(panel => panel.id))
+  const connectionsById = useMemo(() => new Map(project.connections.map(connection => [connection.id, connection])), [project.connections])
+  const previewConnectionIds = new Set(preview?.connections.map(connection => connection.id))
+  const previewPanelIds = new Set(preview?.panels.map(panel => panel.id))
   const previewConnections = preview?.connections.filter(connection => {
-    const old = project.connections.find(item => item.id === connection.id)
+    const old = connectionsById.get(connection.id)
     return !old || JSON.stringify(old) !== JSON.stringify(connection) || previewIds.has(connection.parentId) || previewIds.has(connection.childId)
   }) ?? []
-  const suppressedConnectionIds = preview ? project.connections.filter(connection => !preview.connections.some(item => item.id === connection.id)).map(connection => connection.id) : []
-  const suppressedPanelIds = preview ? project.panels.filter(panel => !preview.panels.some(item => item.id === panel.id)).map(panel => panel.id) : []
+  const suppressedConnectionIds = preview ? project.connections.filter(connection => !previewConnectionIds.has(connection.id)).map(connection => connection.id) : []
+  const suppressedPanelIds = preview ? project.panels.filter(panel => !previewPanelIds.has(panel.id)).map(panel => panel.id) : []
   const clearPlacement = () => { setPlacement(null); setHover(null) }
   const close = () => { setEditingId(null); clearPlacement() }
   const select = (id: string, next = project) => {
@@ -99,7 +102,8 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
   }
   const updateDefinition = (patch: Partial<Panel>) => {
     if (!editingInstance) return false
-    const partIds = Object.entries(editingInstance.panelIds).filter(([, id]) => selectedIds.includes(id)).map(([id]) => id)
+    const selected = new Set(selectedIds)
+    const partIds = Object.entries(editingInstance.panelIds).filter(([, id]) => selected.has(id)).map(([id]) => id)
     return run(() => updateAssemblyDefinition(project, editingInstance.id, patch, partIds))
   }
   const attach = (id: string) => {

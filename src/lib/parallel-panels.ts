@@ -22,10 +22,11 @@ export function parallelPanelCut(panels: readonly Panel[]) {
 
 /** One atomic edit: add the divider, then fit both T joints and remap outer joints. */
 export function splitParallelPanels(project: Project, ids: readonly string[]) {
-  const selected = resolvePanels(project).filter(panel => ids.includes(panel.id))
+  const selectedIds = new Set(ids)
+  const selected = resolvePanels(project).filter(panel => selectedIds.has(panel.id))
   if (selected.some(panel => panel.customOutline)) throw new Error('Remove custom outlines before splitting parallel panels.')
   const cut = parallelPanelCut(selected)
-  if (!cut || new Set(ids).size !== 2) throw new Error('Select two aligned parallel panels with matching dimensions.')
+  if (!cut || selectedIds.size !== 2) throw new Error('Select two aligned parallel panels with matching dimensions.')
   if (ids.some(id => isPanelConnectedToAssembly(project, id))) throw new Error('Disassemble these panels before splitting them.')
   const { a, b, dimension, separation, direction, rotation } = cut
   if (selected.some(panel => panel.thickness < 18 || panel.thickness > 19)) throw new Error('T connectors need 18–19 mm panels.')

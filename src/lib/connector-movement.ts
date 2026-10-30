@@ -38,7 +38,8 @@ export function connectorSlide(rail: NonNullable<ReturnType<typeof getConnectorR
 export function getConnectorKeyboardSlides(project: Pick<Project, 'connections' | 'connectorOverrides'>, panels: Panel[], ids: readonly string[],
   options: { camera: Camera; key: string; shiftKey: boolean; viewport: { width: number; height: number } }) {
   const slides: Record<string, number> = {}
-  for (const piece of getPhysicalConnectors(project).filter(piece => ids.includes(piece.id))) {
+  const selectedIds = new Set(ids)
+  for (const piece of getPhysicalConnectors(project).filter(piece => selectedIds.has(piece.id))) {
     const rail = getConnectorRail(piece.connection, panels, project.connections)
     if (!rail || rail.upper <= rail.lower) continue
     const current = connectorSlide(rail, piece.index, project.connectorOverrides?.[piece.id]?.slide)

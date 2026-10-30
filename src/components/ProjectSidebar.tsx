@@ -37,6 +37,9 @@ export function ProjectSidebar({panelListProps,connectorListProps,selectedCount,
   const tabsId=useId()
   const [expanded,setExpanded]=useState<string[]>([])
   const { panels } = panelListProps
+  const panelsById = new Map(panels.map(panel => [panel.id, panel]))
+  const selectedIds = new Set(panelListProps.selectedIds)
+  const expandedIds = new Set(expanded)
   const memberIds = new Set(assemblies.flatMap(assembly => assembly.panelIds))
   const loosePanels = panels.filter(panel => !memberIds.has(panel.id))
   return <aside className="left-sidebar" aria-label="Project panels">
@@ -56,15 +59,15 @@ export function ProjectSidebar({panelListProps,connectorListProps,selectedCount,
           {assemblyTab==='connectors'?<ConnectorList {...connectorListProps}/>:<><div className="section-label"><span>{assemblies.length?'YOUR ASSEMBLY':'YOUR PANELS'}</span><span className="count-badge">{panels.length.toString().padStart(2,'0')}</span></div>
           <div className="selection-tools"><span aria-live="polite" aria-atomic="true">{selectedAssemblyId?'Assembly selected':selectedCount?`${selectedCount} selected`:'Shift-click to select more'}</span><button onClick={onSelectAll} disabled={!panels.length}>{selectedCount===panels.length&&panels.length?'Clear':'Select all'}</button></div>
           {assemblies.length>0&&<div className="assembly-tree">{assemblies.map(assembly=>{
-            const open=expanded.includes(assembly.id)
-            const selected=selectedAssemblyId===assembly.id||assembly.panelIds.length>0&&assembly.panelIds.every(id=>panelListProps.selectedIds.includes(id))
+            const open=expandedIds.has(assembly.id)
+            const selected=selectedAssemblyId===assembly.id||assembly.panelIds.length>0&&assembly.panelIds.every(id=>selectedIds.has(id))
             return <div className={`assembly-tree-item ${selected?'is-selected':''}`} key={assembly.id} data-assembly-id={assembly.id}>
               <div className="assembly-tree-row"><button className="assembly-tree-toggle" aria-label={`${open?'Collapse':'Expand'} ${assembly.name}`} aria-expanded={open} onClick={()=>setExpanded(ids=>open?ids.filter(id=>id!==assembly.id):[...ids,assembly.id])}>{open?<ChevronDown size={14}/>:<ChevronRight size={14}/>}</button>
                 <button className="assembly-tree-select" aria-label={`Select assembly ${assembly.name}`} aria-pressed={selected} onClick={()=>onSelectAssembly?.(assembly.id)}><Box size={20}/><span><strong>{assembly.name}</strong><small>{assembly.definitionName} · {assembly.panelIds.length} panels</small></span></button></div>
               {open&&<div className="assembly-tree-children">{assembly.panelIds.map(id=>{
-                const panel=panels.find(item=>item.id===id)
+                const panel=panelsById.get(id)
                 if(!panel)return null
-                return <button key={id} className={`assembly-tree-panel ${!selected&&panelListProps.selectedIds.includes(id)?'is-selected':''}`} aria-label={`Select panel ${panel.name} in ${assembly.name}`} aria-pressed={!selected&&panelListProps.selectedIds.includes(id)} onClick={()=>onSelectAssemblyPanel?.(id)}><span className="assembly-tree-panel-color" style={{background:panel.color}}/><span>{panel.name}</span></button>
+                return <button key={id} className={`assembly-tree-panel ${!selected&&selectedIds.has(id)?'is-selected':''}`} aria-label={`Select panel ${panel.name} in ${assembly.name}`} aria-pressed={!selected&&selectedIds.has(id)} onClick={()=>onSelectAssemblyPanel?.(id)}><span className="assembly-tree-panel-color" style={{background:panel.color}}/><span>{panel.name}</span></button>
               })}</div>}
             </div>
           })}</div>}

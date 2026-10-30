@@ -86,16 +86,19 @@ export function findPanelHoles(selected: readonly Panel[], obstacles: readonly P
     }
   }
   const holes = [...result.values()].sort((a, b) => a.label.localeCompare(b.label) || a.panel.position[1] - b.panel.position[1] || a.panel.position[0] - b.panel.position[0])
+  const totals = new Map<string, number>()
+  for (const hole of holes) totals.set(hole.label, (totals.get(hole.label) ?? 0) + 1)
   const counts = new Map<string, number>()
   return holes.map(hole => {
     const count = (counts.get(hole.label) ?? 0) + 1; counts.set(hole.label, count)
-    return holes.filter(other => other.label === hole.label).length > 1 ? { ...hole, label: `${hole.label} ${count}` } : hole
+    return (totals.get(hole.label) ?? 0) > 1 ? { ...hole, label: `${hole.label} ${count}` } : hole
   })
 }
 
 export function closePanelHole(project: Project, selectedIds: readonly string[], holeId: string) {
   const panels = resolvePanels(project)
-  const hole = findPanelHoles(panels.filter(panel => selectedIds.includes(panel.id)), panels).find(item => item.id === holeId)
+  const selected = new Set(selectedIds)
+  const hole = findPanelHoles(panels.filter(panel => selected.has(panel.id)), panels).find(item => item.id === holeId)
   if (!hole) throw new Error('This opening is no longer available. Select its surrounding panels again.')
   if (project.panels.length >= 200) throw new Error('Projects support up to 200 panels.')
   const panel = { ...hole.panel, id: crypto.randomUUID(), name: `${hole.label} panel` }
