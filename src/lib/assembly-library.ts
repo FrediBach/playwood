@@ -2,7 +2,7 @@ import { ANGLED_ASSEMBLIES } from './angled-assemblies'
 import { createAssembly, instantiateAssembly } from './assemblies'
 import { gridProject } from './example-geometry'
 import type { ExampleDefinition } from './example-library'
-import type { AssemblyParameter, Panel, Project } from './types'
+import type { AssemblyDefinition, AssemblyParameter, Panel, Project } from './types'
 
 /** Grid panels use their width for the cut span and height for the shared depth. */
 function moduleParameters(id: string, panels: Panel[], columns: number[], rows: number[], depth: number): AssemblyParameter[] {
@@ -43,6 +43,14 @@ export function insertLibraryAssembly(project: Project, id: string): Project {
   const example = ASSEMBLY_LIBRARY.find(item => item.id === id)
   if (!example) throw new Error(`Unknown library assembly: ${id}`)
   const definition = example.create().assemblies!.definitions[0]
+  return insertAssemblyDefinition(project, definition)
+}
+
+/** Shared free placement for library modules and imported assembly files. */
+export function insertAssemblyDefinition(project: Project, definition: AssemblyDefinition): Project {
+  if (project.panels.length + definition.panels.length > 200 || project.connections.length + definition.connections.length > 400) {
+    throw new Error('Projects support up to 200 panels and 400 connections.')
+  }
   const data = project.assemblies ?? { definitions: [], instances: [], links: [] }
   return instantiateAssembly({ ...project, assemblies: { ...data, definitions: [...data.definitions, definition] } }, definition.id)
 }

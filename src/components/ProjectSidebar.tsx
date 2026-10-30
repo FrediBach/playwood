@@ -29,9 +29,11 @@ interface Props {
   onSelectAssemblyPanel?: (id: string) => void
   libraryAssemblies?: LibraryAssembly[]
   onInsertAssembly?: (id: string) => void
+  onImportAssembly: () => void
+  assemblyImportError: string
 }
 
-export function ProjectSidebar({panelListProps,connectorListProps,selectedCount,connectorCount,connectorSummary,onSelectAll,onCollapse,onParts,onHelp,addPanel,loadTemplate,onInsertLibraryAssembly,assemblies=[],selectedAssemblyId,onSelectAssembly,onSelectAssemblyPanel,libraryAssemblies=[],onInsertAssembly}: Props) {
+export function ProjectSidebar({panelListProps,connectorListProps,selectedCount,connectorCount,connectorSummary,onSelectAll,onCollapse,onParts,onHelp,addPanel,loadTemplate,onInsertLibraryAssembly,assemblies=[],selectedAssemblyId,onSelectAssembly,onSelectAssemblyPanel,libraryAssemblies=[],onInsertAssembly,onImportAssembly,assemblyImportError}: Props) {
   const [leftTab,setLeftTab]=useState<'assembly'|'library'>('assembly')
   const [assemblyTab,setAssemblyTab]=useState<'panels'|'connectors'>('panels')
   const tabsId=useId()
@@ -77,7 +79,7 @@ export function ProjectSidebar({panelListProps,connectorListProps,selectedCount,
           <div className="sidebar-rule"/><div className="section-label"><span>CONNECTIONS</span><span className="count-badge">{connectorCount.toString().padStart(2,'0')}</span></div>
           <div className="connection-summary"><span className="connector-mini"><Link2 size={20}/></span><div><strong>Playwood connectors</strong><span>{connectorSummary||'Select a panel to connect'}</span></div></div>
           <Button variant="ghost" size="sm" className="full-button" onClick={onParts}><ListChecks size={16}/>View parts list<ChevronRight size={15}/></Button>
-        </>}</div>:<><div className="library-intro"><h2>A place to start.</h2><p>Explore builds and reusable modules.<br/>Choose one and make it yours.</p></div><ExampleBrowser compact onSelect={loadTemplate} onInsertAssembly={onInsertLibraryAssembly} myAssemblies={libraryAssemblies.length>0&&<section className="assembly-library"><div className="section-label"><span>MY ASSEMBLIES</span><span className="count-badge">{libraryAssemblies.length}</span></div>{libraryAssemblies.map(assembly=><button key={assembly.id} className="assembly-library-card" aria-label={`Insert ${assembly.name} instance`} onClick={()=>onInsertAssembly?.(assembly.id)}><Box size={23}/><span><strong>{assembly.name}</strong><small>{assembly.panelCount} panels · {assembly.instanceCount} {assembly.instanceCount===1?'instance':'instances'}</small></span><Plus size={16}/></button>)}<p className="assembly-help">Insert a linked copy, then attach it in the workspace.</p></section>}/><button className="library-reference" onClick={onHelp}>About the connector system<ArrowRight size={15}/></button></>}
+        </>}</div>:<><div className="library-intro"><h2>A place to start.</h2><p>Explore builds and reusable modules.<br/>Choose one and make it yours.</p></div><ExampleBrowser compact onImportAssembly={onImportAssembly} assemblyImportError={assemblyImportError} onSelect={loadTemplate} onInsertAssembly={onInsertLibraryAssembly} myAssemblies={libraryAssemblies.length>0&&<section className="assembly-library"><div className="section-label"><span>MY ASSEMBLIES</span><span className="count-badge">{libraryAssemblies.length}</span></div>{libraryAssemblies.map(assembly=><button key={assembly.id} className="assembly-library-card" aria-label={`Insert ${assembly.name} instance`} onClick={()=>onInsertAssembly?.(assembly.id)}><Box size={23}/><span><strong>{assembly.name}</strong><small>{assembly.panelCount} panels · {assembly.instanceCount} {assembly.instanceCount===1?'instance':'instances'}</small></span><Plus size={16}/></button>)}<p className="assembly-help">Insert a linked copy, then attach it in the workspace.</p></section>}/><button className="library-reference" onClick={onHelp}>About the connector system<ArrowRight size={15}/></button></>}
       </div>
       <div className="sidebar-footer"><span className="little-mark">p.</span><div><strong>Less, but better.</strong><span>Made to be made your own.</span></div><IconButton label="Help and reference" onClick={onHelp}><CircleHelp size={18}/></IconButton></div>
     </aside>

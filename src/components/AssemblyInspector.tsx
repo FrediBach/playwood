@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Box, Copy, Link2, Pencil, Plus, RotateCcw, Trash2, Ungroup, Unlink } from 'lucide-react'
+import { Box, Copy, Download, Link2, Pencil, Plus, RotateCcw, Trash2, Ungroup, Unlink } from 'lucide-react'
 import { Button } from './ui/button'
 import { NumberField } from './fields'
 import { AssemblyParametersEditor } from './AssemblyParametersEditor'
@@ -28,6 +28,7 @@ export interface AssemblyInspectorProps {
   onColorChange: (color: string) => void
   onResetColor: () => void
   onDuplicate: () => void
+  onExport: () => void
   onAttachCopy: () => void
   onAttachExisting: (id: string) => void
   onEdit: () => void
@@ -38,7 +39,7 @@ export interface AssemblyInspectorProps {
   onCancelAttach?: () => void
 }
 
-export function AssemblyInspector({ name, definitionName, instanceCount, panelCount, color, hasColorOverride, parameters = [], parameterValues = {}, onParameterChange, onResetParameters, connected, attachmentTargets = [], attachmentActive, canAttachCopy = true, attachmentMessage, onRename, onColorChange, onResetColor, onDuplicate, onAttachCopy, onAttachExisting, onEdit, onDisconnect, onMakeIndependent, onDisassemble, onDelete, onCancelAttach }: AssemblyInspectorProps) {
+export function AssemblyInspector({ name, definitionName, instanceCount, panelCount, color, hasColorOverride, parameters = [], parameterValues = {}, onParameterChange, onResetParameters, connected, attachmentTargets = [], attachmentActive, canAttachCopy = true, attachmentMessage, onRename, onColorChange, onResetColor, onDuplicate, onExport, onAttachCopy, onAttachExisting, onEdit, onDisconnect, onMakeIndependent, onDisassemble, onDelete, onCancelAttach }: AssemblyInspectorProps) {
   const isCustom = (id: string) => Object.hasOwn(parameterValues, id)
   const hasParameterOverrides = parameters.some(parameter => isCustom(parameter.id))
   return <>
@@ -76,6 +77,8 @@ export function AssemblyInspector({ name, definitionName, instanceCount, panelCo
     </section>
 
     <div className="panel-actions assembly-primary-actions"><Button variant="outline" size="sm" onClick={onDuplicate}><Copy size={15}/>Duplicate</Button><Button variant="ghost" size="icon" aria-label="Delete assembly instance" className="delete-button" onClick={onDelete}><Trash2 size={16}/></Button></div>
+    <Button variant="outline" className="full-button mt-2" onClick={onExport}><Download size={15}/>Export assembly</Button>
+    <p className="assembly-help">Save a reusable assembly file with these values and colors as its defaults.</p>
     <div className="assembly-secondary-actions">{connected && <button onClick={onDisconnect}><Unlink size={13}/>Disconnect from neighbors</button>}<button onClick={onMakeIndependent}><Box size={13}/>Make independent</button></div>
     <p className="assembly-help">Make independent gives this instance its own assembly design. Its panels and physical connections stay in place.</p>
     <div className="assembly-secondary-actions"><button onClick={onDisassemble}><Ungroup size={13}/>Disassemble</button></div>

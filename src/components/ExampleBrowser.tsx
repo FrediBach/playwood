@@ -1,5 +1,6 @@
 import { memo, useMemo, useState, type ReactNode } from 'react'
-import { ArrowRight, Plus, Search } from 'lucide-react'
+import { ArrowRight, Plus, Search, Upload } from 'lucide-react'
+import { Button } from './ui/button'
 import { Color, Euler, Vector3 } from 'three'
 import { ASSEMBLY_LIBRARY } from '@/lib/assembly-library'
 import { EXAMPLE_LIBRARY } from '@/lib/example-library'
@@ -74,7 +75,7 @@ const ExampleArt = memo(function ExampleArt({ example }: { example: Example }) {
   </svg></div>
 })
 
-export function ExampleBrowser({ compact = false, onSelect, onInsertAssembly, myAssemblies }: { compact?: boolean; onSelect: (id: string) => void; onInsertAssembly?: (id: string) => void; myAssemblies?: ReactNode }) {
+export function ExampleBrowser({ compact = false, onSelect, onInsertAssembly, myAssemblies, onImportAssembly, assemblyImportError }: { compact?: boolean; onSelect: (id: string) => void; onInsertAssembly?: (id: string) => void; myAssemblies?: ReactNode; onImportAssembly?: () => void; assemblyImportError?: string }) {
   const [collection, setCollection] = useState<'builds' | 'assemblies'>('builds')
   const library = collection === 'builds' ? EXAMPLE_LIBRARY : ASSEMBLY_LIBRARY
   const [query, setQuery] = useState('')
@@ -88,7 +89,14 @@ export function ExampleBrowser({ compact = false, onSelect, onInsertAssembly, my
     <div className="example-collection" role="group" aria-label="Library collection">
       {(['builds', 'assemblies'] as const).map(value => <button key={value} aria-pressed={collection === value} onClick={() => { setCollection(value); setCategory('all'); setQuery('') }}>{value === 'builds' ? 'Full builds' : 'Assemblies'}</button>)}
     </div>
-    {collection === 'assemblies' && <>{myAssemblies}<p className="example-count">{onInsertAssembly ? 'Insert a reusable module into your build, then duplicate or connect it.' : 'Start with a reusable module, then duplicate or connect it.'}</p></>}
+    {collection === 'assemblies' && <>
+      {onImportAssembly && <div className="assembly-file-import">
+        <Button variant="outline" className="full-button" onClick={onImportAssembly}><Upload size={15}/>Import assembly</Button>
+        <p className="assembly-help">Select panels or an assembly to attach it. Clear the selection to place it freely.</p>
+        {assemblyImportError && <p role="alert" className="error-message">{assemblyImportError}</p>}
+      </div>}
+      {myAssemblies}<p className="example-count">{onInsertAssembly ? 'Insert a reusable module into your build, then duplicate or connect it.' : 'Start with a reusable module, then duplicate or connect it.'}</p>
+    </>}
     <div className="example-filters">
       <label className="example-search"><Search size={15} aria-hidden="true"/><span className="visually-hidden">Search examples</span>
         <input type="search" placeholder="Search examples" value={query} onChange={event => setQuery(event.target.value)} />

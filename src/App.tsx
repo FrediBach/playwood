@@ -21,8 +21,8 @@ import { CONNECTORS, DEFAULT_CONNECTOR_COLOR } from '@/lib/connector-options'
 import { MultiPanelInspector } from '@/components/MultiPanelInspector'
 import { ProjectStatus } from '@/components/ProjectStatus'
 import { ProjectSidebar } from '@/components/ProjectSidebar'
-import { copySelection } from '@/lib/clipboard'
-import { insertLibraryAssembly } from '@/lib/assembly-library'
+import { insertAssemblyDefinition } from '@/lib/assembly-library'
+import { createAssemblyFile, parseAssemblyFile } from '@/lib/assembly-file'
 import { createExampleProject } from '@/lib/example-library'
 import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
 import { parallelPanelCut, splitParallelPanels } from '@/lib/parallel-panels'
@@ -38,7 +38,7 @@ import { duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, is
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, rotateProject, validateProject } from '@/lib/model'
-import type { AttachmentOptions, CameraView, Panel, Vec3, ListKind } from '@/lib/types'
+import type { AssemblyDefinition, AttachmentOptions, CameraView, Panel, Vec3, ListKind } from '@/lib/types'
 
 const INITIAL_ATTACHMENT: AttachmentOptions = {side:'right',type:'90',offset:0,inset:0,flip:false,color:DEFAULT_CONNECTOR_COLOR,count:2}
 function download(content:string,name:string,type:string) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
@@ -69,6 +69,8 @@ export default function App() {
   },[])
   const [toast,setToast]=useState(''),[importError,setImportError]=useState('')
   const importRef=useRef<HTMLInputElement>(null)
+  const assemblyImportRef=useRef<HTMLInputElement>(null)
+  const [assemblyImportError,setAssemblyImportError]=useState('')
   const panels=useMemo(()=>resolvePanels(project),[project])
   const selectedIdSet=useMemo(()=>new Set(selectedIds),[selectedIds])
   const selectedPanels=panels.filter(p=>selectedIdSet.has(p.id))
@@ -280,21 +282,40 @@ export default function App() {
   const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setExploded(false);setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87'}));setInspectorTab('attach');setRightOpen(true)}
   const applyAttachment=()=>{if(!previewProject||attachmentErrors.length)return;commit(previewProject);setSelectedId(attachTarget==='new'?draft.id:attachTarget);setInspectorTab('panel');setDraft(createPanel());notify(`${previewPanels.length===1?'Panel':`${previewPanels.length} panels`} attached`)}
   const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return;const group=connection.id.replace(/:\d+$/,'');commit(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
-  const insertModule = (id: string) => {
+  const insertModuleDefinition = (definition: AssemblyDefinition) => {
     try {
       if (selectedIds.length) {
-        const source = createExampleProject(id)
-        const item = copySelection(source, source.panels.map(panel => panel.id))
-        if (item.kind === 'assembly') clipboard.insert(item)
+        clipboard.insert({ kind: 'assembly', definition, instance: {
+          id: crypto.randomUUID(), definitionId: definition.id, name: definition.name,
+          position: [0, 0, 0], rotation: [0, 0, 0], panelIds: {},
+        } })
         return
       }
       clipboard.cancel()
-      const next = insertLibraryAssembly(project, id)
+      const next = insertAssemblyDefinition(project, definition)
       commit(next); assembly.close()
       setSelectedIds(Object.values(next.assemblies!.instances.at(-1)!.panelIds))
-      setInspectorTab('panel'); setExploded(false); setFitSignal(v => v + 1)
+      setInspectorTab('panel'); setRightOpen(true); setExploded(false); setRealisticPreview(false); setFitSignal(v => v + 1)
       notify('Assembly inserted. Duplicate it or attach it to your build.')
     } catch (error) { notify(error instanceof Error ? error.message : 'Could not insert assembly.') }
+  }
+  const insertModule = (id: string) => insertModuleDefinition(createExampleProject(id).assemblies!.definitions[0])
+  const exportAssembly = () => {
+    if (!assembly.selectedInstance) return
+    try {
+      const file = createAssemblyFile(project, assembly.selectedInstance.id)
+      const name = file.definition.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'assembly'
+      download(JSON.stringify(file, null, 2), `${name}.playwood-assembly.json`, 'application/json')
+      notify('Assembly exported')
+    } catch (error) { notify(error instanceof Error ? error.message : 'Could not export assembly.') }
+  }
+  const importAssembly = async (file: File) => {
+    try {
+      if (file.size > 2_000_000) throw new Error('Choose an assembly file smaller than 2 MB.')
+      const definition = parseAssemblyFile(JSON.parse(await file.text()))
+      setAssemblyImportError('')
+      insertModuleDefinition(definition)
+    } catch (error) { setAssemblyImportError(error instanceof Error ? error.message : 'This assembly file could not be read.') }
   }
   const insertSavedAssembly = (id: string) => {
     if (!selectedIds.length) { clipboard.cancel(); assembly.insert(id); return }
@@ -403,7 +424,8 @@ export default function App() {
         onSelectAll:selected=>selectConnectors(selected?physicalConnectors.map(connector=>connector.id):[],selected)}}
       onCollapse={()=>setLeftOpen(false)} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')} addPanel={addPanel} loadTemplate={loadTemplate} onInsertLibraryAssembly={insertModule}
       assemblies={assembly.sidebarAssemblies} selectedAssemblyId={instance?.id} onSelectAssembly={id=>{clipboard.cancel();assembly.select(id)}}
-      onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={insertSavedAssembly}/>
+      onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={insertSavedAssembly}
+      onImportAssembly={()=>{setAssemblyImportError('');assemblyImportRef.current?.click()}} assemblyImportError={assemblyImportError}/>
 
     {contextMenu&&<PreviewContextMenu {...contextMenu} title={selectedConnectors.length?`${selectedConnectors.length} connectors`:instance?.name??(selectedPanels.length===1?selectedPanels[0].name:selectedPanels.length?`${selectedPanels.length} panels`:'Preview')} actions={menuActions} onClose={closeContextMenu}/>}
     <AssemblyWorkspace onPreviewContextMenu={dialog||drag.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
@@ -452,7 +474,7 @@ export default function App() {
           attachmentTargets={assembly.instances.filter(item=>item.id!==instance.id&&!project.assemblies?.links.some(link=>link.a.instanceId===item.id||link.b.instanceId===item.id)).map(item=>({id:item.id,name:item.name}))}
           attachmentActive={assembly.placementActive} attachmentMessage={assemblyHint} onCancelAttach={assembly.clearPlacement} canAttachCopy={validTargets.length>0}
           onRename={name=>assembly.rename(instance.id,name)} onColorChange={color=>assembly.finish(instance.id,color)} onResetColor={()=>assembly.resetFinish(instance.id)}
-          onDuplicate={duplicateSelected} onAttachCopy={()=>{clipboard.cancel();assembly.startAttach()}} onAttachExisting={id=>{clipboard.cancel();assembly.startAttach(id)}}
+          onDuplicate={duplicateSelected} onExport={exportAssembly} onAttachCopy={()=>{clipboard.cancel();assembly.startAttach()}} onAttachExisting={id=>{clipboard.cancel();assembly.startAttach(id)}}
           onEdit={()=>assembly.edit(instance.id)} onDisconnect={()=>assembly.disconnect(instance.id)} onMakeIndependent={()=>assembly.independent(instance.id)} onDisassemble={()=>assembly.disassemble(instance.id)} onDelete={deleteSelected}/>
         :assembly.memberInstance&&selected&&assembly.definition?<AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={()=>assembly.select(assembly.memberInstance!.id)} onEdit={()=>assembly.edit(assembly.memberInstance!.id)}/>
         :assembly.hasMembers?<><div className="selected-heading"><Box size={15}/><span>MULTIPLE OBJECTS</span></div><p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p><div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15}/>Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15}/>Remove</Button></div></>
@@ -475,5 +497,6 @@ export default function App() {
       onRotate={(axis,degrees)=>{commit(p=>rotateProject(p,axis,degrees));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify(`Creation rotated ${degrees}° around ${axis.toUpperCase()}. Undo is available.`)}}
       attachNewPanel={selectedIds.length>0} onAdd={addDraftPanel}/>
     <input ref={importRef} type="file" accept=".json,.playwood.json" className="visually-hidden" aria-label="Import project file" onChange={e=>{const file=e.target.files?.[0];if(file)void importProject(file);e.target.value=''}}/>
+    <input ref={assemblyImportRef} type="file" accept=".json,.playwood-assembly.json" className="visually-hidden" aria-label="Import assembly file" onChange={e=>{const file=e.target.files?.[0];if(file)void importAssembly(file);e.target.value=''}}/>
   </div></TooltipProvider>
 }
