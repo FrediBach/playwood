@@ -1,9 +1,11 @@
+import { snapPanelDelta, type SnapSettings } from '@/lib/preview-snap'
 import { useMemo, useRef, useState } from 'react'
 import { movePreviewDrag, preparePreviewDrag, type PreviewDragSession } from '@/lib/preview-drag'
 import { resolvePanels } from '@/lib/model'
 import type { Project, Vec3 } from '@/lib/types'
 
-export function usePreviewDrag({ project, selectedIds, commit, notify, select }: {
+export function usePreviewDrag({ project, selectedIds, commit, notify, select, snapSettings }: {
+  snapSettings: SnapSettings
   project: Project
   selectedIds: string[]
   commit: (project: Project) => void
@@ -30,7 +32,7 @@ export function usePreviewDrag({ project, selectedIds, commit, notify, select }:
     move: (delta: Vec3, snapDistance: number) => {
       if (!session.current || session.current.original !== project) return
       try {
-        latest.current = movePreviewDrag(session.current, delta, snapDistance)
+        latest.current = movePreviewDrag(session.current, snapPanelDelta(resolvePanels(session.current.project), session.current.movingIds, delta, snapSettings), snapDistance)
         setPreview(latest.current)
       } catch (error) {
         latest.current = null

@@ -1,3 +1,4 @@
+import { readSnapSettings } from '@/lib/preview-snap'
 import { createListGroup, moveListItems, orderedConnectors, renameListGroup, ungroupList } from '@/lib/list-groups'
 import type { ListGroupingProps } from '@/components/GroupedList'
 import { PreviewContextMenu, type PreviewMenuAction } from '@/components/PreviewContextMenu'
@@ -91,7 +92,9 @@ export default function App() {
   const connectorCount=physicalConnectors.length
   const connectorSummary=CONNECTORS.map(type=>({name:type.name,count:physicalConnectors.filter(c=>c.type===type.id).length})).filter(type=>type.count>0).map(type=>`${type.count} × ${type.name}`).join(' · ')
   const notify=useCallback((message:string)=>setToast(message),[])
-  const drag=usePreviewDrag({project,selectedIds,commit,notify,select:setSelectedIds})
+  const [snapSettings,setSnapSettings]=useState(readSnapSettings)
+  useEffect(()=>{try{localStorage.setItem('playwood-snap',JSON.stringify(snapSettings))}catch{/* Storage may be unavailable. */}},[snapSettings])
+  const drag=usePreviewDrag({project,selectedIds,commit,notify,snapSettings,select:setSelectedIds})
   const assembly=useAssemblyEditor({project,selectedIds,setSelectedIds,commit,notify,
     prepareSelection:()=>{setInspectorTab('panel');setRightOpen(true);setExploded(false);if(window.innerWidth<=900)setLeftOpen(false)},fit:()=>setFrameSignal(v=>v+1)})
   const clipboard=useCopyPaste({project,selectedIds,commit,notify,
@@ -211,13 +214,18 @@ export default function App() {
     setSelectedIds(ids);assembly.clearPlacement();setInspectorTab('panel');setRightOpen(true)
   }
   const movementEnabled=!clipboard.active&&!dialog&&!assembly.editingInstance&&!(assembly.memberInstance&&!assembly.selectedInstance)&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))
-  const resize=usePreviewResize({project,selectedIds,selectedConnectorIds,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify})
+  const resize=usePreviewResize({project,selectedIds,selectedConnectorIds,snapSettings,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify})
   useEffect(()=>{
     const onKey=(e:KeyboardEvent)=>{
       const target=e.target as HTMLElement
       if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||dialog)return
       if((e.metaKey||e.ctrlKey)&&['c','v'].includes(e.key.toLowerCase())){
         e.preventDefault();if(!e.repeat){if(e.key.toLowerCase()==='c')clipboard.copy();else clipboard.paste()}return
+      }
+      if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&['g','s'].includes(e.key.toLowerCase())){
+        e.preventDefault()
+        if(!e.repeat)setSnapSettings(value=>({...value,[e.key.toLowerCase()==='g'?'grid':'geometry']:!value[e.key.toLowerCase()==='g'?'grid':'geometry']}))
+        return
       }
       const axis=e.key.toLowerCase()
       if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&(axis==='x'||axis==='y'||axis==='z')){
@@ -442,7 +450,7 @@ export default function App() {
       onImportAssembly={()=>{setAssemblyImportError('');assemblyImportRef.current?.click()}} assemblyImportError={assemblyImportError}/>
 
     {contextMenu&&<PreviewContextMenu {...contextMenu} title={selectedConnectors.length?`${selectedConnectors.length} connectors`:instance?.name??(selectedPanels.length===1?selectedPanels[0].name:selectedPanels.length?`${selectedPanels.length} panels`:'Preview')} actions={menuActions} onClose={closeContextMenu}/>}
-    <AssemblyWorkspace onPreviewContextMenu={dialog||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
+    <AssemblyWorkspace snapSettings={snapSettings} setSnapSettings={setSnapSettings} onPreviewContextMenu={dialog||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
       if(target.connectorId&&!realisticPreview){if(!selectedConnectorIds.includes(target.connectorId))chooseConnector(target.connectorId)}
       else if(target.panelId!==undefined){if(!target.panelId||!selectedIds.includes(target.panelId))choosePanel(target.panelId||null)}
       setContextMenu({x,y})

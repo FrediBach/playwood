@@ -1,0 +1,52 @@
+import { createPanel } from '../src/lib/model'
+import { expect, test } from '@playwright/test'
+
+test('preview snapping controls, shortcuts and saved preferences', async ({ page }) => {
+  await page.goto('/')
+  const settings = page.getByLabel('Snapping settings', { exact: true })
+  await expect(settings).toHaveText('Snap · Off')
+  await settings.click()
+  await page.getByLabel('Global grid', { exact: false }).check()
+  await page.getByLabel('Grid spacing (mm)').fill('25')
+  await page.getByLabel('Snap tolerance (mm)').fill('6')
+  await page.getByLabel('Align to geometry', { exact: false }).check()
+  await expect(settings).toHaveText('Snap · On')
+  // Typing in a field must never toggle snapping.
+  await page.getByLabel('Grid spacing (mm)').focus()
+  await page.keyboard.press('g')
+  await expect(page.getByLabel('Global grid', { exact: false })).toBeChecked()
+  await settings.click()
+  await page.getByLabel('3D preview canvas').focus()
+  await page.keyboard.press('g')
+  await page.keyboard.press('s')
+  await expect(settings).toHaveText('Snap · Off')
+  await page.keyboard.press('g')
+  await page.reload()
+  await settings.click()
+  await expect(page.getByLabel('Global grid', { exact: false })).toBeChecked()
+  await expect(page.getByLabel('Align to geometry', { exact: false })).not.toBeChecked()
+  await expect(page.getByLabel('Grid spacing (mm)')).toHaveValue('25')
+  await expect(page.getByLabel('Snap tolerance (mm)')).toHaveValue('6')
+  await page.screenshot({ path: 'test-results/preview-snap-settings.png' })
+})
+
+
+test('resize keyboard follows grid spacing and commits one undo step', async ({ page }) => {
+  const panel = createPanel({ id: 'snap-panel', width: 400, height: 300, position: [0, 400, 0] })
+  await page.addInitScript(panel => {
+    localStorage.setItem('playwood-studio-project-v1', JSON.stringify({ version: 1, name: 'Snap test', panels: [panel], connections: [] }))
+    localStorage.setItem('playwood-snap', JSON.stringify({ grid: true, geometry: false, spacing: 50, tolerance: 10 }))
+  }, panel)
+  await page.goto('/')
+  await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
+  const handle = page.locator('[data-resize-handle="panel-width-positive"]')
+  await expect(handle).toBeVisible()
+  await handle.focus()
+  await page.keyboard.press('ArrowRight')
+  const width = () => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!).panels[0].width)
+  await expect.poll(width).toBe(450)
+  await page.keyboard.press('ArrowRight')
+  await expect.poll(width).toBe(500)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(width).toBe(450)
+})

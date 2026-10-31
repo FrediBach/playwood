@@ -14,8 +14,9 @@ export interface PreviewResizeProps {
   enabled?: boolean
   distance?: number
   limited?: boolean
+  keyboardStep?: number
   onResizeStart: (handleId: string) => boolean
-  onResizeMove: (distanceMm: number) => void
+  onResizeMove: (distanceMm: number, keyboard?: boolean) => void
   onResizeEnd: (cancel: boolean) => void
 }
 
@@ -39,7 +40,7 @@ const MM = 0.001
 const ARM = 48
 
 /** Screen-sized handles whose drag plane contains the selected structural axis. */
-export function PreviewResizeHandles({ handles, enabled = true, distance, limited, onResizeStart, onResizeMove, onResizeEnd }: PreviewResizeProps) {
+export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 10, distance, limited, onResizeStart, onResizeMove, onResizeEnd }: PreviewResizeProps) {
   const { camera, gl, controls, size, invalidate } = useThree()
   // Drei's implicit target changes when R3F connects its event manager during
   // startup, which can unmount the HTML root while React is rendering it.
@@ -138,7 +139,7 @@ export function PreviewResizeHandles({ handles, enabled = true, distance, limite
     event.preventDefault()
     event.stopPropagation()
     if (enabled && onResizeStart(handle.id)) {
-      onResizeMove(sign * (event.shiftKey ? 100 : 10))
+      onResizeMove(sign * keyboardStep * (event.shiftKey ? 10 : 1), true)
       onResizeEnd(false)
     }
   }
@@ -227,7 +228,7 @@ export function PreviewResizeHandles({ handles, enabled = true, distance, limite
         <span className="preview-resize-root" aria-hidden="true" />
         <span className="preview-resize-stem" aria-hidden="true" />
         <button type="button" className="preview-resize-handle" aria-label={`Resize · ${handle.label}`} data-resize-handle={handle.id}
-          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" title={`${handle.label} · drag to pull or push. Arrow keys: 10 mm; Shift: 100 mm.`}
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" title={`${handle.label} · drag to pull or push. Arrow keys: ${keyboardStep} mm; Shift: ${keyboardStep * 10} mm.`}
           onPointerDown={event => down(event, handle)} onKeyDown={event => step(event, handle)}
           onPointerEnter={() => invalidate()} onFocus={() => invalidate()}
           onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onContextMenu={event => event.preventDefault()}>

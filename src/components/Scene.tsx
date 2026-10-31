@@ -1,3 +1,4 @@
+import { panelSnapPoints, snapPanelDelta, type SnapSettings } from '@/lib/preview-snap'
 import { Component, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
@@ -48,7 +49,7 @@ export interface SceneProps extends PreviewDragProps {
   dragging?: boolean
   resizeHandles?: PreviewResizeHandle[]
   onResizeStart?: (handleId: string) => boolean
-  onResizeMove?: (distance: number) => void
+  onResizeMove?: (distance: number, keyboard?: boolean) => void
   onResizeEnd?: (cancel: boolean) => void
   resizing?: boolean
   resizeDistance?: number
@@ -63,6 +64,7 @@ export interface SceneProps extends PreviewDragProps {
   /** Attachment candidates included in fitting, without rendering them. */
   attachmentBoundsPanels?: Panel[]
   view: CameraView
+  snapSettings?: SnapSettings
   showGrid: boolean
   showDimensions: boolean
   exploded: boolean
@@ -233,7 +235,7 @@ function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, re
 }
 
 /** Read the live camera on every keypress, including during orbit damping. */
-function PanelKeyboardMovement({panels, connections, connectorOverrides, selectedConnectorIds = [], onMoveConnectors, selectedIds, onMove, movementEnabled}: SceneProps) {
+function PanelKeyboardMovement({snapSettings,panels, connections, connectorOverrides, selectedConnectorIds = [], onMoveConnectors, selectedIds, onMove, movementEnabled}: SceneProps) {
   const {camera, gl, size} = useThree()
   const gesture = useRef('')
   const move = useEffectEvent((event: KeyboardEvent) => {
@@ -241,7 +243,7 @@ function PanelKeyboardMovement({panels, connections, connectorOverrides, selecte
     if (selectedConnectorIds.length && onMoveConnectors) {
       camera.updateWorldMatrix(true, false)
       const slides = getConnectorKeyboardSlides({ connections, connectorOverrides }, panels, selectedConnectorIds,
-        { camera, key: event.key, shiftKey: event.shiftKey, viewport: size })
+        { camera, key: event.key, shiftKey: event.shiftKey, viewport: size, snapSettings })
       if (!Object.keys(slides).length) return
       event.preventDefault()
       event.stopPropagation()
@@ -261,7 +263,9 @@ function PanelKeyboardMovement({panels, connections, connectorOverrides, selecte
     event.preventDefault()
     event.stopPropagation()
     const key = `${event.key}:${event.shiftKey}:${selected.map(panel=>panel.id).join(',')}`
-    onMove(delta, event.repeat && gesture.current === key)
+    const stepDelta = snapSettings?.grid ? delta.map(value => value * snapSettings.spacing / 10) as Vec3 : delta
+    const keyboardSnap = snapSettings ? { ...snapSettings, tolerance: Math.min(snapSettings.tolerance, new THREE.Vector3(...stepDelta).length() * 0.45) } : undefined
+    onMove(keyboardSnap ? snapPanelDelta(panels, selectedIds, stepDelta, keyboardSnap, true) : stepDelta, event.repeat && gesture.current === key)
     gesture.current = key
   })
   useEffect(() => {
@@ -406,7 +410,13 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
     <mesh position={[center.x, floorY - 0.002, center.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow raycast={() => null}>
       <planeGeometry args={[200, 200]} /><shadowMaterial color="#706b60" transparent opacity={0.2} />
     </mesh>
-    {showGrid && <Grid position={[0, floorY, 0]} args={[extent, extent]} cellSize={0.1} sectionSize={0.5} cellThickness={0.5} sectionThickness={0.7}
+    {showGrid && props.snapSettings?.geometry && panels.filter(panel => panel.visible && !selectedIds.includes(panel.id)).flatMap(panel =>
+      panelSnapPoints(panel).flatMap((point, index) => [0, 1, 2].map(axis => {
+        const start = point.map(value => value * MM) as Vec3, end = [...start] as Vec3
+        start[axis] -= extent / 2; end[axis] += extent / 2
+        return <Line key={`${panel.id}-${index}-${axis}`} points={[start, end]} color="#719899" transparent opacity={0.25} dashed dashSize={0.025} gapSize={0.025} />
+      }))) }
+    {showGrid && <Grid position={[0, floorY, 0]} args={[extent, extent]} cellSize={props.snapSettings?.grid ? props.snapSettings.spacing / 1000 : 0.1} sectionSize={props.snapSettings?.grid ? props.snapSettings.spacing / 200 : 0.5} cellThickness={0.5} sectionThickness={0.7}
       cellColor="#cccfc5" sectionColor="#b9bdb2" fadeDistance={extent * 0.65} fadeStrength={2} fadeFrom={0} infiniteGrid />}
     </>}
     {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
@@ -416,7 +426,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
     {props.resizeHandles?.length && props.onResizeStart && props.onResizeMove && props.onResizeEnd ? <PreviewResizeHandles
-      handles={props.resizeHandles} enabled={props.movementEnabled && !props.dragging && !exploded}
+      handles={props.resizeHandles} keyboardStep={props.snapSettings?.grid ? props.snapSettings.spacing : 10} enabled={props.movementEnabled && !props.dragging && !exploded}
       onResizeStart={props.onResizeStart} onResizeMove={props.onResizeMove} onResizeEnd={props.onResizeEnd}
       distance={props.resizeDistance} limited={props.resizeLimited}/> : null}
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>

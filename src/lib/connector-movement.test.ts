@@ -15,6 +15,17 @@ const id = connectorId('joint', 0)
 const move = (project: Project, key = 'ArrowRight', shiftKey = false) => getConnectorKeyboardSlides(project, resolvePanels(project), [id], { camera, key, shiftKey, viewport: { width: 800, height: 800 } })
 
 describe('connector keyboard sliding', () => {
+  it('steps on the global grid without sticking and still respects rail limits', () => {
+    const project = fixture()
+    const options = { camera, key: 'ArrowRight', shiftKey: false, viewport: { width: 800, height: 800 },
+      snapSettings: { grid: true, geometry: false, spacing: 50, tolerance: 10 } }
+    expect(getConnectorKeyboardSlides(project, resolvePanels(project), [id], options)).toEqual({ [id]: 50 })
+    const moved = editConnectors(project, [id], { slide: 50 })
+    expect(getConnectorKeyboardSlides(moved, resolvePanels(moved), [id], options)).toEqual({ [id]: 100 })
+    const rail = getConnectorRail(project.connections[0], resolvePanels(project), project.connections)!
+    const atEnd = editConnectors(project, [id], { slide: rail.upper })
+    expect(getConnectorKeyboardSlides(atEnd, resolvePanels(atEnd), [id], options)).toEqual({})
+  })
   it('uses panel increments, ignores perpendicular arrows, and persists without moving panels', () => {
     const project = fixture()
     expect(move(project)).toEqual({ [id]: 10 })

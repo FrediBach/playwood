@@ -86,6 +86,7 @@ function ViewportShortcuts({ panMode, realisticPreview }: { panMode: boolean; re
         <div><dt>Zoom</dt><dd><kbd>Scroll</kbd></dd></div>
         <div><dt>{realisticPreview ? 'Reset room view' : 'Fit view'}</dt><dd><kbd>F</kbd></dd></div>
       </dl>
+      <h3>Snapping</h3><dl><div><dt>Global grid</dt><dd><kbd>G</kbd></dd></div><div><dt>Geometry alignment</dt><dd><kbd>S</kbd></dd></div></dl>
       <h3>Selection</h3>
       <dl>
         {!realisticPreview && <div><dt>Multi-select</dt><dd><kbd>Shift + click</kbd></dd></div>}

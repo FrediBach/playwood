@@ -1,3 +1,4 @@
+import { snapDistance, snapTargets, type SnapSettings } from './preview-snap'
 import { Vector3 } from 'three'
 import type { Camera } from 'three'
 import type { Connection, Panel, Project, Vec3 } from './types'
@@ -36,7 +37,7 @@ export function connectorSlide(rail: NonNullable<ReturnType<typeof getConnectorR
 }
 
 export function getConnectorKeyboardSlides(project: Pick<Project, 'connections' | 'connectorOverrides'>, panels: Panel[], ids: readonly string[],
-  options: { camera: Camera; key: string; shiftKey: boolean; viewport: { width: number; height: number } }) {
+  options: { camera: Camera; key: string; shiftKey: boolean; viewport: { width: number; height: number }; snapSettings?: SnapSettings }) {
   const slides: Record<string, number> = {}
   const selectedIds = new Set(ids)
   for (const piece of getPhysicalConnectors(project).filter(piece => selectedIds.has(piece.id))) {
@@ -46,7 +47,10 @@ export function getConnectorKeyboardSlides(project: Pick<Project, 'connections' 
     const position = new Vector3(...rail.placements[piece.index].position).addScaledVector(new Vector3(...rail.tangent), current).toArray() as Vec3
     const delta = getPanelMovementDelta({ ...options, position, axes: [rail.tangent] })
     if (!delta) continue
-    let next = connectorSlide(rail, piece.index, current + new Vector3(...delta).dot(new Vector3(...rail.tangent)))
+    const requested = new Vector3(...delta).dot(new Vector3(...rail.tangent)) * (options.snapSettings?.grid ? options.snapSettings.spacing / 10 : 1)
+    const amount = options.snapSettings ? snapDistance(position, rail.tangent, requested,
+      snapTargets({ ...project, version: 1, name: '', panels }, [], ids, true), { ...options.snapSettings, tolerance: Math.min(options.snapSettings.tolerance, Math.abs(requested) * 0.45) }) : requested
+    let next = connectorSlide(rail, piece.index, current + amount)
     // Keep physical pieces from passing through or overlapping their neighbors.
     for (let i = 0; i < rail.along.length; i++) {
       if (i === piece.index) continue

@@ -1,10 +1,12 @@
+import { snapDistance, snapTargets, type SnapSettings } from '@/lib/preview-snap'
 import { useMemo, useRef, useState } from 'react'
 import { movePreviewResize, preparePreviewResize } from '@/lib/preview-resize'
 import { resolvePanels } from '@/lib/model'
 import type { Project } from '@/lib/types'
 
 /** Keep transient geometry out of autosave and commit each gesture once. */
-export function usePreviewResize({ project, selectedIds, selectedConnectorIds, enabled, commit, notify }: {
+export function usePreviewResize({ project, selectedIds, selectedConnectorIds, enabled, commit, notify, snapSettings }: {
+  snapSettings: SnapSettings
   project: Project
   selectedIds: readonly string[]
   selectedConnectorIds: readonly string[]
@@ -43,10 +45,14 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
       setPreview({ project, distance: 0, limited: false })
       return true
     },
-    move: (distance: number) => {
+    move: (distance: number, keyboard = false) => {
       if (!session.current || session.current.source !== prepared) return
       try {
-        const result = movePreviewResize(session.current.source, session.current.handleId, Math.round(distance))
+        const source = session.current.source
+        const handle = source.handles.find(item => item.id === session.current!.handleId)!
+        const targets = snapTargets(project, selectedIds, selectedConnectorIds, !!connectorId)
+        const snapped = snapDistance(handle.position, handle.direction, Math.round(distance), targets, keyboard ? { ...snapSettings, tolerance: Math.min(snapSettings.tolerance, Math.abs(distance) * 0.45) } : snapSettings)
+        const result = movePreviewResize(source, session.current.handleId, snapped)
         latest.current = result
         setPreview(result)
       } catch (error) {
