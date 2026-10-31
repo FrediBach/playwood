@@ -13,6 +13,8 @@ export interface LibraryAssembly { id: string; name: string; instanceCount: numb
 interface Props {
   panelListProps: ComponentProps<typeof PanelList>
   connectorListProps: ComponentProps<typeof ConnectorList>
+  assemblyTab: 'panels' | 'connectors'
+  onAssemblyTabChange: (tab: 'panels' | 'connectors') => void
   selectedCount: number
   connectorCount: number
   connectorSummary: string
@@ -33,9 +35,8 @@ interface Props {
   assemblyImportError: string
 }
 
-export function ProjectSidebar({panelListProps,connectorListProps,selectedCount,connectorCount,connectorSummary,onSelectAll,onCollapse,onParts,onHelp,addPanel,loadTemplate,onInsertLibraryAssembly,assemblies=[],selectedAssemblyId,onSelectAssembly,onSelectAssemblyPanel,libraryAssemblies=[],onInsertAssembly,onImportAssembly,assemblyImportError}: Props) {
+export function ProjectSidebar({panelListProps,connectorListProps,assemblyTab,onAssemblyTabChange,selectedCount,connectorCount,connectorSummary,onSelectAll,onCollapse,onParts,onHelp,addPanel,loadTemplate,onInsertLibraryAssembly,assemblies=[],selectedAssemblyId,onSelectAssembly,onSelectAssemblyPanel,libraryAssemblies=[],onInsertAssembly,onImportAssembly,assemblyImportError}: Props) {
   const [leftTab,setLeftTab]=useState<'assembly'|'library'>('assembly')
-  const [assemblyTab,setAssemblyTab]=useState<'panels'|'connectors'>('panels')
   const tabsId=useId()
   const [expanded,setExpanded]=useState<string[]>([])
   const { panels } = panelListProps
@@ -50,11 +51,11 @@ export function ProjectSidebar({panelListProps,connectorListProps,selectedCount,
         if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return
         event.preventDefault()
         const next=event.key==='Home'?'panels':event.key==='End'?'connectors':assemblyTab==='panels'?'connectors':'panels'
-        setAssemblyTab(next)
+        onAssemblyTabChange(next)
         event.currentTarget.querySelector<HTMLButtonElement>(`[id="${tabsId}-${next}"]`)?.focus()
       }}>
-        <button role="tab" id={`${tabsId}-panels`} aria-controls={`${tabsId}-contents`} aria-selected={assemblyTab==='panels'} tabIndex={assemblyTab==='panels'?0:-1} onClick={()=>setAssemblyTab('panels')}><Layers size={13}/>Panels</button>
-        <button role="tab" id={`${tabsId}-connectors`} aria-controls={`${tabsId}-contents`} aria-selected={assemblyTab==='connectors'} tabIndex={assemblyTab==='connectors'?0:-1} onClick={()=>setAssemblyTab('connectors')}><Link2 size={13}/>Connectors</button>
+        <button role="tab" id={`${tabsId}-panels`} aria-controls={`${tabsId}-contents`} aria-selected={assemblyTab==='panels'} tabIndex={assemblyTab==='panels'?0:-1} onClick={()=>onAssemblyTabChange('panels')}><Layers size={13}/>Panels</button>
+        <button role="tab" id={`${tabsId}-connectors`} aria-controls={`${tabsId}-contents`} aria-selected={assemblyTab==='connectors'} tabIndex={assemblyTab==='connectors'?0:-1} onClick={()=>onAssemblyTabChange('connectors')}><Link2 size={13}/>Connectors</button>
       </div>}
       <div className="sidebar-scroll">
         {leftTab==='assembly'?<div role="tabpanel" id={`${tabsId}-contents`} aria-labelledby={`${tabsId}-${assemblyTab}`} tabIndex={0}>

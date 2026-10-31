@@ -42,6 +42,8 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   connections: Connection[]
   connectorOverrides?: Project['connectorOverrides']
   selectedConnectorIds?: readonly string[]
+  /** Inspector category used for movement; both categories remain highlighted. */
+  selectionKind?: 'panels' | 'connectors'
   onPreviewContextMenu?: (target: { panelId?: string; connectorId?: string }, x: number, y: number) => void
   onSelectConnector?: (id: string, additive?: boolean) => void
   selectedIds: readonly string[]
@@ -405,33 +407,36 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
   const floorY = bounds.min.y - 0.012
   const extent = useMemo(() => Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5), [bounds])
   const boxPreview = props.boxSelectActive ? props.boxPreview : null
-  const highlightedPanels = boxPreview && props.boxSelectKind !== 'connectors' ? [...(boxPreview.additive ? selectedIds : []), ...boxPreview.ids] : selectedIds
-  const highlightedConnectors = boxPreview && props.boxSelectKind === 'connectors' ? [...(boxPreview.additive ? props.selectedConnectorIds ?? [] : []), ...boxPreview.ids] : props.selectedConnectorIds
+  const highlightedPanels = boxPreview ? [...(boxPreview.additive ? selectedIds : []), ...boxPreview.panelIds] : selectedIds
+  const highlightedConnectors = boxPreview ? [...(boxPreview.additive ? props.selectedConnectorIds ?? [] : []), ...boxPreview.connectorIds] : props.selectedConnectorIds
   const selectedIdSet = new Set(highlightedPanels)
+  const connectorSelection = (props.selectionKind ?? (props.selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'connectors'
+  const activePanelIds = connectorSelection ? [] : selectedIds
+  const activeConnectorIds = connectorSelection ? props.selectedConnectorIds ?? [] : []
+  const activePanelIdSet = new Set(activePanelIds)
   const [keyboardSnap, setKeyboardSnap] = useState<{ direction: Vec3; selection: string; handleId?: string } | null>(null)
   const resizeHandleId = useRef<string | undefined>(undefined)
-  const selection = JSON.stringify([selectedIds, props.selectedConnectorIds])
+  const selection = JSON.stringify([connectorSelection, activePanelIds, activeConnectorIds])
   useEffect(() => {
     if (!keyboardSnap) return
     const timer = window.setTimeout(() => setKeyboardSnap(null), 900)
     return () => window.clearTimeout(timer)
   }, [keyboardSnap])
   const recordMovement = (direction: Vec3) => setKeyboardSnap({ direction, selection })
-  const connectorSelection = !!props.selectedConnectorIds?.length
   const guideProject: Project = { version: 1, name: '', panels, connections, connectorOverrides: props.connectorOverrides }
-  const guideTargets = snapTargets(guideProject, selectedIds, props.selectedConnectorIds, connectorSelection)
+  const guideTargets = snapTargets(guideProject, activePanelIds, activeConnectorIds, connectorSelection)
   const keyboardProbe = keyboardSnap?.selection === selection && keyboardSnap.handleId
     ? props.resizeHandles?.find(handle => handle.id === keyboardSnap.handleId) : undefined
   const probe = props.snapProbe ?? keyboardProbe
   const guideSources = probe ? [probe.position] : connectorSelection
-    ? snapTargets(guideProject, [], getPhysicalConnectors(guideProject).filter(piece => !props.selectedConnectorIds?.includes(piece.id)).map(piece => piece.id), true)
-    : panels.filter(panel => panel.visible && selectedIdSet.has(panel.id)).flatMap(panelSnapPoints)
+    ? snapTargets(guideProject, [], getPhysicalConnectors(guideProject).filter(piece => !activeConnectorIds.includes(piece.id)).map(piece => piece.id), true)
+    : panels.filter(panel => panel.visible && activePanelIdSet.has(panel.id)).flatMap(panelSnapPoints)
   const guideDirection = props.snapProbe?.direction ?? props.snapDirection ?? (keyboardSnap?.selection === selection ? keyboardSnap.direction : [0, 0, 0]) as Vec3
   return <>
     <PreviewBoxSelection {...props} onPreview={props.onBoxPreview}/>
     <PreviewContextGesture onOpen={props.boxSelectActive ? undefined : props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
-    <PanelKeyboardMovement {...props} onMovement={recordMovement} movementEnabled={props.movementEnabled && !props.dragging && !props.resizing && !props.boxSelectActive}/>
-    <PreviewDragMovement {...props} movementEnabled={props.movementEnabled && !props.resizing && !props.boxSelectActive}/>
+    <PanelKeyboardMovement {...props} selectedIds={activePanelIds} selectedConnectorIds={activeConnectorIds} onMovement={recordMovement} movementEnabled={props.movementEnabled && !props.dragging && !props.resizing && !props.boxSelectActive}/>
+    <PreviewDragMovement {...props} selectedIds={activePanelIds} movementEnabled={props.movementEnabled && !connectorSelection && !props.resizing && !props.boxSelectActive}/>
     {props.view === 'perspective'
       ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
       : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
@@ -491,6 +496,10 @@ class ViewportBoundary extends Component<{ children: ReactNode }, { error: boole
 export default function Scene(props: SceneProps) {
   const attachmentElements = useRef(new Map<string, HTMLDivElement>())
   const [boxPreview, setBoxPreview] = useState<BoxSelectionPreview | null>(null)
+  const boxSelectionLabel = boxPreview ? [
+    boxPreview.panelIds.length ? `${boxPreview.panelIds.length} panel${boxPreview.panelIds.length === 1 ? '' : 's'}` : '',
+    boxPreview.connectorIds.length ? `${boxPreview.connectorIds.length} connector${boxPreview.connectorIds.length === 1 ? '' : 's'}` : '',
+  ].filter(Boolean).join(' · ') || '0 parts' : ''
   const [controlHeld, setControlHeld] = useState(false)
   const clearAttachmentPreview = useEffectEvent(() => props.onAttachmentPreview?.(null))
   useEffect(() => {
@@ -519,7 +528,7 @@ export default function Scene(props: SceneProps) {
       <World {...props} boxPreview={boxPreview} onBoxPreview={setBoxPreview} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
     </Canvas>
     {props.boxSelectActive && boxPreview && <div className="box-selection-rectangle" style={boxPreview.rectangle} aria-hidden="true">
-      <span className="box-selection-count">{boxPreview.additive ? '+ ' : ''}{boxPreview.ids.length} {props.boxSelectKind === 'connectors' ? 'connector' : 'panel'}{boxPreview.ids.length === 1 ? '' : 's'}</span>
+      <span className="box-selection-count">{boxPreview.additive ? '+ ' : ''}{boxSelectionLabel}</span>
     </div>}
     <div className="assembly-attachment-layer">{attachmentHandles.map(handle=><div key={handle.id} className="assembly-attachment-anchor" ref={element=>{if(element)attachmentElements.current.set(handle.id,element);else attachmentElements.current.delete(handle.id)}}>
       <button className={`assembly-attach-handle ${handle.active ? 'is-active' : ''} ${handle.warning ? 'has-warning' : ''}`} aria-label={handle.label} title={handle.label} data-attachment-id={handle.id}
