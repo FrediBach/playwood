@@ -35,6 +35,7 @@ import { useProject } from '@/hooks/use-project'
 import { useCopyPaste } from '@/hooks/use-copy-paste'
 import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { usePreviewDrag } from '@/hooks/use-preview-drag'
+import { usePreviewResize } from '@/hooks/use-preview-resize'
 import { duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, isPanelConnectedToAssembly, moveAssemblies, removeAssembly } from '@/lib/assemblies'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
@@ -209,6 +210,7 @@ export default function App() {
     setSelectedIds(ids);assembly.clearPlacement();setInspectorTab('panel');setRightOpen(true)
   }
   const movementEnabled=!clipboard.active&&!dialog&&!assembly.editingInstance&&!(assembly.memberInstance&&!assembly.selectedInstance)&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))
+  const resize=usePreviewResize({project,selectedIds,selectedConnectorIds,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify})
   useEffect(()=>{
     const onKey=(e:KeyboardEvent)=>{
       const target=e.target as HTMLElement
@@ -218,7 +220,7 @@ export default function App() {
       }
       const axis=e.key.toLowerCase()
       if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&(axis==='x'||axis==='y'||axis==='z')){
-        if(movementEnabled&&!drag.active&&!assembly.target&&selectedPanels.length){
+        if(movementEnabled&&!drag.active&&!resize.active&&!assembly.target&&selectedPanels.length){
           e.preventDefault()
           if(!e.repeat){
             try{commit(current=>rotateSelection(current,selectedIds,axis))}
@@ -439,12 +441,13 @@ export default function App() {
       onImportAssembly={()=>{setAssemblyImportError('');assemblyImportRef.current?.click()}} assemblyImportError={assemblyImportError}/>
 
     {contextMenu&&<PreviewContextMenu {...contextMenu} title={selectedConnectors.length?`${selectedConnectors.length} connectors`:instance?.name??(selectedPanels.length===1?selectedPanels[0].name:selectedPanels.length?`${selectedPanels.length} panels`:'Preview')} actions={menuActions} onClose={closeContextMenu}/>}
-    <AssemblyWorkspace onPreviewContextMenu={dialog||drag.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
+    <AssemblyWorkspace onPreviewContextMenu={dialog||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
       if(target.connectorId&&!realisticPreview){if(!selectedConnectorIds.includes(target.connectorId))chooseConnector(target.connectorId)}
       else if(target.panelId!==undefined){if(!target.panelId||!selectedIds.includes(target.panelId))choosePanel(target.panelId||null)}
       setContextMenu({x,y})
-    }} connectorOverrides={(drag.project??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={drag.panels??panels} connections={(drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
+    }} connectorOverrides={(resize.project??drag.project??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={resize.panels??drag.panels??panels} connections={(resize.project??drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
       onDragStart={drag.start} onDragMove={drag.move} onDragEnd={drag.end} dragging={drag.active} dragSnap={drag.snap}
+      resizeHandles={resize.handles} onResizeStart={resize.start} onResizeMove={resize.move} onResizeEnd={resize.end} resizing={resize.active} resizeDistance={resize.distance} resizeLimited={resize.limited}
       onAutoConnect={addAutoConnectors} autoConnectDisabled={!!dialog||!!assembly.editingInstance||panels.length<2}
       onMoveConnectors={(slides,repeat)=>commit(current=>{
         let next=current

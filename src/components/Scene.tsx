@@ -11,6 +11,8 @@ import { getRoomLayout } from './room-layout'
 import { getConnectorKeyboardSlides } from '@/lib/connector-movement'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
 import { PreviewDragMovement, type PreviewDragProps } from './PreviewDragMovement'
+import { PreviewResizeHandles } from './PreviewResizeHandles'
+import type { PreviewResizeHandle } from '@/lib/preview-resize'
 import { Plus } from 'lucide-react'
 import './assemblies.css'
 
@@ -42,6 +44,13 @@ export interface SceneProps extends PreviewDragProps {
   onMove?: (delta: Vec3, repeat: boolean) => void
   movementEnabled?: boolean
   dragging?: boolean
+  resizeHandles?: PreviewResizeHandle[]
+  onResizeStart?: (handleId: string) => boolean
+  onResizeMove?: (distance: number) => void
+  onResizeEnd?: (cancel: boolean) => void
+  resizing?: boolean
+  resizeDistance?: number
+  resizeLimited?: boolean
   dragSnap?: { position: Vec3; label: string; warning?: string } | null
   onDrillIn?: (panelId: string) => void
   attachmentHandles?: AssemblyAttachmentHandle[]
@@ -423,8 +432,8 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
   return <>
     <PreviewContextGesture onOpen={props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
-    <PanelKeyboardMovement {...props} movementEnabled={props.movementEnabled && !props.dragging}/>
-    <PreviewDragMovement {...props}/>
+    <PanelKeyboardMovement {...props} movementEnabled={props.movementEnabled && !props.dragging && !props.resizing}/>
+    <PreviewDragMovement {...props} movementEnabled={props.movementEnabled && !props.resizing}/>
     {props.view === 'perspective'
       ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
       : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
@@ -447,6 +456,10 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
+    {props.resizeHandles?.length && props.onResizeStart && props.onResizeMove && props.onResizeEnd ? <PreviewResizeHandles
+      handles={props.resizeHandles} enabled={props.movementEnabled && !props.dragging && !exploded}
+      onResizeStart={props.onResizeStart} onResizeMove={props.onResizeMove} onResizeEnd={props.onResizeEnd}
+      distance={props.resizeDistance} limited={props.resizeLimited}/> : null}
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
     <CameraController panMode={props.panMode} bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
@@ -480,7 +493,7 @@ export default function Scene(props: SceneProps) {
       window.removeEventListener('blur', blur)
     }
   }, [])
-  const attachmentHandles = !controlHeld && !props.exploded && !props.realisticPreview && !props.dragging ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
+  const attachmentHandles = !controlHeld && !props.exploded && !props.realisticPreview && !props.dragging && !props.resizing ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
   return <ViewportBoundary>
     <div className="scene-surface">
     <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}

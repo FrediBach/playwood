@@ -1,0 +1,14 @@
+.preview-resize-layer{position:absolute;inset:0;overflow:hidden;pointer-events:none;user-select:none}
+.preview-resize-anchor{position:absolute;top:0;left:0;width:0;height:0;visibility:hidden;--resize-angle:0rad;--resize-x:48px;--resize-y:0px;--resize-arm:48px}
+.preview-resize-root{position:absolute;left:-4px;top:-4px;width:8px;height:8px;border:2px solid #fffaf4;border-radius:50%;background:#d95532;box-shadow:0 0 0 1px #ac492e55;pointer-events:none}
+.preview-resize-stem{position:absolute;top:-1px;left:5px;width:calc(var(--resize-arm) - 8px);height:2px;background:#d95532;box-shadow:0 0 0 1px #fffaf499;transform-origin:-5px 1px;transform:rotate(var(--resize-angle));pointer-events:none}
+.preview-resize-handle{position:absolute;left:var(--resize-x);top:var(--resize-y);display:grid;place-items:center;width:30px;height:30px;padding:0;transform:translate(-50%,-50%);border:1px solid #d95532;border-radius:50%;background:#fffaf4;color:#c54728;box-shadow:0 2px 8px #503c2626;pointer-events:auto;touch-action:none;cursor:grab;transition:background .12s,color .12s,box-shadow .12s}
+.preview-resize-handle>svg{transform:rotate(var(--resize-angle));pointer-events:none}
+.preview-resize-handle:hover,.preview-resize-handle:focus-visible,.preview-resize-anchor.is-active .preview-resize-handle{color:#fffaf4;background:#d95532;box-shadow:0 2px 11px #ad4a2c33}
+.preview-resize-handle:focus-visible{outline:2px solid #d9553280;outline-offset:3px}
+.preview-resize-anchor.is-active .preview-resize-handle{cursor:grabbing}
+.preview-resize-caption{position:absolute;left:var(--resize-caption-x,var(--resize-x));top:var(--resize-caption-y,calc(var(--resize-y) + 23px));transform:translateX(-50%);display:none;width:max-content;max-width:240px;padding:5px 8px;border:1px solid #e2d8cb;border-radius:5px;background:#fffdf7f5;color:#695847;font-size:11px;font-weight:500;line-height:1.5;text-align:center;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;box-shadow:0 2px 9px #503c2610;pointer-events:none}
+.preview-resize-caption small{display:block;font-size:10px;font-weight:400;color:#857667;white-space:nowrap}
+.preview-resize-handle:hover+.preview-resize-caption,.preview-resize-handle:focus-visible+.preview-resize-caption,.preview-resize-anchor.is-active .preview-resize-caption{display:block}
+.preview-resize-caption.is-limited{border-color:#cfb273;background:#fff8e7;color:#86611c}
+@media(pointer:coarse){.preview-resize-handle{width:38px;height:38px}}

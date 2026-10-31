@@ -12,7 +12,7 @@ type Dimensions = Partial<Pick<Panel, 'width' | 'height'>>
 type Row = { entries: Map<number, number>; value: number }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, Dimensions> }
+type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, Dimensions>; centerDelta?: Vec3 }
 
 const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 const position = (panel: Panel) => new Vector3(...panel.position)
@@ -264,9 +264,10 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     if (edit.kind === 'move') worldAxes.forEach((axis, dimension) => center(row(edit.delta[dimension]), index, axis))
   }
   if (edit.kind === 'resize') {
-    // Keep the selected panel's center (or selection centroid) stationary.
-    for (const axis of worldAxes) {
-      const constraint = row()
+    // An edge pull shifts the center by half the growth to anchor its opposite
+    // edge. Numeric dimension edits keep the selected center stationary.
+    for (const [dimension, axis] of worldAxes.entries()) {
+      const constraint = row(edit.centerDelta?.[dimension] ?? 0)
       selected.forEach(item => center(constraint, indices.get(item.panel.id)!, axis, 1 / selected.length))
     }
   } else {
@@ -371,6 +372,19 @@ export function resizePanels(project: Project, ids: readonly string[], patch: Di
   const wanted = new Set(ids)
   if (!project.panels.some(panel => wanted.has(panel.id) && (['width', 'height'] as const).some(field => patch[field] !== undefined && Math.abs(panel[field] - patch[field]!) > EPSILON))) return project
   return editStructure(project, ids, { kind: 'resize', patch })
+}
+
+/** Pull one local panel edge, keeping its opposite edge at the same position. */
+export function resizePanelEdge(project: Project, id: string, dimension: 'width' | 'height', side: -1 | 1, distance: number): Project {
+  if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
+  if (Math.abs(distance) < EPSILON) return project
+  const panel = resolvePanels(project).find(panel => panel.id === id)
+  if (!panel) return project
+  const size = panel[dimension] + distance
+  if (size < 40 || size > 4000) throw new Error(LIMIT_MESSAGE)
+  const axis = frame(panel).axes[dimension === 'width' ? 0 : 1]
+  return editStructure(project, [id], { kind: 'resize', patch: { [dimension]: size },
+    centerDelta: axis.multiplyScalar(side * distance / 2).toArray() as Vec3 })
 }
 
 /** Simultaneous independent targets, used by assembly instance parameters. */
