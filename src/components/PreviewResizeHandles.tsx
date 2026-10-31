@@ -15,7 +15,7 @@ export interface PreviewResizeProps {
   distance?: number
   limited?: boolean
   keyboardStep?: number
-  onResizeStart: (handleId: string) => boolean
+  onResizeStart: (handleId: string, local?: boolean) => boolean
   onResizeMove: (distanceMm: number, keyboard?: boolean) => void
   onResizeEnd: (cancel: boolean) => void
 }
@@ -29,6 +29,7 @@ interface Gesture {
   point: Vector3
   plane: Plane
   axis: Vector3
+  local: boolean
   started: boolean
   controls?: OrbitControls
   controlsEnabled: boolean
@@ -87,7 +88,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     const orbit = controls as OrbitControls | undefined
     gesture.current = {
       handleId: handle.id, pointerId: event.pointerId, target: event.currentTarget,
-      x: event.clientX, y: event.clientY, point, plane, axis, started: false,
+      x: event.clientX, y: event.clientY, point, plane, axis, started: false, local: event.shiftKey,
       controls: orbit, controlsEnabled: orbit?.enabled ?? true, previousCursor: document.body.style.cursor,
       arm: Number(event.currentTarget.parentElement?.dataset.resizeArm) || ARM,
     }
@@ -106,7 +107,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     event.stopImmediatePropagation()
     if (!current.started) {
       if (Math.hypot(event.clientX - current.x, event.clientY - current.y) < 3) return
-      if (!onResizeStart(current.handleId)) { finish(true); return }
+      if (!onResizeStart(current.handleId, current.local)) { finish(true); return }
       current.started = true
     }
     const point = pointAt(event.clientX, event.clientY, current.plane)
@@ -228,7 +229,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
         <span className="preview-resize-root" aria-hidden="true" />
         <span className="preview-resize-stem" aria-hidden="true" />
         <button type="button" className="preview-resize-handle" aria-label={`Resize · ${handle.label}`} data-resize-handle={handle.id}
-          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" title={`${handle.label} · drag to pull or push. Arrow keys: ${keyboardStep} mm; Shift: ${keyboardStep * 10} mm.`}
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" title={`${handle.label} · drag to pull or push. Shift-drag: resize only this panel edge, keeping connectors fixed. Arrow keys: ${keyboardStep} mm; Shift: ${keyboardStep * 10} mm.`}
           onPointerDown={event => down(event, handle)} onKeyDown={event => step(event, handle)}
           onPointerEnter={() => invalidate()} onFocus={() => invalidate()}
           onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onContextMenu={event => event.preventDefault()}>

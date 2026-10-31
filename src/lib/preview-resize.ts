@@ -125,13 +125,16 @@ export function preparePreviewResize(project: Project, selection: PreviewResizeS
 
 /** Preview from the pointer-down snapshot, stopping at the last feasible cut.
  * No state is persisted here, so callers can cancel or commit one undo step. */
-export function movePreviewResize(session: PreviewResizeSession, handleId: string, distance: number): { project: Project; distance: number; limited: boolean } {
+export function movePreviewResize(session: PreviewResizeSession, handleId: string, distance: number, local = false): { project: Project; distance: number; limited: boolean } {
   if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
   const handle = session.handles.find(item => item.id === handleId)
   const driver = session.drivers.get(handleId)
   if (!handle || !driver || Math.abs(distance) < 1e-6) return { project: session.original, distance: 0, limited: false }
   const attempt = (amount: number) => {
-    const next = apply(session.original, driver.operation, amount / driver.scale)
+    if (local && (!session.selection.panelId || driver.operation.kind !== 'edge')) throw new Error('Only panel edges can resize independently.')
+    const next = local && driver.operation.kind === 'edge'
+      ? resizePanelEdge(session.original, driver.operation.panelId, driver.operation.dimension, driver.operation.side, amount, true)
+      : apply(session.original, driver.operation, amount / driver.scale)
     if (session.selection.connectorId) {
       const position = connectorPosition(next, session.selection.connectorId)
       const target = vector(handle.position).addScaledVector(vector(handle.direction), amount)

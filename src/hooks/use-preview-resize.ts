@@ -22,7 +22,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
   }, [project, panelId, connectorId, enabled])
   type Session = NonNullable<typeof prepared>
   type Result = ReturnType<typeof movePreviewResize>
-  const session = useRef<{ source: Session; handleId: string } | null>(null)
+  const session = useRef<{ source: Session; handleId: string; local: boolean } | null>(null)
   const latest = useRef<Result | null>(null)
   const [preview, setPreview] = useState<Result | null>(null)
   const current = session.current?.source === prepared ? preview : null
@@ -39,9 +39,9 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
     panels,
     distance: current?.distance,
     limited: current?.limited,
-    start: (handleId: string) => {
+    start: (handleId: string, local = false) => {
       if (!prepared?.handles.some(handle => handle.id === handleId)) return false
-      session.current = { source: prepared, handleId }
+      session.current = { source: prepared, handleId, local }
       latest.current = null
       setPreview({ project, distance: 0, limited: false })
       return true
@@ -53,7 +53,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
         const handle = source.handles.find(item => item.id === session.current!.handleId)!
         const targets = snapTargets(project, selectedIds, selectedConnectorIds, !!connectorId)
         const snapped = snapDistance(handle.position, handle.direction, Math.round(distance), targets, keyboard ? { ...snapSettings, tolerance: Math.min(snapSettings.tolerance, Math.abs(distance) * 0.45) } : snapSettings)
-        const result = movePreviewResize(source, session.current.handleId, snapped)
+        const result = movePreviewResize(source, session.current.handleId, snapped, session.current.local)
         latest.current = result
         setPreview(result)
       } catch (error) {

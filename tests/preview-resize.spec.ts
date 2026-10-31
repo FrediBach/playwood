@@ -208,3 +208,27 @@ test('resize handles are limited to one visible selection and disappear during a
   await page.getByRole('button', { name: 'Hide Bottom shelf', exact: true }).click()
   await expect(handles).toHaveCount(0)
 })
+
+
+test('Shift-drag resizes only a shelf edge and can be undone', async ({ page }) => {
+  const project = createStarterProject()
+  const middle = resolvePanels(project).find(panel => panel.name === 'Middle shelf')!
+  const handle = preparePreviewResize(project, { panelId: middle.id })!.handles.find(handle => handle.id === 'panel-height-positive')!
+  await openProject(page, project, 'perspective')
+  await page.locator('.panel-list-select').filter({ hasText: /^Middle shelf$/ }).click()
+  await page.keyboard.down('Shift')
+  await beginResize(page, handle, 80)
+  await page.mouse.up()
+  await page.keyboard.up('Shift')
+  await expect.poll(async () => (await savedProject(page)).panels.find(panel => panel.id === middle.id)!.height).toBeGreaterThan(middle.height + 40)
+  const resized = await savedProject(page)
+  for (const old of resolvePanels(project).filter(panel => panel.id !== middle.id)) {
+    const next = resolvePanels(resized).find(panel => panel.id === old.id)!
+    expect(next.width).toBeCloseTo(old.width, 5)
+    expect(next.height).toBeCloseTo(old.height, 5)
+    next.position.forEach((value, axis) => expect(value).toBeCloseTo(old.position[axis], 5))
+  }
+  expectAnglesAndJoints(project, resized)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
+})

@@ -1,5 +1,7 @@
 import { Euler, Quaternion, Vector3 } from 'three'
 import { resolvePanels, validateProject } from './model'
+import { connectorSlide, getConnectorRail } from './connector-movement'
+import { getPhysicalConnectors } from './connector-selection'
 import { isPanelConnectedToAssembly } from './assemblies'
 import type { Connection, Panel, Project, Vec3 } from './types'
 
@@ -12,7 +14,7 @@ type Dimensions = Partial<Pick<Panel, 'width' | 'height'>>
 type Row = { entries: Map<number, number>; value: number }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, Dimensions>; centerDelta?: Vec3 }
+type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, Dimensions>; centerDelta?: Vec3; local?: boolean }
 
 const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 const position = (panel: Panel) => new Vector3(...panel.position)
@@ -107,9 +109,12 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   // plane. Dimensions are allowed to adapt while thickness remains physical.
   const weights = frames.flatMap(() => [1, 1, 64, 0.25, 0.25])
   const connections = project.connections.filter(connection => indices.has(connection.parentId) && indices.has(connection.childId))
+  // Independent edge pulls may shift one branch center along a shared T/cross
+  // joint without shifting the other branches or the physical hardware.
+  const offsetKey = (connection: Connection) => edit.kind === 'resize' && edit.local ? connection.id : jointId(connection)
   const offsetVariables = new Map<string, number>()
-  for (const connection of connections) if (!offsetVariables.has(jointId(connection))) {
-    offsetVariables.set(jointId(connection), weights.length)
+  for (const connection of connections) if (!offsetVariables.has(offsetKey(connection))) {
+    offsetVariables.set(offsetKey(connection), weights.length)
     weights.push(4)
   }
   const rows: Row[] = []
@@ -146,9 +151,9 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       add(constraint, parentIndex * 5 + 4, -changes[1].dot(axis))
       add(constraint, childIndex * 5 + 3, -changes[2].dot(axis))
       add(constraint, childIndex * 5 + 4, -changes[3].dot(axis))
-      add(constraint, offsetVariables.get(jointId(connection))!, -changes[4].dot(axis))
+      add(constraint, offsetVariables.get(offsetKey(connection))!, -changes[4].dot(axis))
     })
-    if (edit.kind === 'resize') {
+    if (edit.kind === 'resize' && !edit.local) {
       const horizontal = ['top', 'bottom', 'front', 'back'].includes(connection.side)
       const dimension = horizontal ? 0 : 1
       const childDimension = connection.quarterTurn ? 1 - dimension : dimension
@@ -169,7 +174,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         const constraint = row()
         add(constraint, parentIndex * 5 + 3 + dimension, side / 2)
         add(constraint, childIndex * 5 + 3 + childDimension, -side / 2)
-        add(constraint, offsetVariables.get(jointId(connection))!, -1)
+        add(constraint, offsetVariables.get(offsetKey(connection))!, -1)
       }
     }
   }
@@ -178,7 +183,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     const constraint = row()
     edge(constraint, contact.b, contact.normal, -contact.sign)
     edge(constraint, contact.a, contact.normal, contact.sign, -1)
-    if (edit.kind === 'resize') {
+    if (edit.kind === 'resize' && !edit.local) {
       // Preserve flush insert edges as well as surface contact, so inserts
       // travel with the compartment when its width or depth is edited.
       for (const axis of frames[contact.a].axes.filter(axis => Math.abs(axis.dot(contact.normal)) < EPSILON)) {
@@ -197,7 +202,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   // two surrounding structural faces, without relying on panel names/types.
   const structural = new Set(connections.flatMap(connection => [connection.parentId, connection.childId]))
   frames.forEach((item, index) => {
-    if (structural.has(item.panel.id) || (edit.kind === 'move' && ids.has(item.panel.id))) return
+    if ((edit.kind === 'resize' && edit.local) || structural.has(item.panel.id) || (edit.kind === 'move' && ids.has(item.panel.id))) return
     item.axes.forEach((axis, dimension) => {
       const minimum = coordinate(item, axis, -1), maximum = coordinate(item, axis, 1)
       const centerAt = coordinate(item, axis)
@@ -297,6 +302,11 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     }
   }
 
+  if (edit.kind === 'resize' && edit.local) frames.forEach((item, index) => {
+    if (ids.has(item.panel.id)) return
+    for (let variable = 0; variable < 5; variable++) add(row(), index * 5 + variable, 1)
+  })
+
   const changes = solve(rows, weights)
   const changedPanels = new Map(frames.map((item, index) => {
     const moved = position(item.panel)
@@ -310,7 +320,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   return { ...project,
     panels: project.panels.map(panel => changedPanels.get(panel.id) ?? panel),
     connections: project.connections.map(connection => {
-      const variable = offsetVariables.get(jointId(connection))
+      const variable = offsetVariables.get(offsetKey(connection))
       return variable === undefined || Math.abs(changes[variable]) < EPSILON ? connection : { ...connection, offset: Math.round((connection.offset + changes[variable]) * 1e8) / 1e8 }
     }),
   }
@@ -326,12 +336,12 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit): Pr
     // the loose-panel solver deform their materialized, linked source panels.
     const looseConnections = project.connections.filter(connection => !managed.has(connection.parentId) && !managed.has(connection.childId))
     const boundary = new Set(project.panels.filter(panel => !managed.has(panel.id) && isPanelConnectedToAssembly(project, panel.id)).map(panel => panel.id))
-    const loose: Project = { version: 1, name: project.name, panels: project.panels.filter(panel => !managed.has(panel.id) && !boundary.has(panel.id)),
+    const loose: Project = { version: 1, name: project.name, connectorOverrides: project.connectorOverrides, panels: project.panels.filter(panel => !managed.has(panel.id) && !boundary.has(panel.id)),
       connections: looseConnections.filter(connection => !boundary.has(connection.parentId) && !boundary.has(connection.childId)) }
     const edited = editStructure(loose, ids, edit)
     const byId = new Map(edited.panels.map(panel => [panel.id, panel]))
     const connectionById = new Map(edited.connections.map(connection => [connection.id, connection]))
-    return { ...project, panels: project.panels.map(panel => byId.get(panel.id) ?? panel), connections: project.connections.map(connection => connectionById.get(connection.id) ?? connection) }
+    return { ...project, connectorOverrides: edited.connectorOverrides, panels: project.panels.map(panel => byId.get(panel.id) ?? panel), connections: project.connections.map(connection => connectionById.get(connection.id) ?? connection) }
   }
   const panels = resolvePanels(project)
   if (!panels.some(panel => wanted.has(panel.id))) return project
@@ -355,6 +365,23 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit): Pr
   next = { ...next, panels: resolvePanels(next) }
   if (next.panels.some(panel => panel.position.some(value => !Number.isFinite(value) || Math.abs(value) > 100000))
     || next.connections.some(connection => !Number.isFinite(connection.offset) || Math.abs(connection.offset) > 10000)) throw new Error('This move would exceed the project placement limits. Try a smaller step.')
+  if (edit.kind === 'resize' && edit.local) {
+    const overrides = { ...project.connectorOverrides }
+    for (const piece of getPhysicalConnectors(project)) {
+      const before = getConnectorRail(piece.connection, panels, project.connections)
+      const connection = next.connections.find(item => item.id === piece.connection.id)!
+      const after = getConnectorRail(connection, next.panels, next.connections)
+      if (!before || !after) continue
+      const original = new Vector3(...before.placements[piece.index].position).addScaledVector(new Vector3(...before.tangent),
+        connectorSlide(before, piece.index, project.connectorOverrides?.[piece.id]?.slide))
+      const delta = original.clone().sub(new Vector3(...after.placements[piece.index].position))
+      const slide = delta.dot(new Vector3(...after.tangent))
+      const actual = new Vector3(...after.placements[piece.index].position).addScaledVector(new Vector3(...after.tangent), connectorSlide(after, piece.index, slide))
+      if (actual.distanceTo(original) > EPSILON) throw new Error('This resize would move a connector.')
+      if (Math.abs(slide - (overrides[piece.id]?.slide ?? 0)) > EPSILON) overrides[piece.id] = { ...overrides[piece.id], slide }
+    }
+    next = { ...next, connectorOverrides: Object.keys(overrides).length ? overrides : project.connectorOverrides }
+  }
   const previousErrors = new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id))
   const newError = validateProject(next).find(issue => issue.severity === 'error' && !previousErrors.has(issue.id))
   if (newError) throw new Error(`Cannot keep this edit connected: ${newError.message}`)
@@ -385,8 +412,8 @@ export function resizePanels(project: Project, ids: readonly string[], patch: Di
   return editStructure(project, ids, { kind: 'resize', patch })
 }
 
-/** Pull one local panel edge, keeping its opposite edge at the same position. */
-export function resizePanelEdge(project: Project, id: string, dimension: 'width' | 'height', side: -1 | 1, distance: number): Project {
+/** Pull one panel edge, anchoring its opposite edge. Local edits also fix other panels and hardware. */
+export function resizePanelEdge(project: Project, id: string, dimension: 'width' | 'height', side: -1 | 1, distance: number, local = false): Project {
   if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
   if (Math.abs(distance) < EPSILON) return project
   const panel = resolvePanels(project).find(panel => panel.id === id)
@@ -394,7 +421,7 @@ export function resizePanelEdge(project: Project, id: string, dimension: 'width'
   const size = panel[dimension] + distance
   if (size < 40 || size > 4000) throw new Error(LIMIT_MESSAGE)
   const axis = frame(panel).axes[dimension === 'width' ? 0 : 1]
-  return editStructure(project, [id], { kind: 'resize', patch: { [dimension]: size },
+  return editStructure(project, [id], { kind: 'resize', patch: { [dimension]: size }, local,
     centerDelta: axis.multiplyScalar(side * distance / 2).toArray() as Vec3 })
 }
 

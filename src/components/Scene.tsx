@@ -49,7 +49,7 @@ export interface SceneProps extends PreviewDragProps {
   movementEnabled?: boolean
   dragging?: boolean
   resizeHandles?: PreviewResizeHandle[]
-  onResizeStart?: (handleId: string) => boolean
+  onResizeStart?: (handleId: string, local?: boolean) => boolean
   onResizeMove?: (distance: number, keyboard?: boolean) => void
   onResizeEnd?: (cancel: boolean) => void
   resizing?: boolean
@@ -458,8 +458,8 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
     {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
     {props.resizeHandles?.length && props.onResizeStart && props.onResizeMove && props.onResizeEnd ? <PreviewResizeHandles
       handles={props.resizeHandles} keyboardStep={props.snapSettings?.grid ? props.snapSettings.spacing : 10} enabled={props.movementEnabled && !props.dragging && !exploded}
-      onResizeStart={id => {
-        const started = props.onResizeStart!(id)
+      onResizeStart={(id, local) => {
+        const started = props.onResizeStart!(id, local)
         if (started) { resizeHandleId.current = id; setKeyboardSnap(null) }
         return started
       }} onResizeMove={(distance, keyboard) => {

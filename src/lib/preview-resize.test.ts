@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { createAssembly } from './assemblies'
-import { connectorId } from './connector-selection'
+import { connectorId, getPhysicalConnectors } from './connector-selection'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { attachPanel, createPanel, createStarterProject, parseProject, resolvePanels, rotateProject, validateProject } from './model'
 import { movePreviewResize, preparePreviewResize, type PreviewResizeSession } from './preview-resize'
@@ -21,6 +21,38 @@ const piecePosition = (project: Project, index = 0) => {
 }
 
 describe('preview structural resize handles', () => {
+  it.each([false, true])('resizes only one panel with fixed hardware (rotated: %s)', rotated => {
+    const source = createStarterProject()
+    const project = rotated ? rotateProject(source, 'y', 27) : source
+    const selected = named(project, 'Middle shelf')
+    const session = preparePreviewResize(project, { panelId: selected.id })!
+    const positions = (value: Project) => getPhysicalConnectors(value).map(piece => {
+      const rail = getConnectorRail(piece.connection, resolvePanels(value), value.connections)!
+      return new Vector3(...rail.placements[piece.index].position).addScaledVector(new Vector3(...rail.tangent),
+        connectorSlide(rail, piece.index, value.connectorOverrides?.[piece.id]?.slide)).toArray()
+    })
+    const result = movePreviewResize(session, 'panel-height-positive', 80, true)
+    expect(result.limited).toBe(false)
+    expect(named(result.project, selected.name).height).toBeCloseTo(selected.height + 80)
+    for (const old of resolvePanels(project).filter(panel => panel.id !== selected.id)) {
+      const next = named(result.project, old.name)
+      near(next.position, old.position)
+      expect(next.width).toBeCloseTo(old.width)
+      expect(next.height).toBeCloseTo(old.height)
+    }
+    positions(result.project).forEach((value, index) => near(value, positions(project)[index]))
+    valid(result.project)
+    const shrink = movePreviewResize(preparePreviewResize(result.project, { panelId: selected.id })!, 'panel-height-positive', -40, true)
+    expect(shrink.limited).toBe(false)
+    expect(named(shrink.project, selected.name).height).toBeCloseTo(selected.height + 40)
+    positions(shrink.project).forEach((value, index) => near(value, positions(project)[index]))
+    const blocked = movePreviewResize(session, 'panel-height-positive', -100, true)
+    expect(blocked.limited).toBe(true)
+    positions(blocked.project).forEach((value, index) => near(value, positions(project)[index]))
+    const normal = session.handles.find(handle => handle.id.startsWith('panel-normal'))!
+    expect(movePreviewResize(session, normal.id, 80, true).distance).toBe(0)
+  })
+
   it.each([
     { distance: 200, rotated: false }, { distance: -80, rotated: false },
     { distance: 200, rotated: true }, { distance: -80, rotated: true },

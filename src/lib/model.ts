@@ -248,9 +248,9 @@ function jointStructureIssues(connections: Connection[]): ValidationIssue[] {
   for (const [id, group] of groups) {
     const first = group[0]
     const expected = first.type === 't' ? 2 : first.type === 'cross' ? 3 : 1
-    // Supplemental branches can have different centers along the shared edge.
+    // Joint branches can have different centers along the shared edge.
     // Their physical clamps use the intersection of all branch spans.
-    const inconsistent = group.some(c => c.parentId !== first.parentId || c.type !== first.type || c.role !== first.role || c.partial !== first.partial || c.side !== first.side || c.inset !== first.inset || (first.role !== 'support' && c.offset !== first.offset) || c.flip !== first.flip || c.color !== first.color)
+    const inconsistent = group.some(c => c.parentId !== first.parentId || c.type !== first.type || c.role !== first.role || c.partial !== first.partial || c.side !== first.side || c.inset !== first.inset || c.flip !== first.flip || c.color !== first.color)
     const branchIndices = group.map(branchIndex).sort()
     const partial = first.partial === true && first.role === 'support' && expected > 1 && group.every(c => c.partial === true)
     const invalidIndices = branchIndices.some((index, i) => partial
