@@ -20,3 +20,7 @@
 .panel-split-middle:hover:not(:disabled){color:var(--accent);background:var(--accent-light)}
 .panel-split-note{font-size:10px;line-height:1.6;color:var(--muted);text-align:center;margin-top:9px;text-wrap:balance}
 .panel-split-empty{display:grid;place-items:center;min-height:104px;font-size:12px;color:var(--muted);text-align:center}
+.panel-split-stepper input{width:45px;height:30px;border:0;border-inline:1px solid var(--line);border-radius:0;background:transparent;color:inherit;text-align:center;font-size:13px;font-weight:600;padding:0 2px;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield}
+.panel-split-stepper input::-webkit-inner-spin-button,.panel-split-stepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.grid-split-axis{display:block;font-size:10px;font-weight:400;color:var(--muted);margin-top:3px}
+.grid-split-error{color:var(--accent)}

@@ -27,6 +27,8 @@ import { createAssemblyFile, parseAssemblyFile } from '@/lib/assembly-file'
 import { createExampleProject } from '@/lib/example-library'
 import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
 import { useParallelPanelSplitCounts } from '@/hooks/useParallelPanelSplitCounts'
+import { GridPanelSplit } from '@/components/GridPanelSplit'
+import { gridPanelCut } from '@/lib/grid-split'
 import { ParallelPanelSplit } from '@/components/ParallelPanelSplit'
 import { parallelPanelCut, splitParallelPanels } from '@/lib/parallel-panels'
 import { autoConnect } from '@/lib/auto-connect'
@@ -80,6 +82,7 @@ export default function App() {
   const selectedIdSet=useMemo(()=>new Set(selectedIds),[selectedIds])
   const selectedPanels=panels.filter(p=>selectedIdSet.has(p.id))
   const {counts:splitCounts,checking:checkingSplits}=useParallelPanelSplitCounts(project,selectedIds)
+  const gridCut=gridPanelCut(selectedPanels)
   const selectedFinishCoverages=selectedPanels.map(p=>p.material==='painted'?1:p.finishCoverage??0)
   const selected=selectedPanels.length===1?selectedPanels[0]:undefined
   const selectedId=selected?.id??null
@@ -418,6 +421,7 @@ export default function App() {
         if (selected) menuAction('Attach panel',startAttach)
         if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Disconnect panels',detachSelection)
         if (splitCounts.includes(1)) menuAction('Split in the middle',()=>splitSelection())
+        if (gridCut) menuAction('Divide into a grid',()=>{setInspectorTab('panel');setRightOpen(true);requestAnimationFrame(()=>document.getElementById('grid-split-X')?.focus())})
         if (parallelPanelCut(selectedPanels)) menuAction('Split x times',()=>{setInspectorTab('panel');setRightOpen(true);requestAnimationFrame(()=>document.querySelector<HTMLSelectElement>('[aria-label="Number of splits"]')?.focus())})
       }
       if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`Fill hole · ${hole.label}`,()=>closeHole(hole.id))
@@ -488,6 +492,7 @@ export default function App() {
       onDoneEditing={assembly.editingInstance?assembly.done:undefined}>
         {selectedConnectors.length?<ConnectorInspector connectors={selectedConnectors} onChange={patch=>commit(current=>editConnectors(current,selectedConnectorIds,patch))} onRemove={removeSelectedConnectors} onConnectPanel={connectWithPanel} panelFitReason={assembly.editingInstance?'Finish editing the assembly before connecting a panel.':dialog?'Close the dialog before connecting a panel.':connectorPanelFit.reason}/>:<>
         {clipboard.inserting&&<section className="inspector-section"><p>Choose a + in the preview to attach the {clipboard.inserting}.</p><Button variant="outline" onClick={clipboard.cancel}>Cancel placement</Button></section>}
+        {!assembly.editingInstance&&!clipboard.active&&!assembly.placementActive&&!assembly.hasMembers&&gridCut&&<GridPanelSplit key={`grid:${selectedIds.join('/')}`} project={project} ids={selectedIds} frame={gridCut} onSplit={(result,x,y)=>{commit(result.project);setSelectedIds(result.panelIds);notify(`Created a ${x+1} × ${y+1} grid with ${result.connectors} new connectors. Undo is available.`)}}/>}
         {!assembly.editingInstance&&!clipboard.active&&!assembly.placementActive&&(instance||!assembly.hasMembers)&&<CloseHoles key={selectedIds.join('/')} holes={holes} assembly={!!instance} onClose={closeHole}/>}
         {!assembly.editingInstance&&<section className="inspector-section"><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2}><Link2 size={15}/>Auto-add connectors</Button><p className="field-note">{selectedIds.length>1?'Connect matching edges between selected panels.':selectedIds.length===1?'Connect this panel to matching nearby edges.':'Connect matching edges throughout the design.'} Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p></section>}
         {assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
