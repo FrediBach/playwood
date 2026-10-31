@@ -11,10 +11,11 @@ import { MATERIALS } from '@/lib/materials'
 import { CONNECTORS } from '@/lib/connector-options'
 import type { Panel, Project, ValidationIssue } from '@/lib/types'
 
-export type ProjectDialog = 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | null
+export type ProjectDialog = 'new' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | null
 interface Props {
   dialog: ProjectDialog
   onClose: () => void
+  onNew: () => void
   onAdd: () => void
   attachNewPanel: boolean
   onRotate: ComponentProps<typeof RotateCreation>['onRotate']
@@ -45,6 +46,7 @@ export function ProjectDialogs(props: Props) {
 
 function DialogBody(props: Props) {
   switch (props.dialog) {
+    case 'new': return <NewProjectDialog {...props}/>
     case 'rotate': return <RotateDialog {...props}/>
     case 'add': return <AddDialog {...props}/>
     case 'templates': return <TemplatesDialog {...props}/>
@@ -53,6 +55,10 @@ function DialogBody(props: Props) {
     case 'parts': return <PartsDialog {...props}/>
     default: return null
   }
+}
+
+function NewProjectDialog({onClose,onNew,exportProject,project}: Pick<Props, 'onClose' | 'onNew' | 'exportProject' | 'project'>) {
+  return <><DialogTitle>Start a new project?</DialogTitle><DialogDescription>This will replace “{project.name}” with an empty workspace, including its saved copy in this browser. Export your current project first to keep a separate copy. You can undo this change until you reload or close the app.</DialogDescription><Button variant="outline" onClick={exportProject}><Download size={17}/>Export current project</Button><div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={onNew}>Start new project</Button></div></>
 }
 
 function RotateDialog({onClose,onRotate}: Pick<Props, 'onClose' | 'onRotate'>) {

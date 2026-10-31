@@ -337,6 +337,7 @@ export default function App() {
   }
   const loadTemplate=(template:string)=>{const next=createExampleProject(template);commit(next);assembly.close();const instance=next.assemblies?.instances[0];setSelectedIds(instance?Object.values(instance.panelIds):next.panels.slice(0,1).map(p=>p.id));setInspectorTab('panel');setDialog(null);setExploded(false);setFitSignal(v=>v+1);notify(template==='blank'?'A fresh start. Add your first panel.':'Template loaded. Make it your own.')}
   const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
+  const startNewProject=()=>{clipboard.cancel();closeContextMenu();loadTemplate('blank');setRealisticPreview(false);setView('perspective');setAttachTarget('new');setAttachment(INITIAL_ATTACHMENT);setImportError('');notify('New project started. Undo to restore your previous project.')}
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
   const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=repairLegacyShelf(imported);const repaired=repairLegacyExampleInserts(shelf);commit(repaired);assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
   const instance=assembly.selectedInstance
@@ -418,7 +419,7 @@ export default function App() {
 
   return <TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
     <ProjectHeader projectName={project.name} saveStatus={saveStatus} canUndo={canUndo} canRedo={canRedo} undo={undo} redo={redo}
-      onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')}/>
+      onNew={()=>setDialog('new')} onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')}/>
 
     <ProjectSidebar panelListProps={{...listGrouping('panels'),panels: panels,
       selectedIds: selectedIds,
@@ -501,7 +502,7 @@ export default function App() {
     <ProjectStatus panelCount={project.panels.length} connectorCount={connectorCount} issueCount={issues.length} bounds={bounds} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')}/>
     {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
 
-    <ProjectDialogs dialog={dialog} onClose={()=>setDialog(null)} draft={draft} setDraft={setDraft} loadTemplate={loadTemplate}
+    <ProjectDialogs onNew={startNewProject} dialog={dialog} onClose={()=>setDialog(null)} draft={draft} setDraft={setDraft} loadTemplate={loadTemplate}
       exportProject={exportProject} onExportParts={()=>{download(projectToCsv(project),`${exportName}-parts.csv`,'text/csv');notify('Parts list exported')}}
       onImport={()=>importRef.current?.click()} importError={importError} project={project} panels={panels} connectorCount={connectorCount} issues={issues}
       onRotate={(axis,degrees)=>{commit(p=>rotateProject(p,axis,degrees));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify(`Creation rotated ${degrees}° around ${axis.toUpperCase()}. Undo is available.`)}}
