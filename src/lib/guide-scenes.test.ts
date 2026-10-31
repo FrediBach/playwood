@@ -6,7 +6,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { GuidePreview } from '@/components/GuidePreview'
 
-const guideIds: GuideId[] = ['workspace', 'first-panel', 'attach', 'angles', 'auto-connect', 'close-hole', 'split-panels', 'move-snap', 'resize', 'rotate', 'copy-paste', 'multi-select', 'finishes', 'custom-outline', 'groups', 'assemblies', 'assembly-attach', 'assembly-values', 'assembly-edit', 'assembly-controls', 'assembly-files', 'connectors', 'review', 'save-export']
+const guideIds: GuideId[] = ['workspace', 'first-panel', 'attach', 'angles', 'auto-connect', 'connect-panel', 'close-hole', 'split-panels', 'move-snap', 'resize', 'rotate', 'copy-paste', 'multi-select', 'finishes', 'custom-outline', 'groups', 'assemblies', 'assembly-attach', 'assembly-values', 'assembly-edit', 'assembly-controls', 'assembly-files', 'connectors', 'review', 'save-export']
 
 describe('beginner guide project studies', () => {
   it.each(guideIds)('%s produces four finite, readable scene snapshots', id => {

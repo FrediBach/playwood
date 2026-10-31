@@ -3,6 +3,7 @@ import type { AttachmentOptions, Panel, Project, Vec3 } from './types'
 import { attachPanel, createPanel, createStarterProject, getProjectBounds, resolvePanels, rotateProject } from './model'
 import { gridProject } from './example-geometry'
 import { autoConnect } from './auto-connect'
+import { connectSelectedConnectors } from './connect-panel'
 import { closePanelHole, findPanelHoles } from './close-holes'
 import { splitParallelPanels } from './parallel-panels'
 import { createAssembly, disconnectAssembly, duplicateAssembly, getAssemblyAttachmentTargets, makeAssemblyIndependent, updateAssemblyDefinition, updateAssemblyFinish, updateAssemblyParameterValues } from './assemblies'
@@ -80,6 +81,16 @@ function buildScenes(id: GuideId): GuideScene[] {
         scene(loose, 'Select the panels whose compatible edges should join.', { selected: ids(loose) }),
         scene(fitted, 'Auto-add connectors fits the joints at their current positions.', { selected: ids(fitted), labels: [{ text: 'Eight fitted connectors', point: [192.5, 9, 155] }] }),
         scene(t, 'Adding a continuation can upgrade a corner into a complete T joint.', { selected: [t.panels[2].id], labels: [label(t.panels[2], 'Third panel completes the T')] })]
+    }
+    case 'connect-panel': {
+      const p = corner(), hardware = getPhysicalConnectors(p).map(piece => piece.id)
+      const open = editConnectors(p, hardware, { type: 't' })
+      const fitted = connectSelectedConnectors(open, hardware)
+      const panel = fitted.project.panels.find(panel => panel.id === fitted.panelId)!
+      return [scene(p, 'Select two physical connectors along the existing corner.', { selectedConnectors: hardware }),
+        scene(open, 'T hardware provides matching free openings without moving the boards.', { selectedConnectors: hardware, document: { title: 'Connector type · T', lines: ['Two occupied branches', 'One free opening per clamp'] } }),
+        scene(fitted.project, 'Connect with a panel fills both openings with one fitted board.', { selected: [panel.id], labels: [label(panel, 'New continuation panel')] }),
+        scene(fitted.project, 'The corner keeps its position; the open end extends 360 mm.', { selected: [panel.id], view: 'side', labels: [label(panel, '360 × 360 × 18 mm')] })]
     }
     case 'close-hole': {
       const p = box(), hole = findPanelHoles(resolvePanels(p)).find(item => item.label === 'Back')!
