@@ -6,6 +6,7 @@
 .guide-preview .guide-svg-label{font-size:18px;font-weight:550}
 .guide-preview .guide-svg-document-line{font-size:17px;fill:#66705c}
 .guide-preview .guide-svg-dimension{font-size:17px}
+.guide-resize-button{fill:#fbfaf7;stroke:#c94727;stroke-width:1.5}.guide-resize-arrow{fill:none;stroke:#c94727;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.guide-resize-handle.is-active .guide-resize-button{fill:#c94727}.guide-resize-handle.is-active .guide-resize-arrow{stroke:#fbfaf7}
 .guide-preview-legend{display:flex;gap:15px;flex-wrap:wrap;padding:3px 15px 12px;font-size:11px;color:#58634e}
 .guide-preview-legend>span{display:inline-flex;gap:6px;align-items:center}
 .guide-preview-legend i{display:block;width:9px;height:9px;border-radius:2px}

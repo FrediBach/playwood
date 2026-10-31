@@ -29,6 +29,7 @@ test('every building technique has four illustrated steps without another WebGL 
       expect(await illustration.locator('polygon, path').count()).toBeGreaterThan(0)
       await expect(article.getByText('What you should see', { exact: true })).toBeVisible()
       if (id === 'connect-panel' && (step === 2 || step === 4)) await page.screenshot({ path: `test-results/guide-connect-panel-step-${step}.png` })
+      if (id === 'resize') await page.screenshot({ path: `test-results/guide-resize-step-${step}.png` })
       if (step < 4) await article.getByRole('button', { name: 'Next step', exact: true }).click()
     }
     await expect(article.getByRole('button', { name: 'Read again', exact: true })).toBeVisible()

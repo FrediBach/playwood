@@ -123,13 +123,13 @@ export default function BuildGuide() {
 const SHORTCUT_GROUPS = [
   { title: 'Look around', rows: [['Orbit in Perspective', 'Drag'], ['Pan', 'Right-drag / Pan view'], ['Zoom', 'Scroll / + / −'], ['Fit view', 'F']] },
   { title: 'Select & organize', rows: [['Select several panels', 'Shift-click / Ctrl / ⌘-click'], ['Select all', '⌘ / Ctrl A'], ['Rename a list item', 'F2'], ['List reorder: pick up / drop', 'Space / Enter'], ['List reorder: move', '↑ ↓ / Home / End']] },
-  { title: 'Move & build', rows: [['Move & snap', 'Ctrl + drag'], ['Move in preview · 1 cm', '↑ ↓ ← →'], ['Move further · 10 cm', 'Shift + arrows'], ['Rotate selection 90°', 'X / Y / Z'], ['Copy / paste at a +', '⌘ / Ctrl C / V'], ['Duplicate', '⌘ / Ctrl D']] },
+  { title: 'Move & build', rows: [['Resize panel / connector', 'Drag resize arrow'], ['Move & snap', 'Ctrl + drag'], ['Move in preview · 1 cm', '↑ ↓ ← →'], ['Move further · 10 cm', 'Shift + arrows'], ['Rotate selection 90°', 'X / Y / Z'], ['Copy / paste at a +', '⌘ / Ctrl C / V'], ['Duplicate', '⌘ / Ctrl D']] },
   { title: 'Edit & recover', rows: [['Undo', '⌘ / Ctrl Z'], ['Redo', '⌘ / Ctrl Shift Z'], ['Remove selection', 'Delete / Backspace'], ['Cancel preview / clear selection', 'Esc'], ['Context menu', 'Right-click / Shift F10']] },
 ]
 
 function ShortcutReference({ onChooseGuide }: { onChooseGuide: (id: Guide['id']) => void }) {
   return <div className="guide-reference">
-    <div className="guide-reference-intro"><h2>A little less clicking.</h2><p>Click the model before using movement keys. Text fields keep their normal editing shortcuts. On a Mac, move &amp; snap still uses Control, not Command.</p></div>
+    <div className="guide-reference-intro"><h2>A little less clicking.</h2><p>Click the model before using movement keys. Text fields keep their normal editing shortcuts. Resize handles use a plain drag on an orange arrow. On a Mac, move &amp; snap uses the Control key.</p></div>
     <div className="guide-shortcut-grid">{SHORTCUT_GROUPS.map(group => <section key={group.title}><h3>{group.title}</h3><dl>{group.rows.map(([label, key]) => <div key={label}><dt>{label}</dt><dd><kbd>{key}</kbd></dd></div>)}</dl></section>)}</div>
     <div className="guide-system-note"><h3>Understand the connection.</h3><p>Angled joints turn one panel away from another. T and cross joints add continuation panels too. Start with the same 18 mm panel thickness throughout a practice build, and inspect each preview before committing.</p><button onClick={() => onChooseGuide('angles')}>Learn the connector types<ArrowRight size={15}/></button><p>The previews explain the editor’s geometry. Material strength, loading, manufacturing tolerances, and screw tightening are not simulated.</p>
       <a href="https://www.playwood.it/site/assets/files/18237/technical_information_playwood_connectors.pdf" target="_blank" rel="noreferrer">Official technical drawings<ArrowRight size={14}/></a>

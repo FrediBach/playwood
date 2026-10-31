@@ -9,7 +9,7 @@ import { splitParallelPanels } from './parallel-panels'
 import { createAssembly, disconnectAssembly, duplicateAssembly, getAssemblyAttachmentTargets, makeAssemblyIndependent, updateAssemblyDefinition, updateAssemblyFinish, updateAssemblyParameterValues } from './assemblies'
 import { ASSEMBLY_LIBRARY, insertAssemblyDefinition } from './assembly-library'
 import { createAssemblyFile, parseAssemblyFile } from './assembly-file'
-import { movePanels, resizePanels } from './structure-edit'
+import { movePreviewResize, preparePreviewResize, type PreviewResizeHandle } from './preview-resize'
 import { rotateSelection } from './selection-rotation'
 import { editConnectors, getPhysicalConnectors } from './connector-selection'
 
@@ -22,6 +22,7 @@ export interface GuideScene {
   view?: 'front' | 'side' | 'top'
   dimensions?: boolean
   selectedConnectors?: string[]
+  resizeHandles?: (PreviewResizeHandle & { distance?: number })[]
   outlinePoints?: boolean
   room?: boolean
   document?: { title: string; lines: string[] }
@@ -122,12 +123,20 @@ function buildScenes(id: GuideId): GuideScene[] {
     }
     case 'resize': {
       const p = box(), top = p.panels.find(panel => panel.name === 'Shelf 1.2')!
-      const wider = resizePanels(p, [top.id], { width: 450 })
-      const taller = movePanels(wider, [top.id], [0, 100, 0])
-      return [scene(p, 'Select the top panel to edit its cut dimensions.', { selected: [top.id], dimensions: true, labels: [label(top, 'Width: 350 mm')] }),
-        scene(wider, 'Changing the top width adjusts the connected frame.', { selected: [top.id], dimensions: true, labels: [label(top, 'Width: 450 mm')] }),
-        scene(taller, 'Moving the top upward extends its connected side panels.', { selected: [top.id], dimensions: true, labels: [label(top, 'Moved up 100 mm')] }),
-        scene(taller, 'The resized frame keeps its joints aligned. Undo lets you compare.', { selected: [top.id], dimensions: true, view: 'side' })]
+      const panelResize = preparePreviewResize(p, { panelId: top.id })!
+      const edge = panelResize.handles.find(handle => handle.id === 'panel-width-positive')!
+      const widthChange = movePreviewResize(panelResize, edge.id, 100)
+      const wider = widthChange.project
+      const connector = getPhysicalConnectors(wider).find(piece => piece.connection.parentId === top.id || piece.connection.childId === top.id)!
+      const connectorResize = preparePreviewResize(wider, { connectorId: connector.id })!
+      const upward = connectorResize.handles.find(handle => handle.direction[1] > .999)!
+      const heightChange = movePreviewResize(connectorResize, upward.id, 100)
+      const movedHandle = (handle: PreviewResizeHandle, distance: number) => ({ ...handle,
+        position: handle.position.map((value, axis) => value + handle.direction[axis] * distance) as Vec3, distance })
+      return [scene(p, 'One selected panel reveals the directions you can pull or push.', { selected: [top.id], dimensions: true, resizeHandles: panelResize.handles }),
+        scene(wider, 'Pulling this edge by 100 mm widens the frame; the opposite edge stays fixed.', { selected: [top.id], dimensions: true, resizeHandles: [movedHandle(edge, widthChange.distance)] }),
+        scene(heightChange.project, 'Pulling one connector upward by 100 mm extends the side panels and keeps the corners joined.', { selectedConnectors: [connector.id], dimensions: true, resizeHandles: [movedHandle(upward, heightChange.distance)] }),
+        scene(heightChange.project, 'Release to apply one undoable resize. Escape during a drag restores the starting shape.', { dimensions: true, view: 'side' })]
     }
     case 'rotate': {
       const p = box()

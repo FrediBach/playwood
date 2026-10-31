@@ -41,7 +41,7 @@ In the panel and connector lists, **F2** edits a focused panel or group name. Fo
 
 ## Illustrated building guide
 
-Choose **Guide** in the header (the book icon on small screens), or **Shortcuts & help** in the status bar, to open the field guide. Its 24 searchable techniques cover the workspace, panels and finishes, attachment and connector types, automatic joints, closing openings, splitting panels, movement and snapping, rotation, copy/paste, selection and groups, reusable assemblies and their editable controls, review, and project and assembly files.
+Choose **Guide** in the header (the book icon on small screens), or **Shortcuts & help** in the status bar, to open the field guide. Its 25 searchable techniques cover the workspace, panels and finishes, attachment and connector types, automatic joints, closing openings, splitting panels, pull/push resizing, movement and snapping, rotation, copy/paste, selection and groups, reusable assemblies and their editable controls, review, and project and assembly files.
 
 Every technique has four steps with an illustrated example, exact controls, an explanation, the expected result, and relevant tips. Start with the suggested setup, move through **Next step**, or jump to a numbered step. Related guides connect techniques into longer workflows. The guide remembers your reading position for the current browser session; browsing it never changes the project. **Keyboard shortcuts** remains available as a separate quick reference.
 
