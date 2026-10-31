@@ -17,6 +17,8 @@ export interface Connection {
   id: string; parentId: string; childId: string; type: ConnectorType;
   /** Supplemental hardware that does not determine the child's transform. */
   role?: 'support';
+  /** A supplemental T/cross joint may leave unused clamp openings. */
+  partial?: boolean;
   /** Child's width/height axes are turned 90 degrees within its clamp plane. */
   quarterTurn?: boolean;
   side: Side; offset: number; inset: number; flip: boolean;

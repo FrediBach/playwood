@@ -250,10 +250,14 @@ function jointStructureIssues(connections: Connection[]): ValidationIssue[] {
     const expected = first.type === 't' ? 2 : first.type === 'cross' ? 3 : 1
     // Supplemental branches can have different centers along the shared edge.
     // Their physical clamps use the intersection of all branch spans.
-    const inconsistent = group.some(c => c.parentId !== first.parentId || c.type !== first.type || c.role !== first.role || c.side !== first.side || c.inset !== first.inset || (first.role !== 'support' && c.offset !== first.offset) || c.flip !== first.flip || c.color !== first.color)
+    const inconsistent = group.some(c => c.parentId !== first.parentId || c.type !== first.type || c.role !== first.role || c.partial !== first.partial || c.side !== first.side || c.inset !== first.inset || (first.role !== 'support' && c.offset !== first.offset) || c.flip !== first.flip || c.color !== first.color)
     const branchIndices = group.map(branchIndex).sort()
-    const invalidShared = expected > 1 && (branchIndices.some((index, i) => index !== i) || group.some(c => branchIndex(c) === 0 ? c.count < 1 : c.count !== 0))
-    if (group.length !== expected || inconsistent || invalidShared || (expected === 1 && first.count < 1)) issues.push({
+    const partial = first.partial === true && first.role === 'support' && expected > 1 && group.every(c => c.partial === true)
+    const invalidIndices = branchIndices.some((index, i) => partial
+      ? index < 0 || index >= expected || (i === 0 ? index !== 0 : index === branchIndices[i - 1])
+      : index !== i)
+    const invalidShared = expected > 1 && (invalidIndices || group.some(c => branchIndex(c) === 0 ? c.count < 1 : c.count !== 0))
+    if ((first.partial && !partial) || (partial ? group.length > expected : group.length !== expected) || inconsistent || invalidShared || (expected === 1 && first.count < 1)) issues.push({
       id: `${id}-joint`, severity: 'error', message: `${first.type === 't' ? 'T' : first.type === 'cross' ? 'Cross' : `${first.type}°`} joint is incomplete or inconsistent. Detach it and reconnect the panels.`, panelIds: [...new Set(group.flatMap(c => [c.parentId, c.childId]))],
     })
   }
@@ -431,6 +435,10 @@ export function parseProject(input: unknown): Project {
     if (raw.quarterTurn !== undefined) {
       if (typeof raw.quarterTurn !== 'boolean') throw new Error('Invalid child panel orientation.')
       c.quarterTurn = raw.quarterTurn
+    }
+    if (raw.partial !== undefined) {
+      if (typeof raw.partial !== 'boolean') throw new Error('Invalid partial joint.')
+      c.partial = raw.partial
     }
     if (typeof c.flip !== 'boolean' || !Number.isInteger(c.count)) throw new Error('Invalid connector options.')
     if (!panelIds.has(c.parentId) || !panelIds.has(c.childId) || c.parentId === c.childId) throw new Error('Connections must link two different, existing panels.')

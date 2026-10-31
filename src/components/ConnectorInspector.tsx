@@ -1,15 +1,17 @@
 import { ConnectorColorField } from './ConnectorColorField'
-import { Link2, Trash2 } from 'lucide-react'
+import { Link2, Plus, Trash2 } from 'lucide-react'
 import type { ConnectorOverride, ConnectorType } from '@/lib/types'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
 import { CONNECTORS } from '@/lib/connector-options'
 import { SelectField } from './fields'
 import { Button } from './ui/button'
 
-export function ConnectorInspector({ connectors, onChange, onRemove }: {
+export function ConnectorInspector({ connectors, onChange, onRemove, onConnectPanel, panelFitReason }: {
   connectors: ReturnType<typeof getPhysicalConnectors>
   onChange: (patch: ConnectorOverride) => void
   onRemove: () => void
+  onConnectPanel: () => void
+  panelFitReason: string
 }) {
   const first = connectors[0]
   const sameType = connectors.every(connector => connector.type === first.type)
@@ -26,6 +28,10 @@ export function ConnectorInspector({ connectors, onChange, onRemove }: {
       <p className="field-note">In the preview, use arrow keys to slide along the joint by 1 cm, or Shift + arrows for 10 cm. Movement stops at panel ends and other connectors.</p>
       <p className="field-note">Panels keep their placement when hardware is changed or removed.</p>
       {connectors.some(connector => connector.type !== connector.connection.type) && <p className="validation-note warning">The replacement type differs from the joint layout. Check that its angle and openings fit the panels.</p>}
+    </section>
+    <section className="inspector-section">
+      <Button variant="outline" onClick={onConnectPanel} disabled={!!panelFitReason}><Plus size={15}/>Connect with a panel</Button>
+      <p className="field-note">{panelFitReason || 'Fits one panel to every selected opening. Opposing connectors set its size; an open end extends 36 cm.'}</p>
     </section>
     <div className="panel-actions"><Button variant="outline" onClick={onRemove}><Trash2 size={15}/>Remove {connectors.length === 1 ? 'connector' : 'connectors'}</Button></div>
   </>

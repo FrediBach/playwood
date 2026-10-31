@@ -27,6 +27,7 @@ import { createExampleProject } from '@/lib/example-library'
 import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
 import { parallelPanelCut, splitParallelPanels } from '@/lib/parallel-panels'
 import { autoConnect } from '@/lib/auto-connect'
+import { getConnectorPanelFit } from '@/lib/connect-panel'
 import { movePanels, resizePanels } from '@/lib/structure-edit'
 import { rotateSelection } from '@/lib/selection-rotation'
 import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
@@ -84,6 +85,7 @@ export default function App() {
   const physicalConnectors=useMemo(()=>orderedConnectors(project),[project])
   const selectedConnectorIdSet=useMemo(()=>new Set(selectedConnectorIds),[selectedConnectorIds])
   const selectedConnectors=physicalConnectors.filter(connector=>selectedConnectorIdSet.has(connector.id))
+  const connectorPanelFit=useMemo(()=>getConnectorPanelFit(project,selectedConnectorIds),[project,selectedConnectorIds])
   const connectorCount=physicalConnectors.length
   const connectorSummary=CONNECTORS.map(type=>({name:type.name,count:physicalConnectors.filter(c=>c.type===type.id).length})).filter(type=>type.count>0).map(type=>`${type.count} × ${type.name}`).join(' · ')
   const notify=useCallback((message:string)=>setToast(message),[])
@@ -193,6 +195,13 @@ export default function App() {
       if(result.splits&&selectedIds.length>1)setSelectedIds(ids=>[...ids,...result.addedPanelIds])
       notify(`${result.connectors} connectors ${result.upgrades?'fitted':'added'} at ${result.joints} ${result.joints===1?'joint':'joints'}. ${result.upgrades?`${result.upgrades} existing ${result.upgrades===1?'joint':'joints'} upgraded. `:''}${result.splits?`${result.splits} panel ${result.splits===1?'split':'splits'} for T joints; outer dimensions kept.`:'Panel positions kept.'}${result.disassembledNames.length?` Made independent: ${result.disassembledNames.join(', ')}.`:''} Undo is available.`)
     } catch(error){notify(error instanceof Error?error.message:'Connectors could not be added.')}
+  }
+  const connectWithPanel=()=>{
+    if(assembly.editingInstance||dialog)return
+    const result=connectorPanelFit.result
+    if(!result){notify(connectorPanelFit.reason);return}
+    commit(result.project);clipboard.cancel();assembly.clearPlacement();setSelectedId(result.panelId);setInspectorTab('panel');setRightOpen(true);setExploded(false);setFitSignal(v=>v+1)
+    notify(`Panel fitted to ${selectedConnectors.length} connectors.${result.disassembledNames.length?` Made independent: ${result.disassembledNames.join(', ')}.`:''} Undo is available.`)
   }
   const selectAll=(includeConnectors=false)=>{
     if(includeConnectors&&selectedConnectors.length){setSelectedConnectorIds(physicalConnectors.filter(c=>[c.connection.parentId,c.connection.childId].every(id=>panels.some(p=>p.id===id&&p.visible))).map(c=>c.id));return}
@@ -373,6 +382,7 @@ export default function App() {
   const menuActions: PreviewMenuAction[] = []
   const menuAction = (label: string, run: () => void, danger = false) => menuActions.push({ label, run, danger })
   if (selectedConnectors.length) {
+    if(connectorPanelFit.result&&!assembly.editingInstance&&!dialog)menuAction('Connect with a panel',connectWithPanel)
     menuAction('Group selected',()=>groupSelected('connectors',selectedConnectorIds))
     menuAction('Inspect connectors',()=>setRightOpen(true))
     menuAction('Remove connectors',removeSelectedConnectors,true)
@@ -459,7 +469,7 @@ export default function App() {
       canAttach={!!previewProject&&!attachmentErrors.length} attachmentType={attachment.type}
       contextLabel={selectedConnectors.length?'Connectors':assembly.editingInstance?'Shared assembly':assembly.hasMembers?'Assembly':undefined}
       onDoneEditing={assembly.editingInstance?assembly.done:undefined}>
-        {selectedConnectors.length?<ConnectorInspector connectors={selectedConnectors} onChange={patch=>commit(current=>editConnectors(current,selectedConnectorIds,patch))} onRemove={removeSelectedConnectors}/>:<>
+        {selectedConnectors.length?<ConnectorInspector connectors={selectedConnectors} onChange={patch=>commit(current=>editConnectors(current,selectedConnectorIds,patch))} onRemove={removeSelectedConnectors} onConnectPanel={connectWithPanel} panelFitReason={assembly.editingInstance?'Finish editing the assembly before connecting a panel.':dialog?'Close the dialog before connecting a panel.':connectorPanelFit.reason}/>:<>
         {clipboard.inserting&&<section className="inspector-section"><p>Choose a + in the preview to attach the {clipboard.inserting}.</p><Button variant="outline" onClick={clipboard.cancel}>Cancel placement</Button></section>}
         {!assembly.editingInstance&&!clipboard.active&&!assembly.placementActive&&(instance||!assembly.hasMembers)&&<CloseHoles key={selectedIds.join('/')} holes={holes} assembly={!!instance} onClose={closeHole}/>}
         {!assembly.editingInstance&&<section className="inspector-section"><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2}><Link2 size={15}/>Auto-add connectors</Button><p className="field-note">{selectedIds.length>1?'Connect matching edges between selected panels.':selectedIds.length===1?'Connect this panel to matching nearby edges.':'Connect matching edges throughout the design.'} Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p></section>}

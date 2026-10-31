@@ -1,0 +1,38 @@
+import { test, expect } from '@playwright/test'
+import { attachPanel, createPanel } from '../src/lib/model'
+
+test('connect selected openings with a panel, undo, redo, and reload', async ({ page }) => {
+  const parent = createPanel({ width: 300, height: 300, position: [0, 500, 0] })
+  const project = attachPanel({ version: 1, name: 'Connect panel', panels: [parent], connections: [] }, parent.id, createPanel({ width: 300, height: 300 }),
+    { type: '90', side: 'right', flip: false, offset: 0, inset: 0, count: 2, color: '#ff0000' })
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'corner.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  await page.getByRole('tab', { name: 'Connectors', exact: true }).click()
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  const connect = page.getByRole('button', { name: 'Connect with a panel', exact: true })
+  await expect(connect).toBeDisabled()
+  await expect(page.getByText('Each selected connector needs a free, compatible opening.', { exact: false })).toBeVisible()
+  await page.getByLabel('Connector type', { exact: true }).selectOption('t')
+  await expect(connect).toBeEnabled()
+  await page.screenshot({ path: 'test-results/connect-panel-ready.png' })
+  await connect.click()
+  await expect(page.getByLabel('Panel name', { exact: true })).toHaveValue('Connecting panel')
+  await expect(page.locator('.connector-list-row')).toHaveCount(2)
+  await page.getByRole('tab', { name: 'Panels', exact: true }).click()
+  await expect(page.locator('.panel-list-row')).toHaveCount(3)
+  await page.screenshot({ path: 'test-results/connect-panel-result.png' })
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  await expect(page.locator('.panel-list-row')).toHaveCount(2)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  await expect(page.locator('.panel-list-row')).toHaveCount(3)
+  await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.locator('.panel-list-row')).toHaveCount(3)
+  await page.getByRole('tab', { name: 'Connectors', exact: true }).click()
+  await expect(page.locator('.connector-list-row')).toHaveCount(2)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await expect(connect).toBeDisabled()
+  expect(errors).toEqual([])
+})
