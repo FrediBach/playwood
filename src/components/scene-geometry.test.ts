@@ -84,3 +84,36 @@ describe('rounded panel outlines', () => {
     geometry.dispose(); material.dispose()
   })
 })
+
+describe('panel texture scale', () => {
+  const shapes: Partial<Panel>[] = [
+    { pattern: 'solid' },
+    { pattern: 'solid', cornerRadius: 80 },
+    { pattern: 'solid', customOutline: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }] },
+    { pattern: 'pegboard' },
+    { pattern: 'slots' },
+  ]
+
+  it.each(shapes)('keeps grain at the same physical scale on both faces of $pattern panels', shape => {
+    const material = new MeshBasicMaterial({ side: DoubleSide })
+    for (const [width, height] of [[240, 480], [1200, 2400], [2400, 480]]) {
+      const geometry = makePanelGeometry(createPanel({ width, height, holeSize: 12, holeSpacing: 48, ...shape }))
+      const mesh = new Mesh(geometry, material)
+      for (const back of [false, true]) {
+        const uvAt = (x: number, y: number) => new Raycaster(
+          new Vector3(x, y, back ? -1 : 1), new Vector3(0, 0, back ? 1 : -1),
+        ).intersectObject(mesh)[0]?.uv
+        const start = uvAt(-0.06, 0.02)
+        const end = uvAt(-0.03, 0.025)
+        expect(start).toBeDefined()
+        expect(end).toBeDefined()
+        // A 30 × 5 mm move across the face always covers the same texture
+        // distance, regardless of board size, aspect ratio, or tessellation.
+        expect(end!.x - start!.x).toBeCloseTo(0.03, 6)
+        expect(end!.y - start!.y).toBeCloseTo(0.005, 6)
+      }
+      geometry.dispose()
+    }
+    material.dispose()
+  })
+})

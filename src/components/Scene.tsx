@@ -6,6 +6,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraView, Connection, Panel, Project, Vec3 } from '@/lib/types'
 import { ConnectorMeshes } from './ConnectorMeshes'
 import { makePanelGeometry } from './scene-geometry'
+import { createWoodTextures } from './wood-texture'
 import { RoomEnvironment } from './RoomEnvironment'
 import { getRoomLayout } from './room-layout'
 import { getConnectorKeyboardSlides } from '@/lib/connector-movement'
@@ -87,44 +88,19 @@ function boundsOf(panels: Panel[]) {
   return bounds
 }
 
-function woodTexture(material: Panel['material']) {
-  const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 512
-  const ctx = canvas.getContext('2d')!
-  const pixels = ctx.createImageData(canvas.width, canvas.height)
-  const strength = material === 'mdf' ? 0.008 : material === 'walnut' ? 0.025 : material === 'oak' ? 0.02 : 0.009
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      const bend = Math.sin(y * 0.009) * 3 + Math.sin(y * 0.021 + x * 0.015) * 1.2
-      const grain = Math.sin((x + bend) * 0.27) * 0.35 + Math.sin((x + bend) * 0.73) * 0.2 + Math.sin((x + bend) * 1.81) * 0.08
-      const fine = Math.sin(x * 128.32 + y * 72.53) * 0.08
-      const shade = Math.round(255 * (1 - strength + strength * (grain + fine)))
-      const i = (y * canvas.width + x) * 4
-      pixels.data[i] = shade; pixels.data[i + 1] = shade; pixels.data[i + 2] = shade; pixels.data[i + 3] = 255
-    }
-  }
-  ctx.putImageData(pixels, 0, 0)
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.repeat.set(1.5, 1)
-  texture.anisotropy = 8
-  return texture
-}
-
-
 function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDrillIn }: {
   panel: Panel; selected: boolean; ghost?: boolean; interactive?: boolean; onSelect: SceneProps['onSelect']; onDrillIn?: SceneProps['onDrillIn']
 }) {
   const { width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline } = panel
   const geometry = useMemo(() => makePanelGeometry({ width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline }), [width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline])
-  const texture = useMemo(() => panel.material !== 'painted' ? woodTexture(panel.material) : null, [panel.material])
+  const textures = useMemo(() => !ghost && panel.material !== 'painted' ? createWoodTextures(panel.material) : null, [panel.material, ghost])
   const face = useMemo(() => new THREE.MeshStandardMaterial({
-    color: ghost ? ACCENT : panel.color, map: ghost ? null : texture,
-    roughness: 0.76, metalness: 0, transparent: ghost, opacity: ghost ? 0.38 : 1,
+    color: ghost ? ACCENT : panel.color, map: textures?.color ?? null,
+    bumpMap: textures?.surface ?? null, bumpScale: panel.material === 'mdf' ? 0.00008 : 0.0003,
+    roughnessMap: textures?.surface ?? null, roughness: textures ? 1 : 0.76,
+    metalness: 0, transparent: ghost, opacity: ghost ? 0.38 : 1,
     depthWrite: !ghost,
-  }), [panel.color, texture, ghost])
+  }), [panel.color, panel.material, textures, ghost])
   const edge = useMemo(() => {
     const material = new THREE.MeshStandardMaterial({ color: ghost ? ACCENT : panel.color, roughness: 0.9, transparent: ghost, opacity: ghost ? 0.32 : 1, depthWrite: !ghost })
     if (panel.material === 'birch' && !ghost) {
@@ -145,7 +121,7 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDri
     return edges
   }, [panel.width, panel.height, panel.thickness])
   useEffect(() => () => { geometry.dispose() }, [geometry])
-  useEffect(() => () => { texture?.dispose() }, [texture])
+  useEffect(() => () => { textures?.color.dispose(); textures?.surface.dispose() }, [textures])
   useEffect(() => () => { face.dispose(); edge.dispose() }, [face, edge])
   useEffect(() => () => { outline.dispose() }, [outline])
   useEffect(() => () => { document.body.style.cursor = '' }, [])

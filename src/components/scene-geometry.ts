@@ -94,8 +94,8 @@ export function makePanelGeometry(panel: Pick<Panel, 'width' | 'height' | 'thick
   }
   const geometry = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, steps: 1, curveSegments: 8 })
   geometry.translate(0, 0, -t / 2)
-  const uv = geometry.getAttribute('uv')
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / Math.max(w, 0.001), uv.getY(i) / Math.max(h, 0.001))
+  // ExtrudeGeometry's face UVs use local metres. Keep that physical scale so
+  // repeating grain stays the same size when a board is resized or reshaped.
   return geometry
 }
 
