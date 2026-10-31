@@ -1,5 +1,5 @@
 import { useId, useState, type ComponentProps } from 'react'
-import { ArrowRight, Box, ChevronDown, ChevronRight, CircleHelp, Layers, Link2, ListChecks, PanelLeftClose, Plus } from 'lucide-react'
+import { ArrowRight, Box, ChevronDown, ChevronRight, Layers, Link2, ListChecks, PanelLeftClose, Plus } from 'lucide-react'
 import { Button } from './ui/button'
 import { IconButton } from './editor-controls'
 import { PanelList } from './PanelList'
@@ -81,6 +81,5 @@ export function ProjectSidebar({panelListProps,connectorListProps,selectedCount,
           <Button variant="ghost" size="sm" className="full-button" onClick={onParts}><ListChecks size={16}/>View parts list<ChevronRight size={15}/></Button>
         </>}</div>:<><div className="library-intro"><h2>A place to start.</h2><p>Explore builds and reusable modules.<br/>Choose one and make it yours.</p></div><ExampleBrowser compact onImportAssembly={onImportAssembly} assemblyImportError={assemblyImportError} onSelect={loadTemplate} onInsertAssembly={onInsertLibraryAssembly} myAssemblies={libraryAssemblies.length>0&&<section className="assembly-library"><div className="section-label"><span>MY ASSEMBLIES</span><span className="count-badge">{libraryAssemblies.length}</span></div>{libraryAssemblies.map(assembly=><button key={assembly.id} className="assembly-library-card" aria-label={`Insert ${assembly.name} instance`} onClick={()=>onInsertAssembly?.(assembly.id)}><Box size={23}/><span><strong>{assembly.name}</strong><small>{assembly.panelCount} panels · {assembly.instanceCount} {assembly.instanceCount===1?'instance':'instances'}</small></span><Plus size={16}/></button>)}<p className="assembly-help">Insert a linked copy, then attach it in the workspace.</p></section>}/><button className="library-reference" onClick={onHelp}>About the connector system<ArrowRight size={15}/></button></>}
       </div>
-      <div className="sidebar-footer"><span className="little-mark">p.</span><div><strong>Less, but better.</strong><span>Made to be made your own.</span></div><IconButton label="Help and reference" onClick={onHelp}><CircleHelp size={18}/></IconButton></div>
     </aside>
 }
