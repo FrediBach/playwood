@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Box, ChevronDown, Expand, Hand, House, Keyboard, Maximize, Minus, Plus } from 'lucide-react'
+import { Box, ChevronDown, Expand, Hand, House, Keyboard, Maximize, Minus, Plus, SquareDashedMousePointer } from 'lucide-react'
 import { IconButton } from './editor-controls'
 import { Tooltip } from './ui/tooltip'
 import type { CameraView } from '@/lib/types'
@@ -8,6 +8,9 @@ import './viewport-controls.css'
 interface Props {
   panMode: boolean
   onTogglePan: () => void
+  boxSelectActive?: boolean
+  boxSelectDisabled?: boolean
+  onBoxSelect?: () => void
   realisticPreview: boolean
   view: CameraView
   onViewChange: (view: CameraView) => void
@@ -21,7 +24,7 @@ interface Props {
   roomDetails?: ReactNode
 }
 
-export function ViewportControls({ panMode, onTogglePan, realisticPreview, view, onViewChange, onZoom, onFit, exploded, onToggleExploded, status, notice, showTransformShortcuts, roomDetails }: Props) {
+export function ViewportControls({ panMode, onTogglePan, boxSelectActive = false, boxSelectDisabled = false, onBoxSelect, realisticPreview, view, onViewChange, onZoom, onFit, exploded, onToggleExploded, status, notice, showTransformShortcuts, roomDetails }: Props) {
   return <div className="viewport-dock">
     {roomDetails}
     {(notice || status || showTransformShortcuts) && <div className="viewport-guidance">
@@ -41,6 +44,7 @@ export function ViewportControls({ panMode, onTogglePan, realisticPreview, view,
           </select><ChevronDown size={12}/>
         </div>}
       <IconButton label="Pan view" aria-pressed={panMode} onClick={onTogglePan}><Hand size={17}/></IconButton>
+      {onBoxSelect && <IconButton label="Box select (B)" aria-pressed={boxSelectActive} aria-keyshortcuts="B" disabled={boxSelectDisabled} onClick={onBoxSelect}><SquareDashedMousePointer size={17}/></IconButton>}
       <span className="viewport-divider"/>
       <IconButton label="Zoom out" onClick={() => onZoom(-1)}><Minus size={17}/></IconButton>
       <IconButton label="Zoom in" onClick={() => onZoom(1)}><Plus size={17}/></IconButton>
@@ -90,6 +94,9 @@ function ViewportShortcuts({ panMode, realisticPreview }: { panMode: boolean; re
       <h3>Selection</h3>
       <dl>
         {!realisticPreview && <div><dt>Multi-select</dt><dd><kbd>Shift + click</kbd></dd></div>}
+        <div><dt>Box select</dt><dd><kbd>B then drag</kbd></dd></div>
+        <div><dt>Add with box</dt><dd><kbd>Shift while drawing</kbd></dd></div>
+        <div><dt>Cancel box</dt><dd><kbd>Esc</kbd></dd></div>
         <div><dt>Move &amp; snap</dt><dd><kbd>Ctrl + drag</kbd></dd></div>
         <div><dt>Move 1 cm</dt><dd><kbd>↑ ↓ ← →</kbd></dd></div>
         <div><dt>Move 10 cm</dt><dd><kbd>Shift + arrows</kbd></dd></div>

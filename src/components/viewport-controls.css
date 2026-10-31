@@ -139,6 +139,13 @@
   .viewport-room-label { gap: 5px; padding: 0 6px; font-size: 11px; }
 }
 
+@media (max-width: 400px) {
+  .viewport-bar .button-icon,
+  .viewport-shortcuts summary { width: 28px; }
+  .viewport-camera select { width: 90px; }
+  .viewport-divider { margin: 0 2px; }
+}
+
 .snap-controls { position: relative; font-size: 12px; color: #445039; }
 .snap-controls summary { cursor: pointer; padding: 8px; border: 1px solid #d8dbd1; border-radius: 6px; background: #fbfaf7; }
 .snap-panel { position: absolute; right: 0; top: calc(100% + 8px); width: min(280px, 80vw); padding: 16px; display: grid; gap: 14px; background: #fbfaf7; border: 1px solid #d8dbd1; border-radius: 10px; box-shadow: 0 8px 24px #343c2820; z-index: 10; }

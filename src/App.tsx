@@ -64,6 +64,7 @@ export default function App() {
   const [attachTarget,setAttachTarget]=useState('new')
   const [attachment,setAttachment]=useState<AttachmentOptions>(INITIAL_ATTACHMENT)
   const [view,setView]=useState<CameraView>('perspective')
+  const [boxSelectActive,setBoxSelectActive]=useState(false)
   const [realisticPreview,setRealisticPreview]=useState(false)
   const [showGrid,setShowGrid]=useState(true),[showDimensions,setShowDimensions]=useState(false),[exploded,setExploded]=useState(false)
   const [fitSignal,setFitSignal]=useState(0),[zoomSignal,setZoomSignal]=useState({direction:0,key:0})
@@ -221,10 +222,36 @@ export default function App() {
   }
   const movementEnabled=!clipboard.active&&!dialog&&!assembly.editingInstance&&!(assembly.memberInstance&&!assembly.selectedInstance)&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))
   const resize=usePreviewResize({project,selectedIds,selectedConnectorIds,snapSettings,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify})
+  const boxSelectAvailable=!dialog&&!clipboard.active&&!drag.active&&!resize.active&&!assembly.placementActive&&inspectorTab!=='attach'&&hasVisiblePanels
+  const boxSelectKind=selectedConnectorIds.length&&!realisticPreview&&!exploded?'connectors':'panels'
+  const cancelBoxSelect=useCallback(()=>setBoxSelectActive(false),[])
+  useEffect(()=>{setBoxSelectActive(false)},[project,view,realisticPreview,exploded,boxSelectAvailable])
+  const toggleBoxSelect=()=>{
+    if(!boxSelectAvailable)return
+    closeContextMenu();assembly.clearPlacement();setBoxSelectActive(active=>!active)
+  }
+  const resolveBoxPanelIds=(ids:string[])=>{
+    if(assembly.editingInstance){const allowed=new Set(Object.values(assembly.editingInstance.panelIds));return ids.filter(id=>allowed.has(id))}
+    return [...new Set(ids.flatMap(id=>{const owner=getAssemblyInstance(project,id);return owner?Object.values(owner.panelIds):[id]}))]
+  }
+  const selectBox=(ids:string[],additive:boolean)=>{
+    setBoxSelectActive(false)
+    const update=(current:string[])=>additive?[...new Set([...current,...ids])]:ids
+    if(boxSelectKind==='connectors')selectConnectors(update,false)
+    else{
+      assembly.clearPlacement();setSelectedIds(update);setInspectorTab('panel')
+      if(ids.length)setRightOpen(true)
+    }
+  }
   useEffect(()=>{
     const onKey=(e:KeyboardEvent)=>{
       const target=e.target as HTMLElement
       if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||dialog)return
+      if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='b'){
+        if(boxSelectAvailable){e.preventDefault();if(!e.repeat)toggleBoxSelect()}
+        return
+      }
+      if(boxSelectActive)return
       if((e.metaKey||e.ctrlKey)&&['c','v'].includes(e.key.toLowerCase())){
         e.preventDefault();if(!e.repeat){if(e.key.toLowerCase()==='c')clipboard.copy();else clipboard.paste()}return
       }
@@ -458,7 +485,8 @@ export default function App() {
       onImportAssembly={()=>{setAssemblyImportError('');assemblyImportRef.current?.click()}} assemblyImportError={assemblyImportError}/>
 
     {contextMenu&&<PreviewContextMenu {...contextMenu} title={selectedConnectors.length?`${selectedConnectors.length} connectors`:instance?.name??(selectedPanels.length===1?selectedPanels[0].name:selectedPanels.length?`${selectedPanels.length} panels`:'Preview')} actions={menuActions} onClose={closeContextMenu}/>}
-    <AssemblyWorkspace snapProbe={resize.snapProbe} snapDirection={drag.snapDirection} snapSettings={snapSettings} setSnapSettings={setSnapSettings} onPreviewContextMenu={dialog||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
+    <AssemblyWorkspace boxSelectActive={boxSelectActive&&boxSelectAvailable} boxSelectDisabled={!boxSelectAvailable} boxSelectKind={boxSelectKind} onToggleBoxSelect={toggleBoxSelect} onBoxSelect={selectBox} onBoxSelectCancel={cancelBoxSelect} resolveBoxPanelIds={resolveBoxPanelIds}
+      snapProbe={resize.snapProbe} snapDirection={drag.snapDirection} snapSettings={snapSettings} setSnapSettings={setSnapSettings} onPreviewContextMenu={dialog||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
       if(target.connectorId&&!realisticPreview){if(!selectedConnectorIds.includes(target.connectorId))chooseConnector(target.connectorId)}
       else if(target.panelId!==undefined){if(!target.panelId||!selectedIds.includes(target.panelId))choosePanel(target.panelId||null)}
       setContextMenu({x,y})

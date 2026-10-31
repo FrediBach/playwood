@@ -1,0 +1,20 @@
+.scene-surface.is-box-selecting canvas { cursor: crosshair !important; }
+.box-selection-rectangle {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px dashed #b54b2c;
+  background: #e75a3515;
+  box-sizing: border-box;
+}
+.box-selection-count {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: #873a23;
+  background: #fbfaf7f2;
+  font-size: 11px;
+  white-space: nowrap;
+}

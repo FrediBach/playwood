@@ -16,9 +16,11 @@ import { getConnectorKeyboardSlides, getConnectorRail } from '@/lib/connector-mo
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
 import { PreviewDragMovement, type PreviewDragProps } from './PreviewDragMovement'
 import { PreviewResizeHandles } from './PreviewResizeHandles'
+import { PreviewBoxSelection, type BoxSelectionProps, type BoxSelectionPreview } from './PreviewBoxSelection'
 import type { PreviewResizeHandle } from '@/lib/preview-resize'
 import { Plus } from 'lucide-react'
 import './assemblies.css'
+import './box-selection.css'
 
 const MM = 0.001
 const ACCENT = '#e75a35'
@@ -35,7 +37,7 @@ export interface AssemblyAttachmentHandle {
   warning?: string
 }
 
-export interface SceneProps extends PreviewDragProps {
+export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   panels: Panel[]
   connections: Connection[]
   connectorOverrides?: Project['connectorOverrides']
@@ -282,7 +284,7 @@ function PanelKeyboardMovement({onMovement,snapSettings,panels, connections, con
     const canvas = gl.domElement
     canvas.tabIndex = 0
     canvas.setAttribute('aria-label', '3D preview canvas')
-    canvas.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight X Y Z')
+    canvas.setAttribute('aria-keyshortcuts', 'B ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight X Y Z')
     const reset = () => { gesture.current = '' }
     const focus = () => canvas.focus({preventScroll:true})
     canvas.addEventListener('pointerdown', focus)
@@ -389,7 +391,7 @@ function PreviewContextGesture({ onOpen, realisticPreview }: Pick<SceneProps, 'r
   return null
 }
 
-function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
+function World(props: SceneProps & { attachmentElements: AttachmentElements; boxPreview: BoxSelectionPreview | null; onBoxPreview: (preview: BoxSelectionPreview | null) => void }) {
   const { panels, connections, selectedIds, onSelect, previewPanels = EMPTY_PANELS, previewConnections = EMPTY_CONNECTIONS, attachmentBoundsPanels = EMPTY_PANELS, showGrid, showDimensions, exploded, realisticPreview } = props
   const displayPanels = useMemo(() => {
     if (!exploded) return panels
@@ -402,7 +404,10 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
   const shownPanels = displayPanels.filter(panel => panel.visible)
   const floorY = bounds.min.y - 0.012
   const extent = useMemo(() => Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5), [bounds])
-  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const boxPreview = props.boxSelectActive ? props.boxPreview : null
+  const highlightedPanels = boxPreview && props.boxSelectKind !== 'connectors' ? [...(boxPreview.additive ? selectedIds : []), ...boxPreview.ids] : selectedIds
+  const highlightedConnectors = boxPreview && props.boxSelectKind === 'connectors' ? [...(boxPreview.additive ? props.selectedConnectorIds ?? [] : []), ...boxPreview.ids] : props.selectedConnectorIds
+  const selectedIdSet = new Set(highlightedPanels)
   const [keyboardSnap, setKeyboardSnap] = useState<{ direction: Vec3; selection: string; handleId?: string } | null>(null)
   const resizeHandleId = useRef<string | undefined>(undefined)
   const selection = JSON.stringify([selectedIds, props.selectedConnectorIds])
@@ -423,9 +428,10 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
     : panels.filter(panel => panel.visible && selectedIdSet.has(panel.id)).flatMap(panelSnapPoints)
   const guideDirection = props.snapProbe?.direction ?? props.snapDirection ?? (keyboardSnap?.selection === selection ? keyboardSnap.direction : [0, 0, 0]) as Vec3
   return <>
-    <PreviewContextGesture onOpen={props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
-    <PanelKeyboardMovement {...props} onMovement={recordMovement} movementEnabled={props.movementEnabled && !props.dragging && !props.resizing}/>
-    <PreviewDragMovement {...props} movementEnabled={props.movementEnabled && !props.resizing}/>
+    <PreviewBoxSelection {...props} onPreview={props.onBoxPreview}/>
+    <PreviewContextGesture onOpen={props.boxSelectActive ? undefined : props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
+    <PanelKeyboardMovement {...props} onMovement={recordMovement} movementEnabled={props.movementEnabled && !props.dragging && !props.resizing && !props.boxSelectActive}/>
+    <PreviewDragMovement {...props} movementEnabled={props.movementEnabled && !props.resizing && !props.boxSelectActive}/>
     {props.view === 'perspective'
       ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
       : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
@@ -451,12 +457,12 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements }) {
       cellColor="#cccfc5" sectionColor="#b9bdb2" fadeDistance={extent * 0.65} fadeStrength={2} fadeFrom={0} infiniteGrid />}
     </>}
     {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
-    {!exploded && <ConnectorMeshes panels={panels} connections={connections} connectorOverrides={props.connectorOverrides} selectedConnectorIds={props.selectedConnectorIds} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
+    {!exploded && <ConnectorMeshes panels={panels} connections={connections} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
-    {props.resizeHandles?.length && props.onResizeStart && props.onResizeMove && props.onResizeEnd ? <PreviewResizeHandles
+    {!props.boxSelectActive && props.resizeHandles?.length && props.onResizeStart && props.onResizeMove && props.onResizeEnd ? <PreviewResizeHandles
       handles={props.resizeHandles} keyboardStep={props.snapSettings?.grid ? props.snapSettings.spacing : 10} enabled={props.movementEnabled && !props.dragging && !exploded}
       onResizeStart={(id, local) => {
         const started = props.onResizeStart!(id, local)
@@ -484,6 +490,7 @@ class ViewportBoundary extends Component<{ children: ReactNode }, { error: boole
 
 export default function Scene(props: SceneProps) {
   const attachmentElements = useRef(new Map<string, HTMLDivElement>())
+  const [boxPreview, setBoxPreview] = useState<BoxSelectionPreview | null>(null)
   const [controlHeld, setControlHeld] = useState(false)
   const clearAttachmentPreview = useEffectEvent(() => props.onAttachmentPreview?.(null))
   useEffect(() => {
@@ -501,16 +508,19 @@ export default function Scene(props: SceneProps) {
       window.removeEventListener('blur', blur)
     }
   }, [])
-  const attachmentHandles = !controlHeld && !props.exploded && !props.realisticPreview && !props.dragging && !props.resizing ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
+  const attachmentHandles = !props.boxSelectActive && !controlHeld && !props.exploded && !props.realisticPreview && !props.dragging && !props.resizing ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
   return <ViewportBoundary>
-    <div className="scene-surface">
+    <div className={`scene-surface${props.boxSelectActive ? ' is-box-selecting' : ''}`}>
     <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
-      style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.panMode ? 'grab' : undefined }}
+      style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.boxSelectActive ? 'crosshair' : props.panMode ? 'grab' : undefined }}
       onPointerMissed={event => { if (event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}
       fallback={<div style={{ padding: 32 }}>Your browser needs WebGL to display this 3D workspace.</div>}>
-      <World {...props} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
+      <World {...props} boxPreview={boxPreview} onBoxPreview={setBoxPreview} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
     </Canvas>
+    {props.boxSelectActive && boxPreview && <div className="box-selection-rectangle" style={boxPreview.rectangle} aria-hidden="true">
+      <span className="box-selection-count">{boxPreview.additive ? '+ ' : ''}{boxPreview.ids.length} {props.boxSelectKind === 'connectors' ? 'connector' : 'panel'}{boxPreview.ids.length === 1 ? '' : 's'}</span>
+    </div>}
     <div className="assembly-attachment-layer">{attachmentHandles.map(handle=><div key={handle.id} className="assembly-attachment-anchor" ref={element=>{if(element)attachmentElements.current.set(handle.id,element);else attachmentElements.current.delete(handle.id)}}>
       <button className={`assembly-attach-handle ${handle.active ? 'is-active' : ''} ${handle.warning ? 'has-warning' : ''}`} aria-label={handle.label} title={handle.label} data-attachment-id={handle.id}
         onPointerDown={event => event.stopPropagation()}
