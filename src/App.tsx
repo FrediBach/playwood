@@ -450,7 +450,7 @@ export default function App() {
       onImportAssembly={()=>{setAssemblyImportError('');assemblyImportRef.current?.click()}} assemblyImportError={assemblyImportError}/>
 
     {contextMenu&&<PreviewContextMenu {...contextMenu} title={selectedConnectors.length?`${selectedConnectors.length} connectors`:instance?.name??(selectedPanels.length===1?selectedPanels[0].name:selectedPanels.length?`${selectedPanels.length} panels`:'Preview')} actions={menuActions} onClose={closeContextMenu}/>}
-    <AssemblyWorkspace snapSettings={snapSettings} setSnapSettings={setSnapSettings} onPreviewContextMenu={dialog||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
+    <AssemblyWorkspace snapProbe={resize.snapProbe} snapDirection={drag.snapDirection} snapSettings={snapSettings} setSnapSettings={setSnapSettings} onPreviewContextMenu={dialog||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
       if(target.connectorId&&!realisticPreview){if(!selectedConnectorIds.includes(target.connectorId))chooseConnector(target.connectorId)}
       else if(target.panelId!==undefined){if(!target.panelId||!selectedIds.includes(target.panelId))choosePanel(target.panelId||null)}
       setContextMenu({x,y})

@@ -89,3 +89,9 @@ export function snapPanelDelta(panels: Panel[], ids: readonly string[], delta: V
     return result
   }) as Vec3
 }
+
+/** Only emphasize lines lying in a matched plane, never the line crossing it. */
+export function isGeometryGuideActive(point: Vec3, lineAxis: number, sources: readonly Vec3[], direction: Vec3): boolean {
+  return direction.some((component, axis) => axis !== lineAxis && Math.abs(component) > 1e-6
+    && sources.some(source => Math.abs(source[axis] - point[axis]) < 0.001))
+}

@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { createPanel } from './model'
-import { DEFAULT_SNAP, panelSnapPoints, snapDistance, snapPanelDelta, snapTargets } from './preview-snap'
+import { DEFAULT_SNAP, isGeometryGuideActive, panelSnapPoints, snapDistance, snapPanelDelta, snapTargets } from './preview-snap'
 import { movePreviewResize, preparePreviewResize } from './preview-resize'
 import type { Project } from './types'
 
 const grid = { ...DEFAULT_SNAP, grid: true }
 const geometry = { ...DEFAULT_SNAP, geometry: true }
 describe('preview snapping', () => {
+  it('highlights only guide lines in the reached plane along the moving axes', () => {
+    const target: [number, number, number] = [100, 200, 300]
+    expect(isGeometryGuideActive(target, 1, [[100, 0, 0]], [1, 0, 0])).toBe(true)
+    expect(isGeometryGuideActive(target, 2, [[100, 0, 0]], [1, 0, 0])).toBe(true)
+    expect(isGeometryGuideActive(target, 0, [[100, 0, 0]], [1, 0, 0])).toBe(false)
+    expect(isGeometryGuideActive(target, 1, [[99, 200, 300]], [1, 0, 0])).toBe(false)
+    expect(isGeometryGuideActive(target, 1, [[100, 200, 300]], [0, 0, 0])).toBe(false)
+  })
   it('is optional and snaps absolute coordinates on either side of the origin', () => {
     expect(snapDistance([13, 0, 0], [1, 0, 0], 34, [], DEFAULT_SNAP)).toBe(34)
     expect(snapDistance([13, 0, 0], [1, 0, 0], 34, [], grid)).toBe(37)

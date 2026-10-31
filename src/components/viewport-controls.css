@@ -146,3 +146,7 @@
 .snap-panel input[type=number] { width: 72px; margin-left: auto; padding: 5px; border: 1px solid #d8dbd1; border-radius: 4px; }
 .snap-panel kbd { margin-left: auto; }
 .snap-panel p { margin: 0; line-height: 1.5; color: #69725c; }
+
+/* Contain all canvas Html portals below the preview toolbar and its menus. */
+.scene-container { isolation: isolate; z-index: 0; }
+.workspace-top:has(.snap-controls[open]) { z-index: 4; }

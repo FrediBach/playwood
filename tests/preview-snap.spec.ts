@@ -50,3 +50,46 @@ test('resize keyboard follows grid spacing and commits one undo step', async ({ 
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(width).toBe(450)
 })
+
+test('geometry guides darken at alignment and the dropdown covers resize handles', async ({ page }) => {
+  const panels = [
+    createPanel({ id: 'moving', width: 400, height: 300, position: [0, 400, 0] }),
+    createPanel({ id: 'target', width: 400, height: 300, position: [410, 950, 0] }),
+  ]
+  await page.addInitScript(panels => {
+    localStorage.setItem('playwood-studio-project-v1', JSON.stringify({ version: 1, name: 'Guide feedback', panels, connections: [] }))
+    localStorage.setItem('playwood-snap', JSON.stringify({ grid: false, geometry: true, spacing: 50, tolerance: 10 }))
+  }, panels)
+  await page.goto('/')
+  await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
+  const handle = page.locator('[data-resize-handle="panel-width-positive"]')
+  await expect(handle).toBeVisible()
+  const activeGuides = () => page.locator('canvas').evaluate(async canvas => {
+    const url = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/@react-three_fiber.js'))!
+    const { _roots } = await import(url)
+    const { scene } = _roots.get(canvas).store.getState()
+    let count = 0
+    scene.traverse((object: { name: string; userData: { snapActive?: boolean }; material?: { opacity: number } }) => {
+      if (object.name === 'geometry-snap-guide' && object.userData.snapActive && object.material?.opacity === 0.9) count++
+    })
+    return count
+  })
+  await expect.poll(activeGuides).toBe(0)
+  await handle.focus()
+  await page.keyboard.press('ArrowRight')
+  await expect.poll(activeGuides).toBeGreaterThan(0)
+  await page.screenshot({ path: 'test-results/geometry-snap-highlight.png' })
+  await expect.poll(activeGuides).toBe(0)
+
+  await page.getByLabel('Snapping settings', { exact: true }).click()
+  const box = (await handle.boundingBox())!
+  // Place the real menu over a real handle to exercise their stacking contexts,
+  // independently of camera zoom and the user's panel dimensions.
+  await page.locator('.snap-panel').evaluate((panel, box) => {
+    Object.assign((panel as HTMLElement).style, { position: 'fixed', left: `${box.x - 30}px`, top: `${box.y - 30}px`, right: 'auto' })
+  }, box)
+  const covered = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.snap-panel'),
+    { x: box.x + box.width / 2, y: box.y + box.height / 2 })
+  expect(covered).toBe(true)
+  await page.screenshot({ path: 'test-results/snap-dropdown-stacking.png' })
+})

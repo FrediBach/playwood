@@ -33,6 +33,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
 
   return {
     handles,
+    snapProbe: current && session.current ? handles.find(handle => handle.id === session.current!.handleId) : undefined,
     active: !!current,
     project: current?.project,
     panels,
