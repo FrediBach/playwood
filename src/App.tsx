@@ -76,6 +76,7 @@ export default function App() {
   const panels=useMemo(()=>resolvePanels(project),[project])
   const selectedIdSet=useMemo(()=>new Set(selectedIds),[selectedIds])
   const selectedPanels=panels.filter(p=>selectedIdSet.has(p.id))
+  const selectedFinishCoverages=selectedPanels.map(p=>p.material==='painted'?1:p.finishCoverage??0)
   const selected=selectedPanels.length===1?selectedPanels[0]:undefined
   const selectedId=selected?.id??null
   const connection=project.connections.find(c=>c.childId===selectedId&&c.role!=='support')
@@ -290,7 +291,7 @@ export default function App() {
     setSelectedId(panel.id); setInspectorTab('panel'); setRightOpen(true)
     setFitSignal(v => v + 1); notify('Your panel is ready')
   }
-  const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setExploded(false);setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87'}));setInspectorTab('attach');setRightOpen(true)}
+  const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setExploded(false);setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87',...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}));setInspectorTab('attach');setRightOpen(true)}
   const applyAttachment=()=>{if(!previewProject||attachmentErrors.length)return;commit(previewProject);setSelectedId(attachTarget==='new'?draft.id:attachTarget);setInspectorTab('panel');setDraft(createPanel());notify(`${previewPanels.length===1?'Panel':`${previewPanels.length} panels`} attached`)}
   const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return;const group=connection.id.replace(/:\d+$/,'');commit(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
   const insertModuleDefinition = (definition: AssemblyDefinition) => {
@@ -481,13 +482,15 @@ export default function App() {
           panels={assembly.editingDefinition.panels.filter(panel=>selectedIdSet.has(assembly.editingInstance!.panelIds[panel.id]))}
           definitionPanels={assembly.editingDefinition.panels} parameters={assembly.editingDefinition.parameters} onParametersChange={assembly.parameters}
           name={assembly.editingDefinition.name} count={assemblyCount(assembly.editingDefinition.id)} onChange={assembly.updateDefinition}/>
-        :instance&&assembly.definition?<AssemblyInspector name={instance.name} definitionName={assembly.definition.name}
+        :instance&&assembly.definition?<AssemblyInspector key={instance.id} name={instance.name} definitionName={assembly.definition.name}
           parameters={assembly.definition.parameters} parameterValues={instance.parameterValues} onParameterChange={(id,value)=>assembly.parameter(instance.id,id,value)} onResetParameters={()=>assembly.resetParameters(instance.id)}
           instanceCount={assemblyCount(instance.definitionId)} panelCount={Object.keys(instance.panelIds).length} color={instance.finish?.color??selectedPanels[0]?.color??'#d9bb87'} hasColorOverride={!!instance.finish?.color}
+          finishCoverage={selectedFinishCoverages[0]??0} finishCoverageMixed={selectedFinishCoverages.some(value=>value!==selectedFinishCoverages[0])} finishCoverageDisabled={selectedPanels.every(p=>p.material==='painted')}
+          hasFinishCoverageOverride={instance.finish?.finishCoverage!==undefined} onFinishCoverageChange={finishCoverage=>assembly.finish(instance.id,{finishCoverage})} onResetFinishCoverage={()=>assembly.resetFinish(instance.id,'finishCoverage')}
           connected={project.assemblies?.links.some(link=>link.a.instanceId===instance.id||link.b.instanceId===instance.id)}
           attachmentTargets={assembly.instances.filter(item=>item.id!==instance.id&&!project.assemblies?.links.some(link=>link.a.instanceId===item.id||link.b.instanceId===item.id)).map(item=>({id:item.id,name:item.name}))}
           attachmentActive={assembly.placementActive} attachmentMessage={assemblyHint} onCancelAttach={assembly.clearPlacement} canAttachCopy={validTargets.length>0}
-          onRename={name=>assembly.rename(instance.id,name)} onColorChange={color=>assembly.finish(instance.id,color)} onResetColor={()=>assembly.resetFinish(instance.id)}
+          onRename={name=>assembly.rename(instance.id,name)} onColorChange={color=>assembly.finish(instance.id,{color})} onResetColor={()=>assembly.resetFinish(instance.id,'color')}
           onDuplicate={duplicateSelected} onExport={exportAssembly} onAttachCopy={()=>{clipboard.cancel();assembly.startAttach()}} onAttachExisting={id=>{clipboard.cancel();assembly.startAttach(id)}}
           onEdit={()=>assembly.edit(instance.id)} onDisconnect={()=>assembly.disconnect(instance.id)} onMakeIndependent={()=>assembly.independent(instance.id)} onDisassemble={()=>assembly.disassemble(instance.id)} onDelete={deleteSelected}/>
         :assembly.memberInstance&&selected&&assembly.definition?<AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={()=>assembly.select(assembly.memberInstance!.id)} onEdit={()=>assembly.edit(assembly.memberInstance!.id)}/>

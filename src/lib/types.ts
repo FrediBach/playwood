@@ -9,6 +9,8 @@ export interface OutlinePoint { x: number; y: number }
 export interface Panel {
   id: string; name: string; width: number; height: number; thickness: number;
   material: Material; color: string; pattern: Pattern;
+  /** 0 keeps the natural texture; 1 covers it with solid color. Defaults to 0. */
+  finishCoverage?: number;
   position: Vec3; rotation: Vec3; visible: boolean;
   holeSize: number; holeSpacing: number; cornerRadius?: number;
   customOutline?: OutlinePoint[];
@@ -29,7 +31,7 @@ export type AssemblyDimension = 'width' | 'height' | 'thickness'
 export interface AssemblyParameterBinding { panelId: string; dimension: AssemblyDimension; scale: number; offset: number }
 export interface AssemblyParameter { id: string; name: string; defaultValue: number; bindings: AssemblyParameterBinding[] }
 export interface AssemblyDefinition { id: string; name: string; panels: Panel[]; connections: Connection[]; ports: AssemblyPort[]; parameters?: AssemblyParameter[] }
-export interface AssemblyFinish { color?: string; material?: Material }
+export interface AssemblyFinish { color?: string; material?: Material; finishCoverage?: number }
 export interface AssemblyInstance {
   id: string; definitionId: string; name: string; position: Vec3; rotation: Vec3;
   /** Stable definition-panel ID to materialized project-panel ID mapping. */

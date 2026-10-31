@@ -60,7 +60,8 @@ export function repairLegacyExampleInserts(project: Project): Project {
     const oldInsert = project.panels.find(panel => panel.thickness !== 18)
     for (const panel of current) if (!existingNames.has(panel.name)) {
       // New supporting sides use the existing insert's finish when available.
-      panels.push(oldInsert ? { ...panel, material: oldInsert.material, color: oldInsert.color, visible: oldInsert.visible } : panel)
+      panels.push(oldInsert ? { ...panel, material: oldInsert.material, color: oldInsert.color, visible: oldInsert.visible,
+        ...(oldInsert.finishCoverage === undefined ? {} : { finishCoverage: oldInsert.finishCoverage }) } : panel)
     }
     return { ...project, panels }
   }

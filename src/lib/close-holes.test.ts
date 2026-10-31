@@ -12,8 +12,10 @@ const openings = (project: ReturnType<typeof gridProject>) => findPanelHoles(res
 describe('close holes', () => {
   it('finds front and back and closes exactly one, then the other', () => {
     const project = gridProject('Box', [350], [350])
+    project.panels.forEach(panel => { panel.finishCoverage = 0.6 })
     expect(openings(project).map(hole => hole.label)).toEqual(['Back', 'Front'])
     const result = closePanelHole(project, project.panels.map(panel => panel.id), openings(project)[0].id)
+    expect(result.project.panels.find(panel => panel.id === result.panelId)?.finishCoverage).toBe(0.6)
     const added = result.project.connections.filter(connection => [connection.parentId, connection.childId].includes(result.panelId))
     expect(added).toHaveLength(4)
     expect(new Set(added.map(connection => connection.parentId === result.panelId ? connection.childId : connection.parentId))).toEqual(new Set(project.panels.map(panel => panel.id)))
@@ -24,6 +26,7 @@ describe('close holes', () => {
     const closed = closePanelHole(result.project, result.project.panels.map(panel => panel.id), openings(result.project)[0].id)
     expect(openings(closed.project)).toEqual([])
     expect(parseProject(JSON.parse(JSON.stringify(closed.project))).panels).toHaveLength(6)
+    expect(closed.project.panels.every(panel => panel.finishCoverage === 0.6)).toBe(true)
     expect(project.panels).toHaveLength(4)
     expect(() => closePanelHole(result.project, project.panels.map(panel => panel.id), openings(project)[0].id)).toThrow('no longer available')
   })

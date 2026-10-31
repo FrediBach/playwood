@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Box, Copy, Download, Link2, Pencil, Plus, RotateCcw, Trash2, Ungroup, Unlink } from 'lucide-react'
 import { Button } from './ui/button'
 import { NumberField } from './fields'
+import { FinishCoverageField } from './FinishCoverageField'
 import { AssemblyParametersEditor } from './AssemblyParametersEditor'
 import { assemblyParametersError } from '@/lib/assembly-parameters-validation'
 import { getAssemblyParameterRange } from '@/lib/assembly-parameters'
@@ -15,6 +16,12 @@ export interface AssemblyInspectorProps {
   panelCount: number
   color: string
   hasColorOverride: boolean
+  finishCoverage?: number
+  finishCoverageMixed?: boolean
+  finishCoverageDisabled?: boolean
+  hasFinishCoverageOverride?: boolean
+  onFinishCoverageChange?: (coverage: number) => void
+  onResetFinishCoverage?: () => void
   parameters?: AssemblyParameter[]
   parameterValues?: Record<string, number>
   onParameterChange?: (id: string, value: number) => boolean
@@ -39,7 +46,7 @@ export interface AssemblyInspectorProps {
   onCancelAttach?: () => void
 }
 
-export function AssemblyInspector({ name, definitionName, instanceCount, panelCount, color, hasColorOverride, parameters = [], parameterValues = {}, onParameterChange, onResetParameters, connected, attachmentTargets = [], attachmentActive, canAttachCopy = true, attachmentMessage, onRename, onColorChange, onResetColor, onDuplicate, onExport, onAttachCopy, onAttachExisting, onEdit, onDisconnect, onMakeIndependent, onDisassemble, onDelete, onCancelAttach }: AssemblyInspectorProps) {
+export function AssemblyInspector({ name, definitionName, instanceCount, panelCount, color, hasColorOverride, finishCoverage = 0, finishCoverageMixed = false, finishCoverageDisabled = false, hasFinishCoverageOverride = false, onFinishCoverageChange, onResetFinishCoverage, parameters = [], parameterValues = {}, onParameterChange, onResetParameters, connected, attachmentTargets = [], attachmentActive, canAttachCopy = true, attachmentMessage, onRename, onColorChange, onResetColor, onDuplicate, onExport, onAttachCopy, onAttachExisting, onEdit, onDisconnect, onMakeIndependent, onDisassemble, onDelete, onCancelAttach }: AssemblyInspectorProps) {
   const isCustom = (id: string) => Object.hasOwn(parameterValues, id)
   const hasParameterOverrides = parameters.some(parameter => isCustom(parameter.id))
   return <>
@@ -65,7 +72,11 @@ export function AssemblyInspector({ name, definitionName, instanceCount, panelCo
     <section className="inspector-section assembly-finish-section"><div className="section-title"><h2>This instance</h2><span>LOCAL</span></div>
       <label className="assembly-color-field"><span>Panel color</span><input type="color" aria-label="Instance panel color" value={color} onChange={event => onColorChange(event.target.value)}/></label>
       <div className="assembly-override-status"><span>{hasColorOverride ? 'Custom color' : 'Using assembly color'}</span>{hasColorOverride && <button onClick={onResetColor}><RotateCcw size={12}/>Reset</button>}</div>
-      <p className="assembly-help">Color affects only this instance.</p>
+      {onFinishCoverageChange && <>
+        <FinishCoverageField key={name} value={finishCoverage} mixed={finishCoverageMixed} disabled={finishCoverageDisabled} onChange={onFinishCoverageChange}/>
+        <div className="assembly-override-status"><span>{hasFinishCoverageOverride ? 'Custom finish' : 'Using assembly finish'}</span>{hasFinishCoverageOverride && onResetFinishCoverage && <button aria-label="Reset instance finish coverage" onClick={onResetFinishCoverage}><RotateCcw size={12}/>Reset</button>}</div>
+      </>}
+      <p className="assembly-help">Color and finish affect only this instance.</p>
     </section>
 
     <section className="inspector-section"><div className="section-title"><h2>Keep building</h2><Link2 size={16}/></div>

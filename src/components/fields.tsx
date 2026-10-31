@@ -5,6 +5,7 @@ import type { Panel, Pattern } from '@/lib/types'
 import { getSharedPanelFields } from '@/lib/selection'
 import { MATERIALS, COLORS } from '@/lib/materials'
 import { PanelOutlineControl } from './PanelOutlineEditor'
+import { FinishCoverageField } from './FinishCoverageField'
 
 export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false,commitOnBlur=false,precision=1}: {
   label:string;value:number;onChange:(v:number)=>boolean|void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean;commitOnBlur?:boolean;precision?:number
@@ -57,7 +58,7 @@ export function SelectField({label,value,onChange,children,disabled=false,mixed=
 function FinishField({color,mixed,disabled,onChange}: {color:string;mixed:boolean;disabled:boolean;onChange:(color:string)=>void}) {
   const finishName=mixed?'Mixed':COLORS.find(c=>c.color.toLowerCase()===color.toLowerCase())?.name || (MATERIALS.some(m=>m.color===color)||['#d9bd8c','#b88b54','#76523b','#ae9677'].includes(color)?'Natural':'Custom')
   return <div className={`field ${disabled?'field-disabled':''}`}>
-      <span>Finish <span className="field-hint">{finishName}</span></span>
+      <span>Finish color <span className="field-hint">{finishName}</span></span>
       <div className="swatches">
         {COLORS.map(c=>{
           const selected=!mixed&&color.toLowerCase()===c.color.toLowerCase()
@@ -82,6 +83,9 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
   const disabled=(key:keyof Panel)=>disabledFields.includes(key)||mixed(key)
   const patternMixed=mixed('pattern')
   const colorMixed=mixed('color')
+  const finishCoverage=panel.material==='painted'?1:panel.finishCoverage??0
+  const finishCoverageMixed=selection.some(p=>(p.material==='painted'?1:p.finishCoverage??0)!==finishCoverage)
+  const allPainted=selection.every(p=>p.material==='painted')
   const onChange=(change:Partial<Panel>)=>{
     const patch=Object.fromEntries(Object.entries(change).filter(([key])=>!disabled(key as keyof Panel))) as Partial<Panel>
     if(!Object.keys(patch).length)return
@@ -113,6 +117,8 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
       {MATERIALS.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
     </SelectField>
     <FinishField color={panel.color} mixed={colorMixed} disabled={disabled('color')} onChange={color=>onChange({color})}/>
+    <FinishCoverageField key={`finish:${selection.map(p=>p.id).join(':')}`} value={finishCoverage} mixed={finishCoverageMixed}
+      disabled={allPainted||disabled('finishCoverage')} onChange={finishCoverage=>onChange({finishCoverage})}/>
     <div className={`field ${disabled('pattern')?'field-disabled':''}`}>
       <span>Surface{patternMixed&&<span className="field-hint">Mixed</span>}</span>
       <div className="pattern-options">

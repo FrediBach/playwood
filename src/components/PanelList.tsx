@@ -72,7 +72,7 @@ export function PanelList({ panels, selectedIds, issues, onSelect, onRename, onR
           className={`panel-list-row ${selected ? 'selected' : ''} ${!panel.visible ? 'is-hidden' : ''} ${editingId === panel.id ? 'is-editing' : ''}`}>
           <label className="panel-selection-toggle"><input type="checkbox" aria-label={`Select ${panel.name}`} checked={selected} onChange={() => onSelect(panel.id, true)} /></label>
             <button className="panel-drag-handle" data-list-handle {...handle}>
-              <span className={`panel-thumbnail ${panel.pattern}`} style={{ '--panel-color': panel.color } as React.CSSProperties} />
+              <span className={`panel-thumbnail ${panel.pattern}`} style={{ '--panel-color': panel.color, '--panel-grain-opacity': panel.material === 'painted' ? 0 : 0.08 * (1 - (panel.finishCoverage ?? 0)) } as React.CSSProperties} />
               <span className="panel-grip"><GripVertical size={17} /></span>
             </button>
           <div className="panel-list-copy">

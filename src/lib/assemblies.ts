@@ -488,14 +488,22 @@ export function updateAssemblyFinish(project: Project, instanceId: string, finis
   instanceFor(project, instanceId)
   if (finish.color !== undefined && !/^#[\da-f]{6}$/i.test(finish.color)) throw new Error('Choose a valid finish color.')
   if (finish.material !== undefined && !['birch', 'oak', 'walnut', 'mdf', 'painted'].includes(finish.material)) throw new Error('Choose a valid panel material.')
+  if (finish.finishCoverage !== undefined && (!Number.isFinite(finish.finishCoverage) || finish.finishCoverage < 0 || finish.finishCoverage > 1)) throw new Error('Choose finish coverage between 0 and 1.')
   const data = project.assemblies!
   return rebuild(project, { ...data, instances: data.instances.map(instance => instance.id === instanceId ? { ...instance, finish: { ...instance.finish, ...finish } } : instance) })
 }
 
-export function resetAssemblyFinish(project: Project, instanceId: string): Project {
-  instanceFor(project, instanceId)
+export function resetAssemblyFinish(project: Project, instanceId: string, key?: keyof AssemblyFinish): Project {
+  const selected = instanceFor(project, instanceId)
+  if (!selected.finish || (key && !Object.hasOwn(selected.finish, key))) return project
   const data = project.assemblies!
-  return rebuild(project, { ...data, instances: data.instances.map(instance => { if (instance.id !== instanceId) return instance; const { finish: _finish, ...rest } = instance; return rest }) })
+  return rebuild(project, { ...data, instances: data.instances.map(instance => {
+    if (instance.id !== instanceId) return instance
+    const { finish, ...rest } = instance
+    if (!key) return rest
+    const { [key]: _value, ...remaining } = finish!
+    return { ...rest, ...(Object.keys(remaining).length ? { finish: remaining } : {}) }
+  }) })
 }
 
 function solveInstancePlacements(data: AssemblyData): AssemblyData {
@@ -565,11 +573,12 @@ export function updateAssemblyDefinition(project: Project, instanceId: string, p
   const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
   const ids = new Set(partIds ?? definition.panels.map(panel => panel.id))
   if (![...ids].every(id => definition.panels.some(panel => panel.id === id))) throw new Error('Choose panels from this assembly source.')
-  const editable = ['name', 'width', 'height', 'thickness', 'material', 'color', 'pattern', 'visible', 'holeSize', 'holeSpacing', 'cornerRadius', 'customOutline'] as const
+  const editable = ['name', 'width', 'height', 'thickness', 'material', 'color', 'finishCoverage', 'pattern', 'visible', 'holeSize', 'holeSpacing', 'cornerRadius', 'customOutline'] as const
   const entries = editable.flatMap(key => patch[key] === undefined && !(key === 'customOutline' && Object.hasOwn(patch, key)) ? [] : [[key, patch[key]] as const])
   // A restored field can commit again on blur after a rejected edit. Preserve
   // the exact project and undo history rather than solving unchanged geometry.
-  if (definition.panels.filter(panel => ids.has(panel.id)).every(panel => entries.every(([key, value]) => panelValuesEqual(panel[key], value)))) return project
+  if (definition.panels.filter(panel => ids.has(panel.id)).every(panel => entries.every(([key, value]) => key === 'finishCoverage'
+    ? panelValuesEqual(panel[key] ?? 0, value) : panelValuesEqual(panel[key], value)))) return project
   const controlled = definition.parameters?.flatMap(parameter => parameter.bindings) ?? []
   if (controlled.some(binding => ids.has(binding.panelId) && patch[binding.dimension] !== undefined
     && definition.panels.find(panel => panel.id === binding.panelId)![binding.dimension] !== patch[binding.dimension])) {
@@ -647,10 +656,14 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
       }))
     }
     if (raw.finish !== undefined) {
-      if (!record(raw.finish) || Object.keys(raw.finish).some(key => key !== 'color' && key !== 'material')) throw new Error('Invalid assembly finish override.')
+      if (!record(raw.finish) || Object.keys(raw.finish).some(key => key !== 'color' && key !== 'material' && key !== 'finishCoverage')) throw new Error('Invalid assembly finish override.')
       const finish: AssemblyFinish = {}
       if (raw.finish.color !== undefined) { if (typeof raw.finish.color !== 'string' || !/^#[\da-f]{6}$/i.test(raw.finish.color)) throw new Error('Invalid assembly finish color.'); finish.color = raw.finish.color }
       if (raw.finish.material !== undefined) { if (typeof raw.finish.material !== 'string' || !['birch', 'oak', 'walnut', 'mdf', 'painted'].includes(raw.finish.material)) throw new Error('Invalid assembly material.'); finish.material = raw.finish.material as AssemblyFinish['material'] }
+      if (raw.finish.finishCoverage !== undefined) {
+        if (typeof raw.finish.finishCoverage !== 'number' || !Number.isFinite(raw.finish.finishCoverage) || raw.finish.finishCoverage < 0 || raw.finish.finishCoverage > 1) throw new Error('Invalid assembly finish coverage.')
+        finish.finishCoverage = raw.finish.finishCoverage
+      }
       instance.finish = finish
     }
     if (raw.parameterValues !== undefined) instance.parameterValues = parseAssemblyParameterValues(raw.parameterValues, definition.parameters ?? [])
@@ -695,7 +708,7 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
   const sameNumber = (a: number, b: number) => Math.abs(a - b) < 0.001
   for (const panel of rebuilt.panels) {
     const actual = panelsById.get(panel.id)
-    if (!actual || (actual.cornerRadius ?? 0) !== (panel.cornerRadius ?? 0) || !panelValuesEqual(actual.customOutline, panel.customOutline) || ['width', 'height', 'thickness', 'holeSize', 'holeSpacing'].some(key => !sameNumber(actual[key as 'width'], panel[key as 'width']))
+    if (!actual || (actual.cornerRadius ?? 0) !== (panel.cornerRadius ?? 0) || (actual.finishCoverage ?? 0) !== (panel.finishCoverage ?? 0) || !panelValuesEqual(actual.customOutline, panel.customOutline) || ['width', 'height', 'thickness', 'holeSize', 'holeSpacing'].some(key => !sameNumber(actual[key as 'width'], panel[key as 'width']))
       || actual.position.some((number, i) => !sameNumber(number, panel.position[i])) || Math.abs(q(actual.rotation).dot(q(panel.rotation))) < 0.999999
       || ['color', 'material', 'pattern', 'visible', 'name'].some(key => actual[key as 'color'] !== panel[key as 'color'])) throw new Error('Assembly panels do not match their source and instance transforms.')
   }

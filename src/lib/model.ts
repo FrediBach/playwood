@@ -411,6 +411,7 @@ export function parseProject(input: unknown): Project {
       visible: raw.visible === undefined ? true : raw.visible as boolean,
       holeSize: numberIn(raw.holeSize, 2, 200, 'hole size'), holeSpacing: numberIn(raw.holeSpacing, 10, 500, 'hole spacing'),
     }
+    if (raw.finishCoverage !== undefined) p.finishCoverage = numberIn(raw.finishCoverage, 0, 1, 'finish coverage')
     if (raw.customOutline !== undefined) {
       const outlineError = getOutlineError(raw.customOutline)
       if (outlineError) throw new Error(`Invalid custom outline: ${outlineError}`)
@@ -504,11 +505,11 @@ export function projectToCsv(project: Project): string {
     const safe = typeof value === 'string' && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value)
     return `"${safe.replaceAll('"', '""')}"`
   }
-  const rows: (string | number)[][] = [['Item', 'Quantity', 'Width (mm)', 'Height (mm)', 'Thickness (mm)', 'Material', 'Color', 'Pattern', 'Hole size (mm)', 'Hole pitch (mm)', 'Corner radius (mm)', 'Custom outline points (mm, x/y from top left)']]
-  for (const panel of project.panels) rows.push([panel.name, 1, panel.width, panel.height, panel.thickness, panel.material, panel.color, panel.pattern, panel.pattern === 'solid' ? '' : panel.holeSize, panel.pattern === 'solid' ? '' : panel.holeSpacing, panelCornerRadius(panel),
+  const rows: (string | number)[][] = [['Item', 'Quantity', 'Width (mm)', 'Height (mm)', 'Thickness (mm)', 'Material', 'Color', 'Finish coverage (%)', 'Pattern', 'Hole size (mm)', 'Hole pitch (mm)', 'Corner radius (mm)', 'Custom outline points (mm, x/y from top left)']]
+  for (const panel of project.panels) rows.push([panel.name, 1, panel.width, panel.height, panel.thickness, panel.material, panel.color, panel.material === 'painted' ? 100 : Math.round((panel.finishCoverage ?? 0) * 100), panel.pattern, panel.pattern === 'solid' ? '' : panel.holeSize, panel.pattern === 'solid' ? '' : panel.holeSpacing, panelCornerRadius(panel),
     panel.customOutline?.map(point => `${Number((point.x * panel.width).toFixed(3))}/${Number((point.y * panel.height).toFixed(3))}`).join('; ') ?? ''])
   const connectors = new Map<string, number>()
   for (const c of getPhysicalConnectors(project)) { const key = `${c.type}|${c.color}`; connectors.set(key, (connectors.get(key) ?? 0) + 1) }
-  for (const [key, count] of connectors) { const [type, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', 'Reinforced plastic', color, '', '', '', '', '']) }
+  for (const [key, count] of connectors) { const [type, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', 'Reinforced plastic', color, '', '', '', '', '', '']) }
   return '\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n')
 }

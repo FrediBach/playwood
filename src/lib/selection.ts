@@ -19,15 +19,15 @@ export function panelValuesEqual(a: unknown, b: unknown): boolean {
 export function getSharedPanelFields(panels: Panel[]): Set<keyof Panel> {
   if (!panels.length) return new Set()
   const first = panels[0]
-  return new Set(([...new Set([...Object.keys(first), 'cornerRadius', 'customOutline'])] as (keyof Panel)[]).filter(key => {
+  return new Set(([...new Set([...Object.keys(first), 'cornerRadius', 'customOutline', 'finishCoverage'])] as (keyof Panel)[]).filter(key => {
     if (key === 'id' && panels.length > 1) return false
     return panels.every(panel => key === 'color'
       ? panel.color.toLowerCase() === first.color.toLowerCase()
-      : key === 'cornerRadius' ? panelValuesEqual(panel[key] ?? 0, first[key] ?? 0) : panelValuesEqual(panel[key], first[key]))
+      : key === 'cornerRadius' || key === 'finishCoverage' ? panelValuesEqual(panel[key] ?? 0, first[key] ?? 0) : panelValuesEqual(panel[key], first[key]))
   }))
 }
 
-const scalarFields = ['name', 'width', 'height', 'thickness', 'material', 'color', 'pattern', 'visible', 'holeSize', 'holeSpacing', 'cornerRadius'] as const
+const scalarFields = ['name', 'width', 'height', 'thickness', 'material', 'color', 'finishCoverage', 'pattern', 'visible', 'holeSize', 'holeSpacing', 'cornerRadius'] as const
 
 /**
  * Apply one bulk edit, preserving mixed fields even if a control includes a
@@ -64,7 +64,8 @@ export function updateSelectedPanels(project: Project, ids: string[], patch: Par
       }
     }
     // Preserve references when a patch is entirely disabled or repeats a value.
-    if ((Object.keys(next) as (keyof Panel)[]).every(key => panelValuesEqual(next[key], panel[key]))) return panel
+    if ((Object.keys(next) as (keyof Panel)[]).every(key => key === 'finishCoverage'
+      ? panelValuesEqual(next[key] ?? 0, panel[key] ?? 0) : panelValuesEqual(next[key], panel[key]))) return panel
     changed = true
     return next
   })

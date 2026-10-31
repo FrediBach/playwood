@@ -43,6 +43,7 @@ describe('saved library insert repairs', () => {
       panel.name = `My panel ${index}`
       panel.color = '#123456'
       panel.material = 'walnut'
+      panel.finishCoverage = 0.3
       panel.pattern = 'pegboard'
       panel.visible = index % 2 === 0
       panel.holeSize = 8
@@ -54,7 +55,7 @@ describe('saved library insert repairs', () => {
     expect(repaired.panels.map(panel => panel.id)).toEqual(project.panels.map(panel => panel.id))
     for (const panel of repaired.panels) {
       const before = project.panels.find(candidate => candidate.id === panel.id)!
-      for (const key of ['name', 'color', 'material', 'pattern', 'visible', 'holeSize', 'holeSpacing'] as const) expect(panel[key]).toBe(before[key])
+      for (const key of ['name', 'color', 'material', 'finishCoverage', 'pattern', 'visible', 'holeSize', 'holeSpacing'] as const) expect(panel[key]).toBe(before[key])
     }
     expect(repaired.connections).toBe(project.connections)
     expect(shapes(repaired)).toEqual(shapes(createExampleProject('modular-shelf')))
@@ -65,10 +66,13 @@ describe('saved library insert repairs', () => {
     const shelf = project.panels.find(panel => panel.thickness !== 18)!
     shelf.color = '#123456'
     shelf.material = 'walnut'
+    shelf.finishCoverage = 0.7
     const repaired = repairLegacyExampleInserts(project)
     expect(repaired.panels).toHaveLength(project.panels.length + 2)
     expect(repaired.panels.find(panel => panel.id === shelf.id)?.width).toBe(355)
     expect(repaired.panels.slice(-2).map(panel => [panel.material, panel.color])).toEqual([['walnut', '#123456'], ['walnut', '#123456']])
+    expect(repaired.panels.slice(-2).map(panel => panel.finishCoverage)).toEqual([0.7, 0.7])
+    expect(parseProject(JSON.parse(JSON.stringify(repaired)))).toEqual(repaired)
   })
 
   it.each(['structural size', 'insert size', 'position', 'rotation', 'missing panel', 'extra panel', 'connection'])("leaves custom %s changes alone", change => {

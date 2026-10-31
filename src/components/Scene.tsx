@@ -7,6 +7,7 @@ import type { CameraView, Connection, Panel, Project, Vec3 } from '@/lib/types'
 import { ConnectorMeshes } from './ConnectorMeshes'
 import { makePanelGeometry } from './scene-geometry'
 import { createWoodTextures } from './wood-texture'
+import { createPanelMaterials } from './panel-materials'
 import { RoomEnvironment } from './RoomEnvironment'
 import { getRoomLayout } from './room-layout'
 import { getConnectorKeyboardSlides } from '@/lib/connector-movement'
@@ -93,27 +94,9 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDri
 }) {
   const { width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline } = panel
   const geometry = useMemo(() => makePanelGeometry({ width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline }), [width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline])
-  const textures = useMemo(() => !ghost && panel.material !== 'painted' ? createWoodTextures(panel.material) : null, [panel.material, ghost])
-  const face = useMemo(() => new THREE.MeshStandardMaterial({
-    color: ghost ? ACCENT : panel.color, map: textures?.color ?? null,
-    bumpMap: textures?.surface ?? null, bumpScale: panel.material === 'mdf' ? 0.00008 : 0.0003,
-    roughnessMap: textures?.surface ?? null, roughness: textures ? 1 : 0.76,
-    metalness: 0, transparent: ghost, opacity: ghost ? 0.38 : 1,
-    depthWrite: !ghost,
-  }), [panel.color, panel.material, textures, ghost])
-  const edge = useMemo(() => {
-    const material = new THREE.MeshStandardMaterial({ color: ghost ? ACCENT : panel.color, roughness: 0.9, transparent: ghost, opacity: ghost ? 0.32 : 1, depthWrite: !ghost })
-    if (panel.material === 'birch' && !ghost) {
-      material.onBeforeCompile = shader => {
-        shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying float plywoodZ;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\nplywoodZ = position.z;')
-        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying float plywoodZ;')
-          .replace('#include <color_fragment>', '#include <color_fragment>\nfloat ply = smoothstep(0.37, 0.43, fract(plywoodZ * 700.0));\ndiffuseColor.rgb *= mix(0.75, 1.02, ply);')
-      }
-      material.customProgramCacheKey = () => 'playwood-plywood-edges'
-    }
-    return material
-  }, [panel.color, panel.material, ghost])
+  const textured = !ghost && (panel.finishCoverage ?? 0) < 1
+  const textures = useMemo(() => textured && panel.material !== 'painted' ? createWoodTextures(panel.material) : null, [panel.material, textured])
+  const materials = useMemo(() => createPanelMaterials(panel, textures, ghost ? ACCENT : undefined), [panel.color, panel.material, panel.finishCoverage, textures, ghost])
   const outline = useMemo(() => {
     const box = new THREE.BoxGeometry(panel.width * MM + 0.001, panel.height * MM + 0.001, panel.thickness * MM + 0.001)
     const edges = new THREE.EdgesGeometry(box)
@@ -122,12 +105,12 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDri
   }, [panel.width, panel.height, panel.thickness])
   useEffect(() => () => { geometry.dispose() }, [geometry])
   useEffect(() => () => { textures?.color.dispose(); textures?.surface.dispose() }, [textures])
-  useEffect(() => () => { face.dispose(); edge.dispose() }, [face, edge])
+  useEffect(() => () => { materials.forEach(material => material.dispose()) }, [materials])
   useEffect(() => () => { outline.dispose() }, [outline])
   useEffect(() => () => { document.body.style.cursor = '' }, [])
   const position = panel.position.map(value => value * MM) as Vec3
   return <group position={position} rotation={panel.rotation}>
-    <mesh name={panel.name} userData={ghost || !interactive ? undefined : { panelId: panel.id }} geometry={geometry} material={[face, edge]} castShadow={!ghost} receiveShadow={!ghost}
+    <mesh name={panel.name} userData={ghost || !interactive ? undefined : { panelId: panel.id }} geometry={geometry} material={materials} castShadow={!ghost} receiveShadow={!ghost}
       onClick={ghost || !interactive ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey) }}
       onDoubleClick={ghost || !interactive || !onDrillIn ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onDrillIn(panel.id) }}
       onPointerOver={ghost || !interactive ? undefined : event => { event.stopPropagation(); document.body.style.cursor = 'pointer' }}

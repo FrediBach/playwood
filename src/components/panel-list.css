@@ -4,6 +4,7 @@
 .panel-drag-handle{position:relative;display:grid;place-items:center;width:27px;min-width:27px;height:42px;padding:0;background:none;cursor:grab;touch-action:none;border-radius:4px}
 .panel-drag-handle:disabled{opacity:1;cursor:default}
 .panel-drag-handle .panel-thumbnail{width:24px;height:32px}
+.panel-thumbnail.solid{background-image:repeating-linear-gradient(92deg,transparent 0 3px,rgba(255,255,255,var(--panel-grain-opacity,.08)) 3px 4px,transparent 5px 6px)}
 .panel-grip{position:absolute;inset:4px 0;display:grid;place-items:center;border-radius:3px;background:#faf9f0d9;color:#5e6652;opacity:0;transition:opacity .15s}
 .panel-list-row:hover .panel-grip,.panel-drag-handle:focus-visible .panel-grip,.is-dragging .panel-grip{opacity:1}
 .panel-drag-handle:disabled .panel-grip{display:none}

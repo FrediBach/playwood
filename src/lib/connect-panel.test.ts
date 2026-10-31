@@ -31,10 +31,12 @@ function expectSamePositions(a: number[][], b: number[][]) {
 describe('connect selected connectors with a panel', () => {
   it('fills free T openings, keeps physical hardware and existing panels stationary, and round-trips', () => {
     const { project, ids } = fixture()
+    project.panels.forEach(panel => { panel.finishCoverage = 0.65 })
     const before = structuredClone(project)
     const result = connectSelectedConnectors(project, ids)
     expect(project).toEqual(before)
     expect(result.project.panels).toHaveLength(3)
+    expect(result.project.panels.at(-1)!.finishCoverage).toBe(0.65)
     expect(resolvePanels(result.project).slice(0, 2)).toEqual(resolvePanels(project))
     expectSamePositions(positions(result.project), positions(project))
     expect(getPhysicalConnectors(result.project).every(piece => piece.type === 't' && piece.color === '#ff0000')).toBe(true)
@@ -59,6 +61,7 @@ describe('connect selected connectors with a panel', () => {
   it('allows cross openings to be filled one plane at a time', () => {
     const { project, ids } = fixture('cross')
     const first = connectSelectedConnectors(project, ids)
+    expect(Object.hasOwn(first.project.panels.at(-1)!, 'finishCoverage')).toBe(false)
     expect(validateProject(first.project)).toEqual([])
     expect(parseProject(JSON.parse(JSON.stringify(first.project)))).toEqual(first.project)
     const second = connectSelectedConnectors(first.project, getPhysicalConnectors(first.project).map(piece => piece.id))

@@ -5,7 +5,7 @@ import {
   updateAssemblyDefinition, updateAssemblyFinish, resetAssemblyFinish, renameAssembly,
   disassembleAssembly, updateAssemblyParameters, updateAssemblyParameterValues, resetAssemblyParameterValues,
 } from '@/lib/assemblies'
-import type { AssemblyParameter, Panel, Project } from '@/lib/types'
+import type { AssemblyFinish, AssemblyParameter, Panel, Project } from '@/lib/types'
 
 interface Options {
   project: Project
@@ -147,8 +147,8 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
       }
     },
     rename: (id: string, name: string) => run(() => renameAssembly(project, id, name)),
-    finish: (id: string, color: string) => run(() => updateAssemblyFinish(project, id, { color })),
-    resetFinish: (id: string) => run(() => resetAssemblyFinish(project, id)),
+    finish: (id: string, finish: AssemblyFinish) => run(() => updateAssemblyFinish(project, id, finish)),
+    resetFinish: (id: string, key?: keyof AssemblyFinish) => run(() => resetAssemblyFinish(project, id, key)),
     startAttach: (sourceId?: string) => {
       if (!selectedInstance) return
       setPlacement({ targetId: selectedInstance.id, sourceId }); setHover(null); prepareSelection(); fit()

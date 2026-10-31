@@ -90,6 +90,7 @@ function fitRectangle(options: Opening[][], first: Opening, source: Panel) {
   }
   const euler = new Euler().setFromRotationMatrix(new Matrix4().makeBasis(x, y, normal))
   const panel = createPanel({ name: 'Connecting panel', material: source.material, color: source.color, thickness: source.thickness,
+    ...(source.finishCoverage === undefined ? {} : { finishCoverage: source.finishCoverage }),
     width: Math.max(40, bounds[0].high - bounds[0].low), height: Math.max(40, bounds[1].high - bounds[1].low),
     position: origin.clone().addScaledVector(x, (bounds[0].low + bounds[0].high) / 2).addScaledVector(y, (bounds[1].low + bounds[1].high) / 2).toArray(),
     rotation: [euler.x, euler.y, euler.z] })
