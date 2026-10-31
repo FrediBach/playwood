@@ -154,7 +154,18 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       const childDimension = connection.quarterTurn ? 1 - dimension : dimension
       const parentLength = dimension === 0 ? parent.width : parent.height
       const childLength = childDimension === 0 ? child.width : child.height
-      for (const side of [-1, 1]) if (Math.abs(side * parentLength / 2 - connection.offset - side * childLength / 2) < CONTACT_TOLERANCE) {
+      const overlap = Math.min(parentLength / 2, connection.offset + childLength / 2)
+        - Math.max(-parentLength / 2, connection.offset - childLength / 2)
+      // Preserve both existing end setbacks along the joint, even for inset
+      // or previously edited panels. These rows constrain changes, so unequal
+      // lengths retain their difference rather than being snapped flush.
+      // Only preserving exactly flush ends lets a resize dissipate into joint
+      // sliding and progressively different depths across the structure.
+      // A joint covering half an edge or less can instead be one of several
+      // split supports (e.g. two legs under a desktop); its spans must remain
+      // independent, retaining only ends that were already flush.
+      const spansJoint = overlap > Math.max(parentLength, childLength) / 2 + CONTACT_TOLERANCE
+      for (const side of [-1, 1]) if (spansJoint || Math.abs(side * parentLength / 2 - connection.offset - side * childLength / 2) < CONTACT_TOLERANCE) {
         const constraint = row()
         add(constraint, parentIndex * 5 + 3 + dimension, side / 2)
         add(constraint, childIndex * 5 + 3 + childDimension, -side / 2)

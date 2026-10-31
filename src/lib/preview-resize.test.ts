@@ -3,10 +3,11 @@ import { Euler, Quaternion, Vector3 } from 'three'
 import { createAssembly } from './assemblies'
 import { connectorId } from './connector-selection'
 import { connectorSlide, getConnectorRail } from './connector-movement'
-import { attachPanel, createPanel, createStarterProject, resolvePanels, rotateProject, validateProject } from './model'
+import { attachPanel, createPanel, createStarterProject, parseProject, resolvePanels, rotateProject, validateProject } from './model'
 import { movePreviewResize, preparePreviewResize, type PreviewResizeSession } from './preview-resize'
 import { gridProject } from './example-geometry'
 import type { Project, Vec3 } from './types'
+import everydayShelf from './fixtures/everyday-shelf.json'
 
 const named = (project: Project, name: string) => resolvePanels(project).find(panel => panel.name === name)!
 const near = (actual: number[], expected: number[], precision = 5) => actual.forEach((value, index) => expect(value).toBeCloseTo(expected[index], precision))
@@ -20,6 +21,34 @@ const piecePosition = (project: Project, index = 0) => {
 }
 
 describe('preview structural resize handles', () => {
+  it.each([
+    { distance: 200, rotated: false }, { distance: -80, rotated: false },
+    { distance: 200, rotated: true }, { distance: -80, rotated: true },
+  ])('preserves everyday shelf setbacks for a $distance mm edge pull (rotated: $rotated)', ({ distance, rotated }) => {
+    const loaded = parseProject(everydayShelf)
+    const project = rotated ? rotateProject(rotateProject(loaded, 'y', 27), 'z', 15) : loaded
+    const before = resolvePanels(project)
+    const selected = named(project, 'Right upper side')
+    const session = preparePreviewResize(project, { panelId: selected.id })!
+    const handle = session.handles.find(handle => handle.id === 'panel-height-negative')!
+    const result = movePreviewResize(session, handle.id, distance)
+    expect(result.limited).toBe(false)
+    const direction = new Vector3(...handle.direction)
+    for (const old of before.filter(panel => panel.height > 300)) {
+      const next = result.project.panels.find(panel => panel.id === old.id)!
+      expect(next.height, old.name).toBeCloseTo(old.height + distance, 4)
+      near(new Vector3(...next.position).sub(new Vector3(...old.position)).toArray(), direction.clone().multiplyScalar(distance / 2).toArray(), 4)
+    }
+    for (const old of before) {
+      const next = result.project.panels.find(panel => panel.id === old.id)!
+      expect(next.width, old.name).toBeCloseTo(old.width, 4)
+      expect(next.thickness).toBe(old.thickness)
+      near(next.rotation, old.rotation)
+      expect(next.customOutline).toEqual(old.customOutline)
+    }
+    expect(result.project.connections.map(connection => connection.offset)).toEqual(project.connections.map(connection => connection.offset))
+    expect(result.project.connectorOverrides).toEqual(project.connectorOverrides)
+  })
   it('offers four edge handles on a loose panel, keeps its opposite edge fixed, and preserves rotation and thickness', () => {
     const panel = createPanel({ width: 400, height: 300, position: [120, 500, 10], rotation: [0.2, 0.3, 0.4] })
     const project: Project = { version: 1, name: 'Panel', panels: [panel], connections: [] }
