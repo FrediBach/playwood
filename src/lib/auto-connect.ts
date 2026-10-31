@@ -154,7 +154,7 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
  * Try the complete edit first, including any existing joints on the outer edges.
  * A rejected candidate never alters the project.
  */
-function splitInteriorTJoints(original: Project, selectedIds: readonly string[]) {
+export function splitInteriorTJoints(original: Project, selectedIds: readonly string[]) {
   let project = original, splits = 0, connectors = 0
   const addedPanelIds: string[] = [], selected = new Set(selectedIds)
   const seat = CONNECTOR_PROFILES.t.seat

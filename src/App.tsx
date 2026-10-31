@@ -26,6 +26,8 @@ import { insertAssemblyDefinition } from '@/lib/assembly-library'
 import { createAssemblyFile, parseAssemblyFile } from '@/lib/assembly-file'
 import { createExampleProject } from '@/lib/example-library'
 import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
+import { useParallelPanelSplitCounts } from '@/hooks/useParallelPanelSplitCounts'
+import { ParallelPanelSplit } from '@/components/ParallelPanelSplit'
 import { parallelPanelCut, splitParallelPanels } from '@/lib/parallel-panels'
 import { autoConnect } from '@/lib/auto-connect'
 import { getConnectorPanelFit } from '@/lib/connect-panel'
@@ -77,6 +79,7 @@ export default function App() {
   const panels=useMemo(()=>resolvePanels(project),[project])
   const selectedIdSet=useMemo(()=>new Set(selectedIds),[selectedIds])
   const selectedPanels=panels.filter(p=>selectedIdSet.has(p.id))
+  const {counts:splitCounts,checking:checkingSplits}=useParallelPanelSplitCounts(project,selectedIds)
   const selectedFinishCoverages=selectedPanels.map(p=>p.material==='painted'?1:p.finishCoverage??0)
   const selected=selectedPanels.length===1?selectedPanels[0]:undefined
   const selectedId=selected?.id??null
@@ -159,11 +162,11 @@ export default function App() {
       },{group:'panel-move',repeat})
     } catch(error) {notify(error instanceof Error?error.message:'This move cannot keep the joints aligned.')}
   }
-  const splitSelection=()=>{
+  const splitSelection=(count=1)=>{
     try {
-      const result=splitParallelPanels(project,selectedIds)
+      const result=splitParallelPanels(project,selectedIds,count)
       commit(result.project);setSelectedIds(result.panelIds)
-      notify(`Panels split into four sections with a center divider and ${result.connectors} new connectors. Undo is available.`)
+      notify(`Panels split into ${count+1} equal sections each with ${count} ${count===1?'divider':'dividers'} and ${result.connectors} new connectors. Undo is available.`)
     } catch(error) {notify(error instanceof Error?error.message:'These panels could not be split.')}
   }
   const detachSelection=()=>{
@@ -414,7 +417,8 @@ export default function App() {
         menuAction('Group selected',()=>groupSelected('panels',selectedIds))
         if (selected) menuAction('Attach panel',startAttach)
         if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Disconnect panels',detachSelection)
-        if (parallelPanelCut(selectedPanels)) menuAction('Split in the middle',splitSelection)
+        if (splitCounts.includes(1)) menuAction('Split in the middle',()=>splitSelection())
+        if (parallelPanelCut(selectedPanels)) menuAction('Split x times',()=>{setInspectorTab('panel');setRightOpen(true);requestAnimationFrame(()=>document.querySelector<HTMLSelectElement>('[aria-label="Number of splits"]')?.focus())})
       }
       if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`Fill hole · ${hole.label}`,()=>closeHole(hole.id))
       if (!assembly.memberInstance || instance) {
@@ -504,8 +508,8 @@ export default function App() {
         :assembly.memberInstance&&selected&&assembly.definition?<AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={()=>assembly.select(assembly.memberInstance!.id)} onEdit={()=>assembly.edit(assembly.memberInstance!.id)}/>
         :assembly.hasMembers?<><div className="selected-heading"><Box size={15}/><span>MULTIPLE OBJECTS</span></div><p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p><div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15}/>Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15}/>Remove</Button></div></>
         :<>
-          {parallelPanelCut(selectedPanels)&&<section className="inspector-section"><Button variant="outline" size="sm" onClick={splitSelection}>Split in the middle</Button><p className="field-note">Create four equal sections and a center divider with T connectors. Keeps the outer dimensions.</p></section>}
-          {selectedPanels.length>1&&<CreateAssemblyForm key={selectedIds.join('/')} panelCount={selectedPanels.length} panels={selectedPanels} onCreate={assembly.create}/>}
+          {parallelPanelCut(selectedPanels)&&<ParallelPanelSplit key={`split:${selectedIds.join('/')}`} counts={splitCounts} checking={checkingSplits} onSplit={splitSelection}/>}
+          {selectedPanels.length>1&&<CreateAssemblyForm key={`assembly:${selectedIds.join('/')}`} panelCount={selectedPanels.length} panels={selectedPanels} onCreate={assembly.create}/>}
           {selectedPanels.length>1&&<MultiPanelInspector panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commit(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
           {selected&&(inspectorTab==='panel'?<SinglePanelInspector selected={selected} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewError={previewResult.error} previewIssues={previewIssues} hasPreview={!!previewProject}/>)}
           {!selectedPanels.length&&<div className="no-selection"><MousePointer2 size={28}/><h2>A little more detail.</h2><p>Select a panel or connector in the workspace<br/>to make it your own.</p><Button variant="outline" onClick={addPanel}><Plus size={16}/>Add a panel</Button></div>}

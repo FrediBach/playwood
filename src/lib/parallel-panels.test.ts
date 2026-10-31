@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createPanel, createStarterProject, getProjectBounds, parseProject, resolvePanels, rotateProject, validateProject } from './model'
-import { parallelPanelCut, splitParallelPanels } from './parallel-panels'
+import { parallelPanelCut, parallelPanelSplitCounts, splitParallelPanels } from './parallel-panels'
 import { gridProject } from './example-geometry'
 import type { Project } from './types'
 
@@ -33,13 +33,41 @@ describe('split parallel panels', () => {
     expect(validateProject(result.project).filter(i => i.severity === 'error')).toEqual([])
     expect(original.connections.every(c => result.project.connections.some(next => next.id === c.id))).toBe(true)
   })
-  it('works after arbitrary world rotation and with rounded panels', () => {
+  it.each([1, 3])('works after arbitrary world rotation and with rounded panels (%s splits)', count => {
     const original = shelves()
     original.panels.forEach(p => { p.cornerRadius = 30 })
     const rotated = rotateProject(rotateProject(original, 'y', 37), 'x', 24)
-    const result = splitParallelPanels(rotated, ['b', 'a'])
+    const result = splitParallelPanels(rotated, ['b', 'a'], count)
     expect(validateProject(result.project)).toEqual([])
-    expect(result.project.panels.filter(p => p.name !== 'Center divider').every(p => p.cornerRadius === 30)).toBe(true)
+    expect(result.project.panels.filter(p => p.name !== 'Center divider' && !p.name.startsWith('Divider')).every(p => p.cornerRadius === 30)).toBe(true)
+  })
+  it.each([[900, 300], [300, 900]])('makes three evenly spaced cuts (%s × %s)', (width, height) => {
+    const original = shelves(width, height)
+    const result = splitParallelPanels(original, ['a', 'b'], 3)
+    const dimension = width > height ? 'width' : 'height'
+    expect(result.project.panels).toHaveLength(11)
+    expect(result.connectors).toBe(12)
+    const sections = resolvePanels(result.project).filter(panel => !panel.name.startsWith('Divider'))
+    expect(sections).toHaveLength(8)
+    for (const section of sections) expect(section[dimension]).toBeCloseTo((900 - 3 * 35) / 4)
+    expect(validateProject(result.project)).toEqual([])
+    expect(getProjectBounds(result.project.panels)).toEqual(getProjectBounds(original.panels))
+    expect(new Set(result.panelIds).size).toBe(11)
+  })
+  it('offers only counts that fit and rejects invalid counts atomically', () => {
+    const original = shelves(200, 100), before = structuredClone(original)
+    expect(parallelPanelSplitCounts(original, ['a', 'b'])).toEqual([1, 2])
+    for (const count of [0, -1, 1.5, NaN, Infinity, 3]) expect(() => splitParallelPanels(original, ['a', 'b'], count)).toThrow()
+    expect(original).toEqual(before)
+    original.panels[0].thickness = 16
+    expect(parallelPanelSplitCounts(original, ['a', 'b'])).toEqual([])
+  })
+  it('preserves existing outer joints with multiple dividers', () => {
+    const original = createStarterProject()
+    const ids = resolvePanels(original).filter(p => ['Top shelf', 'Middle shelf'].includes(p.name)).map(p => p.id)
+    const result = splitParallelPanels(original, ids, 3)
+    expect(original.connections.every(c => result.project.connections.some(next => next.id === c.id))).toBe(true)
+    expect(validateProject(result.project)).toEqual([])
   })
   it('rejects incompatible selections and leaves the original intact', () => {
     expect(parallelPanelCut(shelves().panels.slice(0, 1))).toBeUndefined()
