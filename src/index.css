@@ -26,6 +26,13 @@
 .room-details .room-dimensions{font-size:14px;color:#353b30;font-variant-numeric:tabular-nums}
 .room-dimensions span{font-size:10px;color:#767b6d;white-space:nowrap}
 .room-details .room-scale-note{margin-top:11px;padding-top:10px;border-top:1px solid #deded3;font-size:11px}
+.room-furnishing-control{margin-top:11px;padding-top:10px;border-top:1px solid #deded3}
+.room-furnishing-control label{display:flex;align-items:center;gap:8px;min-height:28px;font-size:12px;font-weight:550;color:#353b30;cursor:pointer}
+.room-furnishing-control input{width:16px;height:16px;accent-color:#47553d;cursor:pointer;flex-shrink:0}
+.room-furnishing-control input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.room-furnishing-control label span{margin-left:auto;font-size:10px;font-weight:400;color:#6b7162}
+.room-details .room-furnishing-control p{margin-top:4px;font-size:11px;line-height:1.45}
+.room-details .room-furnishing-status{color:#47553d}
 
 @media(max-width:680px){
   .preview-mode-switch button{font-size:11px;padding:8px 10px}
@@ -33,6 +40,9 @@
   .room-preview .workspace-top{left:18px;right:18px;top:20px}
   .room-details{position:static;align-self:center;width:calc(100% - 12px);max-width:none;padding:12px 15px}
   .room-details h2{font-size:16px;margin:7px 0 4px}.room-details .room-scale-note{margin-top:7px;padding-top:6px}.room-details .room-dimensions{font-size:13px}
+  .room-details .room-eyebrow,.room-details h2{display:none}
+  .room-details .room-scale-note{margin-top:4px;padding-top:0;border-top:0;font-size:10px}
+  .room-furnishing-control{margin-top:7px;padding-top:6px}
 }
 /* Comfortable contrast for the small, persistent workspace labels. */
 .field-note,.field-hint,.dialog-note,.save-label{color:#707968}.field>span,.field input:not([type=color]),.field select{color:#4c5941}.input-unit{color:#737d67}.dialog-content h2+p,.help-steps p,.reference-note>p,.export-options small,.template-card>span,.library-intro p{color:#6f7c61}.status-bar{color:#657255}.overline,.section-label,.selected-heading{color:#6a775c}.connection-summary>div>span{color:#747d69}.swatches{padding:3px 0}

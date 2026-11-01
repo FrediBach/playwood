@@ -1,5 +1,16 @@
 import { test, expect, type Page } from '@playwright/test'
-import { createPanel } from '../src/lib/model'
+import { createPanel, resolvePanels } from '../src/lib/model'
+import { createExampleProject } from '../src/lib/example-library'
+import type { Panel } from '../src/lib/types'
+
+async function importPanels(page: Page, panels: Panel[]) {
+  await page.getByRole('button', { name: 'Export project', exact: true }).click()
+  await page.getByLabel('Import project file').setInputFiles({
+    name: 'furnishing.playwood.json', mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ version: 1, name: 'Furnishing test', panels, connections: [] })),
+  })
+  await expect(page.getByRole('dialog')).not.toBeVisible()
+}
 
 async function exportedProject(page: Page) {
   await page.getByRole('button', { name: 'Export project', exact: true }).click()
@@ -91,10 +102,121 @@ test('phone room preview fits the screen and returns to the previous drawer stat
   await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
   await expectRenderedRoom(page)
   await expect(page.getByLabel('Room scale reference')).toBeInViewport()
+  const furnish = page.getByRole('checkbox', { name: 'Auto furnish', exact: true })
+  await expect(furnish).toBeInViewport()
+  await expect(furnish).not.toBeChecked()
+  await furnish.check()
+  await expect(furnish).toBeChecked()
+  await expect(furnish).toBeInViewport()
   await expect(page.getByRole('button', { name: 'Reset room view (F)', exact: true })).toBeInViewport()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBe(true)
   await page.screenshot({ path: 'test-results/realistic-preview-mobile.png' })
   await page.getByRole('button', { name: 'Studio', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Open panel list', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Open inspector', exact: true })).toBeVisible()
+})
+
+test('auto furnishing is opt-in, renders desk props, and never changes the project', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/')
+  await importPanels(page, [
+    createPanel({ name: 'Panel A', width: 1400, height: 700, position: [0, 741, 0], rotation: [-Math.PI / 2, 0, 0] }),
+    ...[-620, 620].map((x, index) => createPanel({ name: `Panel ${index + 2}`, width: 700, height: 732, position: [x, 366, 0], rotation: [0, Math.PI / 2, 0] })),
+  ])
+  const original = await exportedProject(page)
+  const furnish = page.getByRole('checkbox', { name: 'Auto furnish', exact: true })
+  const surface = page.locator('[data-preview-furnishings]')
+  await expect(furnish).not.toBeVisible()
+  await expect(surface).toHaveAttribute('data-preview-furnishings', '0')
+
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await expect(furnish).not.toBeChecked()
+  await expect(surface).toHaveAttribute('data-preview-furnishings', '0')
+  await expectRenderedRoom(page)
+  const unfurnished = await page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())
+
+  await furnish.check()
+  await expect(surface).toHaveAttribute('data-preview-furnishings', /^[1-9]\d*$/)
+  const count = await surface.getAttribute('data-preview-furnishings')
+  await expect.poll(() => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())).not.toBe(unfurnished)
+  await expectRenderedRoom(page)
+  await page.screenshot({ path: 'test-results/realistic-preview-furnished-desk.png' })
+  expect(await exportedProject(page)).toEqual(original)
+
+  await page.getByRole('button', { name: 'Studio', exact: true }).click()
+  await expect(furnish).not.toBeVisible()
+  await expect(surface).toHaveAttribute('data-preview-furnishings', '0')
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await expect(furnish).toBeChecked()
+  await expect(surface).toHaveAttribute('data-preview-furnishings', count!)
+  await furnish.uncheck()
+  await expect(surface).toHaveAttribute('data-preview-furnishings', '0')
+  expect(await exportedProject(page)).toEqual(original)
+  expect(errors).toEqual([])
+})
+
+test('auto furnishing skips vertical, tilted, and hidden surfaces', async ({ page }) => {
+  await page.goto('/')
+  await importPanels(page, [
+    createPanel({ name: 'Vertical', width: 1200, height: 800, position: [0, 500, 0] }),
+    createPanel({ name: 'Tilted', width: 1200, height: 700, position: [0, 1000, 0], rotation: [-Math.PI / 3, 0, 0] }),
+    createPanel({ name: 'Hidden horizontal', width: 1400, height: 700, position: [2000, 741, 0], rotation: [-Math.PI / 2, 0, 0], visible: false }),
+  ])
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
+  await expect(page.locator('[data-preview-furnishings]')).toHaveAttribute('data-preview-furnishings', '0')
+  await expect(page.getByText('No suitable surfaces found.', { exact: true })).toBeVisible()
+  await expectRenderedRoom(page)
+})
+
+test('auto furnishing seats a person on the gallery bench', async ({ page }) => {
+  await page.goto('/')
+  await importPanels(page, resolvePanels(createExampleProject('bench')))
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await expectRenderedRoom(page)
+  const unfurnished = await page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())
+  await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
+  await expect(page.locator('[data-preview-furnishings]')).toHaveAttribute('data-preview-furnishings', /^[1-9]\d*$/)
+  await expect.poll(() => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())).not.toBe(unfurnished)
+  await expect(page.getByRole('alert')).not.toBeVisible()
+  await page.screenshot({ path: 'test-results/realistic-preview-furnished-bench.png' })
+})
+
+test('deep cubby shelves show varied books facing their openings', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  const panels: Panel[] = []
+  // Each opening is narrower than its depth. The side walls and back, rather
+  // than the longest shelf edge or a panel name, establish the reading direction.
+  for (const [column, x] of [-398, 0, 398].entries()) {
+    for (const [row, y] of [49, 417, 785, 1153].entries()) {
+      panels.push(createPanel({
+        id: `cubby-${column}-${row}`, name: `Panel ${column}-${row}`,
+        width: 380, height: 420, position: [x, y, 0], rotation: [-Math.PI / 2, 0, 0],
+      }))
+    }
+  }
+  for (const [index, x] of [-597, -199, 199, 597].entries()) {
+    panels.push(createPanel({
+      id: `cubby-divider-${index}`, name: `Panel D${index}`,
+      width: 420, height: 1162, position: [x, 581, 0], rotation: [0, Math.PI / 2, 0],
+    }))
+  }
+  panels.push(createPanel({ id: 'cubby-rear', name: 'Panel R', width: 1212, height: 1162, position: [0, 581, -219] }))
+  await page.goto('/')
+  await importPanels(page, panels)
+  const original = await exportedProject(page)
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await expectRenderedRoom(page)
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
+  const unfurnished = await page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())
+  await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
+  await expect(page.locator('[data-preview-furnishings]')).toHaveAttribute('data-preview-furnishings', /^[1-9]\d*$/)
+  await expect.poll(() => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())).not.toBe(unfurnished)
+  await expectRenderedRoom(page)
+  await page.screenshot({ path: 'test-results/realistic-preview-varied-books.png' })
+  expect(await exportedProject(page)).toEqual(original)
+  expect(errors).toEqual([])
 })

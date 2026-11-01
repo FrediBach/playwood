@@ -1,5 +1,5 @@
 import type { SnapSettings } from '@/lib/preview-snap'
-import { useState, type Dispatch, type SetStateAction } from 'react'
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { Box, Grid2X2, House, Link2, PanelLeftOpen, Plus, Move, RotateCw, Ruler, SlidersHorizontal, Sun } from 'lucide-react'
 import Scene, { type SceneProps } from './Scene'
 import { ViewportControls } from './ViewportControls'
@@ -8,6 +8,7 @@ import { Tooltip } from './ui/tooltip'
 import { Button } from './ui/button'
 import type { CameraView, Side } from '@/lib/types'
 import { getProjectBounds } from '@/lib/model'
+import { detectPreviewFurnishings } from '@/lib/preview-furnishings'
 
 type Setter<T> = Dispatch<SetStateAction<T>>
 interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'previewConnections'> {
@@ -50,11 +51,15 @@ const number = (n:number)=>Math.round(n).toLocaleString()
 
 export function AssemblyWorkspace({boxSelectActive,boxSelectDisabled,selectionKind,onToggleBoxSelect,onBoxSelect,onBoxSelectCancel,resolveBoxPanelIds,resolveBoxConnectorIds,snapProbe,snapDirection,snapSettings,setSnapSettings,onPreviewContextMenu,connectorOverrides,selectedConnectorIds,onSelectConnector,panels,connections,selectedIds,choosePanel,onMove,onMoveConnectors,movementEnabled,onDragStart,onDragMove,onDragEnd,dragging,dragSnap,resizeHandles,onResizeStart,onResizeMove,onResizeEnd,resizing,resizeDistance,resizeLimited,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,frameSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onMoveCreation,onRotate,addPanel,onAutoConnect,autoConnectDisabled,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels,onDrillIn,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,suppressedConnectionIds=[],suppressedPanelIds=[],editingAssembly,assemblyHint,attachmentSummary,attachmentWarning}: Props) {
   const [panMode, setPanMode] = useState(false)
+  const [autoFurnish, setAutoFurnish] = useState(false)
+  // Keep detection and all additional meshes out of the default preview path.
+  const furnishings = useMemo(() => realisticPreview && autoFurnish ? detectPreviewFurnishings(panels) : [], [panels, realisticPreview, autoFurnish])
+  const furnishedSurfaces = new Set(furnishings.map(item => item.panelId)).size
   const panelSelectionActive = (selectionKind ?? (selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'panels'
   const previewIds = new Set([...suppressedPanelIds, ...previewPanels.map(panel => panel.id)])
   const replacedConnectionIds = new Set([...suppressedConnectionIds,...previewConnections.map(connection=>connection.id)])
   const sceneProps: SceneProps = realisticPreview
-    ? { panels, connections, selectedIds, onSelect: choosePanel, view: 'perspective', showGrid: false, showDimensions, exploded: false, realisticPreview, fitSignal, frameSignal, zoomSignal }
+    ? { panels, connections, selectedIds, onSelect: choosePanel, view: 'perspective', showGrid: false, showDimensions, exploded: false, realisticPreview, furnishings, fitSignal, frameSignal, zoomSignal }
     : { panels: panels.filter(panel => !previewIds.has(panel.id)), connections: connections.filter(connection => !replacedConnectionIds.has(connection.id) && !previewIds.has(connection.childId) && !previewIds.has(connection.parentId)), selectedIds, onSelect: choosePanel, onDrillIn, attachmentHandles, onAttachmentPreview, onAttachmentCommit, attachmentBoundsPanels, previewPanels, previewConnections, view, showGrid, showDimensions, exploded, realisticPreview, fitSignal, frameSignal, zoomSignal }
   const movementStatus = boxSelectActive ? <><span>Box select parts · drag to enclose</span><kbd>Shift</kbd> Add <kbd>Esc</kbd> Cancel</> : resizing ? <><span>{resizeLimited ? 'Resize limit reached' : 'Resizing panels'} · release to apply</span><kbd>Esc</kbd> Cancel</> : resizeHandles?.length ? 'Drag an arrow to pull or push · angles stay fixed' : panelSelectionActive && selectedIds.length > 0 && !editingAssembly && (!assemblyHint || movementEnabled)
     ? movementEnabled
@@ -81,6 +86,11 @@ export function AssemblyWorkspace({boxSelectActive,boxSelectDisabled,selectionKi
         <h2>{hasVisiblePanels?'Your design, in proportion.':'A room for your next idea.'}</h2>
         {hasVisiblePanels?<p className="room-dimensions">{number(visibleBounds.width)} × {number(visibleBounds.height)} × {number(visibleBounds.depth)} <span>mm · W × H × D</span></p>:<p>Add or show a panel in Studio to see it here.</p>}
         <p className="room-scale-note">Life-size setting · banana 22 cm long · floor lamp 165 cm tall</p>
+        <div className="room-furnishing-control">
+          <label><input type="checkbox" checked={autoFurnish} onChange={event=>setAutoFurnish(event.target.checked)} aria-label="Auto furnish" aria-describedby="room-furnishing-note"/>Auto furnish<span>Preview only</span></label>
+          <p id="room-furnishing-note">Books, desk accessories, decor and people. May slow large previews.</p>
+          {autoFurnish && <p className="room-furnishing-status" role="status">{furnishedSurfaces ? `${furnishedSurfaces} ${furnishedSurfaces === 1 ? 'surface furnished' : 'surfaces furnished'}` : 'No suitable surfaces found.'}</p>}
+        </div>
       </div>}/>
       {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}
     </main>

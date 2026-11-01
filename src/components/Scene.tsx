@@ -11,6 +11,8 @@ import { makePanelGeometry } from './scene-geometry'
 import { createWoodTextures } from './wood-texture'
 import { createPanelMaterials } from './panel-materials'
 import { RoomEnvironment } from './RoomEnvironment'
+import { PreviewFurnishings } from './PreviewFurnishings'
+import type { FurnishingPlacement } from '@/lib/preview-furnishings'
 import { GroundGrid } from './GroundGrid'
 import { getRoomLayout } from './room-layout'
 import { getConnectorKeyboardSlides, getConnectorRail } from '@/lib/connector-movement'
@@ -77,6 +79,7 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   showDimensions: boolean
   exploded: boolean
   realisticPreview?: boolean
+  furnishings?: FurnishingPlacement[]
   panMode?: boolean
   fitSignal: number
   frameSignal?: number
@@ -462,6 +465,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
     {showGrid && <GroundGrid floorY={floorY} extent={extent} cellSize={props.snapSettings?.grid ? props.snapSettings.spacing * MM : 0.1} />}
     </>}
     {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
+    {realisticPreview && !!props.furnishings?.length && <PreviewFurnishings placements={props.furnishings} />}
     {!exploded && <ConnectorMeshes panels={panels} connections={connections} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
@@ -519,7 +523,7 @@ export default function Scene(props: SceneProps) {
   }, [])
   const attachmentHandles = !props.boxSelectActive && !controlHeld && !props.exploded && !props.realisticPreview && !props.dragging && !props.resizing ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
   return <ViewportBoundary>
-    <div className={`scene-surface${props.boxSelectActive ? ' is-box-selecting' : ''}`}>
+    <div className={`scene-surface${props.boxSelectActive ? ' is-box-selecting' : ''}`} data-preview-furnishings={props.realisticPreview ? props.furnishings?.length ?? 0 : 0}>
     <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
       style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.boxSelectActive ? 'crosshair' : props.panMode ? 'grab' : undefined }}
