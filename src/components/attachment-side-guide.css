@@ -1,0 +1,14 @@
+.attachment-side-guide{position:absolute;inset:0;overflow:hidden;pointer-events:none;user-select:none}
+.attachment-side-anchor{position:absolute;left:0;top:0;width:0;height:0;visibility:hidden;color:#6b795b}
+.attachment-side-root{position:absolute;z-index:0;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 2px #fffdf1cc;pointer-events:none}
+.attachment-side-leader{position:absolute;z-index:0;left:0;top:0;width:var(--side-leader-length,0px);height:0;border-top:1.5px solid currentColor;transform-origin:0 0;transform:rotate(var(--side-leader-angle,0rad));pointer-events:none}
+.attachment-side-anchor.is-rear .attachment-side-leader{border-top-style:dashed}
+.attachment-side-label{position:absolute;z-index:1;left:var(--side-label-x,0px);top:var(--side-label-y,0px);transform:translate(-50%,-50%);display:flex;align-items:center;gap:7px;width:104px;height:34px;padding:5px 8px;border:1px solid #b8c2aa;border-radius:6px;background:#fffef7f5;color:#536345;box-shadow:0 2px 7px #24361718;font-size:12px;line-height:1;white-space:nowrap;pointer-events:auto;touch-action:none;cursor:pointer;transition:background .12s,border-color .12s,color .12s}
+.attachment-side-badge{display:grid;place-items:center;width:20px;height:20px;flex-shrink:0;border:1px solid currentColor;border-radius:4px;font-size:10px;font-weight:650;line-height:1}
+.attachment-side-anchor.is-rear .attachment-side-label{border-style:dashed}
+.attachment-side-anchor.is-selected,.attachment-side-anchor.is-highlighted{color:#cb4f2c}
+.attachment-side-label.is-selected{border-color:#cb4f2c;color:#a83f21;background:#fff2e7}
+.attachment-side-label.is-selected .attachment-side-badge{border-color:#cb4f2c;background:#cb4f2c;color:#fffaf4}
+.attachment-side-label:hover,.attachment-side-label.is-highlighted{border-color:#cb4f2c;background:#fff7ee;color:#ac4528;box-shadow:0 0 0 2px #cb4f2c30,0 2px 7px #24361718}
+.attachment-side-label:focus-visible{outline:2px solid #cb4f2c;outline-offset:3px}
+.attachment-side-anchor.is-highlighted .attachment-side-leader,.attachment-side-anchor.is-selected .attachment-side-leader{border-top-width:2px}

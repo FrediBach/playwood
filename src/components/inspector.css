@@ -1,4 +1,12 @@
 /* Inspector hierarchy: identity, properties, task tools, object actions. */
+.right-sidebar .attachment-side-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.right-sidebar .attachment-side-options button { display: flex; align-items: center; gap: 8px; padding: 8px; min-height: 38px; text-align: left; }
+.attachment-side-key { display: inline-grid; place-items: center; flex-shrink: 0; width: 20px; height: 20px; border-radius: 4px; background: #e1e6d7; color: #526347; font-size: 10px; font-weight: 650; line-height: 1; }
+.right-sidebar .attachment-side-options button.selected { border-color: #cb7654; background: #faeee2; color: #994322; }
+.attachment-side-options button.selected .attachment-side-key { background: #b84e2d; color: #fffaf4; }
+.right-sidebar .attachment-side-options button.is-highlighted { border-color: #b84e2d; box-shadow: 0 0 0 1px #b84e2d; }
+.right-sidebar .attachment-side-options button:focus-visible { outline: 2px solid #b84e2d; outline-offset: 3px; }
+.right-sidebar .attachment-side-field .field-note { margin: 2px 0 0; font-size: 11px; }
 .right-sidebar .inspector-header { height: 54px; padding-inline: 20px; }
 .right-sidebar .inspector-scroll { padding: 20px; scroll-padding-block: 16px; }
 .right-sidebar .selected-heading { margin-bottom: 8px; letter-spacing: .9px; }

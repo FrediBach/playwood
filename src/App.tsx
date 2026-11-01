@@ -18,6 +18,7 @@ import { InspectorDisclosure } from '@/components/InspectorPrimitives'
 import { InspectorSidebar } from '@/components/InspectorSidebar'
 import { SinglePanelInspector } from '@/components/SinglePanelInspector'
 import { AttachmentInspector } from '@/components/AttachmentInspector'
+import type { AttachmentSideGuideState } from '@/components/AttachmentSideGuide'
 import { AssemblyInspector, CreateAssemblyForm } from '@/components/AssemblyInspector'
 import { AssemblyEditingInspector, AssemblyPartInspector } from '@/components/AssemblyEditingInspector'
 import { CONNECTORS, DEFAULT_CONNECTOR_COLOR } from '@/lib/connector-options'
@@ -50,7 +51,7 @@ import { duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, is
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, moveProject, rotateProject, validateProject } from '@/lib/model'
-import type { AssemblyDefinition, AttachmentOptions, CameraView, Panel, Project, Vec3, ListKind } from '@/lib/types'
+import type { AssemblyDefinition, AttachmentOptions, CameraView, Panel, Project, Side, Vec3, ListKind } from '@/lib/types'
 
 const INITIAL_ATTACHMENT: AttachmentOptions = {side:'right',type:'90',offset:0,inset:0,flip:false,color:DEFAULT_CONNECTOR_COLOR,count:2}
 function download(content:string,name:string,type:string) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
@@ -83,6 +84,7 @@ export default function App() {
   },[projectPalette])
   const [attachTarget,setAttachTarget]=useState('new')
   const [attachment,setAttachment]=useState<AttachmentOptions>(INITIAL_ATTACHMENT)
+  const [attachmentSideHighlight,setAttachmentSideHighlight]=useState<{panelId:string;side:Side}|null>(null)
   const [view,setView]=useState<CameraView>('perspective')
   const [boxSelectActive,setBoxSelectActive]=useState(false)
   const [realisticPreview,setRealisticPreview]=useState(false)
@@ -109,6 +111,13 @@ export default function App() {
   const selectedFinishCoverages=selectedPanels.map(p=>p.material==='painted'?1:p.finishCoverage??0)
   const selected=selectedPanels.length===1?selectedPanels[0]:undefined
   const selectedId=selected?.id??null
+  const attachmentSideGuide: AttachmentSideGuideState | undefined=selected?{
+    panelId:selected.id,
+    side:attachment.side,
+    highlightedSide:attachmentSideHighlight?.panelId===selected.id?attachmentSideHighlight.side:null,
+    onHighlight:side=>setAttachmentSideHighlight(side?{panelId:selected.id,side}:null),
+    onSelect:side=>setAttachment(current=>({...current,side})),
+  }:undefined
   const connection=project.connections.find(c=>c.childId===selectedId&&c.role!=='support')
   const bounds=useMemo(()=>getProjectBounds(panels),[panels])
   const visibleBounds=useMemo(()=>getProjectBounds(panels.filter(panel=>panel.visible)),[panels])
@@ -367,7 +376,7 @@ export default function App() {
     setSelectedId(panel.id); setInspectorTab('panel'); setRightOpen(true)
     setFitSignal(v => v + 1); notify('Your panel is ready')
   }
-  const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setExploded(false);setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87',...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}));setInspectorTab('attach');setRightOpen(true)}
+  const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setAttachmentSideHighlight(null);setRealisticPreview(false);setExploded(false);setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87',...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}));setInspectorTab('attach');setRightOpen(true)}
   const applyAttachment=()=>{if(!previewProject||attachmentErrors.length)return;commit(previewProject);setSelectedId(attachTarget==='new'?draft.id:attachTarget);setInspectorTab('panel');setDraft(createPanel());notify(`${previewPanels.length===1?'Panel':`${previewPanels.length} panels`} attached`)}
   const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return;const group=connection.id.replace(/:\d+$/,'');commit(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
   const insertModuleDefinition = (definition: AssemblyDefinition) => {
@@ -563,7 +572,7 @@ export default function App() {
       setRealisticPreview={setRealisticPreview} leftOpen={leftOpen} rightOpen={rightOpen} setLeftOpen={setLeftOpen} setRightOpen={setRightOpen}
       setShowDimensions={setShowDimensions} setShowGrid={setShowGrid} setView={setView} setZoomSignal={setZoomSignal} setFitSignal={setFitSignal}
       setExploded={setExploded} onMoveCreation={()=>setDialog('move')} onRescale={()=>setDialog('rescale')} onRotate={()=>setDialog('rotate')} addPanel={addPanel} isAttaching={inspectorTab==='attach'&&!!selected}
-      attachmentSide={attachment.side} visibleBounds={visibleBounds} hasVisiblePanels={hasVisiblePanels}
+      attachmentSide={attachment.side} attachmentSideGuide={inspectorTab==='attach'&&!dialog?attachmentSideGuide:undefined} visibleBounds={visibleBounds} hasVisiblePanels={hasVisiblePanels}
       attachmentHandles={!dialog&&!inspectingConnectors?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?(clipboard.inserting?`Attach ${clipboard.inserting} at`:'Paste at'):'Attach'} ${target.label}${target.warning?` · ${target.warning}`:''}`,position:target.position,warning:target.warning,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
       onAttachmentPreview={clipboard.active?clipboard.hover:assembly.hover} onAttachmentCommit={clipboard.active?clipboard.attach:assembly.attach} suppressedConnectionIds={clipboard.active?clipboard.suppressedConnectionIds:assembly.suppressedConnectionIds}
       suppressedPanelIds={clipboard.active?clipboard.suppressedPanelIds:assembly.suppressedPanelIds}
@@ -599,7 +608,7 @@ export default function App() {
         :assembly.hasMembers?<><div className="selected-heading"><Box size={15}/><span>MULTIPLE OBJECTS</span></div><p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p>{buildTools}<div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15}/>Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15}/>Remove</Button></div></>
         :<>
           {selectedPanels.length>1&&<MultiPanelInspector buildTools={buildTools} panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commit(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
-          {selected&&(inspectorTab==='panel'?<SinglePanelInspector buildTools={buildTools} selected={selected} connected={project.connections.some(c=>c.parentId===selected.id||c.childId===selected.id)} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewIssues={previewIssues}/>)}
+          {selected&&(inspectorTab==='panel'?<SinglePanelInspector buildTools={buildTools} selected={selected} connected={project.connections.some(c=>c.parentId===selected.id||c.childId===selected.id)} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewIssues={previewIssues} sideGuide={attachmentSideGuide!}/>)}
           {!selectedPanels.length&&<div className="no-selection"><MousePointer2 size={28}/><h2>A little more detail.</h2><p>Select a panel or connector in the workspace<br/>to make it your own.</p><Button variant="outline" onClick={addPanel}><Plus size={16}/>Add a panel</Button></div>}
         </>}
         </>}

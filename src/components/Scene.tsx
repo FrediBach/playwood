@@ -19,6 +19,7 @@ import { getConnectorKeyboardSlides, getConnectorRail } from '@/lib/connector-mo
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
 import { PreviewDragMovement, type PreviewDragProps } from './PreviewDragMovement'
 import { PreviewResizeHandles } from './PreviewResizeHandles'
+import { AttachmentSideGuide, type AttachmentSideGuideState } from './AttachmentSideGuide'
 import { PreviewBoxSelection, type BoxSelectionProps, type BoxSelectionPreview } from './PreviewBoxSelection'
 import type { PreviewResizeHandle } from '@/lib/preview-resize'
 import { Plus } from 'lucide-react'
@@ -65,6 +66,7 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   dragSnap?: { position: Vec3; label: string; warning?: string } | null
   onDrillIn?: (panelId: string) => void
   attachmentHandles?: AssemblyAttachmentHandle[]
+  attachmentSideGuide?: AttachmentSideGuideState
   onAttachmentPreview?: (id: string | null) => void
   onAttachmentCommit?: (id: string) => void
   previewPanels?: Panel[]
@@ -408,6 +410,8 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
   const cameraBounds = useMemo(() => boundsOf([...displayPanels, ...previewPanels, ...attachmentBoundsPanels]), [displayPanels, previewPanels, attachmentBoundsPanels])
   const center = useMemo(() => bounds.getCenter(new THREE.Vector3()), [bounds])
   const shownPanels = displayPanels.filter(panel => panel.visible)
+  const sideGuidePanel = props.attachmentSideGuide && !realisticPreview && !exploded && !props.boxSelectActive
+    ? shownPanels.find(panel => panel.id === props.attachmentSideGuide!.panelId) : undefined
   const floorY = bounds.min.y - 0.012
   const extent = useMemo(() => Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5), [bounds])
   const boxPreview = props.boxSelectActive ? props.boxPreview : null
@@ -484,6 +488,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
       }} onResizeEnd={props.onResizeEnd}
       distance={props.resizeDistance} limited={props.resizeLimited}/> : null}
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
+    {sideGuidePanel && props.attachmentSideGuide && <AttachmentSideGuide panel={sideGuidePanel} guide={props.attachmentSideGuide}/>}
     <CameraController panMode={props.panMode} bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
 }

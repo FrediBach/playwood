@@ -6,6 +6,7 @@ import { NumberField, PanelFields, SelectField } from './fields'
 import { InspectorDisclosure } from './InspectorPrimitives'
 import { JointPositionDiagram } from './InspectorDiagrams'
 import { PanelSecondaryFields } from './PanelInspectorFields'
+import type { AttachmentSideGuideState } from './AttachmentSideGuide'
 import { SIDES } from '@/lib/connector-options'
 import { createPanel } from '@/lib/model'
 import type { AttachmentOptions, Panel, ValidationIssue } from '@/lib/types'
@@ -20,14 +21,30 @@ interface Props {
   attachTarget: string
   setAttachTarget: (target: string) => void
   previewIssues: ValidationIssue[]
+  sideGuide: AttachmentSideGuideState
 }
 
-export function AttachmentInspector({selected,panels,draft,setDraft,attachment,setAttachment,attachTarget,setAttachTarget,previewIssues}: Props) {
+export function AttachmentInspector({selected,panels,draft,setDraft,attachment,setAttachment,attachTarget,setAttachTarget,previewIssues,sideGuide}: Props) {
   const count=attachment.type==='t'?2:attachment.type==='cross'?3:1
   return <>
     <div className="attach-intro"><Link2 size={19}/><div><h2>Attach to {selected.name}</h2><p>{count>1?`Creates ${count} panels around one joint.`:attachTarget==='new'?'Preview a new connected panel.':'Preview an existing panel in its new position.'}</p></div></div>
     <SelectField label="Panel to attach" value={attachTarget} onChange={value=>{setAttachTarget(value);setDraft(value==='new'?createPanel({name:`Panel ${panels.length+1}`,width:selected.width,height:360,thickness:selected.thickness,material:selected.material,color:selected.color,...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}):{...panels.find(p=>p.id===value)!})}}><option value="new">Create a new panel</option>{panels.filter(p=>p.id!==selected.id).map(p=><option key={p.id} value={p.id}>{p.name} · existing</option>)}</SelectField>
-    <div className="field"><span>Choose a side</span><div className="side-options">{SIDES.map(side=><button key={side} className={attachment.side===side?'selected':''} aria-pressed={attachment.side===side} onClick={()=>setAttachment(a=>({...a,side}))}>{side[0].toUpperCase()+side.slice(1)}</button>)}</div></div>
+    <div className="field attachment-side-field">
+      <span id="attachment-side-label">Choose a side</span>
+      <div className="side-options attachment-side-options" role="group" aria-labelledby="attachment-side-label" aria-describedby="attachment-side-help">
+        {SIDES.map((side,index)=><button key={side} type="button" data-inspector-side={side}
+          className={`${attachment.side===side?'selected ':''}${sideGuide.highlightedSide===side?'is-highlighted':''}`}
+          aria-pressed={attachment.side===side}
+          onPointerEnter={()=>sideGuide.onHighlight(side)}
+          onPointerLeave={()=>sideGuide.onHighlight(null)}
+          onFocus={()=>sideGuide.onHighlight(side)} onBlur={()=>sideGuide.onHighlight(null)}
+          onClick={()=>sideGuide.onSelect(side)}>
+          <span className="attachment-side-key" aria-hidden="true">{String.fromCharCode(65+index)}</span>
+          {side[0].toUpperCase()+side.slice(1)}
+        </button>)}
+      </div>
+      <p className="field-note" id="attachment-side-help">Match the letters in the preview, or click a label there. Side names stay with the panel as you orbit.</p>
+    </div>
     <ConnectorTypeField value={attachment.type} onChange={type=>setAttachment(a=>({...a,type}))}/>
     <section className="inspector-section"><div className="section-title"><h2>{count>1?`${count} new panels`:attachTarget==='new'?'New panel dimensions':'Panel dimensions'}</h2><span>mm</span></div><PanelFields group="dimensions" panel={draft} onChange={patch=>setDraft(p=>({...p,...patch}))} compact/></section>
     <InspectorDisclosure title="Joint position" summary={`${attachment.count} connectors · ${attachment.side}`} defaultOpen>
