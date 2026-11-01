@@ -85,13 +85,13 @@ test('reusable box copies share construction while finish overrides stay local',
 
   phase = 'color override'
   await openInspectorSection(page, 'Appearance')
-  await page.getByLabel('Instance panel color', { exact: true }).fill('#6b8f71')
+  await page.getByRole('button', { name: 'Sage finish', exact: true }).click()
   await expect(page.getByText('Custom color', { exact: true })).toBeVisible()
   const colored = await exportedProject(page)
-  const overridden = colored.assemblies!.instances.find(instance => instance.finish?.color === '#6b8f71')!
+  const overridden = colored.assemblies!.instances.find(instance => instance.finish?.color === '#94a18c')!
   expect(overridden).toBeDefined()
   const overridePanels = new Set(Object.values(overridden.panelIds))
-  expect(colored.panels.filter(panel => overridePanels.has(panel.id)).every(panel => panel.color === '#6b8f71')).toBe(true)
+  expect(colored.panels.filter(panel => overridePanels.has(panel.id)).every(panel => panel.color === '#94a18c')).toBe(true)
   expect(colored.panels.filter(panel => !overridePanels.has(panel.id)).map(panel => panel.color)).toEqual(first.panels.map(panel => panel.color))
 
   phase = 'reset color'
@@ -294,9 +294,9 @@ test('disassembling a free copy preserves its finish and hardware as independent
   await createBoxAssembly(page)
   await page.getByRole('button', { name: 'Duplicate', exact: true }).click()
   await openInspectorSection(page, 'Appearance')
-  await page.getByLabel('Instance panel color', { exact: true }).fill('#6b8f71')
+  await page.getByRole('button', { name: 'Sage finish', exact: true }).click()
   const before = await exportedProject(page)
-  const selected = before.assemblies!.instances.find(instance => instance.finish?.color === '#6b8f71')!
+  const selected = before.assemblies!.instances.find(instance => instance.finish?.color === '#94a18c')!
   const looseIds = new Set(Object.values(selected.panelIds))
 
   await openInspectorSection(page, 'Manage assembly')
@@ -322,11 +322,11 @@ test('disassembling a free copy preserves its finish and hardware as independent
   await page.getByLabel('Panel name', { exact: true }).fill('My loose shelf')
   await page.getByLabel('Panel name', { exact: true }).press('Enter')
   await openInspectorSection(page, 'Material & finish')
-  await page.getByLabel('Custom finish color', { exact: true }).fill('#775599')
+  await page.getByRole('button', { name: 'Terracotta finish', exact: true }).click()
   const edited = await exportedProject(page)
   const changed = edited.panels.find(panel => panel.name === 'My loose shelf')!
   expect(looseIds.has(changed.id)).toBe(true)
-  expect(changed.color).toBe('#775599')
+  expect(changed.color).toBe('#bc6c50')
   for (const panel of edited.panels.filter(panel => !looseIds.has(panel.id))) {
     expect(panel).toEqual(before.panels.find(original => original.id === panel.id))
   }
@@ -357,9 +357,9 @@ test('disassembling a rotated Diamond box keeps shared connectors and isolates l
   await importProject(page, createExampleProject('diamond-shelf'))
   await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
   await openInspectorSection(page, 'Appearance')
-  await page.getByLabel('Instance panel color', { exact: true }).fill('#4d7f88')
+  await page.getByRole('button', { name: 'Blue gray finish', exact: true }).click()
   const before = await exportedProject(page)
-  const selected = before.assemblies!.instances.find(instance => instance.finish?.color === '#4d7f88')!
+  const selected = before.assemblies!.instances.find(instance => instance.finish?.color === '#778b99')!
   const looseIds = new Set(Object.values(selected.panelIds))
 
   await openInspectorSection(page, 'Manage assembly')
@@ -376,9 +376,9 @@ test('disassembling a rotated Diamond box keeps shared connectors and isolates l
   expect(validateProject(disassembled).filter(issue => issue.severity === 'error' || issue.id.endsWith('-alignment'))).toEqual([])
   await page.screenshot({ path: 'test-results/assembly-disassembled-diamond.png' })
 
-  await expect(page.getByLabel('Custom finish color', { exact: true })).toBeEnabled()
   await openInspectorSection(page, 'Material & finish')
-  await page.getByLabel('Custom finish color', { exact: true }).fill('#a76f5a')
+  await expect(page.getByRole('button', { name: 'Terracotta finish', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Terracotta finish', exact: true }).click()
   await page.locator('.panel-list-select').first().click()
   await expect(page.getByRole('button', { name: 'Detach for free placement', exact: true })).toBeVisible()
   await openInspectorSection(page, 'Placement details')
@@ -387,21 +387,21 @@ test('disassembling a rotated Diamond box keeps shared connectors and isolates l
   await page.getByLabel('Panel name', { exact: true }).press('Enter')
   const looseEdited = await exportedProject(page)
   const loosePanels = looseEdited.panels.filter(panel => looseIds.has(panel.id))
-  expect(loosePanels.every(panel => panel.color === '#a76f5a')).toBe(true)
+  expect(loosePanels.every(panel => panel.color === '#bc6c50')).toBe(true)
   expect(loosePanels.some(panel => panel.name === 'Loose diamond panel')).toBe(true)
 
   await page.locator('[data-assembly-id] .assembly-tree-select').first().click()
   await openInspectorSection(page, 'Appearance')
-  await page.getByLabel('Instance panel color', { exact: true }).fill('#337788')
+  await page.getByRole('button', { name: 'Sage finish', exact: true }).click()
   const instanceEdited = await exportedProject(page)
   for (const panel of loosePanels) expect(instanceEdited.panels.find(current => current.id === panel.id)).toEqual(panel)
   await page.getByRole('button', { name: 'Edit shared design', exact: true }).click()
   await openInspectorSection(page, 'Material & finish')
-  await page.getByLabel('Custom finish color', { exact: true }).fill('#bccccc')
+  await page.getByRole('button', { name: 'Chalk finish', exact: true }).click()
   await page.getByRole('button', { name: 'Done editing', exact: true }).click()
   const sourceEdited = await exportedProject(page)
   expect(sourceEdited.assemblies?.instances).toHaveLength(3)
-  expect(sourceEdited.assemblies!.definitions.find(definition => definition.id === selected.definitionId)!.panels.every(panel => panel.color === '#bccccc')).toBe(true)
+  expect(sourceEdited.assemblies!.definitions.find(definition => definition.id === selected.definitionId)!.panels.every(panel => panel.color === '#e8e5db')).toBe(true)
   for (const panel of loosePanels) expect(sourceEdited.panels.find(current => current.id === panel.id)).toEqual(panel)
   expect(connectorCounts(sourceEdited)).toEqual({ '90': 16, cross: 8 })
   expect(validateProject(sourceEdited).filter(issue => issue.severity === 'error' || issue.id.endsWith('-alignment'))).toEqual([])

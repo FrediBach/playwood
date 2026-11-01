@@ -3,6 +3,7 @@ import { Box, Copy, Download, Link2, Pencil, Plus, RotateCcw, Trash2, Ungroup, U
 import { Button } from './ui/button'
 import { NumberField } from './fields'
 import { FinishCoverageField } from './FinishCoverageField'
+import { PanelColorField } from './PanelColorField'
 import { AssemblyParametersEditor } from './AssemblyParametersEditor'
 import { InspectorDisclosure } from './InspectorPrimitives'
 import { assemblyParametersError } from '@/lib/assembly-parameters-validation'
@@ -83,7 +84,7 @@ export function AssemblyInspector({ name, definitionName, instanceCount, panelCo
     </section>}
 
     <InspectorDisclosure title="Appearance" summary={appearanceSummary} preferenceKey="assembly-appearance" className="assembly-finish-disclosure">
-      <label className="assembly-color-field"><span>Panel color</span><input type="color" aria-label="Instance panel color" value={color} onChange={event => onColorChange(event.target.value)}/></label>
+      <PanelColorField color={color} label="Panel color" onChange={onColorChange}/>
       <div className="assembly-override-status"><span>{hasColorOverride ? 'Custom color' : 'Using assembly color'}</span>{hasColorOverride && <button onClick={onResetColor}><RotateCcw size={12}/>Reset</button>}</div>
       {onFinishCoverageChange && <>
         <FinishCoverageField key={name} value={finishCoverage} mixed={finishCoverageMixed} disabled={finishCoverageDisabled} onChange={onFinishCoverageChange}/>

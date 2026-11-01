@@ -51,8 +51,11 @@ export interface ConnectorOverride { color?: string; type?: ConnectorType; remov
 export type ListKind = 'panels' | 'connectors'
 /** Flat organizational folders; independent of physical assemblies and joints. */
 export interface ListGroup { id: string; name: string; kind: ListKind; itemIds: string[] }
+export interface PaletteColor { id: string; name: string; color: string }
 export interface Project {
   version: 1; name: string; panels: Panel[]; connections: Connection[]; assemblies?: AssemblyData;
+  /** Additional panel finish swatches, saved with this project. */
+  customColors?: PaletteColor[];
   /** Per-piece hardware edits, keyed by serialized [connectionId, placementIndex].
    * Joint connections retain the layout independently of the installed hardware. */
   connectorOverrides?: Record<string, ConnectorOverride>;

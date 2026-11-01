@@ -1,11 +1,12 @@
 import { panelCornerRadius } from '@/lib/panel-shape'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import type { Panel, Pattern } from '@/lib/types'
 import { getSharedPanelFields } from '@/lib/selection'
-import { MATERIALS, COLORS } from '@/lib/materials'
+import { MATERIALS } from '@/lib/materials'
 import { PanelOutlineControl } from './PanelOutlineEditor'
 import { FinishCoverageField } from './FinishCoverageField'
+import { PanelColorField } from './PanelColorField'
 
 export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false,commitOnBlur=false,precision=1}: {
   label:string;value:number;onChange:(v:number)=>boolean|void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean;commitOnBlur?:boolean;precision?:number
@@ -53,25 +54,6 @@ export function SelectField({label,value,onChange,children,disabled=false,mixed=
       <ChevronDown size={14}/>
     </div>
   </label>
-}
-
-function FinishField({color,mixed,disabled,onChange}: {color:string;mixed:boolean;disabled:boolean;onChange:(color:string)=>void}) {
-  const finishName=mixed?'Mixed':COLORS.find(c=>c.color.toLowerCase()===color.toLowerCase())?.name || (MATERIALS.some(m=>m.color===color)||['#d9bd8c','#b88b54','#76523b','#ae9677'].includes(color)?'Natural':'Custom')
-  return <div className={`field ${disabled?'field-disabled':''}`}>
-      <span>Finish color <span className="field-hint">{finishName}</span></span>
-      <div className="swatches">
-        {COLORS.map(c=>{
-          const selected=!mixed&&color.toLowerCase()===c.color.toLowerCase()
-          return <button key={c.color} className={`swatch ${selected?'selected':''}`} style={{background:c.color}}
-            disabled={disabled} aria-label={`${c.name} finish`} aria-pressed={selected} onClick={()=>onChange(c.color)}>
-            {selected&&<Check size={15} color={c.color==='#414641'?'white':'#272823'}/>}
-          </button>
-        })}
-        <label className="custom-color" title={mixed?'Different finish colors in the selection':'Custom finish color'}>
-          <input type="color" aria-label="Custom finish color" disabled={disabled} value={mixed?'#808080':color} onChange={e=>onChange(e.target.value)}/><span>+</span>
-        </label>
-      </div>
-    </div>
 }
 
 export function PanelFields({panel,panels,onChange:applyChange,compact=false,disabledFields=[],resizeOnCommit=false,group}: {
@@ -138,7 +120,7 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
       onChange={v=>{const m=MATERIALS.find(m=>m.id===v)!;onChange({material:m.id,...(!disabled('color')?{color:m.color}:{})})}}>
       {MATERIALS.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
     </SelectField>
-    <FinishField color={panel.color} mixed={colorMixed} disabled={disabled('color')} onChange={color=>onChange({color})}/>
+    <PanelColorField color={panel.color} mixed={colorMixed} disabled={disabled('color')} onChange={color=>onChange({color})}/>
     <FinishCoverageField key={`finish:${selection.map(p=>p.id).join(':')}`} value={finishCoverage} mixed={finishCoverageMixed}
       disabled={allPainted||disabled('finishCoverage')} onChange={finishCoverage=>onChange({finishCoverage})}/>
     </>}

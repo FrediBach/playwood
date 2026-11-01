@@ -11,6 +11,7 @@ import { Box, CheckCheck, Copy, Link2, MousePointer2, Plus, Trash2 } from 'lucid
 import { Button } from '@/components/ui/button'
 import { ProjectHeader } from '@/components/ProjectHeader'
 import { ProjectDialogs, type ProjectDialog } from '@/components/ProjectDialogs'
+import { PanelPaletteProvider } from '@/components/PanelColorField'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AssemblyWorkspace } from '@/components/AssemblyWorkspace'
 import { InspectorDisclosure } from '@/components/InspectorPrimitives'
@@ -38,6 +39,7 @@ import { movePanels, resizePanels } from '@/lib/structure-edit'
 import { rotateSelection } from '@/lib/selection-rotation'
 import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
 import { useProject } from '@/hooks/use-project'
+import { addCustomColor, getProjectPalette, removeCustomColor, updateCustomColor } from '@/lib/custom-colors'
 import { useCopyPaste } from '@/hooks/use-copy-paste'
 import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { usePreviewDrag } from '@/hooks/use-preview-drag'
@@ -65,6 +67,18 @@ export default function App() {
   const [assemblyTab,setAssemblyTab]=useState<ListKind>('panels')
   const [dialog,setDialog]=useState<ProjectDialog>(null)
   const [draft,setDraft]=useState(()=>createPanel({name:'My panel',width:600,height:360,thickness:18}))
+  const projectPalette=useMemo(()=>getProjectPalette({customColors:project.customColors}),[project.customColors])
+  const previousPalette=useRef(projectPalette)
+  useEffect(()=>{
+    const previous=previousPalette.current
+    previousPalette.current=projectPalette
+    setDraft(current=>{
+      if(projectPalette.some(option=>option.color===current.color.toLowerCase()))return current
+      const before=previous.find(option=>option.color===current.color.toLowerCase())
+      const replacement=before&&projectPalette.find(option=>option.id===before.id)
+      return {...current,color:replacement?.color??projectPalette[0].color}
+    })
+  },[projectPalette])
   const [attachTarget,setAttachTarget]=useState('new')
   const [attachment,setAttachment]=useState<AttachmentOptions>(INITIAL_ATTACHMENT)
   const [view,setView]=useState<CameraView>('perspective')
@@ -264,7 +278,7 @@ export default function App() {
   useEffect(()=>{
     const onKey=(e:KeyboardEvent)=>{
       const target=e.target as HTMLElement
-      if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||dialog)return
+      if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||target.closest('[role="dialog"]')||dialog)return
       if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='b'){
         if(boxSelectAvailable){e.preventDefault();if(!e.repeat)toggleBoxSelect()}
         return
@@ -492,7 +506,18 @@ export default function App() {
   </section> : undefined
   const fittedConnectorPanel=connectorPanelFit.result?.project.panels.find(panel=>panel.id===connectorPanelFit.result?.panelId)
 
-  return <TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
+  return <PanelPaletteProvider project={project}
+    onAddColor={color=>commit(current=>addCustomColor(current,color))}
+    onUpdateColor={(id,color)=>{
+      const previous=project.customColors?.find(option=>option.id===id)?.color
+      commit(current=>updateCustomColor(current,id,color))
+      setDraft(current=>current.color.toLowerCase()===previous?{...current,color:color.color.toLowerCase()}:current)
+    }}
+    onRemoveColor={(id,replacement)=>{
+      const previous=project.customColors?.find(option=>option.id===id)?.color
+      commit(current=>removeCustomColor(current,id,replacement))
+      setDraft(current=>current.color.toLowerCase()===previous?{...current,color:replacement??'#d9bb87'}:current)
+    }}><TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
     <ProjectHeader projectName={project.name} saveStatus={saveStatus} canUndo={canUndo} canRedo={canRedo} undo={undo} redo={redo}
       onNew={()=>setDialog('new')} onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')}/>
 
@@ -586,5 +611,5 @@ export default function App() {
       attachNewPanel={!inspectingConnectors&&selectedIds.length>0} onAdd={addDraftPanel}/>
     <input ref={importRef} type="file" accept=".json,.playwood.json" className="visually-hidden" aria-label="Import project file" onChange={e=>{const file=e.target.files?.[0];if(file)void importProject(file);e.target.value=''}}/>
     <input ref={assemblyImportRef} type="file" accept=".json,.playwood-assembly.json" className="visually-hidden" aria-label="Import assembly file" onChange={e=>{const file=e.target.files?.[0];if(file)void importAssembly(file);e.target.value=''}}/>
-  </div></TooltipProvider>
+  </div></TooltipProvider></PanelPaletteProvider>
 }
