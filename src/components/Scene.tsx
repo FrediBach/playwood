@@ -2,7 +2,7 @@ import { getPhysicalConnectors } from '@/lib/connector-selection'
 import { isGeometryGuideActive, snapTargets, panelSnapPoints, snapPanelDelta, type SnapSettings } from '@/lib/preview-snap'
 import { Component, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
-import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
+import { Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraView, Connection, Panel, Project, Vec3 } from '@/lib/types'
@@ -11,6 +11,7 @@ import { makePanelGeometry } from './scene-geometry'
 import { createWoodTextures } from './wood-texture'
 import { createPanelMaterials } from './panel-materials'
 import { RoomEnvironment } from './RoomEnvironment'
+import { GroundGrid } from './GroundGrid'
 import { getRoomLayout } from './room-layout'
 import { getConnectorKeyboardSlides, getConnectorRail } from '@/lib/connector-movement'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
@@ -458,8 +459,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
         color={active ? '#345b5c' : '#719899'} transparent opacity={active ? 0.9 : 0.25} lineWidth={active ? 1.6 : 1}
         dashed dashSize={0.025} gapSize={0.025} />
     }))}
-    {showGrid && <Grid position={[0, floorY, 0]} args={[extent, extent]} cellSize={props.snapSettings?.grid ? props.snapSettings.spacing / 1000 : 0.1} sectionSize={props.snapSettings?.grid ? props.snapSettings.spacing / 200 : 0.5} cellThickness={0.5} sectionThickness={0.7}
-      cellColor="#cccfc5" sectionColor="#b9bdb2" fadeDistance={extent * 0.65} fadeStrength={2} fadeFrom={0} infiniteGrid />}
+    {showGrid && <GroundGrid floorY={floorY} extent={extent} cellSize={props.snapSettings?.grid ? props.snapSettings.spacing * MM : 0.1} />}
     </>}
     {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
     {!exploded && <ConnectorMeshes panels={panels} connections={connections} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
