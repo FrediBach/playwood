@@ -79,7 +79,7 @@ export function AssemblyWorkspace({boxSelectActive,boxSelectDisabled,selectionKi
         <span className="room-eyebrow"><Sun size={14}/>THE DAYLIGHT ROOM</span>
         <h2>{hasVisiblePanels?'Your design, in proportion.':'A room for your next idea.'}</h2>
         {hasVisiblePanels?<p className="room-dimensions">{number(visibleBounds.width)} × {number(visibleBounds.height)} × {number(visibleBounds.depth)} <span>mm · W × H × D</span></p>:<p>Add or show a panel in Studio to see it here.</p>}
-        <p className="room-scale-note">Life-size setting · floor lamp 165 cm tall</p>
+        <p className="room-scale-note">Life-size setting · banana 22 cm long · floor lamp 165 cm tall</p>
       </div>}/>
       {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}
     </main>

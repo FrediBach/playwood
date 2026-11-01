@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { getRoomLayout } from './room-layout'
+import { Banana } from './Banana'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
@@ -149,6 +150,7 @@ function SideTable({ position }: { position: Triple }) {
     <Box position={[-0.03, 0.52, 0.015]} size={[0.19, 0.023, 0.14]} color="#e5ddd0" rotation={[0, 0.1, 0]} />
     <Box position={[-0.03, 0.534, 0.015]} size={[0.19, 0.005, 0.14]} color="#667161" rotation={[0, 0.1, 0]} />
     <mesh position={[0.07, 0.563, -0.07]} castShadow><cylinderGeometry args={[0.035, 0.029, 0.1, 24]} /><meshStandardMaterial color="#ece6d9" roughness={0.45} /></mesh>
+    <Banana />
   </group>
 }
 
