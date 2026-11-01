@@ -4,6 +4,7 @@ export type Material = 'birch' | 'oak' | 'walnut' | 'mdf' | 'painted'
 export type Pattern = 'solid' | 'pegboard' | 'slots'
 export type Side = 'left' | 'right' | 'top' | 'bottom' | 'front' | 'back'
 export type ConnectorType = '90' | '105' | '150' | 't' | 'cross'
+export type ConnectorMaterial = 'plastic' | 'metal'
 /** Panel-relative coordinates, from the top-left corner, in the range 0–1. */
 export interface OutlinePoint { x: number; y: number }
 export interface Panel {
@@ -25,6 +26,8 @@ export interface Connection {
   quarterTurn?: boolean;
   side: Side; offset: number; inset: number; flip: boolean;
   color: string; count: number;
+  /** Omitted in older projects; defaults to plastic. Metal is available for 90° only. */
+  material?: ConnectorMaterial;
 }
 export interface AssemblyPort { id: string; connectionId: string; label: string }
 export type AssemblyDimension = 'width' | 'height' | 'thickness'
@@ -47,7 +50,7 @@ export interface AssemblyEndpoint { instanceId?: string; portId: string }
 export interface AssemblyLoosePort { id: string; connection: Connection }
 export interface AssemblyLink { id: string; a: AssemblyEndpoint; b: AssemblyEndpoint }
 export interface AssemblyData { definitions: AssemblyDefinition[]; instances: AssemblyInstance[]; links: AssemblyLink[]; loosePorts?: AssemblyLoosePort[] }
-export interface ConnectorOverride { color?: string; type?: ConnectorType; removed?: boolean; slide?: number }
+export interface ConnectorOverride { color?: string; type?: ConnectorType; material?: ConnectorMaterial; removed?: boolean; slide?: number }
 export type ListKind = 'panels' | 'connectors'
 /** Flat organizational folders; independent of physical assemblies and joints. */
 export interface ListGroup { id: string; name: string; kind: ListKind; itemIds: string[] }
@@ -62,6 +65,6 @@ export interface Project {
   listGroups?: ListGroup[];
   connectorOrder?: string[];
 }
-export interface AttachmentOptions { side: Side; type: ConnectorType; offset: number; inset: number; flip: boolean; color: string; count: number }
+export interface AttachmentOptions { side: Side; type: ConnectorType; offset: number; inset: number; flip: boolean; color: string; count: number; material?: ConnectorMaterial }
 export interface ValidationIssue { id: string; severity: 'warning' | 'error'; message: string; panelIds: string[] }
 export type CameraView = 'perspective' | 'front' | 'top' | 'right'

@@ -1,5 +1,6 @@
 import { getOutlineError, panelCornerRadius } from './panel-shape'
 import { getPhysicalConnectors } from './connector-selection'
+import { connectorDisplayColor, getConnectorMaterial } from './connector-options'
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import type { AttachmentOptions, Connection, OutlinePoint, Panel, Project, RotationAxis, ValidationIssue, Vec3 } from './types'
@@ -447,6 +448,7 @@ export function parseProject(input: unknown): Project {
       flip: raw.flip as boolean, color: colorIn(raw.color), count: numberIn(raw.count, 0, 20, 'connector quantity'),
     }
     if (raw.role !== undefined) c.role = enumIn(raw.role, ['support'] as const, 'connection role')
+    if (raw.material !== undefined) c.material = getConnectorMaterial(c.type, enumIn(raw.material, ['plastic', 'metal'] as const, 'connector material'))
     if (raw.quarterTurn !== undefined) {
       if (typeof raw.quarterTurn !== 'boolean') throw new Error('Invalid child panel orientation.')
       c.quarterTurn = raw.quarterTurn
@@ -479,9 +481,11 @@ export function parseProject(input: unknown): Project {
       try { key = JSON.parse(id) } catch { throw new Error('Invalid connector selection ID.') }
       if (!Array.isArray(key) || key.length !== 2 || typeof key[0] !== 'string' || !Number.isInteger(key[1]) || key[1] < 0 || key[1] >= 20 || !object(raw)) throw new Error('Invalid connector override.')
       if (raw.removed !== undefined && typeof raw.removed !== 'boolean') throw new Error('Invalid connector removal.')
+      const type = raw.type !== undefined ? enumIn(raw.type, ['90', '105', '150', 't', 'cross'] as const, 'connector type') : connections.find(c => c.id === key[0])?.type
       return [id, {
         ...(raw.color !== undefined ? { color: colorIn(raw.color) } : {}),
-        ...(raw.type !== undefined ? { type: enumIn(raw.type, ['90', '105', '150', 't', 'cross'] as const, 'connector type') } : {}),
+        ...(raw.type !== undefined ? { type } : {}),
+        ...(raw.material !== undefined ? { material: getConnectorMaterial(type ?? '90', enumIn(raw.material, ['plastic', 'metal'] as const, 'connector material')) } : {}),
         ...(raw.removed !== undefined ? { removed: raw.removed as boolean } : {}),
         ...(raw.slide !== undefined ? { slide: numberIn(raw.slide, -10000, 10000, 'connector slide') } : {}),
       }]
@@ -524,7 +528,7 @@ export function projectToCsv(project: Project): string {
   for (const panel of project.panels) rows.push([panel.name, 1, panel.width, panel.height, panel.thickness, panel.material, panel.color, panel.material === 'painted' ? 100 : Math.round((panel.finishCoverage ?? 0) * 100), panel.pattern, panel.pattern === 'solid' ? '' : panel.holeSize, panel.pattern === 'solid' ? '' : panel.holeSpacing, panelCornerRadius(panel),
     panel.customOutline?.map(point => `${Number((point.x * panel.width).toFixed(3))}/${Number((point.y * panel.height).toFixed(3))}`).join('; ') ?? ''])
   const connectors = new Map<string, number>()
-  for (const c of getPhysicalConnectors(project)) { const key = `${c.type}|${c.color}`; connectors.set(key, (connectors.get(key) ?? 0) + 1) }
-  for (const [key, count] of connectors) { const [type, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', 'Reinforced plastic', color, '', '', '', '', '', '']) }
+  for (const c of getPhysicalConnectors(project)) { const key = `${c.type}|${c.material}|${connectorDisplayColor(c)}`; connectors.set(key, (connectors.get(key) ?? 0) + 1) }
+  for (const [key, count] of connectors) { const [type, material, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', material === 'metal' ? 'Cast metal' : 'Reinforced plastic', color, '', '', '', '', '', '']) }
   return '\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n')
 }

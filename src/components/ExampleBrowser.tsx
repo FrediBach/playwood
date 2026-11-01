@@ -6,6 +6,7 @@ import { ASSEMBLY_LIBRARY } from '@/lib/assembly-library'
 import { EXAMPLE_LIBRARY } from '@/lib/example-library'
 import { getConnectionAnchors, resolvePanels } from '@/lib/model'
 import type { Project } from '@/lib/types'
+import { connectorDisplayColor } from '@/lib/connector-options'
 import './example-browser.css'
 
 type Example = (typeof EXAMPLE_LIBRARY)[number]
@@ -52,7 +53,7 @@ function previewFaces(project: Project): PreviewFace[] {
       // Draw a hardware-sized square in the projection so seams remain legible.
       const points = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => center.clone()
         .addScaledVector(screenRight, x * 16).addScaledVector(screenUp, y * 16))
-      faces.push({ points, color: connection.color, depth: center.dot(cameraDirection) + 20 })
+      faces.push({ points, color: connectorDisplayColor(connection), depth: center.dot(cameraDirection) + 20 })
     }
   }
   return faces.sort((a, b) => a.depth - b.depth)

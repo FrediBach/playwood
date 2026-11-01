@@ -10,7 +10,7 @@ import { RotateCreation } from './RotateCreation'
 import { RescaleCreation } from './RescaleCreation'
 import { ConnectorGlyph } from './editor-controls'
 import { MATERIALS } from '@/lib/materials'
-import { CONNECTORS } from '@/lib/connector-options'
+import { CONNECTORS, CONNECTOR_MATERIALS } from '@/lib/connector-options'
 import type { Panel, Project, ValidationIssue } from '@/lib/types'
 
 export type ProjectDialog = 'new' | 'replace' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | 'move' | 'rescale' | null
@@ -91,5 +91,6 @@ function ExportDialog({exportProject,onExportParts,onImport,importError}: Pick<P
 }
 
 function PartsDialog({project,connectorCount,panels,issues,onExportParts}: Pick<Props, 'project' | 'connectorCount' | 'panels' | 'issues' | 'onExportParts'>) {
-  return <><span className="dialog-eyebrow">THE SUM OF SIMPLE PARTS</span><DialogTitle>Your assembly, item by item.</DialogTitle><DialogDescription>{project.panels.length} panels and {connectorCount} connectors in {project.name}.</DialogDescription><div className="parts-table-wrap"><table><thead><tr><th>Panel</th><th>Material</th><th>Dimensions · mm</th></tr></thead><tbody>{panels.map(p=><tr key={p.id}><td>{p.name}<small>{p.pattern==='solid'?'Solid':p.pattern==='pegboard'?'Pegboard':'Rounded slots'}</small></td><td>{MATERIALS.find(m=>m.id===p.material)?.name}</td><td>{p.width} × {p.height} × {p.thickness}</td></tr>)}</tbody></table></div><div className="parts-connectors">{CONNECTORS.map(c=>{const count=getPhysicalConnectors(project).filter(conn=>conn.type===c.id).length;return count>0?<span key={c.id}><ConnectorGlyph type={c.id}/><strong>{count}</strong> × {c.name}</span>:null})}</div>{issues.length>0&&<div className="parts-issues"><h3>Before you build</h3>{issues.map(i=><p key={i.id}><CircleHelp size={15}/>{i.message}</p>)}</div>}<div className="dialog-footer"><Button variant="outline" onClick={onExportParts}><Download size={16}/>Export cutting list</Button></div></>
+  const connectors = getPhysicalConnectors(project)
+  return <><span className="dialog-eyebrow">THE SUM OF SIMPLE PARTS</span><DialogTitle>Your assembly, item by item.</DialogTitle><DialogDescription>{project.panels.length} panels and {connectorCount} connectors in {project.name}.</DialogDescription><div className="parts-table-wrap"><table><thead><tr><th>Panel</th><th>Material</th><th>Dimensions · mm</th></tr></thead><tbody>{panels.map(p=><tr key={p.id}><td>{p.name}<small>{p.pattern==='solid'?'Solid':p.pattern==='pegboard'?'Pegboard':'Rounded slots'}</small></td><td>{MATERIALS.find(m=>m.id===p.material)?.name}</td><td>{p.width} × {p.height} × {p.thickness}</td></tr>)}</tbody></table></div><div className="parts-connectors">{CONNECTORS.flatMap(c=>CONNECTOR_MATERIALS.map(material=>{const count=connectors.filter(conn=>conn.type===c.id&&conn.material===material.id).length;return count>0?<span key={`${c.id}-${material.id}`}><ConnectorGlyph type={c.id}/><strong>{count}</strong> × {c.name} · {material.name}</span>:null}))}</div>{issues.length>0&&<div className="parts-issues"><h3>Before you build</h3>{issues.map(i=><p key={i.id}><CircleHelp size={15}/>{i.message}</p>)}</div>}<div className="dialog-footer"><Button variant="outline" onClick={onExportParts}><Download size={16}/>Export cutting list</Button></div></>
 }

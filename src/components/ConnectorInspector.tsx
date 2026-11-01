@@ -1,4 +1,5 @@
 import { ConnectorColorField } from './ConnectorColorField'
+import { ConnectorMaterialField } from './ConnectorMaterialField'
 import { Link2, Plus, Trash2 } from 'lucide-react'
 import type { ConnectorOverride, Panel } from '@/lib/types'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
@@ -21,6 +22,7 @@ export function ConnectorInspector({ connectors, panels = [], onChange, onRemove
   if (!first) return null
   const sameType = connectors.every(connector => connector.type === first.type)
   const sameColor = connectors.every(connector => connector.color.toLowerCase() === first.color.toLowerCase())
+  const sameMaterial = connectors.every(connector => connector.material === first.material)
   const single = connectors.length === 1
   const typeName = CONNECTORS.find(type => type.id === first.type)?.name ?? first.type
   const panelNames = [first.connection.parentId, first.connection.childId].map(id => panels.find(panel => panel.id === id)?.name).filter(Boolean)
@@ -36,7 +38,8 @@ export function ConnectorInspector({ connectors, panels = [], onChange, onRemove
     <section className="inspector-section" aria-label="Hardware">
       <ConnectorTypeField value={sameType ? first.type : ''} onChange={type => onChange({ type })}/>
       {changedLayout && <p className="validation-note warning connector-type-warning" role="status">Hardware changed; panel angles stay unchanged. Check that the openings fit the joint.</p>}
-      <ConnectorColorField color={first.color} mixed={!sameColor} onChange={color => onChange({ color })}/>
+      <ConnectorMaterialField material={sameMaterial ? first.material : ''} metalAvailable={connectors.every(connector => connector.type === '90')} onChange={material => onChange({ material })}/>
+      {sameMaterial && first.material === 'plastic' && <ConnectorColorField color={first.color} mixed={!sameColor} onChange={color => onChange({ color })}/>}
     </section>
     <section className="inspector-section connector-build-section" aria-label="Connect a panel">
       {single ? <p className="field-note">To add a panel, select at least two connectors with free T or Cross openings.</p> : <>
@@ -45,7 +48,7 @@ export function ConnectorInspector({ connectors, panels = [], onChange, onRemove
       </>}
     </section>
     <InspectorDisclosure title="Selection & movement" preferenceKey="connector-help">
-      <p className="field-note">Shift, ⌘ or Ctrl-click to select several connectors. Type and color changes apply to every selected piece.</p>
+      <p className="field-note">Shift, ⌘ or Ctrl-click to select several connectors. Type, material and color changes apply to every selected piece.</p>
       <p className="field-note">Use arrow keys in the workspace to slide hardware along its joint; hold Shift for larger steps. Snapping follows the workspace settings. Movement stops at panel ends and other connectors.</p>
     </InspectorDisclosure>
     <div className="connector-remove-action">

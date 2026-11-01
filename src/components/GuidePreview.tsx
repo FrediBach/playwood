@@ -6,6 +6,7 @@ import type { ConnectorType, Panel } from '@/lib/types'
 import { getProjectBounds, resolvePanels } from '@/lib/model'
 import { panelOutlineCorners, panelOutlineSvgPath } from '@/lib/panel-shape'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
+import { connectorDisplayColor } from '@/lib/connector-options'
 import { connectorSlide, getConnectorRail } from '@/lib/connector-movement'
 import { getConnectorGeometry } from './connector-geometry'
 import { createPreviewBooks } from '@/lib/preview-books'
@@ -152,7 +153,7 @@ function drawingFor(scene: GuideScene, guideId: GuideId) {
     const ghost = [piece.connection.parentId, piece.connection.childId].some(id => ghosts.has(id))
     for (const [index, vertices] of connectorVertices(piece.type).entries()) {
       const world = vertices.map(point => point.clone().applyEuler(rotation).add(center))
-      faces.push({ points: hull(world.map(project)), color: `#${new Color(piece.color).multiplyScalar(index ? .86 : 1).getHexString()}`,
+      faces.push({ points: hull(world.map(project)), color: `#${new Color(connectorDisplayColor(piece)).multiplyScalar(index ? .86 : 1).getHexString()}`,
         depth: center.dot(direction) + 22, selected, ghost, hardware: true })
     }
   }
