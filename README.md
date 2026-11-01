@@ -84,6 +84,12 @@ The four-box Diamond arrangement has sixteen panels. Four separate boxes use thi
 
 Instances move as rigid units. Automatic assembly attachment currently handles compatible 90° corner pairs; it does not merge overlapping walls or remove duplicate panels. Definitions, instances, overrides, and physical links are saved with the project and survive undo, reload, JSON export, and import. The parts list counts the resulting physical panels and connectors once.
 
+## Panel cutting SVGs
+
+Choose **Export project → Panel cutting SVGs** to download a separate full-size SVG for each panel with pegboard holes, slots, TROFAST openings, a custom outline, or rounded corners. Each file includes its outer contour and all openings in millimeters, with circular arcs preserved. Panel numbers distinguish repeated names; hidden panels and materialized assembly panels are included. Plain rectangular panels remain in the CSV cutting list.
+
+The SVG uses black outside contours and white inside cuts for tools such as Shaper Origin. Coordinates follow the panel’s top-left corner, independent of its placement in the furniture. Set cut depth and tool offsets on your cutter. TROFAST opening dimensions remain approximations: measure your real insert before cutting.
+
 ## Resource examples
 
 The Library and Templates chooser include 22 resource examples alongside the three original starters and a photo-inspired Diamond shelf. Search or filter by category to find editable assemblies from `resources/library-3d`. Numbered CAD resources supply the totem, corner, shelf with doors, H-table 180, and promotional desk. The collection PDFs add shelves, tables, counters, a bench, a trade fair display, an island display, and individual exhibition plinths. Each thumbnail is generated from the assembly it opens; switching examples supports Undo.

@@ -258,7 +258,7 @@ Updating shared parameters preserves overrides for retained control IDs and remo
 
 [`panel-shape.ts`](../src/lib/panel-shape.ts) validates normalized custom outlines and computes rounded corner paths shared by SVG previews and 3D geometry. Radius is clamped at use time to half the panel width/height, preserving compatibility with older documents and subsequent resizes. Custom outline fillets also respect nearby edges so narrow or concave features remain simple.
 
-The detailed panel mesh is produced in [`scene-geometry.ts`](../src/components/scene-geometry.ts), including real pegboard/slot openings. Structural placement still reasons about the panel's rectangular bounds. It does not use a full boundary representation or simulate connector interference with arbitrary cuts.
+The shared `panel-cut-geometry.ts` builds the exact contour and opening paths used by both `panel-svg.ts` and the mesh, including the same perforation clipping and density limit. SVG export retains circular arcs rather than exporting the mesh tessellation. The detailed panel mesh is produced in [`scene-geometry.ts`](../src/components/scene-geometry.ts), including real pegboard/slot openings. Structural placement still reasons about the panel's rectangular bounds. It does not use a full boundary representation or simulate connector interference with arbitrary cuts.
 
 The model is an editable geometric design system. It does not calculate structural strength, load capacity, manufacturing tolerance, tightening, or a separate measured metal connector shape. The source CAD depicts nominal 18 mm slots and no separate screw geometry. These limits should remain explicit when adding geometry or export features.
 

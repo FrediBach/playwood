@@ -1,3 +1,4 @@
+import { panelSvgFilename, panelToSvg } from '@/lib/panel-svg'
 import { readSnapSettings } from '@/lib/preview-snap'
 import { createListGroup, moveListItems, orderedConnectors, renameListGroup, ungroupList } from '@/lib/list-groups'
 import type { ListGroupingProps } from '@/components/GroupedList'
@@ -683,6 +684,7 @@ export default function App() {
     <PanelConnectionFitDialog adjustment={pendingConnectionFit?.fit.adjustment} operations={pendingConnectionFit?.fit.result} onConfirm={acceptConnectionFit} onCancel={()=>setPendingConnectionFit(null)}/>
     <ProjectDialogs onNew={startNewProject} dialog={dialog} onClose={closeProjectDialog} draft={draft} setDraft={setDraft} loadTemplate={loadTemplate}
       replacementName={pendingTemplate?.project.name??''} onReplace={()=>{if(pendingTemplate)applyTemplate(pendingTemplate.id,pendingTemplate.project)}}
+      onExportPanelSvg={(panel,index)=>{download(panelToSvg(panel),`${exportName}-${panelSvgFilename(panel,index)}`,'image/svg+xml');notify('Panel SVG exported')}}
       exportProject={exportProject} onExportParts={()=>{download(projectToCsv(project),`${exportName}-parts.csv`,'text/csv');notify('Parts list exported')}}
       onImport={()=>importRef.current?.click()} importError={importError} project={project} panels={panels} connectorCount={connectorCount} issues={issues}
       onMoveCreation={delta=>{commit(p=>moveProject(p,delta));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);notify('Creation moved. Undo is available.')}}

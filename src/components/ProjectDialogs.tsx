@@ -1,3 +1,4 @@
+import { needsPanelSvg } from '@/lib/panel-svg'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
 import { lazy, Suspense, useRef, type ComponentProps, type Dispatch, type SetStateAction } from 'react'
 import { CircleHelp, Download, FolderOpen, ListChecks, Plus, Upload } from 'lucide-react'
@@ -31,6 +32,7 @@ interface Props {
   loadTemplate: (template: string) => void
   exportProject: () => void
   onExportParts: () => void
+  onExportPanelSvg: (panel: Panel, index: number) => void
   onImport: () => void
   importError: string
   project: Project
@@ -87,8 +89,8 @@ function TemplatesDialog({loadTemplate}: Pick<Props, 'loadTemplate'>) {
   return <><span className="dialog-eyebrow">A FEW GOOD STARTING POINTS</span><DialogTitle>Simple parts. Endless possibilities.</DialogTitle><DialogDescription>Choose a full build or reusable assembly and make it your own. You’ll be asked to confirm before replacing your current project.</DialogDescription><ExampleBrowser onSelect={loadTemplate}/></>
 }
 
-function ExportDialog({exportProject,onExportParts,onImport,importError}: Pick<Props, 'exportProject' | 'onExportParts' | 'onImport' | 'importError'>) {
-  return <><span className="dialog-eyebrow">FROM IDEA TO SOMETHING REAL</span><DialogTitle>Take your project with you.</DialogTitle><DialogDescription>Save an editable project or a parts list for your next build.</DialogDescription><div className="export-options"><button onClick={exportProject}><span className="export-icon"><FolderOpen size={23}/></span><span><strong>Project file</strong><small>All panels, connections, and materials · JSON</small></span><Download size={19}/></button><button onClick={onExportParts}><span className="export-icon"><ListChecks size={23}/></span><span><strong>Parts & cutting list</strong><small>Panels, connectors and purchased inserts · CSV</small></span><Download size={19}/></button></div><div className="import-area"><span>Picking up where you left off?</span><Button variant="outline" onClick={onImport}><Upload size={16}/>Import project</Button></div>{importError&&<p role="alert" className="error-message">{importError}</p>}<p className="dialog-note">Changes are saved automatically in this browser. Export a project file to keep a separate copy.</p></>
+function ExportDialog({exportProject,onExportParts,onExportPanelSvg,project,onImport,importError}: Pick<Props, 'exportProject' | 'onExportParts' | 'onExportPanelSvg' | 'project' | 'onImport' | 'importError'>) {
+  return <><span className="dialog-eyebrow">FROM IDEA TO SOMETHING REAL</span><DialogTitle>Take your project with you.</DialogTitle><DialogDescription>Save an editable project, parts list, or panel cutting SVGs for your next build.</DialogDescription><div className="export-options"><button onClick={exportProject}><span className="export-icon"><FolderOpen size={23}/></span><span><strong>Project file</strong><small>All panels, connections, and materials · JSON</small></span><Download size={19}/></button><button onClick={onExportParts}><span className="export-icon"><ListChecks size={23}/></span><span><strong>Parts & cutting list</strong><small>Panels, connectors and purchased inserts · CSV</small></span><Download size={19}/></button></div>{project.panels.some(needsPanelSvg) && <section aria-label="Panel cutting SVGs"><h3>Panel cutting SVGs</h3><p className="dialog-note">Full-size millimeter outlines for Shaper Origin and other cutting tools. Black: outside cuts. White: through openings. Set depth and tool offsets on your cutter.</p><div className="export-options panel-svg-options">{project.panels.map((panel, index) => needsPanelSvg(panel) && <button key={panel.id} onClick={() => onExportPanelSvg(panel, index)} aria-label={`Export SVG for ${panel.name}`}><span><strong>{index + 1}. {panel.name}</strong><small>{panel.width} × {panel.height} × {panel.thickness} mm · SVG</small></span><Download size={19}/></button>)}</div>{project.panels.some(panel => panel.trofastInserts?.length) && <p className="dialog-note">TROFAST openings are approximate. Measure the real insert before cutting.</p>}</section>}<div className="import-area"><span>Picking up where you left off?</span><Button variant="outline" onClick={onImport}><Upload size={16}/>Import project</Button></div>{importError&&<p role="alert" className="error-message">{importError}</p>}<p className="dialog-note">Changes are saved automatically in this browser. Export a project file to keep a separate copy.</p></>
 }
 
 function PartsDialog({project,connectorCount,panels,issues,onExportParts}: Pick<Props, 'project' | 'connectorCount' | 'panels' | 'issues' | 'onExportParts'>) {
