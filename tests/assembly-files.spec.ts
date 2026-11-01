@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect, type Page } from '@playwright/test'
 import { createAssemblyFile } from '../src/lib/assembly-file'
 import { updateAssemblyFinish, updateAssemblyParameterValues } from '../src/lib/assemblies'
@@ -31,6 +32,7 @@ test('export and import preserve configured construction, create independent cop
   original = updateAssemblyParameterValues(original, source.id, { 'side-length': 450 })
   original = updateAssemblyFinish(original, source.id, { color: '#123456' })
   await load(page, original)
+  await openInspectorSection(page, 'Manage assembly')
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export assembly', exact: true }).click()
   const download = await downloading

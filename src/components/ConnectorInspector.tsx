@@ -1,38 +1,56 @@
 import { ConnectorColorField } from './ConnectorColorField'
 import { Link2, Plus, Trash2 } from 'lucide-react'
-import type { ConnectorOverride, ConnectorType } from '@/lib/types'
+import type { ConnectorOverride, Panel } from '@/lib/types'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
 import { CONNECTORS } from '@/lib/connector-options'
-import { SelectField } from './fields'
+import { ConnectorTypeField } from './ConnectorTypeField'
+import { InspectorDisclosure } from './InspectorPrimitives'
 import { Button } from './ui/button'
+import './connector-inspector.css'
 
-export function ConnectorInspector({ connectors, onChange, onRemove, onConnectPanel, panelFitReason }: {
+export function ConnectorInspector({ connectors, panels = [], onChange, onRemove, onConnectPanel, panelFitReason, fitSummary }: {
   connectors: ReturnType<typeof getPhysicalConnectors>
+  panels?: Panel[]
   onChange: (patch: ConnectorOverride) => void
   onRemove: () => void
   onConnectPanel: () => void
   panelFitReason: string
+  fitSummary?: string
 }) {
   const first = connectors[0]
+  if (!first) return null
   const sameType = connectors.every(connector => connector.type === first.type)
   const sameColor = connectors.every(connector => connector.color.toLowerCase() === first.color.toLowerCase())
+  const single = connectors.length === 1
+  const typeName = CONNECTORS.find(type => type.id === first.type)?.name ?? first.type
+  const panelNames = [first.connection.parentId, first.connection.childId].map(id => panels.find(panel => panel.id === id)?.name).filter(Boolean)
+  const jointCount = new Set(connectors.map(connector => connector.connection.id)).size
+  const changedLayout = connectors.some(connector => connector.type !== connector.connection.type)
   return <>
-    <div className="selected-heading"><Link2 size={15}/><span>{connectors.length === 1 ? 'SELECTED CONNECTOR' : `${connectors.length} SELECTED CONNECTORS`}</span></div>
-    <section className="inspector-section">
-      <SelectField label="Connector type" value={sameType ? first.type : ''} onChange={type => onChange({ type: type as ConnectorType })}>
-        {!sameType && <option value="" disabled>Mixed types</option>}
-        {CONNECTORS.map(type => <option key={type.id} value={type.id}>{type.name} · {type.description}</option>)}
-      </SelectField>
+    <div className="connector-selection-heading">
+      <div><Link2 size={18}/><h2>{single ? `${typeName} connector` : `${connectors.length} connectors`}</h2></div>
+      <p className="inspector-summary">{single
+        ? panelNames.length ? panelNames.join(' ↔ ') : 'Selected hardware'
+        : `${jointCount} ${jointCount === 1 ? 'joint' : 'joints'} · ${sameType ? `${typeName} hardware` : 'Mixed types'}`}</p>
+    </div>
+    <section className="inspector-section" aria-label="Hardware">
+      <ConnectorTypeField value={sameType ? first.type : ''} onChange={type => onChange({ type })}/>
+      {changedLayout && <p className="validation-note warning connector-type-warning" role="status">Hardware changed; panel angles stay unchanged. Check that the openings fit the joint.</p>}
       <ConnectorColorField color={first.color} mixed={!sameColor} onChange={color => onChange({ color })}/>
-      <p className="field-note">Shift, ⌘ or Ctrl-click connectors to select several. Changes apply to the selected pieces of hardware.</p>
-      <p className="field-note">In the preview, use arrow keys to slide along the joint by 1 cm, or Shift + arrows for 10 cm. Movement stops at panel ends and other connectors.</p>
-      <p className="field-note">Panels keep their placement when hardware is changed or removed.</p>
-      {connectors.some(connector => connector.type !== connector.connection.type) && <p className="validation-note warning">The replacement type differs from the joint layout. Check that its angle and openings fit the panels.</p>}
     </section>
-    <section className="inspector-section">
-      <Button variant="outline" onClick={onConnectPanel} disabled={!!panelFitReason}><Plus size={15}/>Connect with a panel</Button>
-      <p className="field-note">{panelFitReason || 'Fits one panel to every selected opening. Opposing connectors set its size; an open end extends 36 cm.'}</p>
+    <section className="inspector-section connector-build-section" aria-label="Connect a panel">
+      {single ? <p className="field-note">To add a panel, select at least two connectors with free T or Cross openings.</p> : <>
+        <Button variant={panelFitReason ? 'outline' : 'default'} className="full-button" onClick={onConnectPanel} disabled={!!panelFitReason} aria-describedby="connector-fit-status"><Plus size={15}/>Connect with a panel</Button>
+        <p className="field-note" id="connector-fit-status" role="status">{panelFitReason || (fitSummary ? `Fits one ${fitSummary} panel to the selected openings.` : 'Fits one panel to the selected free openings.')}</p>
+      </>}
     </section>
-    <div className="panel-actions"><Button variant="outline" onClick={onRemove}><Trash2 size={15}/>Remove {connectors.length === 1 ? 'connector' : 'connectors'}</Button></div>
+    <InspectorDisclosure title="Selection & movement" preferenceKey="connector-help">
+      <p className="field-note">Shift, ⌘ or Ctrl-click to select several connectors. Type and color changes apply to every selected piece.</p>
+      <p className="field-note">Use arrow keys in the workspace to slide hardware along its joint; hold Shift for larger steps. Snapping follows the workspace settings. Movement stops at panel ends and other connectors.</p>
+    </InspectorDisclosure>
+    <div className="connector-remove-action">
+      <Button variant="ghost" size="sm" onClick={onRemove}><Trash2 size={15}/>Remove {single ? 'connector' : 'connectors'}</Button>
+      <p className="field-note">Panels stay in place.</p>
+    </div>
   </>
 }

@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect } from '@playwright/test'
 import { createExampleProject } from '../src/lib/example-library'
 import { attachPanel, createPanel, resolvePanels } from '../src/lib/model'
@@ -9,6 +10,7 @@ test('automatically adds missing box connectors without moving panels, supports 
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles({ name: 'loose-box.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
   await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Auto-add connectors')
   await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).last().click()
   await expect(page.getByText('8 connectors added at 4 joints. Panel positions kept. Undo is available.')).toBeVisible()
   await expect(page.locator('.status-bar')).toContainText('8 connectors')
@@ -35,6 +37,7 @@ test('auto-connect splits a shelf for an interior T and undo restores the contin
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles({ name: 'interior-t.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
   await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Auto-add connectors')
   await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).last().click()
   await expect(page.getByText('2 connectors added at 1 joint. 1 panel split for T joints; outer dimensions kept. Undo is available.')).toBeVisible()
   await expect(page.locator('.panel-list-row')).toHaveCount(3)
@@ -69,6 +72,7 @@ test('auto-connect upgrades a corner using an unselected upright and preserves t
   await expect(page.locator('.status-bar')).toContainText('2 connectors')
 
   const savedProject = () => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+  await openInspectorSection(page, 'Auto-add connectors')
   await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).last().click()
   await expect(page.getByText(/1 existing joint upgraded/)).toBeVisible()
   await expect.poll(async () => (await savedProject()).connections.map((connection: { type: string }) => connection.type)).toEqual(['t', 't'])
@@ -77,6 +81,7 @@ test('auto-connect upgrades a corner using an unselected upright and preserves t
   expect(upgraded.connections.reduce((total: number, connection: { count: number }) => total + connection.count, 0)).toBe(2)
   await expect(page.locator('.status-bar')).toContainText('2 connectors')
 
+  await openInspectorSection(page, 'Auto-add connectors')
   await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).last().click()
   await expect(page.getByText('No compatible unconnected edges found. Check panel angles, edge alignment, and connector clearance.')).toBeVisible()
   expect(await savedProject()).toEqual(upgraded)

@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { expect, test, type Page } from '@playwright/test'
 import { createAssembly } from '../src/lib/assemblies'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
@@ -236,19 +237,20 @@ test('mixed box selection follows the active tab and edits only its inspected ca
   await page.mouse.up()
   await expect.poll(() => highlightedSelection(page)).toEqual(selection)
   await expect(page.locator('.connector-list-row.selected')).toHaveCount(selection.connectors.length)
-  await expect(page.getByText(`${selection.connectors.length} SELECTED CONNECTORS`, { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: `${selection.connectors.length} connectors`, exact: true })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('mixed-connectors.png') })
 
   await page.getByRole('tab', { name: 'Panels', exact: true }).click()
   await expect(page.getByRole('heading', { name: `${selection.panels.length} panels selected`, exact: true })).toBeVisible()
   await expect.poll(() => highlightedSelection(page)).toEqual(selection)
   await page.screenshot({ path: testInfo.outputPath('mixed-panels.png') })
+  await openInspectorSection(page, 'Material & finish')
   await page.getByRole('button', { name: 'Terracotta finish', exact: true }).click()
   await expect.poll(async () => (await savedProject(page)).panels.every(panel => panel.color === '#bc6c50')).toBe(true)
   expect(getPhysicalConnectors(await savedProject(page))).toEqual(getPhysicalConnectors(project))
 
   await page.getByRole('tab', { name: 'Connectors', exact: true }).click()
-  await expect(page.getByText(`${selection.connectors.length} SELECTED CONNECTORS`, { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: `${selection.connectors.length} connectors`, exact: true })).toBeVisible()
   await expect.poll(() => highlightedSelection(page)).toEqual(selection)
   await page.getByRole('button', { name: 'Blue connector color', exact: true }).click()
   await expect.poll(async () => getPhysicalConnectors(await savedProject(page)).every(connector => connector.color === '#0000ff')).toBe(true)
@@ -266,7 +268,7 @@ test('inspecting boxed connectors leaves shared assembly editing and preserves t
   const cube = createExampleProject('cube')
   const project = createAssembly(cube, cube.panels.map(panel => panel.id), 'Shared box')
   await openProject(page, project)
-  await page.getByRole('button', { name: 'Edit assembly', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit shared design', exact: true }).click()
   await expect(page.locator('.assembly-edit-breadcrumb')).toBeVisible()
   const snapshot = await sceneSnapshot(page)
   const selection = { panels: Object.keys(snapshot.panels).sort(), connectors: Object.keys(snapshot.connectors).sort() }
@@ -279,18 +281,18 @@ test('inspecting boxed connectors leaves shared assembly editing and preserves t
   await page.getByRole('tab', { name: 'Connectors', exact: true }).click()
   await expect(page.locator('.assembly-edit-breadcrumb')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Done editing', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('combobox', { name: 'Connector type', exact: true })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Connector type', exact: true })).toBeVisible()
   await expect.poll(() => highlightedSelection(page)).toEqual(selection)
 
   await page.getByRole('tab', { name: 'Panels', exact: true }).click()
-  await page.getByRole('button', { name: 'Edit assembly', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit shared design', exact: true }).click()
   await expect(page.locator('.assembly-edit-breadcrumb')).toBeVisible()
   await expect.poll(() => highlightedSelection(page)).toEqual({ panels: selection.panels, connectors: [] })
   await selectByBox(page, [selection.connectors[0]], { kind: 'connectors' })
   await expect(page.getByRole('tab', { name: 'Panels', exact: true })).toHaveAttribute('aria-selected', 'true')
   await expect(page.locator('.assembly-edit-breadcrumb')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Done editing', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('combobox', { name: 'Connector type', exact: true })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Connector type', exact: true })).toBeVisible()
   await expect.poll(() => highlightedPanels(page)).toEqual([])
   await expect.poll(async () => (await highlightedSelection(page)).connectors).toContain(selection.connectors[0])
   await page.getByRole('button', { name: 'Blue connector color', exact: true }).click()
@@ -308,7 +310,7 @@ test('single-category box results show their inspector even when the opposite ta
   await selectByBox(page, [connectorId], { kind: 'connectors' })
   await expect.poll(async () => (await highlightedSelection(page)).connectors).toContain(connectorId)
   await expect.poll(() => highlightedPanels(page)).toEqual([])
-  await expect(page.getByRole('combobox', { name: 'Connector type', exact: true })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Connector type', exact: true })).toBeVisible()
   await expect(page.getByLabel('Panel name', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('tab', { name: 'Panels', exact: true })).toHaveAttribute('aria-selected', 'true')
 

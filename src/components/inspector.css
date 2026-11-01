@@ -1,0 +1,80 @@
+/* Inspector hierarchy: identity, properties, task tools, object actions. */
+.right-sidebar .inspector-header { height: 54px; padding-inline: 20px; }
+.right-sidebar .inspector-scroll { padding: 20px; scroll-padding-block: 16px; }
+.right-sidebar .selected-heading { margin-bottom: 8px; letter-spacing: .9px; }
+.right-sidebar .selected-index { letter-spacing: 0; text-transform: none; font-size: 11px; }
+.right-sidebar .panel-name-field { margin-bottom: 18px; }
+.right-sidebar .multi-selection-heading { margin-bottom: 20px; }
+.right-sidebar .multi-selection-heading p { margin-top: 6px; line-height: 1.5; }
+.right-sidebar .section-title { margin-bottom: 12px; }
+.right-sidebar .inspector-section + .inspector-section,
+.right-sidebar .inspector-disclosure + .inspector-section { margin-top: 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+.right-sidebar .field { margin-bottom: 14px; gap: 6px; }
+.right-sidebar .field-row { gap: 8px; }
+.right-sidebar .field-row > .field > span { font-size: 12px; }
+.right-sidebar .field-note, .right-sidebar .assembly-help { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.right-sidebar .field-note:last-child { margin-bottom: 0; }
+.right-sidebar .inspector-section > .field-row:last-child > .field { margin-bottom: 0; }
+.right-sidebar .inspector-summary, .right-sidebar .inspector-scope { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; overflow-wrap: anywhere; }
+.right-sidebar .inspector-scope { margin-top: 8px; }
+.right-sidebar .connection-type { margin-bottom: 14px; }
+.right-sidebar .connection-type small { overflow-wrap: anywhere; }
+.right-sidebar .detach-button { white-space: normal; text-align: left; height: auto; min-height: 33px; }
+.right-sidebar .checkbox-label { margin-top: 12px; margin-bottom: 14px; line-height: 1.4; }
+
+.inspector-disclosure { margin: 0; border-top: 1px solid var(--line); }
+.inspector-section + .inspector-disclosure { margin-top: 12px; }
+.inspector-disclosure > summary { display: flex; flex-direction: column; gap: 4px; padding: 14px 0; cursor: pointer; list-style: none; font-size: 13px; font-weight: 600; color: var(--foreground); }
+.inspector-disclosure > summary::-webkit-details-marker { display: none; }
+.inspector-disclosure > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.inspector-disclosure-label { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.inspector-disclosure-label > span { overflow-wrap: anywhere; }
+.inspector-disclosure[open] > summary .inspector-disclosure-label > svg { transform: rotate(90deg); }
+.inspector-disclosure-summary { margin-left: 22px; font-size: 11px; font-weight: 400; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+.inspector-disclosure[open] > summary > .inspector-disclosure-summary { display: none; }
+.inspector-disclosure-content { padding-bottom: 16px; }
+.inspector-disclosure-content > :last-child { margin-bottom: 0; }
+.inspector-disclosure-content > .inspector-section { margin: 0; padding: 0; border: 0; }
+.inspector-disclosure-content > .inspector-section > .section-title:first-child,
+.inspector-disclosure-content > .panel-split > .panel-split-heading:first-child,
+.inspector-disclosure-content > .create-assembly-section > .section-title:first-child { display: none; }
+.inspector-disclosure-content .create-assembly-section { margin: 0; padding: 0; border: 0; }
+.inspector-disclosure-content .create-assembly-section > .assembly-help { margin-top: 0; }
+.inspector-disclosure .inspector-disclosure { border-top: 0; }
+.right-sidebar .inspector-help { margin-top: 0; border: 0; }
+.right-sidebar .inspector-help > summary { font-size: 11px; font-weight: 400; padding: 4px 0 10px; color: var(--muted); }
+.right-sidebar .inspector-help[open] > summary { color: var(--foreground); }
+.right-sidebar .inspector-help .field-note { font-size: 11px; }
+.right-sidebar .inspector-build-tools > .inspector-disclosure { border-top: 0; border-bottom: 1px solid var(--line); }
+.right-sidebar .inspector-build-tools > .inspector-disclosure:last-child { border-bottom: 0; }
+.right-sidebar .inspector-build-tools > .section-title { margin-bottom: 2px; }
+.right-sidebar .inspector-build-tools .inspector-disclosure > summary { padding-block: 12px; }
+.inspector-action-list { display: flex; flex-direction: column; gap: 16px; }
+.inspector-action-list .field-note { margin-top: 6px; }
+.inspector-diagram { display: block; width: 100%; height: auto; max-height: 110px; color: var(--muted); }
+.inspector-diagram text { fill: currentColor; font-size: 11px; font-family: inherit; }
+.inspector-diagram .diagram-board { fill: #e9e4d8; stroke: #9b9d90; stroke-width: 1; }
+.inspector-diagram .diagram-measure { fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; }
+.inspector-diagram .diagram-joint { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; }
+.joint-position-diagram { margin: 0; }
+.right-sidebar .inspector-footer { padding: 14px 20px; }
+.inspector-task-status { margin-bottom: 10px; font-size: 12px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+.inspector-task-status.is-blocked { color: #9e4127; }
+.inspector-task-back { padding: 8px 14px 0; }
+.inspector-task-back + .inspector-scroll { padding-top: 12px; }
+.inspector-edit-context { padding: 12px 20px; border-bottom: 1px solid var(--line); background: #f0f2e9; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.inspector-edit-context p { display: flex; flex-direction: column; gap: 4px; font-size: 12px; line-height: 1.4; min-width: 0; }
+.inspector-edit-context p span { color: var(--muted); overflow-wrap: anywhere; }
+.inspector-edit-context .ui-button { font-size: 12px; }
+.right-sidebar .attach-intro { align-items: flex-start; margin-bottom: 18px; }
+.right-sidebar .attach-intro h2 { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.right-sidebar .attach-intro p { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
+.right-sidebar .validation-note { margin-bottom: 14px; font-size: 12px; }
+.right-sidebar .panel-actions { margin-top: 20px; padding-top: 16px; }
+.right-sidebar .panel-actions + .inspector-help { margin-top: 14px; }
+@media (max-width: 680px) {
+  .right-sidebar .inspector-scroll { padding: 16px 18px; }
+  .right-sidebar .inspector-header { height: 48px; padding-inline: 18px; }
+  .right-sidebar .inspector-footer { padding: 12px 18px; }
+  .inspector-edit-context { padding: 10px 18px; }
+}

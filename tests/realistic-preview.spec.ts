@@ -33,7 +33,7 @@ test('room preview preserves the assembly, selection and studio controls', async
   await expect(page.getByRole('button', { name: 'Realistic preview', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('group', { name: 'Preview mode' })).toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Project panels' })).not.toBeVisible()
-  await expect(page.getByRole('complementary', { name: 'Panel inspector' })).not.toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Inspector' })).not.toBeVisible()
   await expect(page.getByRole('combobox', { name: 'Camera view' })).not.toBeVisible()
   await expect(page.getByRole('button', { name: 'Exploded view', exact: true })).not.toBeVisible()
   await expect(page.getByLabel('Room scale reference')).toContainText('floor lamp 165 cm tall')
@@ -52,7 +52,7 @@ test('room preview preserves the assembly, selection and studio controls', async
 
   await page.getByRole('button', { name: 'Studio', exact: true }).click()
   await expect(page.getByRole('complementary', { name: 'Project panels' })).toBeVisible()
-  await expect(page.getByRole('complementary', { name: 'Panel inspector' })).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible()
   await expect(page.getByLabel('Panel name')).toHaveValue(selectedName)
   await expect(page.getByRole('combobox', { name: 'Camera view' })).toHaveValue('front')
   await expect(page.getByRole('button', { name: 'Exploded view', exact: true })).toHaveAttribute('aria-pressed', 'true')

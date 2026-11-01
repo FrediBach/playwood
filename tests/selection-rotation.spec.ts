@@ -118,7 +118,7 @@ test('an assembly turns as one instance while its source and other copy stay unc
   await expect(page.locator('[data-assembly-id]')).toHaveCount(2)
   expect(await savedProject(page)).toEqual(rotated)
 
-  await page.getByRole('button', { name: 'Edit assembly', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit shared design', exact: true }).click()
   await page.getByLabel('3D preview canvas', { exact: true }).focus()
   await page.keyboard.press('y')
   await page.getByRole('button', { name: 'Done editing', exact: true }).click()

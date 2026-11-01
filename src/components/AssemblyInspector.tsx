@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Box, Copy, Download, Link2, Pencil, Plus, RotateCcw, Trash2, Ungroup, Unlink } from 'lucide-react'
 import { Button } from './ui/button'
 import { NumberField } from './fields'
 import { FinishCoverageField } from './FinishCoverageField'
 import { AssemblyParametersEditor } from './AssemblyParametersEditor'
+import { InspectorDisclosure } from './InspectorPrimitives'
 import { assemblyParametersError } from '@/lib/assembly-parameters-validation'
 import { getAssemblyParameterRange } from '@/lib/assembly-parameters'
 import type { AssemblyParameter, Panel } from '@/lib/types'
 import './assemblies.css'
+import './inspector-assembly.css'
 
 export interface AssemblyInspectorProps {
   name: string
@@ -44,56 +46,68 @@ export interface AssemblyInspectorProps {
   onDisassemble: () => void
   onDelete: () => void
   onCancelAttach?: () => void
+  buildTools?: ReactNode
 }
 
-export function AssemblyInspector({ name, definitionName, instanceCount, panelCount, color, hasColorOverride, finishCoverage = 0, finishCoverageMixed = false, finishCoverageDisabled = false, hasFinishCoverageOverride = false, onFinishCoverageChange, onResetFinishCoverage, parameters = [], parameterValues = {}, onParameterChange, onResetParameters, connected, attachmentTargets = [], attachmentActive, canAttachCopy = true, attachmentMessage, onRename, onColorChange, onResetColor, onDuplicate, onExport, onAttachCopy, onAttachExisting, onEdit, onDisconnect, onMakeIndependent, onDisassemble, onDelete, onCancelAttach }: AssemblyInspectorProps) {
+export function AssemblyInspector({ name, definitionName, instanceCount, panelCount, color, hasColorOverride, finishCoverage = 0, finishCoverageMixed = false, finishCoverageDisabled = false, hasFinishCoverageOverride = false, onFinishCoverageChange, onResetFinishCoverage, parameters = [], parameterValues = {}, onParameterChange, onResetParameters, connected, attachmentTargets = [], attachmentActive, canAttachCopy = true, attachmentMessage, onRename, onColorChange, onResetColor, onDuplicate, onExport, onAttachCopy, onAttachExisting, onEdit, onDisconnect, onMakeIndependent, onDisassemble, onDelete, buildTools }: AssemblyInspectorProps) {
   const isCustom = (id: string) => Object.hasOwn(parameterValues, id)
   const hasParameterOverrides = parameters.some(parameter => isCustom(parameter.id))
+  const appearanceSummary = [hasColorOverride ? 'Custom color' : 'Assembly color', finishCoverageMixed ? 'Mixed finish' : `${Math.round(finishCoverage * 100)}% finish${hasFinishCoverageOverride ? ' · Custom' : ''}`].join(' · ')
+
+  if (attachmentActive) return <div className="assembly-attachment-task">
+    <div className="selected-heading"><Link2 size={15}/><span>ATTACH ASSEMBLY</span></div>
+    <div className="multi-selection-heading"><h2>Attach to {name}</h2><p>{definitionName} · {panelCount} panels</p></div>
+    <div className="assembly-placement-note" role="status"><strong>Choose a connection</strong><p>{attachmentMessage || 'Hover a + in the workspace to preview. Click to attach.'}</p></div>
+  </div>
+
   return <>
     <div className="selected-heading"><Box size={15}/><span>ASSEMBLY INSTANCE</span></div>
     <label className="field panel-name-field"><span>Instance name</span><input key={name} aria-label="Instance name" defaultValue={name} maxLength={120}
       onBlur={event => { const value = event.target.value.trim(); if (value && value !== name) onRename(value) }}
       onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }}/></label>
-    <div className="assembly-definition-note"><Box size={17}/><div><strong>{definitionName}</strong><span>{panelCount} panels · {instanceCount} linked {instanceCount === 1 ? 'instance' : 'instances'}</span></div></div>
-    <Button variant="outline" className="full-button" onClick={onEdit}><Pencil size={15}/>Edit assembly</Button>
-    <p className="assembly-help">Edit shared construction and choose the values each instance can configure.</p>
+    <div className="assembly-design-reference">
+      <div className="assembly-definition-note"><Box size={17}/><div><strong>{definitionName}</strong><span>{panelCount} panels · {instanceCount} linked {instanceCount === 1 ? 'instance' : 'instances'}</span></div></div>
+      <button type="button" className="assembly-edit-design" aria-describedby="assembly-edit-scope" onClick={onEdit}><Pencil size={13}/>Edit shared design</button>
+      <span id="assembly-edit-scope" className="visually-hidden">Changes the shared construction of {instanceCount} linked {instanceCount === 1 ? 'instance' : 'instances'}.</span>
+    </div>
+    <p className="inspector-scope">{parameters.length ? 'Values and appearance affect' : 'Appearance affects'} only this instance.</p>
 
     {parameters.length > 0 && <section className="inspector-section assembly-instance-values" aria-label="Instance values">
-      <div className="section-title"><h2>Instance values</h2><span>mm</span></div>
+      <div className="section-title"><h2>Dimensions</h2><span>mm</span></div>
       {parameters.map(parameter => <div className="assembly-instance-value" key={parameter.id}>
         <NumberField label={parameter.name} value={isCustom(parameter.id) ? parameterValues[parameter.id] : parameter.defaultValue} precision={3} {...getAssemblyParameterRange(parameter)} commitOnBlur disabled={!onParameterChange} onChange={value => onParameterChange?.(parameter.id, value)}/>
-        <p>{parameter.bindings.length} linked {parameter.bindings.length === 1 ? 'dimension' : 'dimensions'}{isCustom(parameter.id) && <span>Custom</span>}</p>
+        <p>{parameter.bindings.length} linked {parameter.bindings.length === 1 ? 'dimension' : 'dimensions'}<span>{isCustom(parameter.id) ? 'Custom' : 'Default'}</span></p>
       </div>)}
-      <p className="assembly-help">Sizes change only for this instance. Connected neighbors may move to keep shared connectors aligned.</p>
-      <p className="assembly-help">Values describe panel cut lengths; overall size includes connector clearances.</p>
+      <p className="field-note">Panel cut lengths; connector clearances add to the overall size.{connected && ' Connected neighbors may move to keep joints aligned.'}</p>
       {hasParameterOverrides && onResetParameters && <button type="button" className="assembly-reset-values" onClick={onResetParameters}><RotateCcw size={13}/>Reset to assembly defaults</button>}
     </section>}
 
-    <section className="inspector-section assembly-finish-section"><div className="section-title"><h2>This instance</h2><span>LOCAL</span></div>
+    <InspectorDisclosure title="Appearance" summary={appearanceSummary} preferenceKey="assembly-appearance" className="assembly-finish-disclosure">
       <label className="assembly-color-field"><span>Panel color</span><input type="color" aria-label="Instance panel color" value={color} onChange={event => onColorChange(event.target.value)}/></label>
       <div className="assembly-override-status"><span>{hasColorOverride ? 'Custom color' : 'Using assembly color'}</span>{hasColorOverride && <button onClick={onResetColor}><RotateCcw size={12}/>Reset</button>}</div>
       {onFinishCoverageChange && <>
         <FinishCoverageField key={name} value={finishCoverage} mixed={finishCoverageMixed} disabled={finishCoverageDisabled} onChange={onFinishCoverageChange}/>
         <div className="assembly-override-status"><span>{hasFinishCoverageOverride ? 'Custom finish' : 'Using assembly finish'}</span>{hasFinishCoverageOverride && onResetFinishCoverage && <button aria-label="Reset instance finish coverage" onClick={onResetFinishCoverage}><RotateCcw size={12}/>Reset</button>}</div>
       </>}
-      <p className="assembly-help">Color and finish affect only this instance.</p>
-    </section>
+    </InspectorDisclosure>
 
-    <section className="inspector-section"><div className="section-title"><h2>Keep building</h2><Link2 size={16}/></div>
-      {attachmentActive ? <div className="assembly-placement-note" role="status"><strong>Choose a connection</strong><p>{attachmentMessage || 'Hover a + in the workspace to preview. Click to attach.'}</p>{onCancelAttach && <Button variant="ghost" size="sm" onClick={onCancelAttach}>Cancel attachment</Button>}</div> : <>
+    <section className="inspector-section assembly-connections"><div className="section-title"><h2>Connections</h2><Link2 size={16}/></div>
         <Button className="full-button" onClick={onAttachCopy} disabled={!canAttachCopy}><Plus size={16}/>Attach a copy</Button>
-        <p className="assembly-help">{canAttachCopy ? 'Choose a + in the workspace. Connectors are fitted automatically.' : attachmentMessage || 'No compatible connection is available. Duplicate this instance for free placement.'}</p>
+        <p className="field-note">{canAttachCopy ? 'Choose a + in the workspace to preview its connection.' : attachmentMessage || 'No compatible connection is available. Duplicate this instance for free placement.'}</p>
         {attachmentTargets.length > 0 && <label className="field"><span>Attach an existing instance</span><select aria-label="Attach an existing instance" value="" onChange={event => { if (event.target.value) onAttachExisting(event.target.value) }}><option value="" disabled>Choose an instance…</option>{attachmentTargets.map(target => <option key={target.id} value={target.id}>{target.name}</option>)}</select></label>}
-      </>}
+        {connected && <Button variant="ghost" size="sm" onClick={onDisconnect}><Unlink size={13}/>Disconnect from neighbors</Button>}
     </section>
 
+    {buildTools}
+
+    <InspectorDisclosure title="Manage assembly" summary="Export, make independent, disassemble" preferenceKey="assembly-management" className="inspector-management">
+      <div className="inspector-action-list">
+        <div><Button variant="outline" size="sm" className="full-button" onClick={onExport}><Download size={15}/>Export assembly</Button><p className="field-note">Save a reusable file with these values and colors as its defaults.</p></div>
+        <div><Button variant="ghost" size="sm" onClick={onMakeIndependent}><Box size={14}/>Make independent</Button><p className="field-note">Give this instance its own design. Panels and physical connections stay in place.</p></div>
+        <div><Button variant="ghost" size="sm" onClick={onDisassemble}><Ungroup size={14}/>Disassemble</Button><p className="field-note">Turn this instance into separate editable panels. Panels and connectors stay in place.</p></div>
+      </div>
+    </InspectorDisclosure>
     <div className="panel-actions assembly-primary-actions"><Button variant="outline" size="sm" onClick={onDuplicate}><Copy size={15}/>Duplicate</Button><Button variant="ghost" size="icon" aria-label="Delete assembly instance" className="delete-button" onClick={onDelete}><Trash2 size={16}/></Button></div>
-    <Button variant="outline" className="full-button mt-2" onClick={onExport}><Download size={15}/>Export assembly</Button>
-    <p className="assembly-help">Save a reusable assembly file with these values and colors as its defaults.</p>
-    <div className="assembly-secondary-actions">{connected && <button onClick={onDisconnect}><Unlink size={13}/>Disconnect from neighbors</button>}<button onClick={onMakeIndependent}><Box size={13}/>Make independent</button></div>
-    <p className="assembly-help">Make independent gives this instance its own assembly design. Its panels and physical connections stay in place.</p>
-    <div className="assembly-secondary-actions"><button onClick={onDisassemble}><Ungroup size={13}/>Disassemble</button></div>
-    <p className="assembly-help">Turn this instance into separate, editable panels. Panels and connectors stay in place.</p>
   </>
 }
 

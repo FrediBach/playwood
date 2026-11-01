@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { expect, test, type Page } from '@playwright/test'
 import { createPanel } from '../src/lib/model'
 import type { Project } from '../src/lib/types'
@@ -13,6 +14,7 @@ async function openPanel(page: Page) {
   })
   await expect(page.getByRole('dialog')).not.toBeVisible()
   await page.locator('.panel-list-select').first().click()
+  await openInspectorSection(page, 'Shape & surface')
 }
 
 async function coordinate(page: Page, name: string, value: string) {
@@ -50,6 +52,7 @@ test('precise outline edits, local history, rounding, scaling, and autosave work
   await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
   await page.reload()
   await page.locator('.panel-list-select').first().click()
+  await openInspectorSection(page, 'Shape & surface')
   await expect(preview).toBeVisible()
   await page.getByRole('button', { name: 'Edit custom outline', exact: true }).click()
   await expect(page.getByRole('spinbutton', { name: 'Point 2 X', exact: true })).toHaveValue('640.5')

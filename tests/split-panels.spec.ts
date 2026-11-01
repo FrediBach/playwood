@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect } from '@playwright/test'
 import { createStarterProject, validateProject } from '../src/lib/model'
 
@@ -9,6 +10,7 @@ test('splits selected shelves with a center divider, saves, and undoes as one ed
   const select = (name: string) => page.locator('.panel-list-row').filter({ has: page.getByText(name, { exact: true }) }).locator('.panel-list-select')
   await select('Top shelf').click()
   await select('Middle shelf').click({ modifiers: ['Shift'] })
+  await openInspectorSection(page, 'Divide evenly')
   await page.getByRole('button', { name: 'Split in the middle', exact: true }).click()
   await expect(page.locator('.panel-list-row')).toHaveCount(10)
   await expect(page.locator('.panel-list-row.selected')).toHaveCount(5)
@@ -34,6 +36,7 @@ test('offers valid split counts and creates evenly sized sections in one undo st
   const select = (name: string) => page.locator('.panel-list-row').filter({ has: page.getByText(name, { exact: true }) }).locator('.panel-list-select')
   await select('Top shelf').click()
   await select('Middle shelf').click({ modifiers: ['Shift'] })
+  await openInspectorSection(page, 'Divide evenly')
   const counts = page.getByRole('combobox', { name: 'Number of splits' })
   await expect(counts.locator('option[value="3"]')).toBeAttached()
   await counts.selectOption('3')
@@ -67,6 +70,7 @@ test('removes split controls when selection changes or clears', async ({ page })
   for (let attempt = 0; attempt < 2; attempt++) {
     await select('Top shelf').click()
     await select('Middle shelf').click({ modifiers: ['Shift'] })
+    await openInspectorSection(page, 'Divide evenly')
     await expect(split).toHaveCount(1)
     await expect(page.getByRole('button', { name: 'Split in the middle', exact: true })).toBeEnabled()
     await page.getByRole('checkbox', { name: 'Select Top shelf', exact: true }).uncheck()
@@ -78,6 +82,7 @@ test('removes split controls when selection changes or clears', async ({ page })
   }
   await select('Top shelf').click()
   await select('Middle shelf').click({ modifiers: ['Shift'] })
+  await openInspectorSection(page, 'Divide evenly')
   await expect(split).toHaveCount(1)
   await page.keyboard.press('Escape')
   await expect(page.locator('.panel-list-row.selected')).toHaveCount(0)
@@ -91,11 +96,13 @@ test('divides four selected sides into a grid, validates inputs, saves and undoe
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles({ name: 'opening.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(original)) })
   await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Divide into a grid')
   const grid = page.getByRole('region', { name: 'Split opening into a grid' })
   await expect(grid).toBeVisible()
   await page.getByRole('button', { name: 'Clear', exact: true }).click()
   await expect(grid).toHaveCount(0)
   await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Divide into a grid')
   await expect(grid).toBeVisible()
   await expect(page.getByRole('region', { name: 'Split parallel panels' })).toHaveCount(0)
   const x = page.getByRole('spinbutton', { name: 'X dividers', exact: true })

@@ -183,7 +183,7 @@ test('pulling a single connector widens its connected structure without sliding 
   expect(resized.connectorOverrides).toEqual(project.connectorOverrides)
   expectAnglesAndJoints(project, resized)
   expect(await cameraState(page)).toEqual(camera)
-  await expect(page.getByText('SELECTED CONNECTOR', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: / connector$/ })).toBeVisible()
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(project)
 })

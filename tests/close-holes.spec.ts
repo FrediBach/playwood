@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect } from '@playwright/test'
 import { ASSEMBLY_LIBRARY } from '../src/lib/assembly-library'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
@@ -8,6 +9,7 @@ test('choose one assembly opening, close the last directly, undo, and reload', a
   const project = ASSEMBLY_LIBRARY.find(item => item.id === 'assembly-cube')!.create()
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles({ name: 'box.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  await openInspectorSection(page, 'Close holes')
   const close = page.getByRole('button', { name: 'Close hole', exact: true })
   await expect(close).toBeDisabled()
   const savedCount = () => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!).panels.length)
@@ -16,6 +18,7 @@ test('choose one assembly opening, close the last directly, undo, and reload', a
   await choice.selectOption({ label: 'Back · 350 × 350 mm' })
   await expect(close).toBeEnabled()
   await close.click()
+  await openInspectorSection(page, 'Close holes')
   await expect(choice).toHaveCount(0)
   await expect(close).toBeEnabled()
   await expect.poll(savedCount).toBe(5)
@@ -27,6 +30,7 @@ test('choose one assembly opening, close the last directly, undo, and reload', a
   await expect(close).toHaveCount(0)
   await expect.poll(savedCount).toBe(6)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await openInspectorSection(page, 'Close holes')
   await expect(close).toBeEnabled()
   await expect.poll(savedCount).toBe(5)
   await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
@@ -43,6 +47,7 @@ test('selected loose panels expose the same hole choices', async ({ page }) => {
   for (const panel of project.panels.slice(1)) {
     await page.locator('.panel-list-row').filter({ has: page.getByText(panel.name, { exact: true }) }).locator('.panel-list-select').click({ modifiers: ['Shift'] })
   }
+  await openInspectorSection(page, 'Close holes')
   await page.getByLabel('Opening to close').selectOption({ label: 'Front · 350 × 350 mm' })
   await page.getByRole('button', { name: 'Close hole', exact: true }).click()
   await expect(page.locator('.panel-list-row')).toHaveCount(5)
@@ -54,9 +59,11 @@ test('neighboring closure replaces 90 degree joints with T connectors', async ({
   const project = ASSEMBLY_LIBRARY.find(item => item.id === 'assembly-double-cubby')!.create()
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles({ name: 'cubby.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  await openInspectorSection(page, 'Close holes')
   const choice = page.getByLabel('Opening to close')
   await choice.selectOption({ label: 'Front 1 · 350 × 350 mm' })
   await page.getByRole('button', { name: 'Close hole', exact: true }).click()
+  await openInspectorSection(page, 'Close holes')
   await choice.selectOption({ label: 'Front · 350 × 350 mm' })
   await page.getByRole('button', { name: 'Close hole', exact: true }).click()
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))

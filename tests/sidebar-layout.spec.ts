@@ -13,7 +13,7 @@ for (const width of [1600, 1440, 800, 390]) {
     await page.setViewportSize({ width, height: 1000 })
     await page.goto('/')
     const panels = page.getByRole('complementary', { name: 'Project panels' })
-    const inspector = page.getByRole('complementary', { name: 'Panel inspector' })
+    const inspector = page.getByRole('complementary', { name: 'Inspector' })
 
     if (width <= 900) await page.getByRole('button', { name: 'Open panel list', exact: true }).click()
     await page.getByRole('button', { name: 'Collapse panel list', exact: true }).click()

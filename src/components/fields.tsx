@@ -74,8 +74,8 @@ function FinishField({color,mixed,disabled,onChange}: {color:string;mixed:boolea
     </div>
 }
 
-export function PanelFields({panel,panels,onChange:applyChange,compact=false,disabledFields=[],resizeOnCommit=false}: {
-  panel:Panel;panels?:Panel[];onChange:(v:Partial<Panel>)=>boolean|void;compact?:boolean;resizeOnCommit?:boolean;disabledFields?:readonly (keyof Panel)[]
+export function PanelFields({panel,panels,onChange:applyChange,compact=false,disabledFields=[],resizeOnCommit=false,group}: {
+  panel:Panel;panels?:Panel[];onChange:(v:Partial<Panel>)=>boolean|void;compact?:boolean;resizeOnCommit?:boolean;disabledFields?:readonly (keyof Panel)[];group?:'dimensions'|'shape'|'appearance'
 }) {
   const selection=panels?.length?panels:[panel]
   const shared=getSharedPanelFields(selection)
@@ -105,20 +105,16 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
   const maxHoleSize=Math.min(40,...selection.map(p=>p.holeSpacing-6))
   const minSpacing=Math.max(...selection.map(p=>Math.max(15,p.holeSize+6,Math.ceil(Math.sqrt(p.width*p.height/4500)))))
   return <>
-    <div className="field-row">
+    {(!group || group==='dimensions') && <><div className="field-row">
       <NumberField label="Width" commitOnBlur={resizeOnCommit} value={panel.width} min={80} max={3000} {...numberProps('width')} onChange={width=>onChange({width})}/>
       <NumberField label="Height" commitOnBlur={resizeOnCommit} value={panel.height} min={80} max={3000} {...numberProps('height')} onChange={height=>onChange({height})}/>
       <NumberField label="Thickness" value={panel.thickness} min={3} max={60} {...numberProps('thickness')} onChange={thickness=>onChange({thickness})}/>
     </div>
+    {!compact&&<p className="field-note">Panel cut dimensions, before assembly.</p>}
+    </>}
+    {(!group || group==='shape') && <>
     <NumberField label="Corner radius" value={panelCornerRadius(panel)} min={0} max={Math.min(...selection.map(p=>Math.min(p.width,p.height)/2))} {...numberProps('cornerRadius')} onChange={cornerRadius=>onChange({cornerRadius})}/>
     {selection.length === 1 && !disabledFields.includes('customOutline') && <PanelOutlineControl key={panel.id} panel={panel} onChange={applyChange}/>}
-    <SelectField label="Material" value={panel.material} mixed={mixed('material')} disabled={disabledFields.includes('material')}
-      onChange={v=>{const m=MATERIALS.find(m=>m.id===v)!;onChange({material:m.id,...(!disabled('color')?{color:m.color}:{})})}}>
-      {MATERIALS.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-    </SelectField>
-    <FinishField color={panel.color} mixed={colorMixed} disabled={disabled('color')} onChange={color=>onChange({color})}/>
-    <FinishCoverageField key={`finish:${selection.map(p=>p.id).join(':')}`} value={finishCoverage} mixed={finishCoverageMixed}
-      disabled={allPainted||disabled('finishCoverage')} onChange={finishCoverage=>onChange({finishCoverage})}/>
     <div className={`field ${disabled('pattern')?'field-disabled':''}`}>
       <span>Surface{patternMixed&&<span className="field-hint">Mixed</span>}</span>
       <div className="pattern-options">
@@ -136,6 +132,15 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
       <NumberField label="Spacing" value={panel.holeSpacing} min={minSpacing} max={Math.max(200,minSpacing)}
         mixed={mixed('holeSpacing')} disabled={disabledFields.includes('holeSpacing')||holeControlsDisabled} onChange={holeSpacing=>onChange({holeSpacing})}/>
     </div>}
-    {!compact&&<p className="field-note">Dimensions describe the panel before assembly.</p>}
+    </>}
+    {(!group || group==='appearance') && <>
+    <SelectField label="Material" value={panel.material} mixed={mixed('material')} disabled={disabledFields.includes('material')}
+      onChange={v=>{const m=MATERIALS.find(m=>m.id===v)!;onChange({material:m.id,...(!disabled('color')?{color:m.color}:{})})}}>
+      {MATERIALS.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+    </SelectField>
+    <FinishField color={panel.color} mixed={colorMixed} disabled={disabled('color')} onChange={color=>onChange({color})}/>
+    <FinishCoverageField key={`finish:${selection.map(p=>p.id).join(':')}`} value={finishCoverage} mixed={finishCoverageMixed}
+      disabled={allPainted||disabled('finishCoverage')} onChange={finishCoverage=>onChange({finishCoverage})}/>
+    </>}
   </>
 }

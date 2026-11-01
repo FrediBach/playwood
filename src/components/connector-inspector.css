@@ -1,0 +1,8 @@
+.connector-selection-heading{margin-bottom:20px}
+.connector-selection-heading>div{display:flex;align-items:center;gap:9px;min-width:0}
+.connector-selection-heading h2{font-size:18px;line-height:1.3;font-weight:550;letter-spacing:-.3px;overflow-wrap:anywhere}
+.connector-selection-heading .inspector-summary{margin-top:7px;overflow-wrap:anywhere}
+.connector-type-warning{margin:0 0 16px}
+.connector-build-section .full-button+.field-note{margin-top:8px}
+.connector-remove-action{margin-top:24px;padding-top:16px;border-top:1px solid var(--line)}
+.connector-remove-action .field-note{margin-top:6px}

@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
-import { ArrowRight, Box, Layers, Link2, Plus, Settings2, X } from 'lucide-react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { ArrowLeft, ArrowRight, Link2, Plus, Settings2, X } from 'lucide-react'
 import { Button } from './ui/button'
 import { IconButton } from './editor-controls'
 import type { ConnectorType } from '@/lib/types'
+import './inspector.css'
 
 interface Props {
   children: ReactNode
@@ -16,15 +17,28 @@ interface Props {
   canAttach: boolean
   attachmentType: ConnectorType
   contextLabel?: string
+  contextDetail?: string
+  selectionKey: string
   footer?: ReactNode
+  attachmentStatus?: string
   onDoneEditing?: () => void
 }
 
-export function InspectorSidebar({children,inspectorTab,selectedCount,hasSelection,onCollapse,onPanel,startAttach,applyAttachment,canAttach,attachmentType,contextLabel,footer,onDoneEditing}: Props) {
-  return <aside className="right-sidebar" aria-label="Panel inspector"><div className="inspector-header"><span><Settings2 size={17}/>Inspector</span><IconButton label="Collapse inspector" onClick={onCollapse}><X size={17}/></IconButton></div>
-      {contextLabel?<div className="assembly-context-label"><Box size={15}/><span>{contextLabel}</span>{onDoneEditing&&<button className="assembly-mobile-done" onClick={onDoneEditing}>Done editing</button>}</div>:<div className="inspector-tabs"><button className={inspectorTab==='panel'?'active':''} onClick={onPanel}>Panel</button><button className={inspectorTab==='attach'?'active':''} disabled={!hasSelection} onClick={startAttach}><Link2 size={15}/>Attach</button></div>}
-      <div className="inspector-scroll">{children}</div>
-      {footer!==undefined?<div className="inspector-footer">{footer}</div>:!contextLabel&&<>{selectedCount>1&&<div className="inspector-footer multi-selection-footer"><Layers size={16}/><span>Editing {selectedCount} panels together</span></div>}
-      {hasSelection&&<div className="inspector-footer">{inspectorTab==='attach'?<><Button className="full-button" onClick={applyAttachment} disabled={!canAttach}><Link2 size={17}/>Attach {attachmentType==='t'?'2 panels':attachmentType==='cross'?'3 panels':'panel'}<ArrowRight size={16}/></Button><button className="text-button" onClick={onPanel}>Cancel preview</button></>:<Button className="full-button" onClick={startAttach}><Plus size={18}/>Attach a panel<ArrowRight size={17}/></Button>}</div>}</>}
-    </aside>
+export function InspectorSidebar({children,inspectorTab,selectedCount,hasSelection,onCollapse,onPanel,startAttach,applyAttachment,canAttach,attachmentType,contextLabel,contextDetail,selectionKey,footer,attachmentStatus,onDoneEditing}: Props) {
+  const attaching = inspectorTab==='attach'&&!contextLabel
+  const scroll = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => { if (scroll.current) scroll.current.scrollTop = 0 }, [selectionKey])
+  return <aside className="right-sidebar" aria-label="Inspector">
+    <div className="inspector-header"><span><Settings2 size={17}/>{attaching?'Attach panel':contextLabel??(selectedCount>1?'Panel selection':'Inspector')}</span><IconButton label="Collapse inspector" onClick={onCollapse}><X size={17}/></IconButton></div>
+    {onDoneEditing&&<div className="inspector-edit-context"><p><strong>Editing shared design</strong><span>{contextDetail}</span></p><Button variant="outline" size="sm" onClick={onDoneEditing}>Done editing</Button></div>}
+    {attaching&&<div className="inspector-task-back"><Button variant="ghost" size="sm" onClick={onPanel}><ArrowLeft size={14}/>Panel</Button></div>}
+    <div ref={scroll} className="inspector-scroll">{children}</div>
+    {footer!==undefined?<div className="inspector-footer">{footer}</div>:!contextLabel&&hasSelection&&<div className="inspector-footer">
+      {attaching?<>
+        <p className={`inspector-task-status ${canAttach?'':'is-blocked'}`} id="attachment-status" role="status">{attachmentStatus || (canAttach?'Ready to attach':'Choose a compatible connection.')}</p>
+        <Button className="full-button" onClick={applyAttachment} disabled={!canAttach} aria-describedby="attachment-status"><Link2 size={17}/>Attach {attachmentType==='t'?'2 panels':attachmentType==='cross'?'3 panels':'panel'}<ArrowRight size={16}/></Button>
+        <button className="text-button" onClick={onPanel}>Cancel preview</button>
+      </>:<Button className="full-button" onClick={startAttach}><Plus size={18}/>Attach a panel<ArrowRight size={17}/></Button>}
+    </div>}
+  </aside>
 }

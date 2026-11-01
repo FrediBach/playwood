@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect, type Page } from '@playwright/test'
 import { ASSEMBLY_LIBRARY } from '../src/lib/assembly-library'
 import { createExampleProject } from '../src/lib/example-library'
@@ -76,6 +77,7 @@ test('authors one value driving multiple dimensions during creation and edits it
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles({ name: 'cube.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(original)) })
   await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Create assembly')
   await page.getByLabel('Assembly name', { exact: true }).fill('Adjustable cube')
   await page.locator('.assembly-create-values summary').click()
   await page.getByRole('button', { name: 'Add editable value', exact: true }).click()
@@ -93,7 +95,7 @@ test('authors one value driving multiple dimensions during creation and edits it
   expect(configured.assemblies!.definitions[0].parameters![0].bindings).toHaveLength(original.panels.length * 2)
   expect(validateProject(configured)).toEqual([])
 
-  await page.getByRole('button', { name: 'Edit assembly', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit shared design', exact: true }).click()
   await expect(page.getByLabel('Width', { exact: true })).toBeDisabled()
   await page.getByRole('button', { name: 'Edit values', exact: true }).click()
   await page.locator('.assembly-parameter-toggle').click()
@@ -107,7 +109,7 @@ test('authors one value driving multiple dimensions during creation and edits it
   expect(reset.panels.every(panel => panel.width === 370 && panel.height === 370)).toBe(true)
   expect(parseProject(reset)).toEqual(reset)
   expect(validateProject(reset)).toEqual([])
-  await page.getByRole('button', { name: 'Edit assembly', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit shared design', exact: true }).click()
   await page.getByRole('button', { name: 'Edit values', exact: true }).click()
   await page.locator('.assembly-parameter-toggle').click()
   await page.screenshot({ path: 'test-results/assembly-parameter-authoring.png' })

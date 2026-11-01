@@ -14,7 +14,7 @@ test('connect selected openings with a panel, undo, redo, and reload', async ({ 
   const connect = page.getByRole('button', { name: 'Connect with a panel', exact: true })
   await expect(connect).toBeDisabled()
   await expect(page.getByText('Each selected connector needs a free, compatible opening.', { exact: false })).toBeVisible()
-  await page.getByLabel('Connector type', { exact: true }).selectOption('t')
+  await page.getByRole('group', { name: 'Connector type', exact: true }).getByRole('button', { name: 'T connector', exact: true }).click()
   await expect(connect).toBeEnabled()
   await page.screenshot({ path: 'test-results/connect-panel-ready.png' })
   await connect.click()

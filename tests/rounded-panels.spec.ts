@@ -1,8 +1,10 @@
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect } from '@playwright/test'
 
 test('corner radius edits persist and support undo', async ({ page }) => {
   await page.goto('/')
   await page.locator('.panel-list-select').first().click()
+  await openInspectorSection(page, 'Shape & surface')
   const radius = page.getByRole('spinbutton', { name: 'Corner radius', exact: true })
   await expect(radius).toHaveValue('0')
   await radius.fill('60')
@@ -15,5 +17,6 @@ test('corner radius edits persist and support undo', async ({ page }) => {
   await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
   await page.reload()
   await page.locator('.panel-list-select').first().click()
+  await openInspectorSection(page, 'Shape & surface')
   await expect(radius).toHaveValue('60')
 })

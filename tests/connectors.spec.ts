@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect, type Page } from '@playwright/test'
 import type { Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three'
 import { attachPanel, createPanel, getProjectBounds, resolvePanels } from '../src/lib/model'
@@ -123,6 +124,7 @@ for (const [type, label, branches] of [
     await page.getByRole('button', { name: 'Attach a panel', exact: true }).click()
     await page.getByRole('button', { name: 'Left', exact: true }).click()
     await page.getByRole('button', { name: `${label} connector`, exact: true }).click()
+    await openInspectorSection(page, 'Connector finish')
     await page.getByRole('button', { name: 'Green connector color', exact: true }).click()
     await expect.poll(async () => (await renderedConnectors(page)).length).toBe(2)
     const preview = await renderedConnectors(page)
@@ -216,7 +218,7 @@ test('middle T hardware fits the shelf side openings without penetrating panels'
   }
   await page.getByRole('button', { name: 'Middle shelf', exact: true }).click()
   await expect(page.getByLabel('Panel name')).toHaveValue('Middle shelf')
-  await expect(page.getByLabel('Connector type')).toContainText('T connector')
+  await expect(page.getByRole('complementary', { name: 'Inspector' }).getByText('T connector', { exact: true })).toBeVisible()
   await page.getByRole('combobox', { name: 'Camera view', exact: true }).selectOption('front')
   await page.getByRole('button', { name: 'Fit assembly (F)', exact: true }).click()
   await page.screenshot({ path: 'test-results/connectors-shelf-middle.png' })

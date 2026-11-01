@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect, type Page } from '@playwright/test'
 import { createPanel } from '../src/lib/model'
 import { createExampleProject } from '../src/lib/example-library'
@@ -51,6 +52,7 @@ test('finish fades rendered grain to solid color and survives undo, save and exp
   await importProject(page, { version: 1, name: 'Finish test', connections: [], panels: [createPanel({ width: 1000, height: 1000, position: [0, 500, 0] })] })
   await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
   await page.getByRole('button', { name: 'Show grid', exact: true }).click()
+  await openInspectorSection(page, 'Material & finish')
   const slider = page.getByRole('slider', { name: 'Finish coverage' })
   await expect(slider).toHaveValue('0')
   await expect.poll(() => faceVariation(page)).toBeGreaterThan(2)
@@ -80,10 +82,12 @@ test('finish fades rendered grain to solid color and survives undo, save and exp
   const exported = await exportProject(page)
   expect(exported.panels[0]).toMatchObject({ material: 'birch', finishCoverage: 1 })
   await page.reload()
+  await openInspectorSection(page, 'Material & finish')
   await expect(slider).toHaveValue('100')
   await importProject(page, exported)
   await expect(slider).toHaveValue('100')
   await page.getByRole('button', { name: 'Attach a panel', exact: true }).click()
+  await openInspectorSection(page, 'Material & finish')
   await expect(slider).toHaveValue('100')
   await page.getByRole('button', { name: 'Cancel preview', exact: true }).click()
   await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
@@ -100,6 +104,7 @@ test('shared finishes update together and painted boards remain solid', async ({
     createPanel({ name: 'Painted', material: 'painted', position: [0, 1000, 0] }),
   ] })
   await page.locator('.panel-list-select').nth(1).click({ modifiers: ['Shift'] })
+  await openInspectorSection(page, 'Material & finish')
   const slider = page.getByRole('slider', { name: 'Finish coverage' })
   await slider.press('End')
   const finished = await exportProject(page)
@@ -129,8 +134,10 @@ test('instance finish coverage and color overrides reset independently', async (
   const cube = createExampleProject('cube')
   await importProject(page, { ...cube, panels: cube.panels.map(panel => ({ ...panel, material: 'birch' })) })
   await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Create assembly')
   await page.getByRole('button', { name: 'Create assembly', exact: true }).click()
   await page.getByRole('button', { name: 'Duplicate', exact: true }).click()
+  await openInspectorSection(page, 'Appearance')
   const slider = page.getByRole('slider', { name: 'Finish coverage' })
   await page.getByLabel('Instance panel color').fill('#94a18c')
   await slider.press('End')

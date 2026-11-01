@@ -1,3 +1,4 @@
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect, type Page } from '@playwright/test'
 import { createPanel } from '../src/lib/model'
 import type { Panel } from '../src/lib/types'
@@ -16,8 +17,8 @@ test('modifier and checkbox selections edit shared values in one undo step',asyn
   await expect(page.getByLabel('Width',{exact:true})).toBeDisabled()
   await expect(page.getByLabel('Width',{exact:true})).toHaveAttribute('placeholder','Mixed')
   await expect(page.getByLabel('Height',{exact:true})).toBeEnabled()
-  await expect(page.getByLabel('Panel name')).toBeDisabled()
-  await expect(page.getByRole('button',{name:'Attach',exact:true})).toBeDisabled()
+  await expect(page.getByLabel('Panel name')).toHaveCount(0)
+  await expect(page.getByRole('button',{name:'Attach a panel',exact:true})).toHaveCount(0)
   await page.getByLabel('Thickness',{exact:true}).fill('19')
   await page.getByLabel('Thickness',{exact:true}).press('Tab')
   await page.getByRole('button',{name:'Undo (⌘/Ctrl Z)'}).click()
@@ -46,6 +47,7 @@ test('mixed finishes, surfaces and spacing remain unchanged during common edits'
   ]
   await importPanels(page,panels)
   await page.locator('.panel-list-select').nth(1).click({modifiers:['ControlOrMeta']})
+  await openInspectorSection(page, 'Shape & surface', 'Material & finish')
   await expect(page.getByLabel('Custom finish color')).toBeDisabled()
   await expect(page.getByRole('button',{name:'Chalk finish'})).toBeDisabled()
   await expect(page.getByLabel('Spacing',{exact:true})).toBeDisabled()
@@ -54,12 +56,14 @@ test('mixed finishes, surfaces and spacing remain unchanged during common edits'
   await page.getByLabel('Height',{exact:true}).press('Tab')
   for(const [index,color,pitch] of [[0,'#bc6c50','40'],[1,'#778b99','60']] as const) {
     await page.locator('.panel-list-select').nth(index).click()
+    await openInspectorSection(page, 'Shape & surface', 'Material & finish')
     await expect(page.getByLabel('Custom finish color')).toHaveValue(color)
     await expect(page.getByLabel('Spacing',{exact:true})).toHaveValue(pitch)
     await expect(page.getByLabel('Material',{exact:true})).toHaveValue('oak')
     await expect(page.getByLabel('Height',{exact:true})).toHaveValue('400')
   }
   await page.locator('.panel-list-select').nth(2).click({modifiers:['Shift']})
+  await openInspectorSection(page, 'Shape & surface', 'Material & finish')
   await expect(page.getByRole('button',{name:'Solid',exact:true})).toBeDisabled()
   await expect(page.getByRole('button',{name:'Pegboard',exact:true})).toBeDisabled()
   await expect(page.getByLabel('Material',{exact:true})).toBeDisabled()
