@@ -7,12 +7,13 @@ import { PanelFields, SelectField } from './fields'
 import { ExampleBrowser } from './ExampleBrowser'
 import { MoveCreation } from './MoveCreation'
 import { RotateCreation } from './RotateCreation'
+import { RescaleCreation } from './RescaleCreation'
 import { ConnectorGlyph } from './editor-controls'
 import { MATERIALS } from '@/lib/materials'
 import { CONNECTORS } from '@/lib/connector-options'
 import type { Panel, Project, ValidationIssue } from '@/lib/types'
 
-export type ProjectDialog = 'new' | 'replace' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | 'move' | null
+export type ProjectDialog = 'new' | 'replace' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | 'move' | 'rescale' | null
 interface Props {
   dialog: ProjectDialog
   onClose: () => void
@@ -23,6 +24,7 @@ interface Props {
   attachNewPanel: boolean
   onMoveCreation: ComponentProps<typeof MoveCreation>['onMove']
   onRotate: ComponentProps<typeof RotateCreation>['onRotate']
+  onRescale: ComponentProps<typeof RescaleCreation>['onRescale']
   draft: Panel
   setDraft: Dispatch<SetStateAction<Panel>>
   loadTemplate: (template: string) => void
@@ -40,7 +42,7 @@ const BuildGuide = lazy(() => import('./BuildGuide'))
 export function ProjectDialogs(props: Props) {
   const opener = useRef<HTMLElement | null>(null)
   return <Dialog open={props.dialog!==null} onOpenChange={open=>{if(!open)props.onClose()}}>
-    <DialogContent className={props.dialog==='move'?'move-creation-dialog':props.dialog==='help'?'build-guide-dialog':props.dialog==='templates'?'wide-dialog':props.dialog==='parts'?'parts-dialog':''}
+    <DialogContent className={props.dialog==='rescale'?'rescale-creation-dialog':props.dialog==='move'?'move-creation-dialog':props.dialog==='help'?'build-guide-dialog':props.dialog==='templates'?'wide-dialog':props.dialog==='parts'?'parts-dialog':''}
       onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
       onCloseAutoFocus={event => { if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus() } }}>
       <DialogBody {...props}/>
@@ -53,6 +55,7 @@ function DialogBody(props: Props) {
     case 'new': return <NewProjectDialog {...props}/>
     case 'replace': return <ReplaceProjectDialog {...props}/>
     case 'move': return <MoveCreation panels={props.panels} onMove={props.onMoveCreation} onCancel={props.onClose}/>
+    case 'rescale': return <RescaleCreation project={props.project} onRescale={props.onRescale} onCancel={props.onClose}/>
     case 'rotate': return <RotateDialog {...props}/>
     case 'add': return <AddDialog {...props}/>
     case 'templates': return <TemplatesDialog {...props}/>

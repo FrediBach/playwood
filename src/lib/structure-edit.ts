@@ -11,10 +11,11 @@ const LIMIT_MESSAGE = 'This move would exceed the panel size limits (40–4,000 
 const CONSTRAINT_MESSAGE = 'These panels cannot move in that direction while keeping their joints connected. Try another direction or select the whole assembly.'
 
 type Dimensions = Partial<Pick<Panel, 'width' | 'height'>>
+type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
 type Row = { entries: Map<number, number>; value: number }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, Dimensions>; centerDelta?: Vec3; local?: boolean }
+type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; local?: boolean }
 
 const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 const position = (panel: Panel) => new Vector3(...panel.position)
@@ -118,6 +119,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     weights.push(4)
   }
   const rows: Row[] = []
+  const thicknessChange = (index: number) => edit.kind === 'resize'
+    ? (edit.patches?.[frames[index].panel.id]?.thickness ?? frames[index].panel.thickness) - frames[index].panel.thickness : 0
   const row = (value = 0): Row => { const next = { entries: new Map<number, number>(), value }; rows.push(next); return next }
   const add = (target: Row, index: number, value: number) => target.entries.set(index, (target.entries.get(index) ?? 0) + value)
   const center = (target: Row, index: number, axis: Vector3, scale = 1) => {
@@ -126,6 +129,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   const edge = (target: Row, index: number, axis: Vector3, side: number, scale = 1) => {
     center(target, index, axis, scale)
     for (let dimension = 0; dimension < 2; dimension++) add(target, index * 5 + 3 + dimension, side * Math.abs(frames[index].axes[dimension].dot(axis)) * scale / 2)
+    // Thickness is a prescribed physical input, never a free solver variable.
+    target.value -= side * Math.abs(frames[index].axes[2].dot(axis)) * scale * thicknessChange(index) / 2
   }
   const worldAxes = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)]
 
@@ -143,8 +148,10 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       expected(parent, { ...child, height: child.height + 1 }, connection.offset).sub(baseline),
       expected(parent, child, connection.offset + 1).sub(baseline),
     ]
+    const thicknessShift = expected({ ...parent, thickness: parent.thickness + thicknessChange(parentIndex) },
+      { ...child, thickness: child.thickness + thicknessChange(childIndex) }, connection.offset).sub(baseline)
     worldAxes.forEach(axis => {
-      const constraint = row()
+      const constraint = row(thicknessShift.dot(axis))
       center(constraint, childIndex, axis)
       center(constraint, parentIndex, axis, -1)
       add(constraint, parentIndex * 5 + 3, -changes[0].dot(axis))
@@ -314,7 +321,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     const width = item.panel.width + changes[index * 5 + 3], height = item.panel.height + changes[index * 5 + 4]
     if (width < 40 - EPSILON || width > 4000 + EPSILON || height < 40 - EPSILON || height > 4000 + EPSILON) throw new Error(LIMIT_MESSAGE)
     const clean = (value: number, previous: number) => Math.abs(value - previous) < EPSILON ? previous : Math.round(value * 1e8) / 1e8
-    return [item.panel.id, { ...item.panel, width: clean(Math.min(4000, Math.max(40, width)), item.panel.width), height: clean(Math.min(4000, Math.max(40, height)), item.panel.height),
+    return [item.panel.id, { ...item.panel, thickness: item.panel.thickness + thicknessChange(index), width: clean(Math.min(4000, Math.max(40, width)), item.panel.width), height: clean(Math.min(4000, Math.max(40, height)), item.panel.height),
       position: moved.toArray().map((value, axis) => clean(value, item.panel.position[axis])) as Vec3 }] as const
   }))
   return { ...project,
@@ -426,11 +433,16 @@ export function resizePanelEdge(project: Project, id: string, dimension: 'width'
 }
 
 /** Simultaneous independent targets, used by assembly instance parameters. */
-export function resizePanelDimensions(project: Project, patches: Record<string, Dimensions>): Project {
-  for (const patch of Object.values(patches)) if (Object.values(patch).some(value => value !== undefined && (!Number.isFinite(value) || value < 40 || value > 4000))) throw new Error(LIMIT_MESSAGE)
+export function resizePanelDimensions(project: Project, patches: Record<string, PanelDimensions>): Project {
+  for (const patch of Object.values(patches)) for (const [field, value] of Object.entries(patch)) {
+    if (value === undefined) continue
+    if (!Number.isFinite(value) || value < (field === 'thickness' ? 3 : 40) || value > (field === 'thickness' ? 100 : 4000)) {
+      throw new Error(field === 'thickness' ? 'Panel thickness must be between 3 and 100 mm.' : LIMIT_MESSAGE)
+    }
+  }
   const ids = Object.keys(patches)
   if (ids.some(id => !project.panels.some(panel => panel.id === id))) throw new Error('A configurable dimension refers to a missing panel.')
-  const ownPatches: Record<string, Dimensions> = Object.assign(Object.create(null), patches)
-  if (!project.panels.some(panel => (['width', 'height'] as const).some(field => ownPatches[panel.id]?.[field] !== undefined && Math.abs(panel[field] - ownPatches[panel.id][field]!) > EPSILON))) return project
+  const ownPatches: Record<string, PanelDimensions> = Object.assign(Object.create(null), patches)
+  if (!project.panels.some(panel => (['width', 'height', 'thickness'] as const).some(field => ownPatches[panel.id]?.[field] !== undefined && Math.abs(panel[field] - ownPatches[panel.id][field]!) > EPSILON))) return project
   return editStructure(project, ids, { kind: 'resize', patch: {}, patches: ownPatches })
 }

@@ -157,3 +157,6 @@
 /* Contain all canvas Html portals below the preview toolbar and its menus. */
 .scene-container { isolation: isolate; z-index: 0; }
 .workspace-top:has(.snap-controls[open]) { z-index: 4; }
+
+/* Keep project helpers reachable when the viewport toolbar wraps on a phone. */
+.workspace-options { flex-wrap: wrap; max-width: 100%; justify-content: flex-end; }

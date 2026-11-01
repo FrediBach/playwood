@@ -36,6 +36,7 @@ import { parallelPanelCut, splitParallelPanels } from '@/lib/parallel-panels'
 import { autoConnect } from '@/lib/auto-connect'
 import { getConnectorPanelFit } from '@/lib/connect-panel'
 import { movePanels, resizePanels } from '@/lib/structure-edit'
+import { rescaleProject } from '@/lib/project-rescale'
 import { rotateSelection } from '@/lib/selection-rotation'
 import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
 import { useProject } from '@/hooks/use-project'
@@ -561,7 +562,7 @@ export default function App() {
       exploded={exploded} realisticPreview={realisticPreview} fitSignal={fitSignal} frameSignal={frameSignal} zoomSignal={zoomSignal}
       setRealisticPreview={setRealisticPreview} leftOpen={leftOpen} rightOpen={rightOpen} setLeftOpen={setLeftOpen} setRightOpen={setRightOpen}
       setShowDimensions={setShowDimensions} setShowGrid={setShowGrid} setView={setView} setZoomSignal={setZoomSignal} setFitSignal={setFitSignal}
-      setExploded={setExploded} onMoveCreation={()=>setDialog('move')} onRotate={()=>setDialog('rotate')} addPanel={addPanel} isAttaching={inspectorTab==='attach'&&!!selected}
+      setExploded={setExploded} onMoveCreation={()=>setDialog('move')} onRescale={()=>setDialog('rescale')} onRotate={()=>setDialog('rotate')} addPanel={addPanel} isAttaching={inspectorTab==='attach'&&!!selected}
       attachmentSide={attachment.side} visibleBounds={visibleBounds} hasVisiblePanels={hasVisiblePanels}
       attachmentHandles={!dialog&&!inspectingConnectors?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?(clipboard.inserting?`Attach ${clipboard.inserting} at`:'Paste at'):'Attach'} ${target.label}${target.warning?` · ${target.warning}`:''}`,position:target.position,warning:target.warning,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
       onAttachmentPreview={clipboard.active?clipboard.hover:assembly.hover} onAttachmentCommit={clipboard.active?clipboard.attach:assembly.attach} suppressedConnectionIds={clipboard.active?clipboard.suppressedConnectionIds:assembly.suppressedConnectionIds}
@@ -612,6 +613,7 @@ export default function App() {
       exportProject={exportProject} onExportParts={()=>{download(projectToCsv(project),`${exportName}-parts.csv`,'text/csv');notify('Parts list exported')}}
       onImport={()=>importRef.current?.click()} importError={importError} project={project} panels={panels} connectorCount={connectorCount} issues={issues}
       onMoveCreation={delta=>{commit(p=>moveProject(p,delta));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);notify('Creation moved. Undo is available.')}}
+      onRescale={changes=>{commit(p=>rescaleProject(p,changes));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify('Creation rescaled. Undo is available.')}}
       onRotate={(axis,degrees)=>{commit(p=>rotateProject(p,axis,degrees));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify(`Creation rotated ${degrees}° around ${axis.toUpperCase()}. Undo is available.`)}}
       attachNewPanel={!inspectingConnectors&&selectedIds.length>0} onAdd={addDraftPanel}/>
     <input ref={importRef} type="file" accept=".json,.playwood.json" className="visually-hidden" aria-label="Import project file" onChange={e=>{const file=e.target.files?.[0];if(file)void importProject(file);e.target.value=''}}/>

@@ -1,0 +1,29 @@
+.rescale-creation-dialog { width: 500px; padding: 30px; }
+.rescale-column-labels { display: flex; justify-content: space-between; gap: 16px; padding: 0 0 10px; color: #7c896d; font-size: 10px; }
+.rescale-column-labels > span:last-child { width: 114px; text-align: center; }
+.rescale-values { max-height: min(370px, 44dvh); overflow-y: auto; overscroll-behavior: contain; border-block: 1px solid #dce2d2; }
+.rescale-row { display: grid; grid-template-columns: minmax(0, 1fr) 14px 114px; align-items: center; gap: 16px; padding: 8px 0; }
+.rescale-row + .rescale-row { border-top: 1px solid #e5e9de; }
+.rescale-row > label { display: flex; flex-direction: column; gap: 5px; cursor: pointer; }
+.rescale-row strong { color: #4d5d3d; font-size: 16px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.rescale-row strong span { font-size: 11px; font-weight: 400; color: #899479; }
+.rescale-row label > span { font-size: 10px; color: #7c896d; line-height: 1.4; }
+.rescale-row > svg { color: #adb69f; }
+.rescale-input { display: flex; flex-direction: column; gap: 5px; }
+.rescale-input input { width: 100%; height: 36px; border: 1px solid #d4ddc7; border-radius: 5px; background: #fffef9; padding: 7px 9px; color: #4d5d3d; font-size: 13px; font-variant-numeric: tabular-nums; }
+.rescale-input input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rescale-input > span { font-size: 9px; color: #8a967c; text-align: center; }
+.rescale-row.is-changed input { border-color: #a4b28d; background: #f0f3e8; }
+.rescale-input input[aria-invalid="true"] { border-color: #b54b31; background: #fdf1ec; }
+.rescale-note, .rescale-empty { font-size: 11px; color: #7c896d; line-height: 1.7; margin-top: 16px; }
+.rescale-footer { align-items: center; gap: 6px; }
+.rescale-reset { margin-right: auto; padding-inline: 0; font-size: 11px; }
+@media (max-width: 480px) {
+  .rescale-creation-dialog { padding: 25px 20px 20px; }
+  .rescale-creation-dialog h2 { font-size: 22px; }
+  .rescale-creation-dialog h2 + p { margin-bottom: 18px; }
+  .rescale-row { gap: 9px; grid-template-columns: minmax(0, 1fr) 14px 96px; }
+  .rescale-column-labels > span:last-child { width: 96px; }
+  .rescale-footer { flex-wrap: wrap; }
+  .rescale-reset { flex-basis: 100%; justify-content: flex-start; height: 26px; }
+}
