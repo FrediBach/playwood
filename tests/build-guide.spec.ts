@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { BUILD_GUIDES } from '../src/lib/build-guides'
 
 async function openGuide(page: Page) {
   await page.goto('/')
@@ -12,7 +13,7 @@ test('every building technique has four illustrated steps without another WebGL 
   page.on('pageerror', error => errors.push(error.message))
   await openGuide(page)
   const guides = page.locator('[data-guide-id]')
-  await expect(guides).toHaveCount(25)
+  await expect(guides).toHaveCount(BUILD_GUIDES.length)
   const ids = await guides.evaluateAll(elements => elements.map(element => element.getAttribute('data-guide-id')!))
   const article = page.getByRole('article')
 
@@ -29,7 +30,7 @@ test('every building technique has four illustrated steps without another WebGL 
       expect(await illustration.locator('polygon, path').count()).toBeGreaterThan(0)
       await expect(article.getByText('What you should see', { exact: true })).toBeVisible()
       if (id === 'connect-panel' && (step === 2 || step === 4)) await page.screenshot({ path: `test-results/guide-connect-panel-step-${step}.png` })
-      if (id === 'resize') await page.screenshot({ path: `test-results/guide-resize-step-${step}.png` })
+      if (id === 'resize' || ['projects', 'box-select', 'grid-split', 'snap-settings', 'palette', 'move-creation', 'rescale', 'room-preview'].includes(id)) await page.screenshot({ path: `test-results/guide-${id}-step-${step}.png` })
       if (step < 4) await article.getByRole('button', { name: 'Next step', exact: true }).click()
     }
     await expect(article.getByRole('button', { name: 'Read again', exact: true })).toBeVisible()
@@ -44,12 +45,16 @@ test('search, direct step selection, related guides and keyboard reference are u
   const search = page.getByRole('searchbox', { name: 'Search guides' })
   await search.fill('auto-add')
   await expect(page.locator('[data-guide-id="auto-connect"]')).toBeVisible()
+  for (const [query, id] of [['Auto furnish', 'room-preview'], ['Finish coverage', 'finishes'], ['Shift before', 'resize'], ['50 mm clearance', 'move-creation'], ['Replacement color', 'palette'], ['grid spacings', 'snap-settings'], ['X dividers', 'grid-split']]) {
+    await search.fill(query)
+    await expect(page.locator(`[data-guide-id="${id}"]`)).toBeVisible()
+  }
   await search.fill('no-such-furniture-technique-987')
   await expect(page.getByText('No matching techniques.', { exact: true })).toBeVisible()
   await expect(page.locator('[data-guide-id]')).toHaveCount(0)
   await page.getByRole('button', { name: 'Show all guides', exact: true }).click()
   await expect(search).toHaveValue('')
-  await expect(page.locator('[data-guide-id]')).toHaveCount(25)
+  await expect(page.locator('[data-guide-id]')).toHaveCount(BUILD_GUIDES.length)
 
   await page.locator('[data-guide-id="attach"]').click()
   const image = page.locator('.guide-illustration svg[role="img"]')
@@ -64,6 +69,8 @@ test('search, direct step selection, related guides and keyboard reference are u
   await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'A little less clicking.' })).toBeVisible()
   await expect(page.getByText('Rotate selection 90°', { exact: true })).toBeVisible()
+  await expect(page.getByText('Toggle global grid', { exact: true })).toBeVisible()
+  await expect(page.getByText('Toggle geometry alignment', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Learn the connector types' }).click()
   await expect(page.locator('[data-guide-id="angles"]')).toHaveAttribute('aria-current', 'page')
 })
@@ -102,11 +109,11 @@ for (const width of [390, 800]) {
     const dialog = page.getByRole('dialog')
     await expect(page.getByRole('button', { name: 'Close dialog' })).toBeInViewport()
     if (width <= 760) {
-      await page.getByRole('button', { name: 'Browse 25 techniques' }).click()
+      await page.getByRole('button', { name: `Browse ${BUILD_GUIDES.length} techniques` }).click()
       await expect(page.getByRole('searchbox', { name: 'Search guides' })).toBeVisible()
     }
     await page.locator('[data-guide-id="attach"]').click()
-    if (width <= 760) await expect(page.getByRole('button', { name: 'Browse 25 techniques' })).toHaveAttribute('aria-expanded', 'false')
+    if (width <= 760) await expect(page.getByRole('button', { name: `Browse ${BUILD_GUIDES.length} techniques` })).toHaveAttribute('aria-expanded', 'false')
     await page.getByRole('button', { name: /^Step 2:/ }).click()
     await expect(page.locator('.guide-illustration svg[role="img"]')).toBeVisible()
     await page.getByRole('button', { name: 'Next step', exact: true }).click()

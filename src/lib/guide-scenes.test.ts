@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { getGuideScene } from './guide-scenes'
-import type { GuideId } from './build-guide-types'
-import { resolvePanels, validateProject } from './model'
+import { BUILD_GUIDES } from './build-guides'
+import { getProjectBounds, resolvePanels, validateProject } from './model'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { GuidePreview } from '@/components/GuidePreview'
 
-const guideIds: GuideId[] = ['workspace', 'first-panel', 'attach', 'angles', 'auto-connect', 'connect-panel', 'close-hole', 'split-panels', 'move-snap', 'resize', 'rotate', 'copy-paste', 'multi-select', 'finishes', 'custom-outline', 'groups', 'assemblies', 'assembly-attach', 'assembly-values', 'assembly-edit', 'assembly-controls', 'assembly-files', 'connectors', 'review', 'save-export']
+const guideIds = BUILD_GUIDES.map(guide => guide.id)
 
 describe('beginner guide project studies', () => {
   it.each(guideIds)('%s produces four finite, readable scene snapshots', id => {
@@ -42,5 +42,25 @@ describe('beginner guide project studies', () => {
       expect(markup).not.toMatch(/NaN|Infinity|<canvas/)
       expect((markup.match(/<(?:path|polygon)/g) ?? []).length).toBeLessThan(300)
     }
+  })
+
+  it('illustrates the real grid, rescale, and whole-creation movement results', () => {
+    const grid = getGuideScene('grid-split', 3).project
+    expect(grid.connections.some(connection => connection.type === 'cross')).toBe(true)
+    expect(grid.connections.some(connection => connection.type === 't')).toBe(true)
+    const original = getGuideScene('rescale', 0).project, scaled = getGuideScene('rescale', 3).project
+    expect(scaled.panels.every(panel => panel.width === 500 && panel.height === 500 && panel.thickness === 18)).toBe(true)
+    expect(scaled.connections).toHaveLength(original.connections.length)
+    const grounded = getGuideScene('move-creation', 3).project
+    expect(getProjectBounds(resolvePanels(grounded)).min[1]).toBeCloseTo(0)
+  })
+
+  it('keeps room dressing out of project parts and replaces uses of removed palette colors', () => {
+    const room = getGuideScene('room-preview', 2)
+    expect(room.furnishings?.length).toBeGreaterThan(0)
+    expect(room.project).toBe(getGuideScene('room-preview', 0).project)
+    const palette = getGuideScene('palette', 3).project
+    expect(palette.customColors).toHaveLength(0)
+    expect(palette.panels.every(panel => panel.color === '#d9bd8c')).toBe(true)
   })
 })

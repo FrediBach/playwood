@@ -1,6 +1,6 @@
 import type { GuideId } from './build-guide-types'
 import type { AttachmentOptions, Panel, Project, Vec3 } from './types'
-import { attachPanel, createPanel, createStarterProject, getProjectBounds, resolvePanels, rotateProject } from './model'
+import { attachPanel, createPanel, createStarterProject, getProjectBounds, moveProject, resolvePanels, rotateProject } from './model'
 import { gridProject } from './example-geometry'
 import { autoConnect } from './auto-connect'
 import { connectSelectedConnectors } from './connect-panel'
@@ -12,6 +12,11 @@ import { createAssemblyFile, parseAssemblyFile } from './assembly-file'
 import { movePreviewResize, preparePreviewResize, type PreviewResizeHandle } from './preview-resize'
 import { rotateSelection } from './selection-rotation'
 import { editConnectors, getPhysicalConnectors } from './connector-selection'
+import { splitPanelGrid } from './grid-split'
+import { getRescaleValues, rescaleProject } from './project-rescale'
+import { addCustomColor, removeCustomColor, updateCustomColor } from './custom-colors'
+import { snapPanelDelta } from './preview-snap'
+import { detectPreviewFurnishings, type FurnishingPlacement } from './preview-furnishings'
 
 export interface GuideScene {
   project: Project
@@ -25,6 +30,11 @@ export interface GuideScene {
   resizeHandles?: (PreviewResizeHandle & { distance?: number })[]
   outlinePoints?: boolean
   room?: boolean
+  selectionBox?: string[]
+  gridSpacing?: number
+  alignment?: [Vec3, Vec3][]
+  swatches?: { name: string; color: string }[]
+  furnishings?: FurnishingPlacement[]
   document?: { title: string; lines: string[] }
 }
 
@@ -44,6 +54,78 @@ const finish = (project: Project, selected: string[], color: string): Project =>
 
 function buildScenes(id: GuideId): GuideScene[] {
   switch (id) {
+    case 'projects': {
+      const p = createStarterProject('shelf'), cube = box()
+      const module = ASSEMBLY_LIBRARY.find(example => example.id === 'assembly-cube')!.create().assemblies!.definitions[0]
+      const added = insertAssemblyDefinition(cube, module)
+      return [scene(p, 'Export a project file before replacing the current build if you want a separate backup.', { document: { title: 'Project file · JSON', lines: ['Editable backup', 'Keep your current build'] } }),
+        scene(p, 'The current build remains until you confirm Start new project in the dialog.', { document: { title: 'Start a new project?', lines: ['Export current project', 'Start new project', 'Cancel'] } }),
+        scene(cube, 'A full build replaces the workspace. Undo restores the previous project.', { labels: [{ text: 'Cube · full build', point: [0, 200, 0] }] }),
+        scene(added, 'An assembly adds a reusable module beside the existing build when nothing is selected.', { selected: added.panels.filter(panel => !ids(cube).includes(panel.id)).map(panel => panel.id) })]
+    }
+    case 'box-select': {
+      const p = box(), hardware = getPhysicalConnectors(p).map(piece => piece.id)
+      const bottom = p.panels.find(panel => panel.name === 'Shelf 1.1')!
+      return [scene(p, 'Use Front view to make a rectangle around the frame easier to draw.', { view: 'front' }),
+        scene(p, 'Press B, then drag until the complete parts are enclosed by the rectangle.', { view: 'front', selected: ids(p), selectedConnectors: hardware, selectionBox: ids(p) }),
+        scene(p, 'Hold Shift while drawing to add the bottom board to the parts already selected.', { view: 'front', selected: ids(p), selectedConnectors: hardware, selectionBox: [bottom.id] }),
+        scene(p, 'For a mixed selection, choose Panels or Connectors to show its inspector.', { selected: ids(p), selectedConnectors: hardware, document: { title: 'Assembly', lines: ['Panels · 4 selected', 'Connectors · 8 selected'] } })]
+    }
+    case 'snap-settings': {
+      const panel = createPanel({ id: 'guide-snap', width: 150, height: 150, position: [-122, 125, 0] })
+      const other = createPanel({ id: 'guide-snap-target', width: 150, height: 150, position: [175, 175, 0] })
+      const p: Project = { ...single(panel), panels: [panel, other] }
+      const shifted = (project: Project, delta: Vec3): Project => ({ ...project, panels: project.panels.map(item => item.id === panel.id ? { ...item, position: item.position.map((value, axis) => value + delta[axis]) as Vec3 } : item) })
+      const gridded = shifted(p, snapPanelDelta(p.panels, [panel.id], [51, 0, 0], { grid: true, geometry: false, spacing: 50, tolerance: 10 }))
+      const aligned = shifted(gridded, snapPanelDelta(gridded.panels, [panel.id], [0, 46, 0], { grid: false, geometry: true, spacing: 50, tolerance: 10 }))
+      const resize = preparePreviewResize(aligned, { panelId: panel.id })!
+      return [scene(p, 'Grid and geometry snapping are independent settings in the Snap menu.', { selected: [panel.id], view: 'front' }),
+        scene(gridded, 'The 50 mm grid begins at world zero. A nearby panel boundary snaps to a grid line.', { selected: [panel.id], view: 'front', gridSpacing: 50 }),
+        scene(aligned, 'Geometry alignment matches the upper and lower boundaries of the other board.', { selected: [panel.id], view: 'front', alignment: [[[-175, 100, 0], [250, 100, 0]], [[-175, 250, 0], [250, 250, 0]]] }),
+        scene(aligned, 'The same snap preferences apply to resize arrows and keyboard movement.', { selected: [panel.id], view: 'front', gridSpacing: 50, resizeHandles: resize.handles })]
+    }
+    case 'grid-split': {
+      const p = box(), divided = splitPanelGrid(p, ids(p), 1, 1).project
+      const added = divided.panels.filter(panel => !ids(p).includes(panel.id)).map(panel => panel.id)
+      return [scene(p, 'A rectangular opening has two pairs of matching opposite panels.', { view: 'front' }),
+        scene(p, 'Select all four frame panels to offer Divide into a grid.', { selected: ids(p), view: 'front' }),
+        scene(divided, 'One X divider and one Y divider create two columns and two rows.', { ghost: added, view: 'front', document: { title: 'Divide into a grid', lines: ['X dividers: 1', 'Y dividers: 1', '2 × 2 compartments'] } }),
+        scene(divided, 'The completed grid includes T joints at its edges and a cross joint at its center.', { dimensions: true, labels: [{ text: 'Cross at the intersection', point: [0, 201.5, 0] }] })]
+    }
+    case 'palette': {
+      const p = single(), green = addCustomColor(p, { name: 'Meadow', color: '#8d9e7e' }), colorId = green.customColors![0].id
+      const applied = finish(green, ids(green), '#8d9e7e')
+      const blue = updateCustomColor(applied, colorId, { name: 'Lake', color: '#6f88a5' })
+      const replaced = removeCustomColor(blue, colorId, '#d9bd8c')
+      return [scene(p, 'Select a panel and open Material & finish to choose its color.', { selected: ids(p) }),
+        scene(green, 'Save color adds a named swatch. Click that swatch to apply it to the panel.', { swatches: [{ name: 'Meadow · saved swatch', color: '#8d9e7e' }] }),
+        scene(blue, 'Editing an applied palette color updates every matching use throughout the project.', { selected: ids(blue), swatches: [{ name: 'Lake · edited color', color: '#6f88a5' }] }),
+        scene(replaced, 'Removing an in-use custom color replaces its uses with your chosen remaining swatch.', { swatches: [{ name: 'Birch · replacement', color: '#d9bd8c' }] })]
+    }
+    case 'move-creation': {
+      const p = box(), moved = moveProject(p, [200, 100, 0])
+      const bounds = getProjectBounds(resolvePanels(moved))
+      const grounded = moveProject(moved, [-(bounds.min[0] + bounds.max[0]) / 2, -bounds.min[1], 0])
+      return [scene(p, 'Move creation moves every panel and connector together, including hidden parts.', { gridSpacing: 100, view: 'front' }),
+        scene(p, 'Enter distances along the fixed world axes before applying the move.', { view: 'front', document: { title: 'Move creation', lines: ['X: 200 mm', 'Y: 100 mm', 'Z: 0 mm'] } }),
+        scene(moved, 'Applying the move shifts the whole frame right and up while preserving every joint.', { gridSpacing: 100, view: 'front' }),
+        scene(grounded, 'Center horizontally and Place on floor set the distances for the next move.', { gridSpacing: 100, view: 'front', labels: [{ text: 'Lowest panel at Y = 0', point: [0, 0, 0] }] })]
+    }
+    case 'rescale': {
+      const p = box(), value = getRescaleValues(p).find(value => value.kind === 'dimension' && value.value === 350)!
+      const scaled = rescaleProject(p, { [value.id]: 500 })
+      return [scene(p, 'Repeated measurements combine matching widths and heights across the whole project.', { dimensions: true }),
+        scene(p, 'Change the repeated 350 mm cut length to 500 mm; thickness stays at 18 mm.', { document: { title: 'Rescale creation', lines: [`350 mm · ${value.count} uses`, 'New value: 500 mm', 'Thickness: 18 mm'] } }),
+        scene(scaled, 'Apply rescale updates the matching cuts and connected spans together.', { selected: ids(scaled), dimensions: true }),
+        scene(scaled, 'The larger frame keeps its original hardware sizes and valid joints.', { dimensions: true, view: 'side' })]
+    }
+    case 'room-preview': {
+      const p = createStarterProject('shelf')
+      return [scene(p, 'Inspect the assembled shelf in Studio before opening Realistic preview.', { dimensions: true }),
+        scene(p, 'The 165 cm floor lamp gives the furniture a familiar reference in the room.', { room: true }),
+        scene(p, 'Auto furnish places books and decor on suitable visible shelves without adding project parts.', { room: true, furnishings: detectPreviewFurnishings(resolvePanels(p)) }),
+        scene(p, 'Return to Studio to keep editing the same panels, dimensions, and connections.', { dimensions: true, selected: [p.panels[4].id] })]
+    }
     case 'workspace': {
       const p = createStarterProject('shelf'), shelf = p.panels[4]
       return [scene(p, 'The same editable shelf you can open from the Library.', { labels: [label(p.panels[0], 'Panels'), label(p.panels[1], 'Connectors join edges')] }),

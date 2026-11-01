@@ -8,6 +8,7 @@ import { panelOutlineCorners, panelOutlineSvgPath } from '@/lib/panel-shape'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
 import { connectorSlide, getConnectorRail } from '@/lib/connector-movement'
 import { getConnectorGeometry } from './connector-geometry'
+import { createPreviewBooks } from '@/lib/preview-books'
 import './guide-preview.css'
 
 type Point = [number, number]
@@ -155,6 +156,35 @@ function drawingFor(scene: GuideScene, guideId: GuideId) {
         depth: center.dot(direction) + 22, selected, ghost, hardware: true })
     }
   }
+  // Furnishings are drawing geometry only: the example project keeps its original parts.
+  const addBox = (center: Vector3, size: Vector3, rotation: Euler, color: string) => {
+    for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) {
+      const normal = new Vector3().setComponent(axis, sign).applyEuler(rotation)
+      if (normal.dot(direction) <= 0) continue
+      const a = (axis + 1) % 3, b = (axis + 2) % 3
+      const vertices = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => new Vector3()
+        .setComponent(axis, sign * size.getComponent(axis) / 2).setComponent(a, x * size.getComponent(a) / 2)
+        .setComponent(b, y * size.getComponent(b) / 2).applyEuler(rotation).add(center))
+      faces.push({ points: vertices.map(project), depth: vertices.reduce((sum, point) => sum + point.dot(direction), 0) / 4,
+        color: `#${new Color(color).multiplyScalar(.8 + .2 * Math.max(0, normal.dot(direction))).getHexString()}` })
+    }
+  }
+  for (const item of scene.furnishings ?? []) {
+    const center = new Vector3(...item.position).multiplyScalar(1000), rotation = new Euler(0, item.rotation, 0)
+    if (item.kind === 'books') {
+      for (const book of createPreviewBooks(item.bookSeed ?? item.id, item.bookArrangement, item.bookSupport)) {
+        const position = new Vector3(...book.position).multiplyScalar(1000).applyEuler(rotation).add(center)
+        // Keep the book's local leaning/stacking angle while turning its spine toward the opening.
+        const bookRotation = new Euler(book.rotation[0], item.rotation + book.rotation[1], book.rotation[2])
+        addBox(position, new Vector3(book.thickness, book.height, book.depth).multiplyScalar(1000), bookRotation, book.color)
+      }
+    } else if (item.kind === 'plant' || item.kind === 'vase') {
+      addBox(center.clone().add(new Vector3(0, 60, 0)), new Vector3(90, 120, 90), rotation, '#a77d60')
+      if (item.kind === 'plant') {
+        for (const offset of [-35, 0, 35]) addBox(center.clone().add(new Vector3(offset, 155 + Math.abs(offset), 0)), new Vector3(55, 110, 45), new Euler(0, 0, offset / 120), '#758968')
+      } else addBox(center.clone().add(new Vector3(0, 150, 0)), new Vector3(45, 70, 45), rotation, '#a77d60')
+    }
+  }
   faces.sort((a, b) => a.depth - b.depth)
   const labels = scene.labels.flatMap(item => {
     const panel = panels.find(panel => panel.id === item.panelId)
@@ -170,7 +200,27 @@ function drawingFor(scene: GuideScene, guideId: GuideId) {
     return [{ ...handle, root, tip, angle: Math.atan2(dy, dx) * 180 / Math.PI }]
   })
   const bounds = getProjectBounds(panels)
+  const gridLines: { points: Point[]; origin: boolean }[] = []
+  if (scene.gridSpacing) {
+    const spacing = scene.gridSpacing
+    const lowX = Math.floor(Math.min(0, bounds.min[0] - spacing) / spacing) * spacing
+    const highX = Math.ceil(Math.max(0, bounds.max[0] + spacing) / spacing) * spacing
+    const lowY = Math.floor(Math.min(0, bounds.min[1] - spacing) / spacing) * spacing
+    const highY = Math.ceil(Math.max(0, bounds.max[1] + spacing) / spacing) * spacing
+    for (let x = lowX; x <= highX; x += spacing) gridLines.push({ points: [project(new Vector3(x, lowY, 0)), project(new Vector3(x, highY, 0))], origin: x === 0 })
+    for (let y = lowY; y <= highY; y += spacing) gridLines.push({ points: [project(new Vector3(lowX, y, 0)), project(new Vector3(highX, y, 0))], origin: y === 0 })
+  }
+  const selectionPoints = panels.filter(panel => !scene.selectionBox || scene.selectionBox.includes(panel.id)).flatMap(panel => {
+    const rotation = new Euler(...panel.rotation)
+    return Array.from({ length: 8 }, (_, index) => project(new Vector3(
+      (index & 1 ? 1 : -1) * panel.width / 2, (index & 2 ? 1 : -1) * panel.height / 2, (index & 4 ? 1 : -1) * panel.thickness / 2,
+    ).applyEuler(rotation).add(new Vector3(...panel.position))))
+  })
+  const selectionBox = { x: Math.min(...selectionPoints.map(point => point[0])) - 12, y: Math.min(...selectionPoints.map(point => point[1])) - 12,
+    width: Math.max(...selectionPoints.map(point => point[0])) - Math.min(...selectionPoints.map(point => point[0])) + 24,
+    height: Math.max(...selectionPoints.map(point => point[1])) - Math.min(...selectionPoints.map(point => point[1])) + 24 }
   return { faces, labels, vertices, connectorPositions, resizeHandles, bounds, centerX, scale,
+    gridLines, selectionBox, alignment: (scene.alignment ?? []).map(line => line.map(point => project(new Vector3(...point)))),
     lamp: lampWorld.map(line => line.map(project)), lampLabel: project(new Vector3(lampX, lampBase + 1750, 0)) }
 }
 
@@ -184,6 +234,7 @@ export const GuidePreview = memo(function GuidePreview({ guideId, step, caption 
       <defs><pattern id={`${id}-grid`} width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#c8c7bc"/></pattern></defs>
       <rect width="600" height="330" fill="#eeede6"/>
       <rect y="55" width="600" height="265" fill={`url(#${id}-grid)`} opacity=".65"/>
+      {drawing.gridLines.map((line, index) => <polyline key={index} points={line.points.map(point => point.join(',')).join(' ')} stroke={line.origin ? '#a39378' : '#c3c9b5'} strokeWidth={line.origin ? 1.5 : .7} fill="none"/>)}
       {scene.room && <g aria-hidden="true" stroke="#929780" strokeWidth="2" fill="none"><path d="M 25 300 H 580" stroke="#cbcdbf"/>{drawing.lamp.map((line, index) => <polyline key={index} points={line.map(point => point.join(',')).join(' ')} fill={index === 2 ? '#e1e3d5' : 'none'}/>)}<text x={drawing.lampLabel[0]} y={drawing.lampLabel[1]} textAnchor="middle" stroke="none" className="guide-svg-label">165 cm</text></g>}
       <text x="20" y="26" className="guide-svg-kicker">PROJECT STUDY · {String(step + 1).padStart(2, '0')}</text>
       <text x="580" y="26" textAnchor="end" className="guide-svg-small">{scene.view === 'front' ? 'Front view' : scene.view === 'top' ? 'Top view' : 'Isometric view'}</text>
@@ -194,6 +245,9 @@ export const GuidePreview = memo(function GuidePreview({ guideId, step, caption 
         return face.path ? <path key={index} d={face.path} transform={face.transform} fillRule="evenodd" vectorEffect="non-scaling-stroke" strokeLinejoin="round" {...style}/>
           : <polygon key={index} points={face.points!.map(point => point.join(',')).join(' ')} strokeLinejoin="round" {...style}/>
       })}
+      {drawing.alignment.map((line, index) => <polyline key={index} points={line.map(point => point.join(',')).join(' ')} stroke="#7294a3" strokeWidth="1.6" strokeDasharray="5 3" fill="none"/>)}
+      {scene.selectionBox && <rect {...drawing.selectionBox} rx="2" fill="#94a884" fillOpacity=".1" stroke="#6c875c" strokeWidth="1.5" strokeDasharray="6 3"/>}
+      {scene.swatches?.map((swatch, index) => <g key={swatch.name} transform={`translate(150 ${285 + index * 28})`}><rect width="20" height="20" rx="4" fill={swatch.color} stroke="#6c705e"/><text x="30" y="16" className="guide-svg-small">{swatch.name}</text></g>)}
       {drawing.connectorPositions.filter(item => item.selected).map((item, index) => <circle key={index} cx={item.point[0]} cy={item.point[1]} r="14" stroke="#be482b" strokeWidth="2" fill="none" strokeDasharray="3 3"/>)}
       {drawing.resizeHandles.map(handle => <g key={handle.id} data-guide-resize-handle={handle.id} className={`guide-resize-handle${handle.distance === undefined ? '' : ' is-active'}`} aria-hidden="true">
         <path d={`M ${handle.root.join(' ')} L ${handle.tip.join(' ')}`} fill="none" stroke="#c94727" strokeWidth="1.6"/>
