@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { createPanel, resolvePanels } from '../src/lib/model'
 import { createExampleProject } from '../src/lib/example-library'
+import { createPreviewBenchProject } from '../src/lib/fixtures/preview-bench'
 import type { Panel } from '../src/lib/types'
 
 async function importPanels(page: Page, panels: Panel[]) {
@@ -226,6 +227,29 @@ test('deep cubby shelves mix furnishings with empty spaces and face books toward
   await expect.poll(() => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())).not.toBe(unfurnished)
   await expectRenderedRoom(page)
   await page.screenshot({ path: 'test-results/realistic-preview-varied-books.png' })
+  expect(await exportedProject(page)).toEqual(original)
+  expect(errors).toEqual([])
+})
+
+test('auto furnishing seats a person on a bench extending from a shelf', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.setViewportSize({ width: 1680, height: 1100 })
+  await page.goto('/')
+  await importPanels(page, resolvePanels(createPreviewBenchProject({ hutch: true })))
+  const original = await exportedProject(page)
+  await page.locator('canvas').focus()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await expectRenderedRoom(page)
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
+  const unfurnished = await page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())
+  await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
+  await expect(page.locator('[data-preview-furnishings]')).toHaveAttribute('data-preview-furnishings', /^[1-9]\d*$/)
+  await expect.poll(() => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())).not.toBe(unfurnished)
+  await expectRenderedRoom(page)
+  await page.screenshot({ path: 'test-results/realistic-preview-shelf-bench.png' })
   expect(await exportedProject(page)).toEqual(original)
   expect(errors).toEqual([])
 })

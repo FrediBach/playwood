@@ -125,13 +125,18 @@ describe('optional preview furnishings', () => {
     expect(props.some(prop => prop.kind === 'seated-person-chair')).toBe(false)
   })
 
-  it('does not sit a person through a panel in front of the bench', () => {
+  it('uses the other long edge when a panel blocks the front of a bench', () => {
     const panels = resolvePanels(createExampleProject('bench'))
     const original = detectPreviewFurnishings(panels).find(prop => prop.kind === 'seated-person')!
     expect(original).toBeDefined()
     panels.push(createPanel({ id: 'leg-obstruction', width: 900, height: 350,
       position: [original.position[0] * 1000, 175, original.position[2] * 1000 + 400] }))
-    expect(detectPreviewFurnishings(panels).some(prop => prop.kind === 'seated-person')).toBe(false)
+    const seated = detectPreviewFurnishings(panels).find(prop => prop.kind === 'seated-person')!
+    expect(seated).toBeDefined()
+    expect(Math.cos(seated.rotation - original.rotation)).toBeCloseTo(-1, 8)
+    const feet = new Vector3(0, -seated.seatHeight!, 0.42).applyAxisAngle(new Vector3(0, 1, 0), seated.rotation)
+      .add(new Vector3(...seated.position))
+    expect(feet.z).toBeLessThan(original.position[2])
   })
 
   it('follows horizontal translation and arbitrary yaw while retaining real object sizes', () => {

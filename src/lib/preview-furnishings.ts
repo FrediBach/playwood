@@ -124,6 +124,54 @@ function bookVariation(id: string) {
   return hash >>> 0
 }
 
+/** Benches use their long span, independently of the opening of adjacent shelving. */
+function benchSurface(base: Surface): Surface {
+  const panel = base.obstacle.panel
+  const intrinsicX = (panel.width >= panel.height ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0))
+    .applyEuler(new Euler(...panel.rotation))
+  // Keep the panel's axis direction so rotating a build also rotates its occupant.
+  return intrinsicX.dot(base.x) >= 0 ? base : { ...base, x: base.x.clone().negate(), z: base.z.clone().negate(), rotation: base.rotation + Math.PI }
+}
+
+function supportedBench(target: Surface, obstacles: Obstacle[]) {
+  const { width, depth, center } = target
+  const height = center.y - FLOOR_Y
+  if (height < 0.32 || height > 0.56 || width < 0.75 || depth < 0.30 || depth > 0.58 || width / depth < 1.8) return false
+
+  // Shelving can carry one end through several panels. Follow only downward
+  // contacts, allowing normal connector gaps, and never use the seat as its own support.
+  const grounded = new Map<string, boolean>()
+  const reachesFloor = (item: Obstacle, steps = 0): boolean => {
+    if (item.bounds.min.y < 0.12) return true
+    if (steps >= 12) return false
+    const cacheKey = `${steps}:${item.panel.id}`
+    const cached = grounded.get(cacheKey)
+    if (cached !== undefined) return cached
+    const nearby = item.obb.clone()
+    nearby.halfSize.addScalar(0.04)
+    const supported = obstacles.some(lower => lower !== item && lower !== target.obstacle
+      && lower.bounds.min.y < item.bounds.min.y - 0.005 && lower.bounds.max.y >= item.bounds.min.y - 0.04
+      && nearby.intersectsOBB(lower.obb, 1e-8) && reachesFloor(lower, steps + 1))
+    grounded.set(cacheKey, supported)
+    return supported
+  }
+  let left = false, right = false
+  const endZone = Math.min(0.20, width * 0.25)
+  for (const item of obstacles) {
+    if (item === target.obstacle || Math.abs(item.normal.y) > 0.05) continue
+    const bounds = boundsInSurface(item, target)
+    if (bounds.max.y < -0.085 || bounds.min.y > -0.05
+      || bounds.min.z > depth / 2 + 0.06 || bounds.max.z < -depth / 2 - 0.06) continue
+    const atLeft = bounds.min.x < -width / 2 + endZone && bounds.max.x > -width / 2 - 0.08
+    const atRight = bounds.max.x > width / 2 - endZone && bounds.min.x < width / 2 + 0.08
+    if ((!atLeft && !atRight) || !reachesFloor(item)) continue
+    left ||= atLeft
+    right ||= atRight
+    if (left && right) return true
+  }
+  return false
+}
+
 function envelope(position: Vector3, rotation: number, offset: Vec3, size: Vec3) {
   const quaternion = new Quaternion().setFromAxisAngle(UP, rotation)
   return new OBB(new Vector3(...offset).applyQuaternion(quaternion).add(position), new Vector3(...size).multiplyScalar(0.5),
@@ -134,8 +182,8 @@ function personEnvelopes(position: Vector3, rotation: number, seatHeight: number
   const boxes = [
     envelope(position, rotation, [0, 0.462, 0], [0.50, 0.92, 0.36]),
     envelope(position, rotation, [0, 0.097, 0.16], [0.48, 0.19, 0.44]),
-    envelope(position, rotation, [0, 0.24, 0.19], [0.50, 0.22, 0.27]),
-    envelope(position, rotation, [0, (-seatHeight + 0.06) / 2, 0.40], [0.43, seatHeight + 0.06, 0.26]),
+    envelope(position, rotation, [0, 0.24, 0.195], [0.50, 0.22, 0.29]),
+    envelope(position, rotation, [0, (-seatHeight + 0.06) / 2, 0.385], [0.43, seatHeight + 0.06, 0.29]),
   ]
   if (chair) boxes.push(
     envelope(position, rotation, [0, -0.028, 0], [0.48, 0.056, 0.44]),
@@ -143,6 +191,18 @@ function personEnvelopes(position: Vector3, rotation: number, seatHeight: number
     envelope(position, rotation, [0, -seatHeight / 2, 0], [0.46, seatHeight - 0.015, 0.42]),
   )
   return boxes
+}
+
+function benchSeats(target: Surface) {
+  const seatY = target.center.y + 0.002, seatHeight = seatY - FLOOR_Y
+  const limit = target.width / 2 - 0.26
+  const preferred = target.width > 1.15 ? -target.width * 0.17 : 0
+  const positions = [...new Set([preferred, 0, -limit, limit, -limit / 2, limit / 2])]
+  return [1, -1].flatMap(side => positions.map(x => {
+    const position = worldPosition(target, x, 0.002, side * (target.depth / 2 - 0.12))
+    const rotation = target.rotation + (side < 0 ? Math.PI : 0)
+    return { position, rotation, seatHeight, boxes: personEnvelopes(position, rotation, seatHeight, false) }
+  }))
 }
 
 /**
@@ -166,7 +226,11 @@ export function detectPreviewFurnishings(panels: Panel[]): FurnishingPlacement[]
 
   for (const base of surfaces.slice(0, 96)) {
     if (result.length >= MAX_PREVIEW_FURNISHINGS) break
-    const target = faceOpening(base, obstacles)
+    const seat = benchSurface(base)
+    const seats = supportedBench(seat, obstacles) ? benchSeats(seat).filter(candidate => candidate.boxes.every(box =>
+      !obstacles.some(item => box.intersectsOBB(item.obb, 1e-8)))) : []
+    const bench = seats.length > 0
+    const target = bench ? seat : faceOpening(base, obstacles)
     const { width, depth, center, rotation } = target
     const panelId = target.obstacle.panel.id
     const relatives = obstacles.filter(item => item.panel.id !== panelId).map(item => ({ item, bounds: boundsInSurface(item, target) }))
@@ -179,7 +243,6 @@ export function detectPreviewFurnishings(panels: Panel[]): FurnishingPlacement[]
       && bounds.min.x < width / 2 + 0.08 && bounds.max.x > -width / 2 - 0.08
       && bounds.min.z < depth / 2 + 0.08 && bounds.max.z > -depth / 2 - 0.08)
     const supported = supports.length >= 2
-    const bench = supported && !above && center.y >= 0.36 && center.y <= 0.54 && width >= 0.85 && depth >= 0.32 && depth <= 0.58 && width / depth >= 1.8
     const desk = supported && !above && center.y >= 0.64 && center.y <= 0.86 && width >= 0.90 && depth >= 0.55
 
     const variation = bookVariation(panelId)
@@ -245,15 +308,14 @@ export function detectPreviewFurnishings(panels: Panel[]): FurnishingPlacement[]
       const kind = (variation >>> 8) % 2 ? 'plant' : 'vase'
       return addObject(kind, x, 0) || addObject(kind === 'plant' ? 'vase' : 'plant', x, 0)
     }
-    const addPerson = (chair: boolean, x: number) => {
+    const addDeskOccupant = (x: number) => {
       if (people >= MAX_PEOPLE || result.length >= MAX_PREVIEW_FURNISHINGS) return false
-      const seatY = chair ? FLOOR_Y + 0.46 : center.y + 0.002
-      const seatHeight = seatY - FLOOR_Y
-      const position = worldPosition(target, x, seatY - center.y, chair ? depth / 2 + 0.35 : depth / 2 - 0.12)
-      const facing = rotation + (chair ? Math.PI : 0)
-      const boxes = personEnvelopes(position, facing, seatHeight, chair)
+      const seatHeight = 0.46, seatY = FLOOR_Y + seatHeight
+      const position = worldPosition(target, x, seatY - center.y, depth / 2 + 0.35)
+      const facing = rotation + Math.PI
+      const boxes = personEnvelopes(position, facing, seatHeight, true)
       if (!clear(boxes)) return false
-      const kind = chair ? 'seated-person-chair' : 'seated-person'
+      const kind = 'seated-person-chair'
       result.push({ id: `${panelId}:${kind}`, panelId, kind, position: position.toArray() as Vec3, rotation: facing, seatHeight })
       occupied.push(...boxes)
       people++
@@ -261,14 +323,20 @@ export function detectPreviewFurnishings(panels: Panel[]): FurnishingPlacement[]
     }
 
     if (bench) {
-      const seated = addPerson(false, width > 1.15 ? -width * 0.17 : 0)
+      const freeSeat = people < MAX_PEOPLE ? seats.find(candidate => clear(candidate.boxes)) : undefined
+      if (freeSeat) {
+        result.push({ id: `${panelId}:seated-person`, panelId, kind: 'seated-person', position: freeSeat.position.toArray() as Vec3,
+          rotation: freeSeat.rotation, seatHeight: freeSeat.seatHeight })
+        occupied.push(...freeSeat.boxes)
+        people++
+      }
       if (width > 1.2) addObject('books', width / 2 - 0.19, -0.015, 'stacked')
-      if (!seated) addObject('vase', -width / 2 + 0.16, 0)
+      if (!freeSeat) addObject('vase', -width / 2 + 0.16, 0)
     } else if (desk) {
       const computer = addObject('computer', 0.07, 0.01)
       addObject('table-lamp', -width / 2 + 0.17, -depth / 2 + 0.17)
       if (width > 1.4) addObject('plant', width / 2 - 0.17, -depth / 2 + 0.17)
-      if (computer) addPerson(true, 0.07)
+      if (computer) addDeskOccupant(0.07)
     } else if (depth <= 0.55) {
       const contents = bookVariation(`${panelId}:contents`) % 10
       if (!above && below && !sideWalls.length) {
