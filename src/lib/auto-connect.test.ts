@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { autoConnect } from './auto-connect'
 import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
 import { createExampleProject } from './example-library'
+import { Vector3 } from 'three'
+import { connectorSlide, getConnectorRail } from './connector-movement'
+import { getPhysicalConnectors } from './connector-selection'
 import type { ConnectorType, Project } from './types'
 
 function joint(type: ConnectorType = '90', width = 300): Project {
@@ -46,6 +49,25 @@ describe('auto-add connectors', () => {
     const result = autoConnect(strip(joint('90', 60)))
     expect(result.joints).toBe(1)
     expect(result.connectors).toBe(1)
+  })
+
+  it('fits one clamp when nearby hardware leaves room for only one on a longer seam', () => {
+    const source = joint('90', 100)
+    const nearbyPanels = resolvePanels(source).map(panel => ({ ...panel, id: `nearby-${panel.id}`,
+      position: [panel.position[0] - 60, panel.position[1], panel.position[2]] as [number, number, number] }))
+    const nearby = { ...source.connections[0], id: 'nearby:0', parentId: nearbyPanels[0].id, childId: nearbyPanels[1].id }
+    const project: Project = { ...source, panels: [...resolvePanels(source), ...nearbyPanels], connections: [nearby] }
+    const result = autoConnect(project, source.panels.map(panel => panel.id))
+    expect(result.joints).toBe(1)
+    expect(result.connectors).toBe(1)
+    expect(result.project.connections).toContainEqual(nearby)
+    const positions = getPhysicalConnectors(result.project).map(piece => {
+      const rail = getConnectorRail(piece.connection, resolvePanels(result.project), result.project.connections)!
+      return { connection: piece.connection, position: new Vector3(...rail.placements[piece.index].position).addScaledVector(new Vector3(...rail.tangent),
+        connectorSlide(rail, piece.index, result.project.connectorOverrides?.[piece.id]?.slide)) }
+    })
+    const added = positions.find(piece => piece.connection.id !== nearby.id)!
+    for (const other of positions.filter(piece => piece.connection.id === nearby.id)) expect(added.position.distanceTo(other.position)).toBeGreaterThanOrEqual(40 - 1e-7)
   })
 
   it('skips incompatible thickness, misalignment and insufficient clearance', () => {

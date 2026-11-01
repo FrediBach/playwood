@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { autoConnect } from './auto-connect'
 import { createAssembly, duplicateAssembly, materializeAssemblies, updateAssemblyFinish } from './assemblies'
-import { getConnectorRail } from './connector-movement'
+import { connectorSlide, getConnectorRail } from './connector-movement'
 import { connectorId, getPhysicalConnectors } from './connector-selection'
 import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
 import type { Panel, Project, Vec3 } from './types'
@@ -243,8 +243,17 @@ describe('auto-connect upgrades existing joints', () => {
       expect(result.joints).toBe(1)
       expect(result.project.connections.filter(connection => connection.type === 't')).toHaveLength(2)
     } else {
-      expect(result.joints).toBe(0)
-      expect(result.project).toEqual(before)
+      expect(result.joints).toBe(1)
+      const physicalPanels = resolvePanels(result.project).map(panel => ({ ...panel, visible: true }))
+      const pieces = getPhysicalConnectors(result.project).map(piece => {
+        const rail = getConnectorRail(piece.connection, physicalPanels, result.project.connections)!
+        return { ...piece, position: new Vector3(...rail.placements[piece.index].position).addScaledVector(new Vector3(...rail.tangent),
+          connectorSlide(rail, piece.index, result.project.connectorOverrides?.[piece.id]?.slide)) }
+      })
+      const nearby = pieces.filter(piece => piece.connection.id === nearbyConnection.id)
+      const replacements = pieces.filter(piece => piece.type === 't')
+      expect(replacements).toHaveLength(2)
+      for (const replacement of replacements) for (const other of nearby) expect(replacement.position.distanceTo(other.position)).toBeGreaterThanOrEqual(40 - 1e-7)
     }
   })
 

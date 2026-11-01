@@ -12,6 +12,10 @@
 .right-sidebar .selected-heading { margin-bottom: 8px; letter-spacing: .9px; }
 .right-sidebar .selected-index { letter-spacing: 0; text-transform: none; font-size: 11px; }
 .right-sidebar .panel-name-field { margin-bottom: 18px; }
+.right-sidebar .ground-fit-note { margin: 7px 0 12px; }
+.panel-fit-measurement { display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); }
+.panel-fit-measurement > span, .panel-fit-measurement > small { color: var(--muted); font-size: 12px; }
+.panel-fit-measurement > strong { font-size: 20px; font-weight: 550; }
 .right-sidebar .multi-selection-heading { margin-bottom: 20px; }
 .right-sidebar .multi-selection-heading p { margin-top: 6px; line-height: 1.5; }
 .right-sidebar .section-title { margin-bottom: 12px; }
