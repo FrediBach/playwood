@@ -18,12 +18,13 @@ function transform(panels: Panel[], yaw: number, shift: Vec3) {
 }
 
 describe('optional preview furnishings', () => {
-  it('places books on all three real starter shelves without mistaking the middle shelf for a bench', () => {
-    const panels = starter('shelf')
+  it('styles the starter shelf without mistaking its middle shelf for a bench or stacking books on its cap', () => {
+    const panels = starter('shelf').map((panel, index) => ({ ...panel, id: `starter-shelf-${index}` }))
     const props = detectPreviewFurnishings(panels)
-    expect(props.filter(prop => prop.kind === 'books')).toHaveLength(3)
+    expect(props.length).toBeGreaterThan(0)
     expect(props.some(prop => prop.kind.startsWith('seated-person'))).toBe(false)
-    expect(new Set(props.map(prop => prop.panelId)).size).toBe(3)
+    const top = panels.find(panel => panel.name === 'Top shelf')!
+    expect(props.some(prop => prop.panelId === top.id && prop.kind === 'books')).toBe(false)
   })
 
   it('furnishes the actual starter desk with a computer, lamp and seated person on a chair', () => {
@@ -92,18 +93,17 @@ describe('optional preview furnishings', () => {
     }
   })
 
-  it('respects overhead clearance and only decorates the top of a tightly spaced stack', () => {
+  it('leaves a compartment empty when no book stack or decoration clears its ceiling', () => {
     const panels = [shelf(), shelf({ id: 'ceiling', position: [0, 850, 0] })]
     expect(detectPreviewFurnishings(panels).some(prop => prop.panelId === 'surface')).toBe(false)
-    expect(detectPreviewFurnishings(panels).some(prop => prop.panelId === 'ceiling')).toBe(true)
   })
 
-  it('assigns distinct stable IDs when two slots both fall back to vases', () => {
-    // This shallow ledge cannot hold even a flat book stack, but fits both vases.
+  it('uses a single decoration on a shallow ledge with stable unique placement IDs', () => {
+    // This shallow ledge cannot hold even a flat book stack, but fits a vase.
     const panels = [shelf({ height: 260 }), shelf({ id: 'ceiling', height: 260, position: [0, 990, 0] })]
     const props = detectPreviewFurnishings(panels)
     const lower = props.filter(prop => prop.panelId === 'surface')
-    expect(lower.map(prop => prop.kind)).toEqual(['vase', 'vase'])
+    expect(lower.map(prop => prop.kind)).toEqual(['vase'])
     expect(new Set(props.map(prop => prop.id)).size).toBe(props.length)
     expect(detectPreviewFurnishings([...panels].reverse())).toEqual(props)
   })

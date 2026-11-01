@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { Box3, Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import {
-  createPreviewBooks, PREVIEW_BOOK_BOUNDS, PREVIEW_BOOK_STACK_BOUNDS,
+  createPreviewBooks, getPreviewBookBounds, PREVIEW_BOOK_BOUNDS, PREVIEW_BOOK_STACK_BOUNDS,
   type PreviewBook, type PreviewBookArrangement,
 } from './preview-books'
 
 const arrangements: PreviewBookArrangement[] = ['upright', 'leaning', 'stacked']
+const supportedArrangements = arrangements.flatMap(arrangement => (['left', 'right'] as const).map(supportSide => ({ arrangement, supportSide })))
 const seeds = Array.from({ length: 64 }, (_, index) => `shelf-${index}:books:left`)
 
 function bookBounds(book: PreviewBook) {
@@ -55,10 +56,10 @@ describe('varied preview books', () => {
     expect(new Set(poses)).toEqual(new Set(arrangements))
   })
 
-  it.each(arrangements)('keeps %s groups grounded, nonintersecting and inside their clearance envelope', arrangement => {
+  it.each(supportedArrangements)('keeps $arrangement groups with $supportSide support grounded, nonintersecting and inside their clearance envelope', ({ arrangement, supportSide }) => {
     const envelope = arrangement === 'stacked' ? PREVIEW_BOOK_STACK_BOUNDS : PREVIEW_BOOK_BOUNDS
     for (const seed of seeds) {
-      const books = createPreviewBooks(seed, arrangement)
+      const books = createPreviewBooks(seed, arrangement, supportSide)
       expect(books.length).toBeGreaterThanOrEqual(2)
       expect(books.length).toBeLessThanOrEqual(arrangement === 'stacked' ? 4 : 7)
       const bounds = books.map(bookBounds)
@@ -82,18 +83,56 @@ describe('varied preview books', () => {
     }
   })
 
-  it('rests a leaning book against a taller upright neighbour', () => {
+  it.each(['left', 'right'] as const)('rests the free end inward against its neighbour with the %s end upright at the wall', supportSide => {
     for (const seed of seeds) {
-      const books = createPreviewBooks(seed, 'leaning')
+      const books = createPreviewBooks(seed, 'leaning', supportSide)
       const index = books.findIndex(book => Math.abs(book.rotation[2]) > 0.03)
       expect(index).toBeGreaterThanOrEqual(0)
       expect(index).toBeLessThan(books.length - 1)
       const leaning = bookBounds(books[index]), neighbour = bookBounds(books[index + 1])
-      expect(books[index].rotation[2]).toBeLessThan(0)
+      expect(books[index].rotation[2] * (supportSide === 'left' ? -1 : 1)).toBeLessThan(0)
       expect(books[index + 1].rotation[2]).toBeCloseTo(0, 9)
-      expect(neighbour.min.x - leaning.max.x).toBeGreaterThanOrEqual(-1e-9)
-      expect(neighbour.min.x - leaning.max.x).toBeLessThanOrEqual(0.003)
+      const gap = supportSide === 'left' ? leaning.min.x - neighbour.max.x : neighbour.min.x - leaning.max.x
+      expect(gap).toBeGreaterThanOrEqual(-1e-9)
+      expect(gap).toBeLessThanOrEqual(0.003)
       expect(neighbour.max.y).toBeGreaterThanOrEqual(leaning.max.y - 1e-9)
+      const supported = books.at(-1)!, supportedBounds = bookBounds(supported), groupBounds = getPreviewBookBounds(books)
+      expect(supported.rotation[2]).toBe(0)
+      expect(supportSide === 'left' ? supportedBounds.min.x : supportedBounds.max.x)
+        .toBeCloseTo(supportSide === 'left' ? groupBounds.min[0] : groupBounds.max[0], 9)
+      for (const book of books) {
+        const spine = new Vector3(0, 0, 1).applyEuler(new Euler(...book.rotation))
+        expect(spine.toArray()).toEqual([0, 0, 1])
+      }
+    }
+  })
+
+  it('mirrors only standing poses for left support while keeping the same books and default right support', () => {
+    for (const arrangement of arrangements) for (const seed of seeds) {
+      const right = createPreviewBooks(seed, arrangement, 'right'), left = createPreviewBooks(seed, arrangement, 'left')
+      expect(createPreviewBooks(seed, arrangement)).toEqual(right)
+      expect(createPreviewBooks(seed, arrangement, 'left')).toEqual(left)
+      if (arrangement === 'stacked') expect(left).toEqual(right)
+      else for (let index = 0; index < right.length; index++) {
+        const a = right[index], b = left[index]
+        expect({ ...b, position: a.position, rotation: a.rotation }).toEqual(a)
+        expect(b.position).toEqual([-a.position[0], a.position[1], a.position[2]])
+        expect(b.rotation[2]).toBeCloseTo(-a.rotation[2], 9)
+        expect(b.rotation.slice(0, 2)).toEqual(a.rotation.slice(0, 2))
+      }
+    }
+  })
+
+  it('reports exact transformed cuboid bounds for anchoring and clearance checks', () => {
+    expect(getPreviewBookBounds([])).toEqual({ min: [0, 0, 0], max: [0, 0, 0] })
+    for (const { arrangement, supportSide } of supportedArrangements) for (const seed of seeds) {
+      const books = createPreviewBooks(seed, arrangement, supportSide)
+      const expected = books.map(bookBounds).reduce((group, bounds) => group.union(bounds), new Box3())
+      const actual = getPreviewBookBounds(books)
+      for (let axis = 0; axis < 3; axis++) {
+        expect(actual.min[axis]).toBeCloseTo(expected.min.getComponent(axis), 10)
+        expect(actual.max[axis]).toBeCloseTo(expected.max.getComponent(axis), 10)
+      }
     }
   })
 

@@ -1,6 +1,8 @@
+import { Box3, Euler, Matrix4, Vector3 } from 'three'
 import type { Vec3 } from './types'
 
 export type PreviewBookArrangement = 'upright' | 'leaning' | 'stacked'
+export type PreviewBookSupport = 'left' | 'right'
 export type PreviewBookDesign = 'band' | 'arch' | 'grid' | 'minimal' | 'split'
 
 /** Local X is the book's thickness, Y its height, and +Z its outward spine. */
@@ -49,7 +51,7 @@ function seededRandom(seed: string) {
 }
 
 /** Seeded variation keeps a shelf stable through selection, camera moves and edits. */
-export function createPreviewBooks(seed: string, arrangement?: PreviewBookArrangement): PreviewBook[] {
+export function createPreviewBooks(seed: string, arrangement?: PreviewBookArrangement, supportSide: PreviewBookSupport = 'right'): PreviewBook[] {
   const random = seededRandom(seed)
   const style = arrangement ?? (['upright', 'leaning', 'stacked'] as const)[Math.floor(random() * 3)]
   const stacked = style === 'stacked'
@@ -102,5 +104,25 @@ export function createPreviewBooks(seed: string, arrangement?: PreviewBookArrang
     book.position = [left + widths[i] / 2, (book.height * Math.cos(angle) + book.thickness * Math.sin(angle)) / 2, 0.105 - book.depth / 2]
     left += widths[i] + gap
   })
+  if (supportSide === 'left') books.forEach(book => {
+    // Mirror the pose, keeping cover artwork and spine normals unmirrored.
+    // The upright end meets the sidewall; the free end leans back into the row.
+    book.position[0] *= -1
+    if (book.rotation[2] !== 0) book.rotation[2] *= -1
+  })
   return books
+}
+
+/** Exact row extents let the detector anchor its upright end against a sidewall. */
+export function getPreviewBookBounds(books: PreviewBook[]): { min: Vec3; max: Vec3 } {
+  if (!books.length) return { min: [0, 0, 0], max: [0, 0, 0] }
+  const bounds = new Box3()
+  for (const book of books) {
+    const transform = new Matrix4().makeRotationFromEuler(new Euler(...book.rotation))
+    transform.setPosition(...book.position)
+    for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+      bounds.expandByPoint(new Vector3(x * book.thickness / 2, y * book.height / 2, z * book.depth / 2).applyMatrix4(transform))
+    }
+  }
+  return { min: bounds.min.toArray() as Vec3, max: bounds.max.toArray() as Vec3 }
 }

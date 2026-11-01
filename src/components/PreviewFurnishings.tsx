@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import type { FurnishingPlacement } from '@/lib/preview-furnishings'
-import { createPreviewBooks, type PreviewBook, type PreviewBookArrangement } from '@/lib/preview-books'
+import { createPreviewBooks, type PreviewBook, type PreviewBookArrangement, type PreviewBookSupport } from '@/lib/preview-books'
 import type { Vec3 } from '@/lib/types'
 
 // Metres, with the supporting surface at y=0 and the front facing +Z.
@@ -110,8 +110,8 @@ function Book({ book }: { book: PreviewBook }) {
   </group>
 }
 
-function Books({ seed, arrangement }: { seed: string; arrangement?: PreviewBookArrangement }) {
-  const books = useMemo(() => createPreviewBooks(seed, arrangement), [seed, arrangement])
+function Books({ seed, arrangement, supportSide }: { seed: string; arrangement?: PreviewBookArrangement; supportSide?: PreviewBookSupport }) {
+  const books = useMemo(() => createPreviewBooks(seed, arrangement, supportSide), [seed, arrangement, supportSide])
   return <group>{books.map((book, i) => <Book key={i} book={book}/>)}</group>
 }
 
@@ -247,7 +247,7 @@ export function PreviewFurnishings({ placements }: { placements: FurnishingPlace
   return <group name="Preview furnishings">
     {placements.map(placement => <group key={placement.id} name={placement.kind} position={placement.position} rotation={[0, placement.rotation, 0]}
       userData={{ previewFurnishing: placement.kind, sourcePanelId: placement.panelId }}>
-      {placement.kind === 'books' && <Books seed={placement.id} arrangement={placement.bookArrangement}/>}
+      {placement.kind === 'books' && <Books seed={placement.bookSeed ?? placement.id} arrangement={placement.bookArrangement} supportSide={placement.bookSupport}/>}
       {placement.kind === 'table-lamp' && <TableLamp/>}
       {placement.kind === 'computer' && <Computer/>}
       {placement.kind === 'plant' && <SmallPlant/>}

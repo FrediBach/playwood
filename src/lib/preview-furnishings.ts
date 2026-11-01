@@ -1,7 +1,7 @@
 import { Box3, Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import type { Panel, Vec3 } from './types'
-import { PREVIEW_BOOK_BOUNDS, PREVIEW_BOOK_STACK_BOUNDS, type PreviewBookArrangement } from './preview-books'
+import { createPreviewBooks, getPreviewBookBounds, PREVIEW_BOOK_BOUNDS, PREVIEW_BOOK_STACK_BOUNDS, type PreviewBookArrangement, type PreviewBookSupport } from './preview-books'
 
 export type FurnishingKind = 'books' | 'table-lamp' | 'computer' | 'plant' | 'vase' | 'seated-person' | 'seated-person-chair'
 /** Preview-only transforms, in metres. People originate at the top of their seat. */
@@ -13,6 +13,8 @@ export interface FurnishingPlacement {
   rotation: number
   seatHeight?: number
   bookArrangement?: PreviewBookArrangement
+  bookSeed?: string
+  bookSupport?: PreviewBookSupport
 }
 
 export const MAX_PREVIEW_FURNISHINGS = 32
@@ -171,6 +173,7 @@ export function detectPreviewFurnishings(panels: Panel[]): FurnishingPlacement[]
     const overlap = (bounds: Box3) => bounds.min.x < width / 2 - 0.08 && bounds.max.x > -width / 2 + 0.08
       && bounds.min.z < depth / 2 - 0.05 && bounds.max.z > -depth / 2 + 0.05
     const above = relatives.some(({ item, bounds }) => Math.abs(item.normal.y) > 0.999999 && bounds.min.y > 0.01 && bounds.min.y < 1 && overlap(bounds))
+    const below = relatives.some(({ item, bounds }) => Math.abs(item.normal.y) > 0.999999 && bounds.max.y < -0.01 && bounds.max.y > -1.2 && overlap(bounds))
     const supports = relatives.filter(({ item, bounds }) => Math.abs(item.normal.y) < 0.05 && item.bounds.min.y < 0.12
       && bounds.max.y > -0.085 && bounds.min.y < -0.25
       && bounds.min.x < width / 2 + 0.08 && bounds.max.x > -width / 2 - 0.08
@@ -181,27 +184,67 @@ export function detectPreviewFurnishings(panels: Panel[]): FurnishingPlacement[]
 
     const variation = bookVariation(panelId)
     const arrangement: PreviewBookArrangement = (above || center.y < 1.1) && variation % 5 < 2 ? 'stacked' : variation % 2 ? 'leaning' : 'upright'
+    const bookSeed = `${panelId}:books`
+    const insideSurface = (minX: number, maxX: number, minZ: number, maxZ: number, margin: number) => {
+      const edgeX = Math.max(Math.abs(minX), Math.abs(maxX)), edgeZ = Math.max(Math.abs(minZ), Math.abs(maxZ))
+      if (edgeX > width / 2 - margin || edgeZ > depth / 2 - margin) return false
+      const radius = Math.min((target.obstacle.panel.cornerRadius ?? 0) * MM, width / 2, depth / 2)
+      const cornerX = Math.max(0, edgeX - (width / 2 - radius)), cornerZ = Math.max(0, edgeZ - (depth / 2 - radius))
+      return radius <= 0 || Math.hypot(cornerX, cornerZ) <= Math.max(0, radius - Math.min(margin, 0.012))
+    }
     const addObject = (kind: keyof typeof footprints, x: number, z: number, bookArrangement = arrangement) => {
       if (result.length >= MAX_PREVIEW_FURNISHINGS) return false
       const size = kind === 'books' && bookArrangement === 'stacked' ? PREVIEW_BOOK_STACK_BOUNDS : footprints[kind]
-      // Reserve a connector/edge margin, then test the footprint's outer corner
-      // against the actual rounded outline. Tiny radii still allow central props.
-      const margin = 0.025
-      if (Math.abs(x) + size[0] / 2 > width / 2 - margin || Math.abs(z) + size[2] / 2 > depth / 2 - margin) return false
-      const radius = Math.min((target.obstacle.panel.cornerRadius ?? 0) * MM, width / 2, depth / 2)
-      const cornerX = Math.max(0, Math.abs(x) + size[0] / 2 - (width / 2 - radius))
-      const cornerZ = Math.max(0, Math.abs(z) + size[2] / 2 - (depth / 2 - radius))
-      if (radius > 0 && Math.hypot(cornerX, cornerZ) > Math.max(0, radius - 0.012)) return false
+      if (!insideSurface(x - size[0] / 2, x + size[0] / 2, z - size[2] / 2, z + size[2] / 2, 0.025)) return false
       const position = worldPosition(target, x, 0.002, z)
       const box = envelope(position, rotation, [0, size[1] / 2, 0], [size[0] + CLEARANCE, size[1] + CLEARANCE, size[2] + CLEARANCE])
       if (!clear([box], panelId)) return false
       result.push({ id: `${panelId}:${kind}:${x.toFixed(4)}:${z.toFixed(4)}`, panelId, kind, position: position.toArray() as Vec3, rotation,
-        ...(kind === 'books' ? { bookArrangement } : {}) })
+        ...(kind === 'books' ? { bookArrangement, bookSeed } : {}) })
       occupied.push(box)
       return true
     }
-    const addBooks = (x: number, z: number) => addObject('books', x, z)
-      || (arrangement !== 'stacked' && addObject('books', x, z, 'stacked'))
+    const sideWalls = relatives.filter(({ item, bounds }) => Math.abs(item.normal.dot(target.x)) > 0.95
+      && bounds.min.y < 0.04 && bounds.max.y > 0.16 && bounds.min.z < -0.08 && bounds.max.z > 0.08
+      && (bounds.max.x < -0.03 && bounds.max.x >= -width / 2 - 0.03
+        || bounds.min.x > 0.03 && bounds.min.x <= width / 2 + 0.03))
+    const addStandingBooks = () => {
+      if (arrangement === 'stacked') return false
+      const preferred: PreviewBookSupport = variation % 2 ? 'left' : 'right'
+      for (const side of [preferred, preferred === 'left' ? 'right' : 'left'] as const) {
+        const bounds = getPreviewBookBounds(createPreviewBooks(bookSeed, arrangement, side))
+        const z = depth / 2 - 0.035 - bounds.max[2]
+        const walls = sideWalls.filter(wall => wall.bounds.max.y >= bounds.max[1] - 0.025
+          && wall.bounds.min.z <= z + bounds.min[2] && wall.bounds.max.z >= z + bounds.max[2]
+          && (side === 'left' ? wall.bounds.max.x < -0.03 && wall.bounds.max.x >= -width / 2 - 0.03
+            : wall.bounds.min.x > 0.03 && wall.bounds.min.x <= width / 2 + 0.03))
+          .sort((a, b) => side === 'left' ? a.bounds.max.x - b.bounds.max.x : b.bounds.min.x - a.bounds.min.x)
+        for (const wall of walls) {
+          // Anchor the upright end to the wall. Connector gaps can put the wall
+          // slightly beyond the board: stop at the board edge rather than overhang.
+          const x = side === 'left'
+            ? Math.max(wall.bounds.max.x + 0.003, -width / 2 + 0.002) - bounds.min[0]
+            : Math.min(wall.bounds.min.x - 0.003, width / 2 - 0.002) - bounds.max[0]
+          if (!insideSurface(x + bounds.min[0], x + bounds.max[0], z + bounds.min[2], z + bounds.max[2], 0.0019)) continue
+          const position = worldPosition(target, x, 0.002, z)
+          const size = bounds.max.map((max, axis) => max - bounds.min[axis] + 0.002) as Vec3
+          const offset = bounds.max.map((max, axis) => (max + bounds.min[axis]) / 2) as Vec3
+          const box = envelope(position, rotation, offset, size)
+          if (!clear([box], panelId)) continue
+          result.push({ id: `${panelId}:books:${side}`, panelId, kind: 'books', position: position.toArray() as Vec3,
+            rotation, bookArrangement: arrangement, bookSeed, bookSupport: side })
+          occupied.push(box)
+          return true
+        }
+      }
+      return false
+    }
+    const addBooks = (x: number) => addStandingBooks() || addObject('books', x, 0, 'stacked')
+    const addDecoration = () => {
+      const x = width > 0.70 ? ((variation % 9) - 4) * width * 0.025 : 0
+      const kind = (variation >>> 8) % 2 ? 'plant' : 'vase'
+      return addObject(kind, x, 0) || addObject(kind === 'plant' ? 'vase' : 'plant', x, 0)
+    }
     const addPerson = (chair: boolean, x: number) => {
       if (people >= MAX_PEOPLE || result.length >= MAX_PREVIEW_FURNISHINGS) return false
       const seatY = chair ? FLOOR_Y + 0.46 : center.y + 0.002
@@ -219,7 +262,7 @@ export function detectPreviewFurnishings(panels: Panel[]): FurnishingPlacement[]
 
     if (bench) {
       const seated = addPerson(false, width > 1.15 ? -width * 0.17 : 0)
-      if (width > 1.2) addBooks(width / 2 - 0.19, -0.015)
+      if (width > 1.2) addObject('books', width / 2 - 0.19, -0.015, 'stacked')
       if (!seated) addObject('vase', -width / 2 + 0.16, 0)
     } else if (desk) {
       const computer = addObject('computer', 0.07, 0.01)
@@ -227,10 +270,17 @@ export function detectPreviewFurnishings(panels: Panel[]): FurnishingPlacement[]
       if (width > 1.4) addObject('plant', width / 2 - 0.17, -depth / 2 + 0.17)
       if (computer) addPerson(true, 0.07)
     } else if (depth <= 0.55) {
-      // Books fit the broad, shallow shelves; a small vessel fits narrow ledges.
-      const left = width > 0.65 ? -width * (0.16 + (variation % 11) * 0.012) : 0
-      if (!addBooks(left, 0)) addObject('vase', left, 0)
-      if (width > 0.70) addObject(above ? 'vase' : 'plant', width * 0.25, 0)
+      const contents = bookVariation(`${panelId}:contents`) % 10
+      if (!above && below && !sideWalls.length) {
+        // A bookcase's exposed cap gets occasional decor, not unsupported books.
+        if (contents < 3) addDecoration()
+      } else if (contents >= 2 && contents < 5) {
+        addDecoration()
+      } else if (contents >= 5) {
+        const x = width > 0.65 ? -width * (0.12 + (variation % 9) * 0.012) : 0
+        if (!addBooks(x)) addDecoration()
+      }
+      // Other compartments intentionally stay empty, independent of render limits.
     }
   }
   return result

@@ -89,7 +89,7 @@ export function AssemblyWorkspace({boxSelectActive,boxSelectDisabled,selectionKi
         <div className="room-furnishing-control">
           <label><input type="checkbox" checked={autoFurnish} onChange={event=>setAutoFurnish(event.target.checked)} aria-label="Auto furnish" aria-describedby="room-furnishing-note"/>Auto furnish<span>Preview only</span></label>
           <p id="room-furnishing-note">Books, desk accessories, decor and people. May slow large previews.</p>
-          {autoFurnish && <p className="room-furnishing-status" role="status">{furnishedSurfaces ? `${furnishedSurfaces} ${furnishedSurfaces === 1 ? 'surface furnished' : 'surfaces furnished'}` : 'No suitable surfaces found.'}</p>}
+          {autoFurnish && <p className="room-furnishing-status" role="status">{furnishedSurfaces ? `${furnishedSurfaces} ${furnishedSurfaces === 1 ? 'surface furnished' : 'surfaces furnished'}` : 'No furnishings placed.'}</p>}
         </div>
       </div>}/>
       {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}

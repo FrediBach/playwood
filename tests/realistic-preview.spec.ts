@@ -166,7 +166,7 @@ test('auto furnishing skips vertical, tilted, and hidden surfaces', async ({ pag
   await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
   await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
   await expect(page.locator('[data-preview-furnishings]')).toHaveAttribute('data-preview-furnishings', '0')
-  await expect(page.getByText('No suitable surfaces found.', { exact: true })).toBeVisible()
+  await expect(page.getByText('No furnishings placed.', { exact: true })).toBeVisible()
   await expectRenderedRoom(page)
 })
 
@@ -183,37 +183,46 @@ test('auto furnishing seats a person on the gallery bench', async ({ page }) => 
   await page.screenshot({ path: 'test-results/realistic-preview-furnished-bench.png' })
 })
 
-test('deep cubby shelves show varied books facing their openings', async ({ page }) => {
+test('deep cubby shelves mix furnishings with empty spaces and face books toward their openings', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   const panels: Panel[] = []
+  const columns = [-597, -199, 199, 597]
+  const levels = [49, 417, 785, 1153, 1521]
   // Each opening is narrower than its depth. The side walls and back, rather
   // than the longest shelf edge or a panel name, establish the reading direction.
-  for (const [column, x] of [-398, 0, 398].entries()) {
-    for (const [row, y] of [49, 417, 785, 1153].entries()) {
+  for (const [column, x] of columns.entries()) {
+    for (const [row, y] of levels.entries()) {
       panels.push(createPanel({
         id: `cubby-${column}-${row}`, name: `Panel ${column}-${row}`,
         width: 380, height: 420, position: [x, y, 0], rotation: [-Math.PI / 2, 0, 0],
       }))
     }
   }
-  for (const [index, x] of [-597, -199, 199, 597].entries()) {
+  for (const [index, x] of [-796, -398, 0, 398, 796].entries()) {
     panels.push(createPanel({
       id: `cubby-divider-${index}`, name: `Panel D${index}`,
-      width: 420, height: 1162, position: [x, 581, 0], rotation: [0, Math.PI / 2, 0],
+      width: 420, height: 1530, position: [x, 765, 0], rotation: [0, Math.PI / 2, 0],
     }))
   }
-  panels.push(createPanel({ id: 'cubby-rear', name: 'Panel R', width: 1212, height: 1162, position: [0, 581, -219] }))
+  panels.push(createPanel({ id: 'cubby-rear', name: 'Panel R', width: 1610, height: 1530, position: [0, 765, -219] }))
+  await page.setViewportSize({ width: 1680, height: 1100 })
   await page.goto('/')
   await importPanels(page, panels)
   const original = await exportedProject(page)
+  // Clear the imported panel selection through the Studio shortcut so handles
+  // do not cover books in the visual review image.
+  await page.locator('canvas').focus()
+  await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
   await expectRenderedRoom(page)
   await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
   await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
   const unfurnished = await page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())
   await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
-  await expect(page.locator('[data-preview-furnishings]')).toHaveAttribute('data-preview-furnishings', /^[1-9]\d*$/)
+  const surface = page.locator('[data-preview-furnishings]')
+  await expect(surface).toHaveAttribute('data-preview-furnishings', /^[1-9]\d*$/)
+  await expect.poll(async () => Number(await surface.getAttribute('data-preview-furnishings'))).toBeLessThan(columns.length * levels.length)
   await expect.poll(() => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())).not.toBe(unfurnished)
   await expectRenderedRoom(page)
   await page.screenshot({ path: 'test-results/realistic-preview-varied-books.png' })

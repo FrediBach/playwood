@@ -6,14 +6,14 @@ import type { Panel, Vec3 } from './types'
 
 const UP = new Vector3(0, 1, 0)
 
-/** The opening is deliberately narrower than its depth; names carry no clues. */
+/** Fixed seeds select a book compartment and a decorative top. The opening is narrower than its depth. */
 function deepCubby({ back = false, clearance = 350 }: { back?: boolean; clearance?: number } = {}) {
   const topY = 27 + clearance
   const sideY = (9 + topY) / 2
   const sideHeight = clearance - 17
   const panels = [
-    createPanel({ id: 'lower', name: 'Panel A', width: 380, height: 420, position: [0, 9, 0], rotation: [-Math.PI / 2, 0, 0] }),
-    createPanel({ id: 'upper', name: 'Panel B', width: 380, height: 420, position: [0, topY, 0], rotation: [-Math.PI / 2, 0, 0] }),
+    createPanel({ id: 'orientation-0', name: 'Panel A', width: 380, height: 420, position: [0, 9, 0], rotation: [-Math.PI / 2, 0, 0] }),
+    createPanel({ id: 'orientation-6', name: 'Panel B', width: 380, height: 420, position: [0, topY, 0], rotation: [-Math.PI / 2, 0, 0] }),
     createPanel({ id: 'side-a', name: 'Panel C', width: 420, height: sideHeight, position: [-207.5, sideY, 0], rotation: [0, Math.PI / 2, 0] }),
     createPanel({ id: 'side-b', name: 'Panel D', width: 420, height: sideHeight, position: [207.5, sideY, 0], rotation: [0, Math.PI / 2, 0] }),
   ]
@@ -44,7 +44,7 @@ function expectFacing(placement: FurnishingPlacement, direction: Vector3) {
 describe('preview books follow shelf openings', () => {
   it('faces out of a cubby whose opening is narrower than its depth, including its low base', () => {
     const panels = deepCubby()
-    const books = booksOn(panels, 'lower')
+    const books = booksOn(panels, 'orientation-0')
     for (const item of books) {
       expectFacing(item, new Vector3(0, 0, 1))
       expect(item.position[1]).toBeCloseTo(0.020, 8)
@@ -53,18 +53,18 @@ describe('preview books follow shelf openings', () => {
 
   it('uses the room front for a deep narrow board with no surrounding walls', () => {
     const panel = { ...deepCubby()[0], position: [0, 700, 0] as Vec3 }
-    for (const item of booksOn([panel], 'lower')) expectFacing(item, new Vector3(0, 0, 1))
+    for (const item of booksOn([panel], 'orientation-0')) expectFacing(item, new Vector3(0, 0, 1))
   })
 
   it('preserves the opening when horizontal panel width and height axes are swapped', () => {
     const original = deepCubby({ back: true })
     const swapped = original.map(panel => {
-      if (panel.id !== 'lower' && panel.id !== 'upper') return panel
+      if (panel.id !== 'orientation-0' && panel.id !== 'orientation-6') return panel
       const rotation = new Euler().setFromQuaternion(new Quaternion().setFromEuler(new Euler(...panel.rotation))
         .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2)))
       return { ...panel, width: panel.height, height: panel.width, rotation: [rotation.x, rotation.y, rotation.z] as Vec3 }
     })
-    const before = booksOn(original, 'lower'), after = booksOn(swapped, 'lower')
+    const before = booksOn(original, 'orientation-0'), after = booksOn(swapped, 'orientation-0')
     expect(after).toHaveLength(before.length)
     after.forEach((item, index) => {
       expectFacing(item, new Vector3(0, 0, 1))
@@ -74,8 +74,8 @@ describe('preview books follow shelf openings', () => {
 
   it('follows side walls through yaw and translation instead of the longest panel dimension', () => {
     const panels = deepCubby(), yaw = 0.63, shift: Vec3 = [1400, 0, -1800]
-    const original = booksOn(panels, 'lower')
-    const moved = booksOn(turnAndMove(panels, yaw, shift), 'lower')
+    const original = booksOn(panels, 'orientation-0')
+    const moved = booksOn(turnAndMove(panels, yaw, shift), 'orientation-0')
     const direction = new Vector3(0, 0, 1).applyAxisAngle(UP, yaw)
     expect(moved).toHaveLength(original.length)
     moved.forEach((item, index) => {
@@ -89,35 +89,38 @@ describe('preview books follow shelf openings', () => {
     const yaw = Math.PI * 0.7
     const panels = turnAndMove(deepCubby({ back: true }), yaw, [900, 0, 1500])
     const direction = new Vector3(0, 0, 1).applyAxisAngle(UP, yaw)
-    for (const item of booksOn(panels, 'lower')) expectFacing(item, direction)
+    for (const item of booksOn(panels, 'orientation-0')) expectFacing(item, direction)
   })
 
   it('uses the side and back geometry below the top shelf when there are no walls above it', () => {
     const yaw = Math.PI * 0.7
     const panels = turnAndMove(deepCubby({ back: true }), yaw)
     const direction = new Vector3(0, 0, 1).applyAxisAngle(UP, yaw)
-    for (const item of booksOn(panels, 'upper')) expectFacing(item, direction)
+    const props = detectPreviewFurnishings(panels).filter(item => item.panelId === 'orientation-6')
+    expect(props.length).toBeGreaterThan(0)
+    expect(props.some(item => item.kind === 'books')).toBe(false)
+    for (const item of props) expectFacing(item, direction)
   })
 
   it('faces the remaining open side when the front is closed', () => {
     const panels = deepCubby({ back: true }).map(panel => panel.id === 'back'
       ? { ...panel, position: [0, panel.position[1], 201] as Vec3 } : panel)
-    for (const item of booksOn(panels, 'lower')) expectFacing(item, new Vector3(0, 0, -1))
+    for (const item of booksOn(panels, 'orientation-0')) expectFacing(item, new Vector3(0, 0, -1))
   })
 
   it('ignores hidden and distant vertical panels when choosing the opening', () => {
     const panels = deepCubby({ back: true })
-    const original = booksOn(panels, 'lower')
+    const original = booksOn(panels, 'orientation-0')
     const back = panels.find(panel => panel.id === 'back')!
     panels.push({ ...back, id: 'hidden-front', visible: false, position: [0, back.position[1], 201] })
     panels.push({ ...back, id: 'distant-wall', width: 5000, height: 2000, position: [0, 1000, 3000] })
-    expect(booksOn(panels, 'lower')).toEqual(original)
-    expect(booksOn([...panels].reverse(), 'lower')).toEqual(original)
+    expect(booksOn(panels, 'orientation-0')).toEqual(original)
+    expect(booksOn([...panels].reverse(), 'orientation-0')).toEqual(original)
   })
 
   it('uses flat stacks in a low shelf where upright books cannot fit', () => {
     const panels = deepCubby({ clearance: 150 })
-    for (const item of booksOn(panels, 'lower')) {
+    for (const item of booksOn(panels, 'orientation-0')) {
       expect(item.bookArrangement).toBe('stacked')
       expectFacing(item, new Vector3(0, 0, 1))
       expect(item.position[1] + 0.13).toBeLessThan((panels[1].position[1] - 9) / 1000)
