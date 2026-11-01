@@ -27,9 +27,20 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
   const [preview, setPreview] = useState<Result | null>(null)
   const current = session.current?.source === prepared ? preview : null
   const panels = useMemo(() => current ? resolvePanels(current.project) : null, [current])
-  const handles = useMemo(() => (prepared?.handles ?? []).map(handle => current && handle.id === session.current?.handleId
-    ? { ...handle, position: handle.position.map((value, axis) => value + handle.direction[axis] * current.distance) as typeof handle.position }
-    : handle), [prepared, current])
+  const handles = useMemo(() => (prepared?.handles ?? []).map(handle => {
+    if (!current || !panels || handle.id !== session.current?.handleId) return handle
+    const operation = prepared!.drivers.get(handle.id)!.operation
+    const sizes = operation.kind === 'edge'
+      ? panels.filter(panel => panel.id === operation.panelId).map(panel => ({
+        label: operation.dimension === 'width' ? 'Width' : 'Height', value: panel[operation.dimension],
+      }))
+      : panels.flatMap(panel => {
+        const before = prepared!.original.panels.find(item => item.id === panel.id)
+        return (['width', 'height'] as const).filter(dimension => before && Math.abs(panel[dimension] - before[dimension]) > 1e-6)
+          .map(dimension => ({ label: `${panel.name} · ${dimension === 'width' ? 'Width' : 'Height'}`, value: panel[dimension] }))
+      })
+    return { ...handle, sizes, position: handle.position.map((value, axis) => value + handle.direction[axis] * current.distance) as typeof handle.position }
+  }), [prepared, current, panels])
 
   return {
     handles,

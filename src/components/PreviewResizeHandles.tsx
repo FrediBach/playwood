@@ -236,7 +236,9 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h11M10 4l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <span className={`preview-resize-caption${limited && activeId === handle.id ? ' is-limited' : ''}`}>
-          {activeId === handle.id ? <>{shownDistance > 0 ? '+' : ''}{shownDistance} mm{limited ? ' · limit' : ''}<small>Release to resize · Esc to cancel</small></> : handle.label}
+          {activeId === handle.id ? <>{shownDistance > 0 ? '+' : ''}{shownDistance} mm{limited ? ' · limit' : ''}
+            {handle.sizes?.map((size, index) => <span className="preview-resize-size" key={index}>{size.label} = {Math.round(size.value * 100) / 100} mm</span>)}
+            <small>Release to resize · Esc to cancel</small></> : handle.label}
         </span>
       </div>)}
     </div>

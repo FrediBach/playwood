@@ -10,6 +10,7 @@ export interface PreviewResizeHandle {
   position: Vec3
   direction: Vec3
   label: string
+  sizes?: { label: string; value: number }[]
 }
 
 export interface PreviewResizeSelection { panelId?: string; connectorId?: string }

@@ -9,6 +9,7 @@
 .preview-resize-anchor.is-active .preview-resize-handle{cursor:grabbing}
 .preview-resize-caption{position:absolute;left:var(--resize-caption-x,var(--resize-x));top:var(--resize-caption-y,calc(var(--resize-y) + 23px));transform:translateX(-50%);display:none;width:max-content;max-width:240px;padding:5px 8px;border:1px solid #e2d8cb;border-radius:5px;background:#fffdf7f5;color:#695847;font-size:11px;font-weight:500;line-height:1.5;text-align:center;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;box-shadow:0 2px 9px #503c2610;pointer-events:none}
 .preview-resize-caption small{display:block;font-size:10px;font-weight:400;color:#857667;white-space:nowrap}
+.preview-resize-size{display:block}
 .preview-resize-handle:hover+.preview-resize-caption,.preview-resize-handle:focus-visible+.preview-resize-caption,.preview-resize-anchor.is-active .preview-resize-caption{display:block}
 .preview-resize-caption.is-limited{border-color:#cfb273;background:#fff8e7;color:#86611c}
 @media(pointer:coarse){.preview-resize-handle{width:38px;height:38px}}
