@@ -168,7 +168,7 @@ function Curtain({ position, height }: { position: Triple; height: number }) {
 
 export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
   const layout = getRoomLayout(bounds)
-  const { floorY, leftX, rightX, backZ, width, depth, height, chairX, chairZ } = layout
+  const { floorY, leftX, rightX, backZ, width, depth, height, chairX, chairZ, artX, artY } = layout
   const centerX = (leftX + rightX) / 2
   const centerZ = backZ + depth / 2
   const oak = useMemo(floorTexture, [])
@@ -183,7 +183,6 @@ export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
   const windowWidth = 2.4
   const windowHeight = 2.25
   const windowBottom = 0.35
-  const artY = Math.max(1.85, bounds.max.y - bounds.min.y + 0.65)
   const rugWidth = Math.max(2.5, bounds.max.x - bounds.min.x + 1.3)
   const rugDepth = Math.max(1.8, bounds.max.z - bounds.min.z + 1.3)
   return <group name="Modern home">
@@ -225,8 +224,8 @@ export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
     <mesh position={[layout.centerX + 0.12, floorY + 0.004, furnitureCenterZ + 0.16]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[rugWidth, rugDepth]} /><meshStandardMaterial map={linen} roughness={1} bumpMap={linen} bumpScale={0.004} color="#ded5c2" />
     </mesh>
-    <Box position={[layout.centerX - 0.05, floorY + artY, backZ + 0.035]} size={[0.85, 1.05, 0.045]} color="#66543f" />
-    <mesh position={[layout.centerX - 0.05, floorY + artY, backZ + 0.059]} receiveShadow><planeGeometry args={[0.806, 1.006]} /><meshStandardMaterial map={art} roughness={1} /></mesh>
+    <Box position={[artX, floorY + artY, backZ + 0.035]} size={[0.85, 1.05, 0.045]} color="#66543f" />
+    <mesh position={[artX, floorY + artY, backZ + 0.059]} receiveShadow><planeGeometry args={[0.806, 1.006]} /><meshStandardMaterial map={art} roughness={1} /></mesh>
 
     <LoungeChair position={[chairX, floorY, chairZ]} />
     <FloorLamp position={[chairX + 0.63, floorY, chairZ - 0.34]} />
