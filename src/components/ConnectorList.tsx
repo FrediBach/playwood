@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { EyeOff, GripVertical, Link2 } from 'lucide-react'
 import { CONNECTORS, CONNECTOR_COLORS } from '@/lib/connector-options'
 import type { getPhysicalConnectors } from '@/lib/connector-selection'
@@ -6,6 +6,8 @@ import type { Panel } from '@/lib/types'
 import { ConnectorGlyph } from './editor-controls'
 import './connector-list.css'
 import { GroupedList, type ListGroupingProps } from './GroupedList'
+
+import { ListFilters, FilterChoices, FilterResults, emptyFilters, filterCount, matchesCommon, matchesChoice } from './ListFilters'
 
 interface Props extends ListGroupingProps {
   connectors: ReturnType<typeof getPhysicalConnectors>
@@ -18,22 +20,30 @@ interface Props extends ListGroupingProps {
 export function ConnectorList({ connectors, panels, selectedIds, onSelect, onSelectAll, ...grouping }: Props) {
   const panelsById = useMemo(() => new Map(panels.map(panel => [panel.id, panel])), [panels])
   const selected = new Set(selectedIds)
+  const [filters, setFilters] = useState(emptyFilters)
+  const filtering = filterCount(filters) > 0
+  const matching = connectors.filter(connector => matchesCommon(filters, `${CONNECTORS.find(type => type.id === connector.type)?.name} ${panelsById.get(connector.connection.parentId)?.name ?? ''} ${panelsById.get(connector.connection.childId)?.name ?? ''}`, connector.color, !!panelsById.get(connector.connection.parentId)?.visible && !!panelsById.get(connector.connection.childId)?.visible, selected.has(connector.id)) && matchesChoice(filters.types, connector.type))
+  const selectMatching = (value: boolean) => filtering ? grouping.onSelectGroup(matching.map(connector => connector.id), value) : onSelectAll(value)
   const selectedCount = connectors.filter(connector => selected.has(connector.id)).length
-  const allSelected = connectors.length > 0 && selectedCount === connectors.length
+  const allSelected = matching.length > 0 && matching.every(connector => selected.has(connector.id))
 
   return <div onKeyDown={event => {
     if ((event.target as HTMLElement).tagName === 'INPUT' && (event.target as HTMLInputElement).type !== 'checkbox') return
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
       event.preventDefault()
-      if (connectors.length) onSelectAll(true)
+      if (matching.length) selectMatching(true)
     }
   }}>
-    <div className="section-label"><span>YOUR CONNECTORS</span><span className="count-badge">{connectors.length.toString().padStart(2, '0')}</span></div>
+    <div className="section-label"><span>YOUR CONNECTORS</span><ListFilters kind="connectors" filters={filters} onChange={setFilters} count={matching.length} total={connectors.length}>
+      <FilterChoices label="Color" colors values={[...new Set(connectors.map(connector => connector.color.toLowerCase()))].sort().map(color => ({ value: color, label: CONNECTOR_COLORS.find(option => option.color === color)?.name ?? color }))} selected={filters.colors} onChange={colors => setFilters({ ...filters, colors })}/>
+      <FilterChoices label="Connector type" values={CONNECTORS.map(type => ({ value: type.id, label: type.name }))} selected={filters.types} onChange={types => setFilters({ ...filters, types })}/>
+    </ListFilters><span className="count-badge">{connectors.length.toString().padStart(2, '0')}</span></div>
     <div className="selection-tools">
       <span aria-live="polite" aria-atomic="true">{selectedCount ? `${selectedCount} selected` : 'Select to edit colors'}</span>
-      <button onClick={() => onSelectAll(!allSelected)} disabled={!connectors.length}>{allSelected ? 'Clear' : 'Select all'}</button>
+      <button onClick={() => selectMatching(!allSelected)} disabled={!matching.length}>{allSelected ? 'Clear' : 'Select all'}</button>
     </div>
-    <GroupedList {...grouping} onSelect={onSelect} items={connectors} selectedIds={selectedIds} kind="connectors"
+    {filtering && <FilterResults count={matching.length} total={connectors.length} onReset={() => setFilters(emptyFilters())}/>}
+    <GroupedList {...grouping} onSelect={onSelect} items={matching} selectedIds={selectedIds} kind="connectors"
       label={connector => `${CONNECTORS.find(type => type.id === connector.type)!.name} connector ${connector.index + 1}: ${panelsById.get(connector.connection.parentId)?.name ?? 'Panel'} ↔ ${panelsById.get(connector.connection.childId)?.name ?? 'Panel'}`}
       renderItem={(connector, handle) => {
         const parent = panelsById.get(connector.connection.parentId)

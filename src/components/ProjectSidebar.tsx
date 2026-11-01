@@ -6,6 +6,8 @@ import { PanelList } from './PanelList'
 import { ConnectorList } from './ConnectorList'
 import { ExampleBrowser } from './ExampleBrowser'
 import './assemblies.css'
+import { getProjectPalette } from '@/lib/custom-colors'
+import { ListFilters, FilterChoices, FilterResults, emptyFilters, filterCount, matchesCommon, matchesChoice } from './ListFilters'
 
 export interface SidebarAssembly { id: string; name: string; definitionName: string; panelIds: string[] }
 export interface LibraryAssembly { id: string; name: string; instanceCount: number; panelCount: number }
@@ -40,11 +42,18 @@ export function ProjectSidebar({panelListProps,connectorListProps,assemblyTab,on
   const tabsId=useId()
   const [expanded,setExpanded]=useState<string[]>([])
   const { panels } = panelListProps
+  const [filters, setFilters] = useState(emptyFilters)
+  const filtering = filterCount(filters) > 0
+  const matchingPanels = panels.filter(panel => matchesCommon(filters, panel.name, panel.color, panel.visible, panelListProps.selectedIds.includes(panel.id)) && matchesChoice(filters.materials, panel.material) && matchesChoice(filters.patterns, panel.pattern) && matchesChoice(filters.thicknesses, String(panel.thickness)) && panel.width * panel.height / 1e6 >= filters.minArea && (filters.maxArea === null || panel.width * panel.height / 1e6 <= filters.maxArea))
+  const matchingIds = new Set(matchingPanels.map(panel => panel.id))
+  const maxArea = Math.max(0.01, Math.ceil(Math.max(0, ...panels.map(panel => panel.width * panel.height / 1e6), filters.minArea, filters.maxArea ?? 0) * 100) / 100)
+  const choices = (values: string[]) => [...new Set(values)].sort().map(value => ({ value, label: value }))
+  const matchingSelected = matchingPanels.filter(panel => panelListProps.selectedIds.includes(panel.id)).length
   const panelsById = new Map(panels.map(panel => [panel.id, panel]))
   const selectedIds = new Set(panelListProps.selectedIds)
   const expandedIds = new Set(expanded)
   const memberIds = new Set(assemblies.flatMap(assembly => assembly.panelIds))
-  const loosePanels = panels.filter(panel => !memberIds.has(panel.id))
+  const loosePanels = matchingPanels.filter(panel => !memberIds.has(panel.id))
   return <aside className="left-sidebar" aria-label="Project panels">
       <div className="sidebar-tabs"><button className={leftTab==='assembly'?'active':''} onClick={()=>setLeftTab('assembly')}>Assembly</button><button className={leftTab==='library'?'active':''} onClick={()=>setLeftTab('library')}>Library</button><IconButton label="Collapse panel list" onClick={onCollapse}><PanelLeftClose size={17}/></IconButton></div>
       {leftTab==='assembly'&&<div className="assembly-subtabs" role="tablist" aria-label="Assembly contents" onKeyDown={event=>{
@@ -59,17 +68,28 @@ export function ProjectSidebar({panelListProps,connectorListProps,assemblyTab,on
       </div>}
       <div className="sidebar-scroll">
         {leftTab==='assembly'?<div role="tabpanel" id={`${tabsId}-contents`} aria-labelledby={`${tabsId}-${assemblyTab}`} tabIndex={0}>
-          {assemblyTab==='connectors'?<ConnectorList {...connectorListProps}/>:<><div className="section-label"><span>{assemblies.length?'YOUR ASSEMBLY':'YOUR PANELS'}</span><span className="count-badge">{panels.length.toString().padStart(2,'0')}</span></div>
-          <div className="selection-tools"><span aria-live="polite" aria-atomic="true">{selectedAssemblyId?'Assembly selected':selectedCount?`${selectedCount} selected`:'Shift-click to select more'}</span><button onClick={onSelectAll} disabled={!panels.length}>{selectedCount===panels.length&&panels.length?'Clear':'Select all'}</button></div>
-          {assemblies.length>0&&<div className="assembly-tree">{assemblies.map(assembly=>{
-            const open=expandedIds.has(assembly.id)
+          {assemblyTab==='connectors'?<ConnectorList {...connectorListProps}/>:<><div className="section-label"><span>{assemblies.length?'YOUR ASSEMBLY':'YOUR PANELS'}</span><ListFilters kind="panels" filters={filters} onChange={setFilters} count={matchingPanels.length} total={panels.length}>
+            <FilterChoices label="Color" colors values={choices(panels.map(panel => panel.color.toLowerCase())).map(option => ({ ...option, label: getProjectPalette({}).find(color => color.color.toLowerCase() === option.value)?.name ?? option.value }))} selected={filters.colors} onChange={colors => setFilters({ ...filters, colors })}/>
+            <FilterChoices label="Material" values={choices(panels.map(panel => panel.material))} selected={filters.materials} onChange={materials => setFilters({ ...filters, materials })}/>
+            <FilterChoices label="Pattern" values={choices(panels.map(panel => panel.pattern))} selected={filters.patterns} onChange={patterns => setFilters({ ...filters, patterns })}/>
+            <FilterChoices label="Thickness" values={choices(panels.map(panel => String(panel.thickness))).map(option => ({ ...option, label: `${option.value} mm` }))} selected={filters.thicknesses} onChange={thicknesses => setFilters({ ...filters, thicknesses })}/>
+            <fieldset className="filter-field filter-area"><legend>Panel size · m²</legend>
+              <label>From {filters.minArea.toFixed(2)}<input aria-label="Minimum panel area" type="range" min="0" max={maxArea} step="0.01" value={filters.minArea} onChange={event => setFilters({ ...filters, minArea: Math.min(Number(event.target.value), filters.maxArea ?? maxArea) })}/></label>
+              <label>To {(filters.maxArea ?? maxArea).toFixed(2)}<input aria-label="Maximum panel area" type="range" min="0" max={maxArea} step="0.01" value={filters.maxArea ?? maxArea} onChange={event => setFilters({ ...filters, maxArea: Math.max(filters.minArea, Number(event.target.value)) })}/></label>
+              <small>Width × height, before cutouts.</small>
+            </fieldset>
+          </ListFilters><span className="count-badge">{panels.length.toString().padStart(2,'0')}</span></div>
+          <div className="selection-tools"><span aria-live="polite" aria-atomic="true">{selectedAssemblyId?'Assembly selected':selectedCount?`${selectedCount} selected`:'Shift-click to select more'}</span><button onClick={() => filtering ? panelListProps.onSelectGroup(matchingPanels.map(panel => panel.id), matchingSelected !== matchingPanels.length) : onSelectAll()} disabled={!matchingPanels.length}>{matchingSelected===matchingPanels.length&&matchingPanels.length?'Clear':'Select all'}</button></div>
+          {filtering && <FilterResults count={matchingPanels.length} total={panels.length} onReset={() => setFilters(emptyFilters())}/>}
+          {assemblies.length>0&&<div className="assembly-tree">{assemblies.filter(assembly => !filtering || assembly.panelIds.some(id => matchingIds.has(id))).map(assembly=>{
+            const open=filtering || expandedIds.has(assembly.id)
             const selected=selectedAssemblyId===assembly.id||assembly.panelIds.length>0&&assembly.panelIds.every(id=>selectedIds.has(id))
             return <div className={`assembly-tree-item ${selected?'is-selected':''}`} key={assembly.id} data-assembly-id={assembly.id}>
               <div className="assembly-tree-row"><button className="assembly-tree-toggle" aria-label={`${open?'Collapse':'Expand'} ${assembly.name}`} aria-expanded={open} onClick={()=>setExpanded(ids=>open?ids.filter(id=>id!==assembly.id):[...ids,assembly.id])}>{open?<ChevronDown size={14}/>:<ChevronRight size={14}/>}</button>
                 <button className="assembly-tree-select" aria-label={`Select assembly ${assembly.name}`} aria-pressed={selected} onClick={()=>onSelectAssembly?.(assembly.id)}><Box size={20}/><span><strong>{assembly.name}</strong><small>{assembly.definitionName} · {assembly.panelIds.length} panels</small></span></button></div>
               {open&&<div className="assembly-tree-children">{assembly.panelIds.map(id=>{
                 const panel=panelsById.get(id)
-                if(!panel)return null
+                if(!panel || !matchingIds.has(id))return null
                 return <button key={id} className={`assembly-tree-panel ${!selected&&selectedIds.has(id)?'is-selected':''}`} aria-label={`Select panel ${panel.name} in ${assembly.name}`} aria-pressed={!selected&&selectedIds.has(id)} onClick={()=>onSelectAssemblyPanel?.(id)}><span className="assembly-tree-panel-color" style={{background:panel.color}}/><span>{panel.name}</span></button>
               })}</div>}
             </div>
