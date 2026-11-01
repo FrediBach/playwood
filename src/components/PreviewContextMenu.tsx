@@ -1,9 +1,11 @@
 import { useEffectEvent, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import type { LucideIcon } from 'lucide-react'
 import './preview-context-menu.css'
 
 export interface PreviewMenuAction {
   label: string
+  icon: LucideIcon
   run: () => void
   danger?: boolean
   disabled?: boolean
@@ -46,7 +48,8 @@ export function PreviewContextMenu({ x, y, title, actions, onClose, ariaLabel = 
     }}>
     <div className="preview-context-title">{title}</div>
     {actions.map((action, index) => <button key={`${index}-${action.label}`} role="menuitem" aria-disabled={action.disabled || undefined} className={action.danger ? 'is-destructive' : undefined} onClick={() => { if (action.disabled) return; onClose(); action.run() }}>
-      {action.label}
+      <action.icon size={16} strokeWidth={1.75} aria-hidden="true" focusable="false"/>
+      <span>{action.label}</span>
     </button>)}
   </div>, document.body)
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronRight, Folder, FolderPlus, Pencil } from 'lucide-react'
+import { ChevronDown, ChevronRight, Folder, FolderPlus, FolderInput, FolderMinus, Pencil, Ungroup } from 'lucide-react'
 import type { ListGroup } from '@/lib/types'
 import { PreviewContextMenu, type PreviewMenuAction } from './PreviewContextMenu'
 import './grouped-list.css'
@@ -129,13 +129,13 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
   const menuActions: PreviewMenuAction[] = []
   if (menu?.groupId) {
     const groupId = menu.groupId
-    menuActions.push({ label: 'Rename group', run: () => setEditingId(groupId) }, { label: 'Ungroup', run: () => onUngroup(groupId) })
+    menuActions.push({ label: 'Rename group', icon: Pencil, run: () => setEditingId(groupId) }, { label: 'Ungroup', icon: Ungroup, run: () => onUngroup(groupId) })
   } else if (menu?.ids.length) {
-    menuActions.push({ label: 'Group selected', disabled: menu.ids.length < 2, run: () => createGroup(menu.ids) })
-    for (const group of groups) menuActions.push({ label: `Move to ${group.name}`, disabled: menu.ids.every(id => membership.get(id) === group.id), run: () => onMove(menu.ids, group.id, null) })
-    if (menu.ids.some(id => membership.has(id))) menuActions.push({ label: 'Remove from group', run: () => onMove(menu.ids, null, null) })
+    menuActions.push({ label: 'Group selected', icon: FolderPlus, disabled: menu.ids.length < 2, run: () => createGroup(menu.ids) })
+    for (const group of groups) menuActions.push({ label: `Move to ${group.name}`, icon: FolderInput, disabled: menu.ids.every(id => membership.get(id) === group.id), run: () => onMove(menu.ids, group.id, null) })
+    if (menu.ids.some(id => membership.has(id))) menuActions.push({ label: 'Remove from group', icon: FolderMinus, run: () => onMove(menu.ids, null, null) })
   }
-  if (!menu?.groupId) menuActions.push({ label: 'New group', run: () => createGroup([]) })
+  if (!menu?.groupId) menuActions.push({ label: 'New group', icon: FolderPlus, run: () => createGroup([]) })
   const dragged = sort?.active ? items.find(item => item.id === sort.id) : undefined
   return <div ref={listRef} className={`grouped-list ${sort?.active ? 'is-sorting' : ''}`} onContextMenu={event => {
     if ((event.target as HTMLElement).closest('input[type=text], input:not([type])')) return
