@@ -3,3 +3,4 @@
 .preview-context-menu button { display: block; width: 100%; border: 0; background: transparent; padding: 8px 10px; border-radius: 5px; text-align: left; font: inherit; font-size: 13px; color: #30332b; cursor: pointer; }
 .preview-context-menu button:hover, .preview-context-menu button:focus-visible { background: #eeede6; outline: none; }
 .preview-context-menu button.is-destructive { color: #b43d27; }
+.preview-context-menu button[aria-disabled="true"] { color: #77776d; cursor: default; }

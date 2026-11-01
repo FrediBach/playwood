@@ -193,18 +193,27 @@ function ensureValid(next: Project, previous?: Project, collisionIds?: Set<strin
   return next
 }
 
-export function createAssembly(project: Project, selectedPanelIds: readonly string[], name = 'Box', parameters: AssemblyParameter[] = []): Project {
+export function assemblySelectionError(project: Project, selectedPanelIds: readonly string[]): string {
   const ids = new Set(selectedPanelIds)
   const panels = resolvePanels(project).filter(panel => ids.has(panel.id))
-  if (panels.length < 2) throw new Error('Select at least two connected panels to create an assembly.')
-  if (panels.some(panel => getAssemblyInstance(project, panel.id))) throw new Error('These panels already belong to an assembly. Edit its source or make it independent.')
-  if (project.connections.some(connection => ids.has(connection.parentId) !== ids.has(connection.childId))) throw new Error('Select the complete connected assembly, including every connected panel.')
+  if (panels.length < 2) return 'Select at least two connected panels to create an assembly.'
+  if (panels.some(panel => getAssemblyInstance(project, panel.id))) return 'These panels already belong to an assembly. Edit its source or make it independent.'
+  if (project.connections.some(connection => ids.has(connection.parentId) !== ids.has(connection.childId))) return 'Select the complete connected assembly, including every connected panel.'
   const connections = project.connections.filter(connection => ids.has(connection.parentId) && ids.has(connection.childId))
   const reached = new Set([panels[0].id])
   for (let changed = true; changed;) { changed = false; for (const connection of connections) if (reached.has(connection.parentId) || reached.has(connection.childId)) {
     for (const id of [connection.parentId, connection.childId]) if (!reached.has(id)) { reached.add(id); changed = true }
   } }
-  if (reached.size !== panels.length) throw new Error('An assembly must be one connected set of panels.')
+  if (reached.size !== panels.length) return 'An assembly must be one connected set of panels.'
+  return ''
+}
+
+export function createAssembly(project: Project, selectedPanelIds: readonly string[], name = 'Box', parameters: AssemblyParameter[] = []): Project {
+  const error = assemblySelectionError(project, selectedPanelIds)
+  if (error) throw new Error(error)
+  const ids = new Set(selectedPanelIds)
+  const panels = resolvePanels(project).filter(panel => ids.has(panel.id))
+  const connections = project.connections.filter(connection => ids.has(connection.parentId) && ids.has(connection.childId))
   const bounds = getProjectBounds(panels), center = tuple(v(bounds.min).add(v(bounds.max)).multiplyScalar(0.5))
   const local = panels.map(panel => ({ ...panel, position: tuple(v(panel.position).sub(v(center))) }))
   let definition: AssemblyDefinition = { id: uid(), name: name.trim().slice(0, 120) || 'Assembly', panels: local, connections: connections.map(connection => ({ ...connection })), ports: inferPorts(local, connections) }

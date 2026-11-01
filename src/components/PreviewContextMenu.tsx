@@ -6,6 +6,7 @@ export interface PreviewMenuAction {
   label: string
   run: () => void
   danger?: boolean
+  disabled?: boolean
 }
 
 export function PreviewContextMenu({ x, y, title, actions, onClose, ariaLabel = 'Preview actions' }: {
@@ -44,6 +45,8 @@ export function PreviewContextMenu({ x, y, title, actions, onClose, ariaLabel = 
       }
     }}>
     <div className="preview-context-title">{title}</div>
-    {actions.map((action, index) => <button key={`${index}-${action.label}`} role="menuitem" className={action.danger ? 'is-destructive' : undefined} onClick={() => { onClose(); action.run() }}>{action.label}</button>)}
+    {actions.map((action, index) => <button key={`${index}-${action.label}`} role="menuitem" aria-disabled={action.disabled || undefined} className={action.danger ? 'is-destructive' : undefined} onClick={() => { if (action.disabled) return; onClose(); action.run() }}>
+      {action.label}
+    </button>)}
   </div>, document.body)
 }

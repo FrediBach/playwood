@@ -50,7 +50,7 @@ import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { usePreviewDrag } from '@/hooks/use-preview-drag'
 import { usePreviewResize } from '@/hooks/use-preview-resize'
 import type { BoxSelection } from '@/components/PreviewBoxSelection'
-import { duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, isPanelConnectedToAssembly, moveAssemblies, removeAssembly } from '@/lib/assemblies'
+import { assemblySelectionError, duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, isPanelConnectedToAssembly, moveAssemblies, removeAssembly } from '@/lib/assemblies'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, moveProject, rotateProject, validateProject } from '@/lib/model'
@@ -67,7 +67,7 @@ export default function App() {
   const setSelectedId=useCallback((id:string|null)=>setSelectedIds(id?[id]:[]),[])
   const [contextMenu,setContextMenu]=useState<{x:number;y:number}|null>(null)
   const closeContextMenu=useCallback(()=>setContextMenu(null),[])
-  const [toolRequest,setToolRequest]=useState<{tool:'grid'|'parallel';selection:string;token:number}>()
+  const [toolRequest,setToolRequest]=useState<{tool:'grid'|'parallel'|'assembly';selection:string;token:number}>()
   const [inspectorTab,setInspectorTab]=useState<'panel'|'attach'>('panel')
   const [assemblyTab,setAssemblyTab]=useState<ListKind>('panels')
   const [dialog,setDialog]=useState<ProjectDialog>(null)
@@ -501,11 +501,19 @@ export default function App() {
     setLeftOpen(true)
   }
 
+  const canMenuAutoConnect = useMemo(() => {
+    if (!contextMenu || inspectingConnectors || assembly.editingInstance || project.panels.length < 2) return false
+    try {
+      const result = autoConnect(project, selectedIds)
+      return result.joints > 0 || !!getAutoConnectFit(result.project, selectedIds)
+    } catch { return false }
+  }, [contextMenu, inspectingConnectors, assembly.editingInstance, project, selectedIds])
+
   const menuActions: PreviewMenuAction[] = []
-  const menuAction = (label: string, run: () => void, danger = false) => menuActions.push({ label, run, danger })
+  const menuAction = (label: string, run: () => void, danger = false, disabled = false) => menuActions.push({ label, run, danger, disabled })
   if (inspectingConnectors) {
-    if(connectorPanelFit.result&&!assembly.editingInstance&&!modalOpen)menuAction('Connect with a panel',connectWithPanel)
-    menuAction('Group selected',()=>groupSelected('connectors',selectedConnectorIds))
+    if(!assembly.editingInstance&&!modalOpen)menuAction('Connect with a panel',connectWithPanel,false,!connectorPanelFit.result)
+    menuAction('Group selected',()=>groupSelected('connectors',selectedConnectorIds),false,selectedConnectorIds.length<2)
     menuAction('Inspect connectors',()=>setRightOpen(true))
     menuAction('Remove connectors',removeSelectedConnectors,true)
   } else if (assembly.editingInstance) {
@@ -520,14 +528,19 @@ export default function App() {
         if (project.assemblies?.links.some(link=>link.a.instanceId===instance.id||link.b.instanceId===instance.id)) menuAction('Disconnect from neighbors',()=>assembly.disconnect(instance.id))
         menuAction('Make independent',()=>assembly.independent(instance.id))
         menuAction('Disassemble',()=>assembly.disassemble(instance.id))
+      } else if (assembly.memberInstance) {
+        const memberInstance = assembly.memberInstance
+        menuAction('Select assembly',()=>assembly.select(memberInstance.id))
+        menuAction('Edit assembly',()=>assembly.edit(memberInstance.id))
       } else if (!assembly.hasMembers) {
-        menuAction('Group selected',()=>groupSelected('panels',selectedIds))
+        menuAction('Group selected',()=>groupSelected('panels',selectedIds),false,selectedPanels.length<2)
         if (selected) menuAction('Attach panel',startAttach)
-        if (selected&&groundPanelFit.result) menuAction('Extend to ground',extendToGround)
+        menuAction('Extend to ground',extendToGround,false,!groundPanelFit.result)
+        if (selectedPanels.length>1) menuAction('Create assembly',()=>{setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'assembly',selection:selectedIds.join('/'),token:Date.now()})},false,!!assemblySelectionError(project,selectedIds))
         if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Disconnect panels',detachSelection)
         if (splitCounts.includes(1)) menuAction('Split in the middle',()=>splitSelection())
         if (gridCut) menuAction('Divide into a grid',()=>{setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'grid',selection:selectedIds.join('/'),token:Date.now()})})
-        if (parallelPanelCut(selectedPanels)) menuAction('Split x times',()=>{setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'parallel',selection:selectedIds.join('/'),token:Date.now()})})
+        if (parallelPanelCut(selectedPanels)) menuAction('Split x times',()=>{setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'parallel',selection:selectedIds.join('/'),token:Date.now()})},false,checkingSplits||!splitCounts.length)
       }
       if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`Fill hole · ${hole.label}`,()=>closeHole(hole.id))
       if (!assembly.memberInstance || instance) {
@@ -536,10 +549,10 @@ export default function App() {
         menuAction('Delete selection',deleteSelected,true)
       }
     } else menuAction('Add panel',addPanel)
-    if (panels.length>1) menuAction('Auto-connect',addAutoConnectors)
+    if (panels.length>1) menuAction('Auto-connect',addAutoConnectors,false,!canMenuAutoConnect)
   }
-  if (panels.length) menuAction('Select all panels',()=>selectAll())
-  menuAction('Fit view',()=>setFitSignal(v=>v+1))
+  if (panels.length) menuAction('Select all panels',()=>selectAll(),false,!inspectingConnectors&&(assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):panels.map(panel=>panel.id)).every(id=>selectedIdSet.has(id)))
+  menuAction('Fit view',()=>setFitSignal(v=>v+1),false,!hasVisiblePanels)
 
   const buildTools = !assembly.editingInstance && !clipboard.active && !assembly.placementActive && inspectorTab==='panel' && selectedPanels.length>0 ? <section className="inspector-section inspector-build-tools" aria-label="Build tools" key={`tools:${selectedIds.join('/')}`}>
     <div className="section-title"><h2>Build tools</h2><Plus size={16}/></div>
@@ -547,7 +560,7 @@ export default function App() {
     {!assembly.hasMembers&&parallelPanelCut(selectedPanels)&&<InspectorDisclosure openRequest={toolRequest?.tool==='parallel'&&toolRequest.selection===selectedIds.join('/')?toolRequest.token:0} focusTarget="select" title="Divide evenly" summary="Add equally spaced dividers" lazy><ParallelPanelSplit counts={splitCounts} checking={checkingSplits} onSplit={splitSelection}/></InspectorDisclosure>}
     {(instance||!assembly.hasMembers)&&holes.length>0&&<InspectorDisclosure title="Close holes" summary={`${holes.length} ${holes.length===1?'opening':'openings'} available`} lazy><CloseHoles holes={holes} assembly={!!instance} onClose={closeHole}/></InspectorDisclosure>}
     <InspectorDisclosure title="Auto-add connectors" summary="Connect matching or nearly fitting edges" lazy><p className="field-note">{selectedPanels.length>1?'Connect matching edges between selected panels.':'Connect this panel to matching nearby edges.'} If a small size change is needed, review it before applying. Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2||modalOpen}><Link2 size={15}/>Auto-add connectors</Button></InspectorDisclosure>
-    {!assembly.hasMembers&&selectedPanels.length>1&&<InspectorDisclosure title="Create assembly" summary="Reuse these panels as linked copies" lazy><CreateAssemblyForm panelCount={selectedPanels.length} panels={selectedPanels} onCreate={assembly.create}/></InspectorDisclosure>}
+    {!assembly.hasMembers&&selectedPanels.length>1&&<InspectorDisclosure openRequest={toolRequest?.tool==='assembly'&&toolRequest.selection===selectedIds.join('/')?toolRequest.token:0} focusTarget="input" title="Create assembly" summary="Reuse these panels as linked copies" lazy><CreateAssemblyForm panelCount={selectedPanels.length} panels={selectedPanels} onCreate={assembly.create}/></InspectorDisclosure>}
   </section> : undefined
   const fittedConnectorPanel=connectorPanelFit.result?.project.panels.find(panel=>panel.id===connectorPanelFit.result?.panelId)
 
