@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { test, expect, type Page } from '@playwright/test'
 import type { Project } from '../src/lib/types'
 
@@ -55,6 +56,7 @@ test('distinct plinth examples load editable assemblies, support undo and persis
   const library = page.getByRole('complementary', { name: 'Project panels' })
   await library.getByRole('searchbox', { name: 'Search examples' }).fill('plinth')
   await library.locator('[data-example-id="plinth-closed-tall"]').click()
+  await page.getByRole('dialog', { name: 'Replace current project?' }).getByRole('button', { name: 'Replace project', exact: true }).click()
   await expect(page.locator('.project-name')).toHaveText('Tall closed plinth')
   await expect.poll(async () => (await savedProject(page))?.name).toBe('Tall closed plinth')
   const tall = (await savedProject(page))!
@@ -66,6 +68,16 @@ test('distinct plinth examples load editable assemblies, support undo and persis
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('searchbox', { name: 'Search examples' }).fill('plinth')
   await dialog.locator('[data-example-id="plinth-closed-low"]').click()
+  const confirmation = page.getByRole('dialog', { name: 'Replace current project?' })
+  await expect(confirmation).toBeVisible()
+  await expect(page.locator('.project-name')).toHaveText('Tall closed plinth')
+  expect(await savedProject(page)).toEqual(tall)
+  await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(dialog.getByRole('searchbox', { name: 'Search examples' })).toBeVisible()
+  expect(await savedProject(page)).toEqual(tall)
+  await dialog.getByRole('searchbox', { name: 'Search examples' }).fill('plinth')
+  await dialog.locator('[data-example-id="plinth-closed-low"]').click()
+  await confirmation.getByRole('button', { name: 'Replace project', exact: true }).click()
   await expect(dialog).not.toBeVisible()
   await expect.poll(async () => (await savedProject(page))?.name).toBe('Low closed plinth')
   const low = (await savedProject(page))!
@@ -91,7 +103,58 @@ test('distinct plinth examples load editable assemblies, support undo and persis
   await expect(page.locator('canvas')).toBeVisible()
 })
 
-test('mobile library and narrow template dialog keep the catalog scrollable inside the viewport', async ({ page }) => {
+test('full builds preserve the current project until replacement is confirmed', async ({ page }) => {
+  await page.goto('/')
+  await expect.poll(async () => (await savedProject(page))?.name, { timeout: 15000 }).toBe('The everyday shelf')
+  const original = (await savedProject(page))!
+  const undo = page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' })
+  await expect(undo).toBeDisabled()
+  await page.getByRole('button', { name: 'Library', exact: true }).click()
+  const library = page.getByRole('complementary', { name: 'Project panels' })
+  await library.getByRole('searchbox', { name: 'Search examples' }).fill('plinth')
+  const card = library.locator('[data-example-id="plinth-closed-tall"]')
+  const confirmation = page.getByRole('dialog', { name: 'Replace current project?' })
+
+  await card.click()
+  await expect(confirmation).toBeVisible()
+  await expect(page.locator('.project-name')).toHaveText(original.name)
+  expect(await savedProject(page)).toEqual(original)
+  await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(confirmation).not.toBeVisible()
+  await expect(card).toBeFocused()
+  await expect(undo).toBeDisabled()
+  expect(await savedProject(page)).toEqual(original)
+
+  await card.click()
+  await expect(confirmation).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(confirmation).not.toBeVisible()
+  await expect(card).toBeFocused()
+  await expect(page.locator('.project-name')).toHaveText(original.name)
+  await expect(undo).toBeDisabled()
+  expect(await savedProject(page)).toEqual(original)
+
+  await card.click()
+  const downloadPromise = page.waitForEvent('download')
+  await confirmation.getByRole('button', { name: 'Export current project', exact: true }).click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toMatch(/\.playwood\.json$/)
+  expect(JSON.parse(await readFile((await download.path())!, 'utf8'))).toEqual(original)
+  await expect(confirmation).toBeVisible()
+  await expect(page.locator('.project-name')).toHaveText(original.name)
+  expect(await savedProject(page)).toEqual(original)
+
+  await confirmation.getByRole('button', { name: 'Replace project', exact: true }).click()
+  await expect(confirmation).not.toBeVisible()
+  await expect(page.locator('.project-name')).toHaveText('Tall closed plinth')
+  await expect.poll(async () => (await savedProject(page))?.name).toBe('Tall closed plinth')
+  await undo.click()
+  await expect(page.locator('.project-name')).toHaveText(original.name)
+  await expect.poll(() => savedProject(page)).toEqual(original)
+  await expect(undo).toBeDisabled()
+})
+
+test('mobile library and templates stay scrollable and confirm blank canvas replacement', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await page.getByRole('button', { name: 'Open panel list', exact: true }).click()
@@ -121,6 +184,19 @@ test('mobile library and narrow template dialog keep the catalog scrollable insi
   }))).toEqual({ fits: true, horizontalOverflow: false, canScroll: true, scrolled: true })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBe(true)
   await page.screenshot({ path: 'test-results/library-dialog-mobile.png' })
+
+  await dialog.locator('[data-example-id="blank"]').click()
+  const confirmation = page.getByRole('dialog', { name: 'Replace current project?' })
+  await expect(confirmation).toBeVisible()
+  await expect(page.locator('.project-name')).toHaveText('The everyday shelf')
+  await expect(confirmation.getByRole('button', { name: 'Cancel', exact: true })).toBeInViewport()
+  const replace = confirmation.getByRole('button', { name: 'Replace project', exact: true })
+  await expect(replace).toBeInViewport()
+  await page.screenshot({ path: 'test-results/library-replace-mobile.png' })
+  await replace.click()
+  await expect(confirmation).not.toBeVisible()
+  await expect(page.locator('.project-name')).toHaveText('Untitled project')
+  await expect.poll(async () => (await savedProject(page))?.panels.length).toBe(0)
 })
 
 test('diamond shelf loads from its own preview, keeps the 45-degree build, and supports undo and reload', async ({ page }) => {
@@ -133,6 +209,7 @@ test('diamond shelf loads from its own preview, keeps the 45-degree build, and s
   await expect(card.locator('svg polygon').first()).toBeVisible()
   await page.screenshot({ path: 'test-results/diamond-shelf-library.png' })
   await card.click()
+  await page.getByRole('dialog', { name: 'Replace current project?' }).getByRole('button', { name: 'Replace project', exact: true }).click()
   await expect(page.locator('.project-name')).toHaveText('Diamond shelf')
   await expect(page.locator('[data-assembly-id]')).toHaveCount(4)
   await expect.poll(async () => (await savedProject(page))?.name).toBe('Diamond shelf')
@@ -178,6 +255,7 @@ test('assembly collection inserts reusable modules without replacing the build',
   await expect(library.locator('[data-example-id]')).toHaveCount(4)
   await library.getByRole('searchbox').fill('')
   await library.getByRole('button', { name: 'Cube module', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Replace current project?' })).toHaveCount(0)
   await expect.poll(async () => (await savedProject(page))?.assemblies?.instances.length).toBe(1)
   const inserted = (await savedProject(page))!
   expect(inserted.name).toBe('The everyday shelf')
@@ -195,6 +273,7 @@ test('assembly collection inserts reusable modules without replacing the build',
   await dialog.getByRole('button', { name: 'Assemblies', exact: true }).click()
   await expect(dialog.locator('[data-example-id]')).toHaveCount(12)
   await dialog.locator('[data-example-id="assembly-double-cubby"]').click()
+  await page.getByRole('dialog', { name: 'Replace current project?' }).getByRole('button', { name: 'Replace project', exact: true }).click()
   await expect.poll(async () => (await savedProject(page))?.name).toBe('Double cubby')
   await page.reload()
   await expect(page.locator('[data-assembly-id]')).toHaveCount(1)

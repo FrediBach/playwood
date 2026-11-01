@@ -42,6 +42,7 @@ test('modular shelf inserts fill their compartments in the library and exported 
   await page.getByRole('button', { name: 'Library', exact: true }).click()
   await page.getByRole('searchbox', { name: 'Search examples' }).fill('modular rectangular')
   await page.locator('[data-example-id="modular-shelf"]').click()
+  await page.getByRole('dialog', { name: 'Replace current project?' }).getByRole('button', { name: 'Replace project', exact: true }).click()
   await expect(page.locator('.project-name')).toHaveText('Modular rectangular shelf')
   await expect.poll(async () => dividerHeights(await savedProject(page))).toEqual([367, 367, 367, 367])
   expectSupportedDividers((await savedProject(page))!)

@@ -49,7 +49,7 @@ import { duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, is
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, rotateProject, validateProject } from '@/lib/model'
-import type { AssemblyDefinition, AttachmentOptions, CameraView, Panel, Vec3, ListKind } from '@/lib/types'
+import type { AssemblyDefinition, AttachmentOptions, CameraView, Panel, Project, Vec3, ListKind } from '@/lib/types'
 
 const INITIAL_ATTACHMENT: AttachmentOptions = {side:'right',type:'90',offset:0,inset:0,flip:false,color:DEFAULT_CONNECTOR_COLOR,count:2}
 function download(content:string,name:string,type:string) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
@@ -66,6 +66,7 @@ export default function App() {
   const [inspectorTab,setInspectorTab]=useState<'panel'|'attach'>('panel')
   const [assemblyTab,setAssemblyTab]=useState<ListKind>('panels')
   const [dialog,setDialog]=useState<ProjectDialog>(null)
+  const [pendingTemplate,setPendingTemplate]=useState<{id:string;project:Project;returnTo:ProjectDialog}|null>(null)
   const [draft,setDraft]=useState(()=>createPanel({name:'My panel',width:600,height:360,thickness:18}))
   const projectPalette=useMemo(()=>getProjectPalette({customColors:project.customColors}),[project.customColors])
   const previousPalette=useRef(projectPalette)
@@ -412,9 +413,11 @@ export default function App() {
       position: [0, 0, 0], rotation: [0, 0, 0], panelIds: {},
     } })
   }
-  const loadTemplate=(template:string)=>{const next=createExampleProject(template);commit(next);assembly.close();const instance=next.assemblies?.instances[0];setSelectedIds(instance?Object.values(instance.panelIds):next.panels.slice(0,1).map(p=>p.id));setInspectorTab('panel');setDialog(null);setExploded(false);setFitSignal(v=>v+1);notify(template==='blank'?'A fresh start. Add your first panel.':'Template loaded. Make it your own.')}
+  const loadTemplate=(template:string)=>{setPendingTemplate({id:template,project:createExampleProject(template),returnTo:dialog});setDialog('replace')}
+  const applyTemplate=(template:string,next:Project)=>{clipboard.cancel();commit(next);assembly.close();const instance=next.assemblies?.instances[0];setSelectedIds(instance?Object.values(instance.panelIds):next.panels.slice(0,1).map(p=>p.id));setInspectorTab('panel');setDialog(null);setPendingTemplate(null);setExploded(false);setFitSignal(v=>v+1);notify(template==='blank'?'A fresh start. Add your first panel.':'Template loaded. Make it your own.')}
+  const closeProjectDialog=()=>{setDialog(dialog==='replace'?pendingTemplate?.returnTo??null:null);setPendingTemplate(null)}
   const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
-  const startNewProject=()=>{clipboard.cancel();closeContextMenu();loadTemplate('blank');setRealisticPreview(false);setView('perspective');setAttachTarget('new');setAttachment(INITIAL_ATTACHMENT);setImportError('');notify('New project started. Undo to restore your previous project.')}
+  const startNewProject=()=>{closeContextMenu();applyTemplate('blank',createExampleProject('blank'));setRealisticPreview(false);setView('perspective');setAttachTarget('new');setAttachment(INITIAL_ATTACHMENT);setImportError('');notify('New project started. Undo to restore your previous project.')}
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
   const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=repairLegacyShelf(imported);const repaired=repairLegacyExampleInserts(shelf);commit(repaired);assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
   const instance=assembly.selectedInstance
@@ -604,7 +607,8 @@ export default function App() {
     <ProjectStatus panelCount={project.panels.length} connectorCount={connectorCount} issueCount={issues.length} bounds={bounds} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')}/>
     {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
 
-    <ProjectDialogs onNew={startNewProject} dialog={dialog} onClose={()=>setDialog(null)} draft={draft} setDraft={setDraft} loadTemplate={loadTemplate}
+    <ProjectDialogs onNew={startNewProject} dialog={dialog} onClose={closeProjectDialog} draft={draft} setDraft={setDraft} loadTemplate={loadTemplate}
+      replacementName={pendingTemplate?.project.name??''} onReplace={()=>{if(pendingTemplate)applyTemplate(pendingTemplate.id,pendingTemplate.project)}}
       exportProject={exportProject} onExportParts={()=>{download(projectToCsv(project),`${exportName}-parts.csv`,'text/csv');notify('Parts list exported')}}
       onImport={()=>importRef.current?.click()} importError={importError} project={project} panels={panels} connectorCount={connectorCount} issues={issues}
       onRotate={(axis,degrees)=>{commit(p=>rotateProject(p,axis,degrees));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify(`Creation rotated ${degrees}° around ${axis.toUpperCase()}. Undo is available.`)}}

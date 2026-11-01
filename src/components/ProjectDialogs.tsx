@@ -11,11 +11,13 @@ import { MATERIALS } from '@/lib/materials'
 import { CONNECTORS } from '@/lib/connector-options'
 import type { Panel, Project, ValidationIssue } from '@/lib/types'
 
-export type ProjectDialog = 'new' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | null
+export type ProjectDialog = 'new' | 'replace' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | null
 interface Props {
   dialog: ProjectDialog
   onClose: () => void
   onNew: () => void
+  onReplace: () => void
+  replacementName: string
   onAdd: () => void
   attachNewPanel: boolean
   onRotate: ComponentProps<typeof RotateCreation>['onRotate']
@@ -47,6 +49,7 @@ export function ProjectDialogs(props: Props) {
 function DialogBody(props: Props) {
   switch (props.dialog) {
     case 'new': return <NewProjectDialog {...props}/>
+    case 'replace': return <ReplaceProjectDialog {...props}/>
     case 'rotate': return <RotateDialog {...props}/>
     case 'add': return <AddDialog {...props}/>
     case 'templates': return <TemplatesDialog {...props}/>
@@ -61,6 +64,10 @@ function NewProjectDialog({onClose,onNew,exportProject,project}: Pick<Props, 'on
   return <><DialogTitle>Start a new project?</DialogTitle><DialogDescription>This will replace “{project.name}” with an empty workspace, including its saved copy in this browser. Export your current project first to keep a separate copy. You can undo this change until you reload or close the app.</DialogDescription><Button variant="outline" onClick={exportProject}><Download size={17}/>Export current project</Button><div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={onNew}>Start new project</Button></div></>
 }
 
+function ReplaceProjectDialog({onClose,onReplace,exportProject,project,replacementName}: Pick<Props, 'onClose' | 'onReplace' | 'exportProject' | 'project' | 'replacementName'>) {
+  return <><DialogTitle>Replace current project?</DialogTitle><DialogDescription>This will replace “{project.name}” with “{replacementName}”, including its saved copy in this browser. Export your current project first to keep a separate copy. You can undo this change until you reload or close the app.</DialogDescription><Button variant="outline" onClick={exportProject}><Download size={17}/>Export current project</Button><div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={onReplace}>Replace project</Button></div></>
+}
+
 function RotateDialog({onClose,onRotate}: Pick<Props, 'onClose' | 'onRotate'>) {
   return <RotateCreation onCancel={onClose} onRotate={onRotate}/>
 }
@@ -70,7 +77,7 @@ function AddDialog({draft,setDraft,onClose,onAdd,attachNewPanel}: Pick<Props, 'd
 }
 
 function TemplatesDialog({loadTemplate}: Pick<Props, 'loadTemplate'>) {
-  return <><span className="dialog-eyebrow">A FEW GOOD STARTING POINTS</span><DialogTitle>Simple parts. Endless possibilities.</DialogTitle><DialogDescription>Choose a full build or reusable assembly and make it your own. You can undo switching templates.</DialogDescription><ExampleBrowser onSelect={loadTemplate}/></>
+  return <><span className="dialog-eyebrow">A FEW GOOD STARTING POINTS</span><DialogTitle>Simple parts. Endless possibilities.</DialogTitle><DialogDescription>Choose a full build or reusable assembly and make it your own. You’ll be asked to confirm before replacing your current project.</DialogDescription><ExampleBrowser onSelect={loadTemplate}/></>
 }
 
 function ExportDialog({exportProject,onExportParts,onImport,importError}: Pick<Props, 'exportProject' | 'onExportParts' | 'onImport' | 'importError'>) {

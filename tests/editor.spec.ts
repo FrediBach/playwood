@@ -45,6 +45,7 @@ test('templates, dimensions, camera and exports work without outer scrolling', a
   await page.getByRole('button', { name: 'Fit assembly (F)' }).click()
   await page.getByRole('button', { name: 'Templates', exact: true }).click()
   await page.getByRole('button', { name: /Creative display Put your creativity/ }).click()
+  await page.getByRole('dialog', { name: 'Replace current project?' }).getByRole('button', { name: 'Replace project', exact: true }).click()
   await expect(page.getByLabel('Panel name')).toHaveValue('Display base')
   await page.getByRole('button', { name: 'Export project', exact: true }).click()
   const exportPromise = page.waitForEvent('download')
