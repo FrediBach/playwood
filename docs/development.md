@@ -131,3 +131,7 @@ The script writes icons and `public/og-image.png`. Inspect those outputs and inc
 Use `npm run build` followed by `npm run preview` to inspect production output when changing imports, lazy modules, workers, or asset URLs. [vercel.json](../vercel.json) configures static hosting; domain changes also affect canonical/social metadata, robots rules, and the sitemap. [Architecture overview](architecture.md) describes the deployment boundary.
 
 Generated `dist/`, `node_modules/`, `*.tsbuildinfo`, and test artifacts are ignored by [.gitignore](../.gitignore). Do not edit generated output as the implementation. Preserve supplied CAD/reference files unless a task explicitly changes the underlying resources.
+
+### TROFAST coverage
+
+`npm test -- src/lib/trofast.test.ts src/components/trofast-geometry.test.ts src/components/scene-geometry.test.ts src/lib/preview-furnishings.test.ts` checks fit, parsing, assemblies, fixed-size geometry, real openings and furnishing clearance. `npm run test:e2e -- tests/trofast.spec.ts tests/trofast-renders.spec.ts` covers placement drafts, colors, undo/reload/export, clearance failures, narrow inspectors, and all catalog renders in both preview modes. The tests use real file import/export controls.

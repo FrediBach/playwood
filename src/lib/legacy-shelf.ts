@@ -19,6 +19,8 @@ function upperSection(panel: Panel, width: number) {
  * positions survive, with two side sections added around the actual T bodies.
  */
 export function repairLegacyShelf(project: Project): Project {
+  // A purchased insert and its cutout are deliberate changes to the old design.
+  if (project.panels.some(panel => panel.trofastInserts?.length)) return project
   const connections = project.connections
   if (project.panels.length !== 5 || connections.length !== 6
     || connections.some(c => c.type !== '90' || c.offset !== 0 || c.flip || c.count < 1)

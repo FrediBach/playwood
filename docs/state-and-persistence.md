@@ -74,6 +74,10 @@ Control-drag preparation releases joints crossing the selection boundary in the 
 
 [use-assembly-editor.ts](../src/hooks/use-assembly-editor.ts) similarly generates corner-attachment candidates and ties the hovered target to the source project reference. Its preview identifies added/moved panels, changed hardware, and suppressed original hardware. Committing a placement includes the necessary shared-joint changes in the same undo step.
 
+### TROFAST placement drafts
+
+[`TrofastInspector.tsx`](../src/components/TrofastInspector.tsx) holds a new or edited insert locally. Item, color, turn, and center controls update the panel diagram and a candidate scene panel, without changing the committed project. `App` ties this preview to the current project identity and selected panel and suppresses it during conflicting modes. Apply uses a functional project commit with clearance validation; Cancel, Escape, selection changes, or unmount discard the preview. Existing inserts remain editable/removable from the panel inspector. Shared assembly edits use the definition API and validate every rebuilt instance. Undo/redo, autosave, project files, standalone assemblies, and panel duplication retain the nested data.
+
 ### Local form drafts
 
 Several forms intentionally have a narrower transaction boundary than the project:
@@ -137,7 +141,7 @@ Project export downloads the current `Project` as indented JSON, named from the 
 Project
   version: 1
   name
-  panels[]
+  panels[]           optional panel-local trofastInserts[]
   connections[]
   assemblies?         definitions, instances, physical links, loose ports
   customColors?       named panel finish swatches

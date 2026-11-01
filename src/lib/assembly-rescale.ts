@@ -46,7 +46,7 @@ function refitConnection(connection: Connection, panels: Map<string, Panel>): Co
  * assembly sources, instance controls, and ports. A shared source must still
  * describe every instance exactly; inconsistent edits are rejected atomically.
  */
-export function rescaleAssemblies(project: Project, resize: (project: Project, parameters?: readonly AssemblyParameter[]) => Project): Project {
+export function rescaleAssemblies(project: Project, resize: (project: Project, parameters?: readonly AssemblyParameter[], trofastWorld?: boolean) => Project): Project {
   const data = project.assemblies
   if (!data?.instances.length) return resize(project)
   const { assemblies: _data, ...plain } = project
@@ -63,7 +63,7 @@ export function rescaleAssemblies(project: Project, resize: (project: Project, p
   const activeDefinitions = new Set(data.instances.map(instance => instance.definitionId))
   const definitions = data.definitions.map(definition => {
     if (!activeDefinitions.has(definition.id)) return definition
-    const resized = resize(flat(definition), definition.parameters)
+    const resized = resize(flat(definition), definition.parameters, false)
     const panels = new Map(resized.panels.map(panel => [panel.id, panel]))
     const parameters = definition.parameters?.map(parameter => ({ ...parameter, defaultValue: parameterValue(parameter, panels) }))
     return { ...definition, panels: resized.panels, connections: resized.connections,

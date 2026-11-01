@@ -7,7 +7,7 @@ import type { Panel, Project } from './types'
 
 /** Find a centered cut shared by two aligned, separated panel faces. */
 export function parallelPanelCut(panels: readonly Panel[]) {
-  if (panels.length !== 2 || panels.some(panel => !panel.visible || panel.customOutline)) return undefined
+  if (panels.length !== 2 || panels.some(panel => !panel.visible || panel.customOutline || panel.trofastInserts?.length)) return undefined
   const [a, b] = panels
   const rotation = (panel: Panel) => new Quaternion().setFromEuler(new Euler(...panel.rotation))
   const qa = rotation(a), qb = rotation(b)
@@ -26,6 +26,7 @@ export function splitParallelPanels(project: Project, ids: readonly string[], co
   const selectedIds = new Set(ids)
   const selected = resolvePanels(project).filter(panel => selectedIds.has(panel.id))
   if (selected.some(panel => panel.customOutline)) throw new Error('Remove custom outlines before splitting parallel panels.')
+  if (selected.some(panel => panel.trofastInserts?.length)) throw new Error('Remove TROFAST inserts before splitting parallel panels.')
   const cut = parallelPanelCut(selected)
   if (!cut || selectedIds.size !== 2) throw new Error('Select two aligned parallel panels with matching dimensions.')
   if (ids.some(id => isPanelConnectedToAssembly(project, id))) throw new Error('Disassemble these panels before splitting them.')

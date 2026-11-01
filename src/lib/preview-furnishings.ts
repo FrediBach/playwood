@@ -1,6 +1,7 @@
 import { Box3, Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import type { Panel, Vec3 } from './types'
+import { getTrofastInsertObb } from './trofast'
 import { createPreviewBooks, getPreviewBookBounds, PREVIEW_BOOK_BOUNDS, PREVIEW_BOOK_STACK_BOUNDS, type PreviewBookArrangement, type PreviewBookSupport } from './preview-books'
 
 export type FurnishingKind = 'books' | 'table-lamp' | 'computer' | 'plant' | 'vase' | 'seated-person' | 'seated-person-chair'
@@ -49,7 +50,7 @@ function obstacle(panel: Panel): Obstacle {
 function surface(item: Obstacle): Surface | null {
   const { panel, normal } = item
   // A bounding rectangle cannot safely furnish a cutout, perforated or tilted board.
-  if (panel.customOutline || panel.pattern !== 'solid' || Math.abs(normal.y) < 0.999999) return null
+  if (panel.customOutline || panel.trofastInserts?.length || panel.pattern !== 'solid' || Math.abs(normal.y) < 0.999999) return null
   const quaternion = new Quaternion().setFromEuler(new Euler(...panel.rotation))
   const x = (panel.width >= panel.height ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0)).applyQuaternion(quaternion)
   x.y = 0
@@ -217,7 +218,12 @@ export function detectPreviewFurnishings(panels: Panel[]): FurnishingPlacement[]
     .filter(item => item.width >= 0.30 && item.width <= 3 && item.depth >= 0.22 && item.depth <= 1.05 && item.center.y >= FLOOR_Y + 0.002 && item.center.y <= 2.15)
     .sort((a, b) => a.center.y - b.center.y || a.center.x - b.center.x || a.center.z - b.center.z || a.obstacle.panel.id.localeCompare(b.obstacle.panel.id))
   const result: FurnishingPlacement[] = []
-  const occupied: OBB[] = []
+  const occupied: OBB[] = panels.filter(panel => panel.visible).flatMap(panel => (panel.trofastInserts ?? []).flatMap(insert => {
+    const box = getTrofastInsertObb(panel, insert)
+    if (!box) return []
+    box.center.multiplyScalar(MM); box.halfSize.multiplyScalar(MM)
+    return [box]
+  }))
   let people = 0
 
   const clear = (boxes: OBB[], supportId?: string) => boxes.every(box =>

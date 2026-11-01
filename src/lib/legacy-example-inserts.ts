@@ -18,6 +18,7 @@ const connectionKey = (connection: Connection, names: Map<string, string>) => JS
  * The caller places the immutable repair in ordinary undo history.
  */
 export function repairLegacyExampleInserts(project: Project): Project {
+  if (project.panels.some(panel => panel.trofastInserts?.length)) return project
   const actual = resolvePanels(project)
   for (const [exampleId, shapes] of Object.entries(LEGACY_INSERT_SHAPES)) {
     const definition = EXAMPLE_LIBRARY.find(example => example.id === exampleId)

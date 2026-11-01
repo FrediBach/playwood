@@ -105,7 +105,7 @@ export function rescaleProject(project: Project, changes: Record<string, number>
   }
   if (!replacements.size) return project
 
-  const resize = (source: Project, parameters: readonly AssemblyParameter[] = []): Project => {
+  const resize = (source: Project, parameters: readonly AssemblyParameter[] = [], trofastWorld = true): Project => {
     const dimensions: Record<string, Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>> = Object.create(null)
     const details = new Map<string, Partial<Panel>>()
     for (const panel of source.panels) for (const { kind, field, value } of measurements(panel)) {
@@ -136,7 +136,7 @@ export function rescaleProject(project: Project, changes: Record<string, number>
     // Validate the whole draft together: increasing hole spacing can make a
     // larger perforated panel valid, and smaller radii can preserve its clamps.
     const prepared = details.size ? { ...source, panels: source.panels.map(panel => details.has(panel.id) ? { ...panel, ...details.get(panel.id) } : panel) } : source
-    return resizePanelDimensions(prepared, dimensions)
+    return resizePanelDimensions(prepared, dimensions, { trofastWorld })
   }
 
   let next: Project

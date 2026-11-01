@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { Html } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrthographicCamera, Plane, Raycaster, Vector2, Vector3 } from 'three'
@@ -166,8 +166,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
   useEffect(() => {
     if (!enabled || (gesture.current && !handles.some(handle => handle.id === gesture.current?.handleId))) cancel()
   }, [enabled, handles])
-  useLayoutEffect(() => { invalidate() }, [handles, enabled, activeId, size, invalidate])
-  useFrame(() => {
+  const positionHandles = useCallback(() => {
     camera.updateMatrixWorld()
     const placed: { x: number; y: number }[] = []
     for (const handle of handles) {
@@ -184,7 +183,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
       const dx = (tip.x - origin.x) * size.width / 2, dy = (origin.y - tip.y) * size.height / 2
       const length = Math.hypot(dx, dy)
       if (camera instanceof OrthographicCamera) camera.getWorldDirection(towards)
-      else towards.copy(position).sub(camera.position).normalize()
+      else towards.subVectors(position, camera.position).normalize()
       const visible = enabled && (!activeId || activeId === handle.id) && origin.z >= -1 && origin.z <= 1
         && length > 0.0001 && Math.abs(towards.dot(axis)) < 0.995
         && (activeId === handle.id || (x >= 0 && x <= size.width && y >= 0 && y <= size.height))
@@ -217,7 +216,11 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
       element.style.setProperty('--resize-caption-x', `${captionX - x}px`)
       element.style.setProperty('--resize-caption-y', `${captionY - y}px`)
     }
-  })
+  }, [activeId, camera, enabled, handles, projection, size.height, size.width])
+  // Cancellation restores the handles before the next demand-rendered frame.
+  // Keep their DOM hit targets in sync so an immediate second drag can start.
+  useLayoutEffect(() => { positionHandles(); invalidate() }, [positionHandles, invalidate])
+  useFrame(positionHandles)
   if (!handles.length || !enabled) return null
   const shownDistance = Math.round(distance ?? requestedDistance)
   return <Html fullscreen portal={portal} zIndexRange={[2, 2]} position={handles[0].position.map(value => value * MM) as Vec3}

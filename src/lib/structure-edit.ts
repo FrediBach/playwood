@@ -16,6 +16,8 @@ type Row = { entries: Map<number, number>; value: number }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
 type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; local?: boolean }
+/** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
+interface ValidationContext { trofastWorld?: boolean }
 
 const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 const position = (panel: Panel) => new Vector3(...panel.position)
@@ -333,7 +335,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   }
 }
 
-function editStructure(project: Project, ids: readonly string[], edit: Edit): Project {
+function editStructure(project: Project, ids: readonly string[], edit: Edit, validation: ValidationContext = {}): Project {
   const wanted = new Set(ids)
   if (project.assemblies?.instances.length) {
     const managed = new Set(project.assemblies.instances.flatMap(instance => Object.values(instance.panelIds)))
@@ -389,8 +391,8 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit): Pr
     }
     next = { ...next, connectorOverrides: Object.keys(overrides).length ? overrides : project.connectorOverrides }
   }
-  const previousErrors = new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id))
-  const newError = validateProject(next).find(issue => issue.severity === 'error' && !previousErrors.has(issue.id))
+  const previousErrors = new Set(validateProject(project, validation).filter(issue => issue.severity === 'error').map(issue => issue.id))
+  const newError = validateProject(next, validation).find(issue => issue.severity === 'error' && !previousErrors.has(issue.id))
   if (newError) throw new Error(`Cannot keep this edit connected: ${newError.message}`)
   const nextFrames = next.panels.map(frame)
   for (const contact of contacts) {
@@ -412,11 +414,11 @@ export function movePanels(project: Project, ids: readonly string[], delta: Vec3
 }
 
 /** Resize a selection while keeping structural joints and existing inserts fitted. */
-export function resizePanels(project: Project, ids: readonly string[], patch: Dimensions): Project {
+export function resizePanels(project: Project, ids: readonly string[], patch: Dimensions, validation: ValidationContext = {}): Project {
   if (Object.values(patch).some(value => value !== undefined && (!Number.isFinite(value) || value < 40 || value > 4000))) throw new Error(LIMIT_MESSAGE)
   const wanted = new Set(ids)
   if (!project.panels.some(panel => wanted.has(panel.id) && (['width', 'height'] as const).some(field => patch[field] !== undefined && Math.abs(panel[field] - patch[field]!) > EPSILON))) return project
-  return editStructure(project, ids, { kind: 'resize', patch })
+  return editStructure(project, ids, { kind: 'resize', patch }, validation)
 }
 
 /** Pull one panel edge, anchoring its opposite edge. Local edits also fix other panels and hardware. */
@@ -433,7 +435,7 @@ export function resizePanelEdge(project: Project, id: string, dimension: 'width'
 }
 
 /** Simultaneous independent targets, used by assembly instance parameters. */
-export function resizePanelDimensions(project: Project, patches: Record<string, PanelDimensions>): Project {
+export function resizePanelDimensions(project: Project, patches: Record<string, PanelDimensions>, validation: ValidationContext = {}): Project {
   for (const patch of Object.values(patches)) for (const [field, value] of Object.entries(patch)) {
     if (value === undefined) continue
     if (!Number.isFinite(value) || value < (field === 'thickness' ? 3 : 40) || value > (field === 'thickness' ? 100 : 4000)) {
@@ -444,5 +446,5 @@ export function resizePanelDimensions(project: Project, patches: Record<string, 
   if (ids.some(id => !project.panels.some(panel => panel.id === id))) throw new Error('A configurable dimension refers to a missing panel.')
   const ownPatches: Record<string, PanelDimensions> = Object.assign(Object.create(null), patches)
   if (!project.panels.some(panel => (['width', 'height', 'thickness'] as const).some(field => ownPatches[panel.id]?.[field] !== undefined && Math.abs(panel[field] - ownPatches[panel.id][field]!) > EPSILON))) return project
-  return editStructure(project, ids, { kind: 'resize', patch: {}, patches: ownPatches })
+  return editStructure(project, ids, { kind: 'resize', patch: {}, patches: ownPatches }, validation)
 }

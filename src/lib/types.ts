@@ -7,6 +7,13 @@ export type ConnectorType = '90' | '105' | '150' | 't' | 'cross'
 export type ConnectorMaterial = 'plastic' | 'metal'
 /** Panel-relative coordinates, from the top-left corner, in the range 0–1. */
 export interface OutlinePoint { x: number; y: number }
+/** A fixed-size purchased insert. Centers are millimeters from the panel's top-left. */
+export interface TrofastInsert {
+  id: string; itemId: string; colorId: string; x: number; y: number;
+  quarterTurn?: boolean;
+  /** Local Z face carrying the rim; it must face upward in the installed project. */
+  face: 1 | -1;
+}
 export interface Panel {
   id: string; name: string; width: number; height: number; thickness: number;
   material: Material; color: string; pattern: Pattern;
@@ -15,6 +22,7 @@ export interface Panel {
   position: Vec3; rotation: Vec3; visible: boolean;
   holeSize: number; holeSpacing: number; cornerRadius?: number;
   customOutline?: OutlinePoint[];
+  trofastInserts?: TrofastInsert[];
 }
 export interface Connection {
   id: string; parentId: string; childId: string; type: ConnectorType;

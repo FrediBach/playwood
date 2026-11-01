@@ -185,9 +185,9 @@ export function materializeAssemblies(project: Project): Project {
   return project.assemblies ? rebuild(project, project.assemblies) : project
 }
 
-function ensureValid(next: Project, previous?: Project, collisionIds?: Set<string>): Project {
+function ensureValid(next: Project, previous?: Project, collisionIds?: Set<string>, trofastWorld = true): Project {
   const previousErrors = new Set(previous ? validateProject(previous).filter(issue => issue.severity === 'error').map(issue => issue.id) : [])
-  const issue = validateProject(next).find(item => (item.severity === 'error' && !previousErrors.has(item.id))
+  const issue = validateProject(next, { trofastWorld }).find(item => (item.severity === 'error' && !previousErrors.has(item.id))
     || (item.id.startsWith('collision-') && (!collisionIds || item.panelIds.some(id => collisionIds.has(id)))))
   if (issue) throw new Error(issue.message)
   return next
@@ -582,8 +582,8 @@ export function updateAssemblyDefinition(project: Project, instanceId: string, p
   const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
   const ids = new Set(partIds ?? definition.panels.map(panel => panel.id))
   if (![...ids].every(id => definition.panels.some(panel => panel.id === id))) throw new Error('Choose panels from this assembly source.')
-  const editable = ['name', 'width', 'height', 'thickness', 'material', 'color', 'finishCoverage', 'pattern', 'visible', 'holeSize', 'holeSpacing', 'cornerRadius', 'customOutline'] as const
-  const entries = editable.flatMap(key => patch[key] === undefined && !(key === 'customOutline' && Object.hasOwn(patch, key)) ? [] : [[key, patch[key]] as const])
+  const editable = ['name', 'width', 'height', 'thickness', 'material', 'color', 'finishCoverage', 'pattern', 'visible', 'holeSize', 'holeSpacing', 'cornerRadius', 'customOutline', 'trofastInserts'] as const
+  const entries = editable.flatMap(key => patch[key] === undefined && !((key === 'customOutline' || key === 'trofastInserts') && Object.hasOwn(patch, key)) ? [] : [[key, patch[key]] as const])
   // A restored field can commit again on blur after a rejected edit. Preserve
   // the exact project and undo history rather than solving unchanged geometry.
   if (definition.panels.filter(panel => ids.has(panel.id)).every(panel => entries.every(([key, value]) => key === 'finishCoverage'
@@ -595,9 +595,9 @@ export function updateAssemblyDefinition(project: Project, instanceId: string, p
   }
   const { width, height, ...properties } = Object.fromEntries(entries) as Partial<Panel>
   let edited: Project = { ...flat(definition), panels: definition.panels.map(panel => ids.has(panel.id) ? { ...panel, ...properties } : panel) }
-  if (width !== undefined || height !== undefined) edited = resizePanels(edited, [...ids], { width, height })
+  if (width !== undefined || height !== undefined) edited = resizePanels(edited, [...ids], { width, height }, { trofastWorld: false })
   edited = parseProject({ ...edited, panels: resolvePanels(edited) })
-  ensureValid(edited)
+  ensureValid(edited, undefined, undefined, false)
   if (controlled.some(binding => Math.abs(edited.panels.find(panel => panel.id === binding.panelId)![binding.dimension]
     - definition.panels.find(panel => panel.id === binding.panelId)![binding.dimension]) > 1e-6)) {
     throw new Error('This edit would change a dimension controlled by a configurable value. Edit the configurable value instead.')
@@ -717,7 +717,7 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
   const sameNumber = (a: number, b: number) => Math.abs(a - b) < 0.001
   for (const panel of rebuilt.panels) {
     const actual = panelsById.get(panel.id)
-    if (!actual || (actual.cornerRadius ?? 0) !== (panel.cornerRadius ?? 0) || (actual.finishCoverage ?? 0) !== (panel.finishCoverage ?? 0) || !panelValuesEqual(actual.customOutline, panel.customOutline) || ['width', 'height', 'thickness', 'holeSize', 'holeSpacing'].some(key => !sameNumber(actual[key as 'width'], panel[key as 'width']))
+    if (!actual || (actual.cornerRadius ?? 0) !== (panel.cornerRadius ?? 0) || (actual.finishCoverage ?? 0) !== (panel.finishCoverage ?? 0) || !panelValuesEqual(actual.customOutline, panel.customOutline) || !panelValuesEqual(actual.trofastInserts ?? [], panel.trofastInserts ?? []) || ['width', 'height', 'thickness', 'holeSize', 'holeSpacing'].some(key => !sameNumber(actual[key as 'width'], panel[key as 'width']))
       || actual.position.some((number, i) => !sameNumber(number, panel.position[i])) || Math.abs(q(actual.rotation).dot(q(panel.rotation))) < 0.999999
       || ['color', 'material', 'pattern', 'visible', 'name'].some(key => actual[key as 'color'] !== panel[key as 'color'])) throw new Error('Assembly panels do not match their source and instance transforms.')
   }

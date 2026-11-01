@@ -18,6 +18,21 @@ function transform(panels: Panel[], yaw: number, shift: Vec3) {
 }
 
 describe('optional preview furnishings', () => {
+  it('keeps cutout panels clear and respects boxes hanging above another shelf', () => {
+    const panels = starter('desk')
+    const top = panels.find(panel => panel.name === 'Desktop')!
+    const withBox = panels.map(panel => panel.id === top.id ? { ...panel, trofastInserts: [{ id: 'box', itemId: 'plastic-medium', colorId: 'white', x: panel.width / 2, y: panel.height / 2, face: 1 as const }] } : panel)
+    expect(detectPreviewFurnishings(withBox).filter(item => item.panelId === top.id)).toEqual([])
+
+    const lower = Array.from({ length: 20 }, (_, index) => shelf({ id: `lower-${index}`, width: 460, height: 340 }))
+      .find(panel => detectPreviewFurnishings([panel]).length > 0)!
+    expect(lower).toBeDefined()
+    const upper = shelf({ id: 'upper', width: 460, height: 340, position: [0, 950, 0], trofastInserts: [
+      { id: 'box', itemId: 'plastic-medium', colorId: 'white', x: 230, y: 170, face: 1 },
+    ] })
+    expect(detectPreviewFurnishings([lower, upper]).filter(item => item.panelId === lower.id)).toEqual([])
+  })
+
   it('styles the starter shelf without mistaking its middle shelf for a bench or stacking books on its cap', () => {
     const panels = starter('shelf').map((panel, index) => ({ ...panel, id: `starter-shelf-${index}` }))
     const props = detectPreviewFurnishings(panels)

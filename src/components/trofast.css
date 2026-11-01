@@ -1,0 +1,28 @@
+.trofast-installed { display: flex; flex-direction: column; gap: 5px; margin: 12px 0; }
+.trofast-installed-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.trofast-installed-row > button:first-child { flex: 1; display: flex; align-items: center; gap: 9px; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--paper); text-align: left; font-size: 12px; }
+.trofast-installed-row > button.selected { border-color: var(--accent); }
+.trofast-installed-row small { display: block; margin-top: 3px; font-size: 10px; color: var(--muted); }
+.trofast-color-dot { width: 20px; height: 20px; flex-shrink: 0; border-radius: 5px; border: 1px solid #0002; }
+.trofast-form { margin-top: 14px; }
+.trofast-swatches { display: flex; flex-wrap: wrap; gap: 8px; padding: 3px; }
+.trofast-swatches button { width: 29px; height: 29px; border: 1px solid #0003; border-radius: 50%; cursor: pointer; }
+.trofast-swatches button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 3px; }
+.trofast-swatches button:focus-visible { outline: 2px solid var(--foreground); outline-offset: 3px; }
+.trofast-position-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 12px; }
+.trofast-position-map { display: block; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: #f6f4ee; cursor: crosshair; touch-action: none; }
+.trofast-position-map:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.trofast-position-map svg { display: block; width: 100%; height: 155px; }
+.trofast-map-panel { fill: #e5d7bc; stroke: #9e927c; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.trofast-map-item { stroke: #5e6658; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.is-blocked .trofast-map-item { stroke: #b44b30; }
+.trofast-map-opening { fill: #0001; stroke: #0002; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.trofast-map-other { fill: #9eaa9c; opacity: .6; }
+.trofast-map-crosshair { stroke: #8c8069; stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.trofast-map-divider { stroke: #fff7; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.right-sidebar .trofast-map-help, .right-sidebar .trofast-disclaimer { margin-top: 7px; font-size: 11px; }
+.trofast-fit-status { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 12px; font-size: 12px; line-height: 1.5; color: #4e6541; }
+.trofast-fit-status svg { flex-shrink: 0; margin-top: 2px; }
+.trofast-fit-status.is-blocked { color: #a7452b; }
+.trofast-form-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.trofast-product-link { display: inline-block; margin-top: 7px; font-size: 11px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }

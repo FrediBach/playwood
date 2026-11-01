@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react'
+import { useId, useRef, type ReactNode } from 'react'
 import { Box, Link2, Pencil } from 'lucide-react'
 import { Button } from './ui/button'
 import { PanelFields } from './fields'
@@ -8,9 +8,10 @@ import { PanelSecondaryFields } from './PanelInspectorFields'
 import type { AssemblyParameter, Panel } from '@/lib/types'
 import './inspector-assembly.css'
 
-export function AssemblyEditingInspector({ panels, definitionPanels = panels, parameters = [], onChange, onParametersChange }: {
+export function AssemblyEditingInspector({ panels, definitionPanels = panels, parameters = [], onChange, onParametersChange, accessories }: {
   panels: Panel[]; definitionPanels?: Panel[]; parameters?: AssemblyParameter[]; name: string; count: number;
   onChange: (patch: Partial<Panel>) => boolean; onParametersChange?: (parameters: AssemblyParameter[]) => boolean
+  accessories?: ReactNode
 }) {
   const first = panels[0]
   const valuesId = useId()
@@ -31,6 +32,7 @@ export function AssemblyEditingInspector({ panels, definitionPanels = panels, pa
         })}</div>}
       </section>
       <PanelSecondaryFields resizeOnCommit panel={first} panels={panels} disabledFields={drivenDimensions} onChange={onChange}/>
+      {accessories}
     </> : <p className="field-note">Select a panel in this assembly to edit its shared construction.</p>}
     {onParametersChange && <div ref={valuesTarget} id={valuesId} className="assembly-values-target"><AssemblyParametersSection key={definitionPanels.map(panel => panel.id).join(',')} panels={definitionPanels} parameters={parameters} onChange={onParametersChange}/></div>}
   </>

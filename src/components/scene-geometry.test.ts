@@ -33,6 +33,31 @@ describe('rendered panel openings', () => {
     expect(rayHits('slots', 24, 40)).toBe(false)
     expect(rayHits('slots', 29.7, 40)).toBe(true)
   })
+  it('cuts positioned TROFAST openings through both faces and keeps the supporting rim area', () => {
+    const panel = { ...createPanel({ width: 800, height: 600 }), trofastInserts: [
+      { id: 'box', itemId: 'plastic-shallow', colorId: 'white', x: 270, y: 260, face: 1 as const },
+    ] }
+    const material = new MeshBasicMaterial({ side: DoubleSide })
+    for (const quarterTurn of [false, true]) {
+      const geometry = makePanelGeometry({ ...panel, trofastInserts: panel.trofastInserts.map(insert => ({ ...insert, quarterTurn })) })
+      const mesh = new Mesh(geometry, material)
+      for (const back of [false, true]) {
+        const hits = (x: number, y: number) => new Raycaster(
+          new Vector3((x - panel.width / 2) / 1000, (panel.height / 2 - y) / 1000, back ? -1 : 1),
+          new Vector3(0, 0, back ? 1 : -1),
+        ).intersectObject(mesh).length > 0
+        expect(hits(270, 260)).toBe(false)
+        expect(hits(270 + (quarterTurn ? 145 : 205), 260)).toBe(true)
+        expect(hits(270, 260 + (quarterTurn ? 205 : 145))).toBe(true)
+        // The long side follows the orientation, rather than cutting a square.
+        expect(hits(450, 260)).toBe(quarterTurn)
+        expect(hits(270, 440)).toBe(!quarterTurn)
+        expect(hits(700, 500)).toBe(true)
+      }
+      geometry.dispose()
+    }
+    material.dispose()
+  })
 })
 
 describe('custom panel geometry', () => {

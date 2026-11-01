@@ -1,0 +1,107 @@
+import { test, expect, type Page } from '@playwright/test'
+import { createPanel } from '../src/lib/model'
+import type { Project } from '../src/lib/types'
+import { openInspectorSection } from './inspector-helpers'
+
+const tabletop = (patch = {}) => createPanel({ id: 'top', name: 'Activity tabletop', width: 1200, height: 700, position: [0, 750, 0], rotation: [-Math.PI / 2, 0, 0], ...patch })
+async function load(page: Page, panels = [tabletop()]) {
+  await page.getByLabel('Import project file').setInputFiles({ name: 'trofast.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ version: 1, name: 'TROFAST table', panels, connections: [] })) })
+  await expect(page.getByRole('dialog')).not.toBeVisible()
+  await openInspectorSection(page, 'TROFAST inserts')
+}
+async function exported(page: Page): Promise<Project> {
+  await page.getByRole('button', { name: 'Export project', exact: true }).click()
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: /Project file All panels/ }).click()
+  const stream = await (await downloading).createReadStream()
+  const chunks: Buffer[] = []
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk))
+  await page.getByRole('button', { name: 'Close dialog' }).click()
+  return JSON.parse(Buffer.concat(chunks).toString())
+}
+async function centerX(page: Page, value: string) {
+  const field = page.getByRole('spinbutton', { name: 'TROFAST center X' })
+  await field.fill(value); await field.press('Enter')
+}
+
+test('drop-in items preview, position, persist, undo and remove with their panel cutouts', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/')
+  await load(page)
+  await page.getByRole('button', { name: 'Add TROFAST item', exact: true }).click()
+  await expect(page.getByRole('combobox', { name: 'TROFAST item' }).locator('option')).toHaveCount(8)
+  await page.getByRole('combobox', { name: 'TROFAST item' }).selectOption('plastic-medium')
+  await expect(page.getByRole('group', { name: 'TROFAST colors' }).getByRole('button')).toHaveCount(6)
+  await page.getByRole('button', { name: 'Bright green TROFAST color', exact: true }).click()
+  await centerX(page, '350')
+  expect((await exported(page)).panels[0].trofastInserts).toBeUndefined()
+  await page.getByRole('button', { name: 'Add TROFAST box', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Edit Medium box', exact: true })).toBeVisible()
+  let saved = await exported(page)
+  expect(saved.panels[0].trofastInserts).toEqual([expect.objectContaining({ itemId: 'plastic-medium', colorId: 'bright-green', x: 350, y: 350, face: 1 })])
+
+  await page.getByRole('button', { name: 'Add TROFAST item', exact: true }).click()
+  await page.getByRole('button', { name: 'Light orange TROFAST color', exact: true }).click()
+  await centerX(page, '900')
+  const map = page.getByRole('button', { name: 'Position TROFAST on panel' })
+  await map.focus(); await map.press('ArrowLeft')
+  await expect(page.getByRole('spinbutton', { name: 'TROFAST center X' })).toHaveValue('890')
+  await page.getByRole('button', { name: 'Add TROFAST box', exact: true }).click()
+  saved = await exported(page)
+  expect(saved.panels[0].trofastInserts).toHaveLength(2)
+  expect(saved.panels[0].trofastInserts![1]).toMatchObject({ colorId: 'light-orange', x: 890 })
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect(page.getByRole('button', { name: 'Edit Shallow box', exact: true })).not.toBeVisible()
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect(page.getByRole('button', { name: 'Edit Shallow box', exact: true })).toBeVisible()
+  await page.reload()
+  await openInspectorSection(page, 'TROFAST inserts')
+  expect((await exported(page)).panels[0].trofastInserts).toEqual(saved.panels[0].trofastInserts)
+
+  await page.getByRole('button', { name: 'Edit Medium box', exact: true }).click()
+  await page.getByRole('button', { name: 'Lilac TROFAST color', exact: true }).click()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect((await exported(page)).panels[0].trofastInserts![0].colorId).toBe('bright-green')
+  await page.getByRole('button', { name: 'Edit Medium box', exact: true }).click()
+  await page.getByRole('button', { name: 'Lilac TROFAST color', exact: true }).click()
+  await page.getByRole('button', { name: 'Save TROFAST changes', exact: true }).click()
+  expect((await exported(page)).panels[0].trofastInserts!.find(insert => insert.itemId === 'plastic-medium')!.colorId).toBe('lilac')
+  await page.getByLabel('Orientation', { exact: true }).selectOption('vertical')
+  await expect(page.getByLabel('Orientation', { exact: true })).toHaveValue('horizontal')
+  await page.screenshot({ path: 'test-results/trofast-inspector.png' })
+  await page.getByRole('button', { name: 'Remove Medium box', exact: true }).click()
+  expect((await exported(page)).panels[0].trofastInserts).toHaveLength(1)
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await expect(page.getByLabel(/^Realistic furniture preview/)).toBeVisible()
+  await page.screenshot({ path: 'test-results/trofast-room.png' })
+  expect(errors).toEqual([])
+})
+
+test('flatness, footprint, floor and occupied space gate additions', async ({ page }) => {
+  await page.goto('/')
+  await load(page, [tabletop({ rotation: [0, 0, 0] })])
+  await expect(page.getByRole('button', { name: 'Add TROFAST item', exact: true })).toBeDisabled()
+  await load(page, [tabletop({ width: 150, height: 150 })])
+  await expect(page.getByRole('button', { name: 'Add TROFAST item', exact: true })).toBeDisabled()
+  await load(page, [tabletop({ position: [0, 150, 0] })])
+  await page.getByRole('button', { name: 'Add TROFAST item', exact: true }).click()
+  await page.getByRole('combobox', { name: 'TROFAST item' }).selectOption('plastic-deep')
+  await expect(page.getByRole('button', { name: 'Add TROFAST box', exact: true })).toBeDisabled()
+  await expect(page.locator('.trofast-fit-status')).toContainText('floor')
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+  await load(page, [tabletop(), tabletop({ id: 'obstacle', name: 'Lower shelf', width: 500, height: 700, position: [-300, 600, 0], visible: false })])
+  await page.getByRole('button', { name: 'Add TROFAST item', exact: true }).click()
+  await page.getByRole('combobox', { name: 'TROFAST item' }).selectOption('plastic-medium')
+  await centerX(page, '300')
+  await expect(page.getByRole('button', { name: 'Add TROFAST box', exact: true })).toBeDisabled()
+  await expect(page.locator('.trofast-fit-status')).toContainText('Lower shelf')
+  await centerX(page, '900')
+  await expect(page.getByRole('button', { name: 'Add TROFAST box', exact: true })).toBeEnabled()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: 'Add TROFAST box', exact: true }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('button', { name: 'Add TROFAST box', exact: true })).toBeInViewport()
+  await page.screenshot({ path: 'test-results/trofast-mobile.png' })
+  await page.getByRole('button', { name: 'Add TROFAST box', exact: true }).click()
+})

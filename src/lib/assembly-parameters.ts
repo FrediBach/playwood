@@ -81,13 +81,13 @@ export function evaluateAssemblyDefinition(definition: AssemblyDefinition, value
       else (patches[binding.panelId] ??= {})[binding.dimension] = exact
     }
   }
-  let edited = resizePanelDimensions(source, patches)
+  let edited = resizePanelDimensions(source, patches, { trofastWorld: false })
   edited = { ...edited, panels: edited.panels.map(panel => thickness.has(panel.id) ? { ...panel, thickness: thickness.get(panel.id)! } : panel) }
   const before = getProjectBounds(source.panels), after = getProjectBounds(edited.panels)
   const shift: Vec3 = [(before.min[0] + before.max[0] - after.min[0] - after.max[0]) / 2,
     before.min[1] - after.min[1], (before.min[2] + before.max[2] - after.min[2] - after.max[2]) / 2]
   edited = { ...edited, panels: edited.panels.map(panel => ({ ...panel, position: panel.position.map((amount, axis) => amount + shift[axis]) as Vec3 })) }
-  const issue = validateProject(edited).find(item => item.severity === 'error' || item.id.startsWith('collision-'))
+  const issue = validateProject(edited, { trofastWorld: false }).find(item => item.severity === 'error' || item.id.startsWith('collision-'))
   if (issue) throw new Error(`These values cannot keep the assembly connected: ${issue.message}`)
   const result = { ...definition, panels: edited.panels, connections: edited.connections }
   let entries = cache.get(definition)

@@ -24,10 +24,11 @@ interface Props {
   onExtendToGround: () => void
   groundFitReason: string
   buildTools?: ReactNode
+  accessories?: ReactNode
 }
 const matchesRotation = (rotation:Vec3, reference:Vec3)=>rotation.every((angle,i)=>Math.abs(angle-reference[i])<.001)
 
-export function SinglePanelInspector({selected,panels,connection,supportConnected=false,connected=false,issues,updatePanel,updateConnection,onDetach,duplicateSelected,deleteSelected,onExtendToGround,groundFitReason,buildTools}: Props) {
+export function SinglePanelInspector({selected,panels,connection,supportConnected=false,connected=false,issues,updatePanel,updateConnection,onDetach,duplicateSelected,deleteSelected,onExtendToGround,groundFitReason,buildTools,accessories}: Props) {
   const placement = <>
     <SelectField label="Orientation" disabled={supportConnected} value={matchesRotation(selected.rotation,[-Math.PI/2,0,0])?'horizontal':matchesRotation(selected.rotation,[0,Math.PI/2,0])?'side':matchesRotation(selected.rotation,[0,0,0])?'vertical':'custom'} onChange={v=>updatePanel({rotation:v==='horizontal'?[-Math.PI/2,0,0]:v==='side'?[0,Math.PI/2,0]:[0,0,0]})}>
       <option value="vertical">Vertical · front facing</option><option value="horizontal">Horizontal · flat</option><option value="side">Vertical · side facing</option><option value="custom" disabled>Custom rotation</option>
@@ -63,6 +64,7 @@ export function SinglePanelInspector({selected,panels,connection,supportConnecte
       </>:placement}
     </section>
     <PanelSecondaryFields resizeOnCommit panel={selected} onChange={updatePanel}/>
+    {accessories}
     {buildTools}
     <div className="panel-actions"><Button variant="outline" size="sm" onClick={duplicateSelected}><Copy size={15}/>Duplicate</Button><IconButton label="Delete selected panel" className="delete-button" onClick={deleteSelected}><Trash2 size={16}/></IconButton></div>
     <InspectorDisclosure title="Selection & movement help" className="inspector-help"><p className="field-note">Shift-click to select more panels. Focus the workspace and use the arrow keys to move the selection; hold Shift for a larger step. Snapping follows the workspace settings.</p></InspectorDisclosure>

@@ -137,6 +137,16 @@ Collision boxes shrink each half-extent by 0.5 mm, with a small minimum, to avoi
 
 Mutation modules often compare issue IDs before and after an edit and reject newly introduced problems. Some operations additionally treat collisions as blockers, while general project validation labels them warnings. Preserve the operation's existing policy instead of assuming every warning should reject every edit.
 
+## TROFAST inserts and panel openings
+
+[`trofast-catalog.ts`](../src/lib/trofast-catalog.ts) defines eight IKEA Switzerland box/tray variants and their product-specific colors, dimensions, and source links. Outer lengths are millimeters; color values, tapered body details, rim profiles, and cutout dimensions are approximations for visualization. They are not manufacturing measurements or a structural approval. Catalog item/color IDs are part of the saved contract; retain legacy entries if retail availability changes.
+
+`Panel.trofastInserts` is optional. Each insert has an ID unique within its host panel, a catalog item/color ID, a center `x/y` in millimeters from the panel's top-left corner, an optional `quarterTurn`, and a `face` (+1 or −1) identifying the local Z side carrying its rim. The rim underside rests on that face; the box extends into the panel and below it. The installed footprint and height never scale with panel dimensions. Panel-local storage preserves relationships through copies, assemblies and transforms.
+
+[`trofast.ts`](../src/lib/trofast.ts) resolves world placement and requires a solid rectangular panel parallel to ground with the opening upward. Rounded panel corners are checked conservatively. Fit reserves 20 mm around the rim and checks the box's outer oriented envelope against ground, other panels (including hidden panels), other inserts, and installed CAD connector bounds, including slides/removals. These are conservative envelopes, not a tapered-shell collision solver or load calculation. A bounded placement search suggests a location; precise positions remain editable. Adds/edits and structural operations reject newly introduced TROFAST issues. Source-definition checks skip world floor/orientation checks until the rebuilt instances are validated in the actual project.
+
+Panel bounds include installed inserts. Splitting panels with inserts is unavailable; automatic hole-closing panels do not inherit neighboring inserts. Legacy template repairs skip designs containing inserts. `parseProject` validates catalog IDs/colors, finite coordinates, face and turn values, up to 24 inserts per panel, and duplicate IDs independently of geometric fit. Purchased items and explicitly approximate opening notes are included in CSV export.
+
 ## Structural movement and resizing
 
 [`structure-edit.ts`](../src/lib/structure-edit.ts) handles connected changes through `movePanels`, `resizePanels`, `resizePanelEdge`, and `resizePanelDimensions`. Directly changing a connected panel's coordinates or dimensions bypasses its constraints.

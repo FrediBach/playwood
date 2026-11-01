@@ -8,6 +8,8 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraView, Connection, Panel, Project, Vec3 } from '@/lib/types'
 import { ConnectorMeshes } from './ConnectorMeshes'
 import { makePanelGeometry } from './scene-geometry'
+import { TrofastMeshes } from './TrofastMeshes'
+import { getTrofastInsertLocalBounds } from '@/lib/trofast'
 import { createWoodTextures } from './wood-texture'
 import { createPanelMaterials } from './panel-materials'
 import { RoomEnvironment } from './RoomEnvironment'
@@ -99,6 +101,13 @@ function boundsOf(panels: Panel[]) {
         .applyEuler(rotation).add(new THREE.Vector3(...panel.position)).multiplyScalar(MM)
       bounds.expandByPoint(point)
     }
+    for (const insert of panel.trofastInserts ?? []) {
+      const local = getTrofastInsertLocalBounds(panel, insert)
+      if (!local) continue
+      for (const x of [local.min[0], local.max[0]]) for (const y of [local.min[1], local.max[1]]) for (const z of [local.min[2], local.max[2]]) {
+        bounds.expandByPoint(new THREE.Vector3(x, y, z).applyEuler(rotation).add(new THREE.Vector3(...panel.position)).multiplyScalar(MM))
+      }
+    }
   }
   if (bounds.isEmpty()) bounds.set(new THREE.Vector3(-0.4, 0, -0.3), new THREE.Vector3(0.4, 0.7, 0.3))
   return bounds
@@ -107,11 +116,11 @@ function boundsOf(panels: Panel[]) {
 function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDrillIn }: {
   panel: Panel; selected: boolean; ghost?: boolean; interactive?: boolean; onSelect: SceneProps['onSelect']; onDrillIn?: SceneProps['onDrillIn']
 }) {
-  const { width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline } = panel
-  const geometry = useMemo(() => makePanelGeometry({ width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline }), [width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline])
+  const { width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline, trofastInserts } = panel
+  const geometry = useMemo(() => makePanelGeometry({ width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline, trofastInserts }), [width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline, trofastInserts])
   const textured = !ghost && (panel.finishCoverage ?? 0) < 1
   const textures = useMemo(() => textured && panel.material !== 'painted' ? createWoodTextures(panel.material) : null, [panel.material, textured])
-  const materials = useMemo(() => createPanelMaterials(panel, textures, ghost ? ACCENT : undefined), [panel.color, panel.material, panel.finishCoverage, textures, ghost])
+  const materials = useMemo(() => createPanelMaterials({ color: panel.color, material: panel.material, finishCoverage: panel.finishCoverage }, textures, ghost ? ACCENT : undefined), [panel.color, panel.material, panel.finishCoverage, textures, ghost])
   const outline = useMemo(() => {
     const box = new THREE.BoxGeometry(panel.width * MM + 0.001, panel.height * MM + 0.001, panel.thickness * MM + 0.001)
     const edges = new THREE.EdgesGeometry(box)
@@ -131,6 +140,7 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDri
       onPointerOver={ghost || !interactive ? undefined : event => { event.stopPropagation(); document.body.style.cursor = 'pointer' }}
       onPointerOut={ghost || !interactive ? undefined : () => { document.body.style.cursor = 'auto' }}>
     </mesh>
+    <TrofastMeshes panel={panel} ghost={ghost} interactive={interactive} onSelect={onSelect} onDrillIn={onDrillIn} />
     {(selected || ghost) && <lineSegments geometry={outline} raycast={() => null}>
       <lineBasicMaterial color={ACCENT} transparent opacity={ghost ? 0.7 : 0.95} depthTest={false} />
     </lineSegments>}

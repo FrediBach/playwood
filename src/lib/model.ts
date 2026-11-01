@@ -7,6 +7,8 @@ import type { AttachmentOptions, Connection, OutlinePoint, Panel, Project, Rotat
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { parseAssemblyData, releaseAssemblyLinksForPanels } from './assemblies'
 import { parseCustomColors } from './custom-colors'
+import { assertNoNewTrofastIssues, getTrofastInsertLocalBounds, MAX_TROFAST_INSERTS, validateTrofastInserts } from './trofast'
+import { getTrofastColor, getTrofastItem } from './trofast-catalog'
 
 const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', painted: '#e8e7df' }
 const uid = () => globalThis.crypto?.randomUUID?.() ?? `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
@@ -21,7 +23,8 @@ export function createPanel(overrides: Partial<Panel> = {}): Panel {
   return { id: uid(), name: 'New panel', width: 600, height: 360, thickness: 18, material,
     color: MATERIAL_COLORS[material], pattern: 'solid', position: [0, 400, 0], rotation: [0, 0, 0],
     visible: true, cornerRadius: 0, holeSize: 12, holeSpacing: 48, ...overrides,
-    ...(overrides.customOutline ? { customOutline: overrides.customOutline.map(point => ({ ...point })) } : {}) }
+    ...(overrides.customOutline ? { customOutline: overrides.customOutline.map(point => ({ ...point })) } : {}),
+    ...(overrides.trofastInserts ? { trofastInserts: overrides.trofastInserts.map(insert => ({ ...insert })) } : {}) }
 }
 
 function seamInfo(parent: Panel, c: Pick<Connection, 'side' | 'offset' | 'inset'>) {
@@ -194,7 +197,10 @@ export function removePanel(project: Project, id: string): Project {
 export function duplicatePanel(project: Project, id: string): Project {
   const panel = resolvePanels(project).find(p => p.id === id)
   if (!panel) return project
-  const duplicate = createPanel({ ...panel, id: uid(), name: `${panel.name} copy`, position: [panel.position[0] + 100, panel.position[1] + 100, panel.position[2] + 100] })
+  const insertOffset = panel.trofastInserts?.length ? getProjectBounds(resolvePanels(project)).max[0] - getProjectBounds([panel]).min[0] + 100 : null
+  const duplicate = createPanel({ ...panel, id: uid(), name: `${panel.name} copy`, position: insertOffset === null
+    ? [panel.position[0] + 100, panel.position[1] + 100, panel.position[2] + 100]
+    : [panel.position[0] + insertOffset, panel.position[1], panel.position[2]] })
   return { ...project, panels: [...project.panels, duplicate] }
 }
 
@@ -207,6 +213,14 @@ export function getProjectBounds(panels: Panel[]) {
       const corner = new Vector3(x * p.width / 2, y * p.height / 2, z * p.thickness / 2).applyQuaternion(rotation).add(vec(p.position))
       min.min(corner); max.max(corner)
     }
+    for (const insert of p.trofastInserts ?? []) {
+      const bounds = getTrofastInsertLocalBounds(p, insert)
+      if (!bounds) continue
+      for (const x of [bounds.min[0], bounds.max[0]]) for (const y of [bounds.min[1], bounds.max[1]]) for (const z of [bounds.min[2], bounds.max[2]]) {
+        const corner = new Vector3(x, y, z).applyQuaternion(rotation).add(vec(p.position))
+        min.min(corner); max.max(corner)
+      }
+    }
   }
   if (!panels.length) { min.set(0, 0, 0); max.set(0, 0, 0) }
   return { width: max.x - min.x, height: max.y - min.y, depth: max.z - min.z, min: tuple(min), max: tuple(max) }
@@ -217,12 +231,12 @@ export function moveProject(project: Project, delta: Vec3): Project {
   if (!delta.every(Number.isFinite)) throw new Error('Movement must be a finite distance.')
   if (!project.panels.length || delta.every(value => value === 0)) return project
   const move = (position: Vec3): Vec3 => tuple(vec(position).add(vec(delta)))
-  return { ...project,
+  return assertNoNewTrofastIssues(project, { ...project,
     panels: resolvePanels(project).map(panel => ({ ...panel, position: move(panel.position) })),
     ...(project.assemblies ? { assemblies: { ...project.assemblies,
       instances: project.assemblies.instances.map(instance => ({ ...instance, position: move(instance.position) })),
     } } : {}),
-  }
+  })
 }
 
 /** Rotate the entire resolved assembly in world space, retaining its lowest panel height. */
@@ -248,7 +262,7 @@ export function rotateProject(project: Project, axis: RotationAxis, degrees: num
   })) }
   // Connections remain in panel-local coordinates. Resolve once more so stored
   // child poses agree with the roots, including multi-branch and support joints.
-  return { ...next, panels: resolvePanels(next) }
+  return assertNoNewTrofastIssues(project, { ...next, panels: resolvePanels(next) })
 }
 
 function panelObb(p: Panel) {
@@ -279,7 +293,7 @@ function jointStructureIssues(connections: Connection[]): ValidationIssue[] {
   return issues
 }
 
-export function validateProject(project: Project): ValidationIssue[] {
+export function validateProject(project: Project, options: { trofastWorld?: boolean } = {}): ValidationIssue[] {
   const issues: ValidationIssue[] = jointStructureIssues(project.connections)
   const panels = resolvePanels(project)
   const byId = new Map(panels.map(p => [p.id, p]))
@@ -346,7 +360,7 @@ export function validateProject(project: Project): ValidationIssue[] {
   for (let i = 0; i < panels.length; i++) for (let j = i + 1; j < panels.length; j++) {
     if (boxes[i].intersectsOBB(boxes[j])) issues.push({ id: `collision-${panels[i].id}-${panels[j].id}`, severity: 'warning', message: `${panels[i].name} overlaps ${panels[j].name}.`, panelIds: [panels[i].id, panels[j].id] })
   }
-  return issues
+  return [...issues, ...validateTrofastInserts(project, panels, options.trofastWorld !== false)]
 }
 
 export function createStarterProject(template: 'shelf' | 'desk' | 'display' | 'blank' = 'shelf'): Project {
@@ -431,6 +445,21 @@ export function parseProject(input: unknown): Project {
       const outlineError = getOutlineError(raw.customOutline)
       if (outlineError) throw new Error(`Invalid custom outline: ${outlineError}`)
       p.customOutline = (raw.customOutline as OutlinePoint[]).map(point => ({ x: point.x, y: point.y }))
+    }
+    if (raw.trofastInserts !== undefined) {
+      if (!Array.isArray(raw.trofastInserts) || raw.trofastInserts.length > MAX_TROFAST_INSERTS) throw new Error('Invalid TROFAST inserts.')
+      p.trofastInserts = raw.trofastInserts.map(value => {
+        if (!object(value)) throw new Error('Invalid TROFAST insert.')
+        const itemId = stringIn(value.itemId, 'TROFAST item'), item = getTrofastItem(itemId)
+        const colorId = stringIn(value.colorId, 'TROFAST color')
+        if (!item || !item.colors.includes(colorId)) throw new Error('Invalid TROFAST item or color.')
+        if (value.face !== 1 && value.face !== -1) throw new Error('Invalid TROFAST mounting face.')
+        if (value.quarterTurn !== undefined && typeof value.quarterTurn !== 'boolean') throw new Error('Invalid TROFAST orientation.')
+        return { id: stringIn(value.id, 'TROFAST ID'), itemId, colorId, face: value.face,
+          x: numberIn(value.x, -4000, 8000, 'TROFAST position X'), y: numberIn(value.y, -4000, 8000, 'TROFAST position Y'),
+          ...(value.quarterTurn !== undefined ? { quarterTurn: value.quarterTurn } : {}) }
+      })
+      if (new Set(p.trofastInserts.map(insert => insert.id)).size !== p.trofastInserts.length) throw new Error('TROFAST insert IDs must be unique within a panel.')
     }
     if (typeof p.visible !== 'boolean') throw new Error('Invalid panel visibility.')
     if (p.holeSpacing < Math.max(15, p.holeSize + 5)) throw new Error('Hole spacing must be at least 15 mm and leave 5 mm of material between holes.')
@@ -524,11 +553,25 @@ export function projectToCsv(project: Project): string {
     const safe = typeof value === 'string' && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value)
     return `"${safe.replaceAll('"', '""')}"`
   }
-  const rows: (string | number)[][] = [['Item', 'Quantity', 'Width (mm)', 'Height (mm)', 'Thickness (mm)', 'Material', 'Color', 'Finish coverage (%)', 'Pattern', 'Hole size (mm)', 'Hole pitch (mm)', 'Corner radius (mm)', 'Custom outline points (mm, x/y from top left)']]
+  const rows: (string | number)[][] = [['Item', 'Quantity', 'Width (mm)', 'Height (mm)', 'Thickness (mm)', 'Material', 'Color', 'Finish coverage (%)', 'Pattern', 'Hole size (mm)', 'Hole pitch (mm)', 'Corner radius (mm)', 'Custom outline points (mm, x/y from top left)', 'TROFAST details (mm; illustrative cutouts, measure actual item before cutting)']]
   for (const panel of project.panels) rows.push([panel.name, 1, panel.width, panel.height, panel.thickness, panel.material, panel.color, panel.material === 'painted' ? 100 : Math.round((panel.finishCoverage ?? 0) * 100), panel.pattern, panel.pattern === 'solid' ? '' : panel.holeSize, panel.pattern === 'solid' ? '' : panel.holeSpacing, panelCornerRadius(panel),
-    panel.customOutline?.map(point => `${Number((point.x * panel.width).toFixed(3))}/${Number((point.y * panel.height).toFixed(3))}`).join('; ') ?? ''])
+    panel.customOutline?.map(point => `${Number((point.x * panel.width).toFixed(3))}/${Number((point.y * panel.height).toFixed(3))}`).join('; ') ?? '',
+    (panel.trofastInserts ?? []).map(insert => {
+      const item = getTrofastItem(insert.itemId)
+      return item ? `${item.name}: center ${insert.x}/${insert.y} from top left; approximate opening ${insert.quarterTurn ? item.cutoutDepth : item.cutoutWidth} x ${insert.quarterTurn ? item.cutoutWidth : item.cutoutDepth}; face ${insert.face}` : ''
+    }).join('; ')])
   const connectors = new Map<string, number>()
   for (const c of getPhysicalConnectors(project)) { const key = `${c.type}|${c.material}|${connectorDisplayColor(c)}`; connectors.set(key, (connectors.get(key) ?? 0) + 1) }
-  for (const [key, count] of connectors) { const [type, material, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', material === 'metal' ? 'Cast metal' : 'Reinforced plastic', color, '', '', '', '', '', '']) }
+  for (const [key, count] of connectors) { const [type, material, color] = key.split('|'); rows.push([`Playwood ${type === 't' ? 'T' : type === 'cross' ? 'Cross' : `${type}°`} connector`, count, '', '', '', material === 'metal' ? 'Cast metal' : 'Reinforced plastic', color, '', '', '', '', '', '', '']) }
+  const purchased = new Map<string, number>()
+  for (const panel of project.panels) for (const insert of panel.trofastInserts ?? []) {
+    const key = `${insert.itemId}|${insert.colorId}`
+    purchased.set(key, (purchased.get(key) ?? 0) + 1)
+  }
+  for (const [key, count] of purchased) {
+    const [itemId, colorId] = key.split('|'), item = getTrofastItem(itemId), color = getTrofastColor(colorId)
+    if (item && color) rows.push([`IKEA TROFAST ${item.name}`, count, '', '', '', item.kind === 'mesh' ? 'Powder-coated steel' : 'Polypropylene', color.name, '', '', '', '', '', '',
+      `Purchased item ${item.productIds[colorId]}; outer W x D x H ${item.width} x ${item.depth} x ${item.height}`])
+  }
   return '\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n')
 }

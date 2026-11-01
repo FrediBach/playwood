@@ -17,6 +17,8 @@ import { AssemblyWorkspace } from '@/components/AssemblyWorkspace'
 import { InspectorDisclosure } from '@/components/InspectorPrimitives'
 import { InspectorSidebar } from '@/components/InspectorSidebar'
 import { SinglePanelInspector } from '@/components/SinglePanelInspector'
+import { TrofastInspector } from '@/components/TrofastInspector'
+import { assertNoNewTrofastIssues } from '@/lib/trofast'
 import { PanelConnectionFitDialog } from '@/components/PanelConnectionFitDialog'
 import { AttachmentInspector } from '@/components/AttachmentInspector'
 import type { AttachmentSideGuideState } from '@/components/AttachmentSideGuide'
@@ -54,7 +56,7 @@ import { assemblySelectionError, duplicateAssembly, getAssemblyInstance, getAsse
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, moveProject, rotateProject, validateProject } from '@/lib/model'
-import type { AssemblyDefinition, AttachmentOptions, CameraView, Panel, Project, Side, Vec3, ListKind } from '@/lib/types'
+import type { AssemblyDefinition, AttachmentOptions, CameraView, Panel, Project, Side, Vec3, ListKind, TrofastInsert } from '@/lib/types'
 
 const INITIAL_ATTACHMENT: AttachmentOptions = {side:'right',type:'90',offset:0,inset:0,flip:false,color:DEFAULT_CONNECTOR_COLOR,count:2}
 function download(content:string,name:string,type:string) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
@@ -69,6 +71,10 @@ export default function App() {
   const closeContextMenu=useCallback(()=>setContextMenu(null),[])
   const [toolRequest,setToolRequest]=useState<{tool:'grid'|'parallel'|'assembly';selection:string;token:number}>()
   const [inspectorTab,setInspectorTab]=useState<'panel'|'attach'>('panel')
+  const [trofastPreview,setTrofastPreview]=useState<{source:Project;panelId:string;inserts:TrofastInsert[]}|null>(null)
+  const previewTrofast=useCallback((panelId:string,inserts:TrofastInsert[]|null)=>{
+    setTrofastPreview(inserts?{source:project,panelId,inserts}:null)
+  },[project])
   const [assemblyTab,setAssemblyTab]=useState<ListKind>('panels')
   const [dialog,setDialog]=useState<ProjectDialog>(null)
   const [pendingConnectionFit,setPendingConnectionFit]=useState<{source:Project;fit:NonNullable<ReturnType<typeof getAutoConnectFit>>}|null>(null)
@@ -139,6 +145,10 @@ export default function App() {
   const connectorCount=physicalConnectors.length
   const connectorSummary=CONNECTORS.map(type=>({name:type.name,count:physicalConnectors.filter(c=>c.type===type.id).length})).filter(type=>type.count>0).map(type=>`${type.count} × ${type.name}`).join(' · ')
   const notify=useCallback((message:string)=>setToast(message),[])
+  const commitWithInsertChecks=(change:(current:Project)=>Project,options?:{group:string;repeat:boolean})=>{
+    try { commit(current=>assertNoNewTrofastIssues(current,change(current)),options);return true }
+    catch(error){notify(error instanceof Error?error.message:'This edit needs more clearance for the TROFAST inserts.');return false}
+  }
   const [snapSettings,setSnapSettings]=useState(readSnapSettings)
   useEffect(()=>{try{localStorage.setItem('playwood-snap',JSON.stringify(snapSettings))}catch{/* Storage may be unavailable. */}},[snapSettings])
   const drag=usePreviewDrag({project,selectedIds:inspectingConnectors?[]:selectedIds,commit,notify,snapSettings,select:setSelectedIds})
@@ -179,8 +189,11 @@ export default function App() {
     try {
       checkLoosePanelPatch(patch)
       const {width,height,...rest}=patch
-      const base={...project,panels:project.panels.map(panel=>panel.id===selectedId?{...panel,...rest}:panel)}
-      commit(width!==undefined||height!==undefined?resizePanels(base,[selectedId],{width,height}):base)
+      commit(current=>{
+        if(patch.trofastInserts!==undefined&&current!==project)throw new Error('The project changed. Review the TROFAST placement before saving it.')
+        const base={...current,panels:current.panels.map(panel=>panel.id===selectedId?{...panel,...rest}:panel)}
+        return assertNoNewTrofastIssues(current,width!==undefined||height!==undefined?resizePanels(base,[selectedId],{width,height}):base)
+      })
       return true
     } catch(error) {notify(error instanceof Error?error.message:'This panel size cannot keep the joints aligned.');return false}
   }
@@ -191,8 +204,10 @@ export default function App() {
       const {width,height,...rest}=patch
       const shared=getSharedPanelFields(selectedPanels)
       const dimensions={width:shared.has('width')?width:undefined,height:shared.has('height')?height:undefined}
-      const base=updateSelectedPanels(project,selectedIds,rest)
-      commit(dimensions.width!==undefined||dimensions.height!==undefined?resizePanels(base,selectedIds,dimensions):base)
+      commit(current=>{
+        const base=updateSelectedPanels(current,selectedIds,rest)
+        return assertNoNewTrofastIssues(current,dimensions.width!==undefined||dimensions.height!==undefined?resizePanels(base,selectedIds,dimensions):base)
+      })
       return true
     } catch(error) {notify(error instanceof Error?error.message:'These panel sizes cannot keep the joints aligned.');return false}
   }
@@ -409,7 +424,7 @@ export default function App() {
   }
   const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setAttachmentSideHighlight(null);setRealisticPreview(false);setExploded(false);setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87',...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}));setInspectorTab('attach');setRightOpen(true)}
   const applyAttachment=()=>{if(!previewProject||attachmentErrors.length)return;commit(previewProject);setSelectedId(attachTarget==='new'?draft.id:attachTarget);setInspectorTab('panel');setDraft(createPanel());notify(`${previewPanels.length===1?'Panel':`${previewPanels.length} panels`} attached`)}
-  const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return;const group=connection.id.replace(/:\d+$/,'');commit(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
+  const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return;const group=connection.id.replace(/:\d+$/,'');commitWithInsertChecks(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
   const insertModuleDefinition = (definition: AssemblyDefinition) => {
     try {
       if (!inspectingConnectors&&selectedIds.length) {
@@ -563,6 +578,9 @@ export default function App() {
     {!assembly.hasMembers&&selectedPanels.length>1&&<InspectorDisclosure openRequest={toolRequest?.tool==='assembly'&&toolRequest.selection===selectedIds.join('/')?toolRequest.token:0} focusTarget="input" title="Create assembly" summary="Reuse these panels as linked copies" lazy><CreateAssemblyForm panelCount={selectedPanels.length} panels={selectedPanels} onCreate={assembly.create}/></InspectorDisclosure>}
   </section> : undefined
   const fittedConnectorPanel=connectorPanelFit.result?.project.panels.find(panel=>panel.id===connectorPanelFit.result?.panelId)
+  const trofastInspector=selected?<TrofastInspector key={`${selected.id}:${JSON.stringify(selected.trofastInserts)}`} project={project} panel={selected} onApply={inserts=>updatePanel({trofastInserts:inserts})} onPreview={previewTrofast}/>:undefined
+  const trofastPreviewActive=trofastPreview?.source===project&&trofastPreview.panelId===selectedId&&inspectorTab==='panel'&&!modalOpen&&!clipboard.active&&!assembly.placementActive&&!exploded
+  const displayPanels=trofastPreviewActive?panels.map(panel=>panel.id===trofastPreview.panelId?{...panel,trofastInserts:trofastPreview.inserts}:panel):panels
 
   return <PanelPaletteProvider project={project}
     onAddColor={color=>commit(current=>addCustomColor(current,color))}
@@ -602,11 +620,11 @@ export default function App() {
       if(target.connectorId&&!realisticPreview){if(!selectedConnectorIds.includes(target.connectorId))chooseConnector(target.connectorId)}
       else if(target.panelId!==undefined){if(!target.panelId||!selectedIds.includes(target.panelId))choosePanel(target.panelId||null)}
       setContextMenu({x,y})
-    }} connectorOverrides={(resize.project??drag.project??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={resize.panels??drag.panels??panels} connections={(resize.project??drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
+    }} connectorOverrides={(resize.project??drag.project??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={resize.panels??drag.panels??displayPanels} connections={(resize.project??drag.project??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
       onDragStart={drag.start} onDragMove={drag.move} onDragEnd={drag.end} dragging={drag.active} dragSnap={drag.snap}
       resizeHandles={resize.handles} onResizeStart={resize.start} onResizeMove={resize.move} onResizeEnd={resize.end} resizing={resize.active} resizeDistance={resize.distance} resizeLimited={resize.limited}
       onAutoConnect={addAutoConnectors} autoConnectDisabled={modalOpen||!!assembly.editingInstance||panels.length<2}
-      onMoveConnectors={(slides,repeat)=>commit(current=>{
+      onMoveConnectors={(slides,repeat)=>commitWithInsertChecks(current=>{
         let next=current
         for(const [id,slide] of Object.entries(slides))next=editConnectors(next,[id],{slide})
         return next
@@ -633,11 +651,11 @@ export default function App() {
       contextDetail={assembly.editingDefinition?`${assembly.editingDefinition.name} · affects ${assemblyCount(assembly.editingDefinition.id)} linked ${assemblyCount(assembly.editingDefinition.id)===1?'instance':'instances'}`:undefined}
       attachmentStatus={previewResult.error||attachmentErrors[0]?.message||(previewProject?'Panel thickness is compatible · Ready to attach':undefined)}
       footer={clipboard.active?<><p className="inspector-task-status" role="status">{attachmentSummary||'Choose a + in the workspace to attach.'}</p><Button variant="outline" className="full-button" onClick={clipboard.cancel}>Cancel placement</Button></>:assembly.placementActive?<><p className={`inspector-task-status ${attachmentWarning?'is-blocked':''}`} role="status">{attachmentSummary||assemblyHint}</p><Button variant="outline" className="full-button" onClick={assembly.clearPlacement}>Cancel attachment</Button></>:undefined}>
-        {inspectingConnectors?<ConnectorInspector panels={panels} fitSummary={fittedConnectorPanel?`${Math.round(fittedConnectorPanel.width)} × ${Math.round(fittedConnectorPanel.height)} × ${fittedConnectorPanel.thickness} mm`:undefined} connectors={selectedConnectors} onChange={patch=>commit(current=>editConnectors(current,selectedConnectorIds,patch))} onRemove={removeSelectedConnectors} onConnectPanel={connectWithPanel} panelFitReason={assembly.editingInstance?'Finish editing the assembly before connecting a panel.':modalOpen?'Close the dialog before connecting a panel.':connectorPanelFit.reason}/>:<>
+        {inspectingConnectors?<ConnectorInspector panels={panels} fitSummary={fittedConnectorPanel?`${Math.round(fittedConnectorPanel.width)} × ${Math.round(fittedConnectorPanel.height)} × ${fittedConnectorPanel.thickness} mm`:undefined} connectors={selectedConnectors} onChange={patch=>commitWithInsertChecks(current=>editConnectors(current,selectedConnectorIds,patch))} onRemove={removeSelectedConnectors} onConnectPanel={connectWithPanel} panelFitReason={assembly.editingInstance?'Finish editing the assembly before connecting a panel.':modalOpen?'Close the dialog before connecting a panel.':connectorPanelFit.reason}/>:<>
         {clipboard.active?<div className="multi-selection-heading"><h2>Place {clipboard.inserting||'copy'}</h2><p>Hover a + in the workspace to preview. Click to attach, or cancel to return.</p></div>:assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
           panels={assembly.editingDefinition.panels.filter(panel=>selectedIdSet.has(assembly.editingInstance!.panelIds[panel.id]))}
           definitionPanels={assembly.editingDefinition.panels} parameters={assembly.editingDefinition.parameters} onParametersChange={assembly.parameters}
-          name={assembly.editingDefinition.name} count={assemblyCount(assembly.editingDefinition.id)} onChange={assembly.updateDefinition}/>
+          name={assembly.editingDefinition.name} count={assemblyCount(assembly.editingDefinition.id)} onChange={assembly.updateDefinition} accessories={trofastInspector}/>
         :instance&&assembly.definition?<AssemblyInspector buildTools={buildTools} key={instance.id} name={instance.name} definitionName={assembly.definition.name}
           parameters={assembly.definition.parameters} parameterValues={instance.parameterValues} onParameterChange={(id,value)=>assembly.parameter(instance.id,id,value)} onResetParameters={()=>assembly.resetParameters(instance.id)}
           instanceCount={assemblyCount(instance.definitionId)} panelCount={Object.keys(instance.panelIds).length} color={instance.finish?.color??selectedPanels[0]?.color??'#d9bb87'} hasColorOverride={!!instance.finish?.color}
@@ -652,8 +670,8 @@ export default function App() {
         :assembly.memberInstance&&selected&&assembly.definition?<><AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={()=>assembly.select(assembly.memberInstance!.id)} onEdit={()=>assembly.edit(assembly.memberInstance!.id)}/>{buildTools}</>
         :assembly.hasMembers?<><div className="selected-heading"><Box size={15}/><span>MULTIPLE OBJECTS</span></div><p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p>{buildTools}<div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15}/>Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15}/>Remove</Button></div></>
         :<>
-          {selectedPanels.length>1&&<MultiPanelInspector buildTools={buildTools} panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commit(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
-          {selected&&(inspectorTab==='panel'?<SinglePanelInspector onExtendToGround={extendToGround} groundFitReason={groundPanelFit.reason} buildTools={buildTools} selected={selected} connected={project.connections.some(c=>c.parentId===selected.id||c.childId===selected.id)} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewIssues={previewIssues} sideGuide={attachmentSideGuide!}/>)}
+          {selectedPanels.length>1&&<MultiPanelInspector buildTools={buildTools} panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commitWithInsertChecks(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
+          {selected&&(inspectorTab==='panel'?<SinglePanelInspector accessories={trofastInspector} onExtendToGround={extendToGround} groundFitReason={groundPanelFit.reason} buildTools={buildTools} selected={selected} connected={project.connections.some(c=>c.parentId===selected.id||c.childId===selected.id)} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewIssues={previewIssues} sideGuide={attachmentSideGuide!}/>)}
           {!selectedPanels.length&&<div className="no-selection"><MousePointer2 size={28}/><h2>A little more detail.</h2><p>Select a panel or connector in the workspace<br/>to make it your own.</p><Button variant="outline" onClick={addPanel}><Plus size={16}/>Add a panel</Button></div>}
         </>}
         </>}

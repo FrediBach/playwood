@@ -66,6 +66,12 @@ The geometry builder has a performance guard: if the candidate perforation grid 
 
 Panel geometry, outline geometry, texture wrappers, and materials have explicit effect cleanup. Preserve this ownership when adding a panel visual: rebuilding a geometry on every selection change is unnecessary, while disposing a shared cache entry can break other meshes.
 
+## TROFAST geometry
+
+[`scene-geometry.ts`](../src/components/scene-geometry.ts) cuts rounded rectangular holes for saved TROFAST inserts. [`TrofastMeshes.tsx`](../src/components/TrofastMeshes.tsx) renders the matching hollow tapered plastic boxes, wire mesh boxes, and divided trays in both Studio and Realistic preview, with shadow-receiving materials and product-specific colors. The render uses fixed real outer sizes from the catalogue; molded profiles, colors and cutout sizes are visual approximations.
+
+[`trofast-geometry.ts`](../src/components/trofast-geometry.ts) caches immutable geometry for application lifetime. Instance materials use declarative React Three Fiber ownership; cached geometry is attached as a primitive and is not disposed per instance. There is no animation loop or network model dependency. Box mesh selection, context menus and box selection refer to the host panel. Camera fitting includes insert bounds. Auto furnish excludes panels with openings and treats hanging boxes as obstacles for other surfaces.
+
 ## Connector geometry and materials
 
 [`ConnectorMeshes.tsx`](../src/components/ConnectorMeshes.tsx) gets each connection's allowed rail and clamp placements from [`connector-movement.ts`](../src/lib/connector-movement.ts). It derives physical connector IDs from the connection ID and clamp index, applies per-piece finish/removal/slide overrides, and renders each remaining piece. Connector selection is attached to the enclosing group so all CAD bodies belonging to one clamp identify the same part.
@@ -96,7 +102,7 @@ Pointer deltas are measured against the initial intersection, converted to milli
 
 ### Resize handles
 
-[`PreviewResizeHandles.tsx`](../src/components/PreviewResizeHandles.tsx) projects structural handles into screen-sized DOM buttons. A stable Drei `Html` portal keeps the overlay attached to the canvas container. Projection hides handles pointing almost directly toward the camera and separates overlapping arrows so each remains reachable.
+[`PreviewResizeHandles.tsx`](../src/components/PreviewResizeHandles.tsx) projects structural handles into screen-sized DOM buttons. A stable Drei `Html` portal keeps the overlay attached to the canvas container. Projection hides handles pointing almost directly toward the camera and separates overlapping arrows so each remains reachable. Layout changes update the DOM hit targets immediately, including after cancellation; demand-rendered frames keep them aligned during camera movement.
 
 A pointer drag uses a camera-facing plane containing the handle's structural axis. Projecting its movement onto that axis produces a distance in millimeters for [`use-preview-resize.ts`](../src/hooks/use-preview-resize.ts). Shift held at pointer-down requests independent panel-edge resizing; it is not toggled halfway through the drag. Arrow keys and plus/minus on a focused handle perform a complete resize operation at the configured keyboard step, with Shift multiplying that step by ten.
 

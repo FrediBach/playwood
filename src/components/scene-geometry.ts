@@ -1,6 +1,7 @@
 import { outlineSegmentsIntersect, panelCornerRadius, panelOutlineCorners, pointSegmentDistance } from '@/lib/panel-shape'
 import * as THREE from 'three'
 import type { OutlinePoint, Panel } from '@/lib/types'
+import { getTrofastItem } from '@/lib/trofast-catalog'
 
 const MM = 0.001
 
@@ -27,7 +28,7 @@ function openingInsideContour(x: number, y: number, radius: number, straight: nu
   return true
 }
 
-export function makePanelGeometry(panel: Pick<Panel, 'width' | 'height' | 'thickness' | 'pattern' | 'holeSize' | 'holeSpacing' | 'cornerRadius' | 'customOutline'>) {
+export function makePanelGeometry(panel: Pick<Panel, 'width' | 'height' | 'thickness' | 'pattern' | 'holeSize' | 'holeSpacing' | 'cornerRadius' | 'customOutline' | 'trofastInserts'>) {
   const w = panel.width * MM, h = panel.height * MM, t = panel.thickness * MM
   const shape = new THREE.Shape()
   const r = panelCornerRadius(panel) * MM
@@ -57,6 +58,28 @@ export function makePanelGeometry(panel: Pick<Panel, 'width' | 'height' | 'thick
     shape.lineTo(w / 2, h / 2); shape.lineTo(-w / 2, h / 2)
   }
   shape.closePath()
+  // TROFAST openings are real holes through the panel; their approximate profiles
+  // are shared with placement validation and never change the purchased box size.
+  for (const insert of panel.trofastInserts ?? []) {
+    const item = getTrofastItem(insert.itemId)
+    if (!item) continue
+    const halfW = (insert.quarterTurn ? item.cutoutDepth : item.cutoutWidth) * MM / 2
+    const halfH = (insert.quarterTurn ? item.cutoutWidth : item.cutoutDepth) * MM / 2
+    const x = insert.x * MM - w / 2, y = h / 2 - insert.y * MM
+    const radius = item.cornerRadius * MM
+    const opening = new THREE.Path()
+    opening.moveTo(x - halfW + radius, y - halfH)
+    opening.lineTo(x + halfW - radius, y - halfH)
+    opening.absarc(x + halfW - radius, y - halfH + radius, radius, -Math.PI / 2, 0, false)
+    opening.lineTo(x + halfW, y + halfH - radius)
+    opening.absarc(x + halfW - radius, y + halfH - radius, radius, 0, Math.PI / 2, false)
+    opening.lineTo(x - halfW + radius, y + halfH)
+    opening.absarc(x - halfW + radius, y + halfH - radius, radius, Math.PI / 2, Math.PI, false)
+    opening.lineTo(x - halfW, y - halfH + radius)
+    opening.absarc(x - halfW + radius, y - halfH + radius, radius, Math.PI, Math.PI * 1.5, false)
+    opening.closePath()
+    shape.holes.push(opening)
+  }
   // Match ExtrudeGeometry's tessellation, so openings stay inside the rendered face.
   const contour = panel.customOutline ? shape.getPoints(8) : null
   if (panel.pattern !== 'solid') {
