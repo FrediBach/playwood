@@ -80,3 +80,5 @@
 
 @media(max-width:900px){.new-project-suffix{display:none}.header-actions .export-project-button span{display:none}.header-actions .export-project-button{width:34px;padding:0}}
 @media(max-width:680px){.app-header{gap:8px}.header-actions{gap:2px}.header-actions .new-project-button{padding-inline:7px;gap:5px}.brand{font-size:18px;gap:4px}}
+
+@media(max-width:600px){.move-creation-dialog{padding:24px 20px}.move-creation-dialog h2+p{margin-bottom:16px}.move-creation-dialog .field{margin-bottom:12px}.move-creation-dialog .dialog-note{margin-top:12px}.move-creation-dialog .dialog-footer{margin-top:18px;padding-top:0}}

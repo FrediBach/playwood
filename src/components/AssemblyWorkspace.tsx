@@ -1,6 +1,6 @@
 import type { SnapSettings } from '@/lib/preview-snap'
 import { useState, type Dispatch, type SetStateAction } from 'react'
-import { Box, Grid2X2, House, Link2, PanelLeftOpen, Plus, RotateCw, Ruler, SlidersHorizontal, Sun } from 'lucide-react'
+import { Box, Grid2X2, House, Link2, PanelLeftOpen, Plus, Move, RotateCw, Ruler, SlidersHorizontal, Sun } from 'lucide-react'
 import Scene, { type SceneProps } from './Scene'
 import { ViewportControls } from './ViewportControls'
 import { IconButton } from './editor-controls'
@@ -30,6 +30,7 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
   setZoomSignal: Setter<SceneProps['zoomSignal']>
   setFitSignal: Setter<number>
   setExploded: Setter<boolean>
+  onMoveCreation: () => void
   onRotate: () => void
   addPanel: () => void
   onAutoConnect: () => void
@@ -47,7 +48,7 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
 }
 const number = (n:number)=>Math.round(n).toLocaleString()
 
-export function AssemblyWorkspace({boxSelectActive,boxSelectDisabled,selectionKind,onToggleBoxSelect,onBoxSelect,onBoxSelectCancel,resolveBoxPanelIds,resolveBoxConnectorIds,snapProbe,snapDirection,snapSettings,setSnapSettings,onPreviewContextMenu,connectorOverrides,selectedConnectorIds,onSelectConnector,panels,connections,selectedIds,choosePanel,onMove,onMoveConnectors,movementEnabled,onDragStart,onDragMove,onDragEnd,dragging,dragSnap,resizeHandles,onResizeStart,onResizeMove,onResizeEnd,resizing,resizeDistance,resizeLimited,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,frameSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onRotate,addPanel,onAutoConnect,autoConnectDisabled,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels,onDrillIn,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,suppressedConnectionIds=[],suppressedPanelIds=[],editingAssembly,assemblyHint,attachmentSummary,attachmentWarning}: Props) {
+export function AssemblyWorkspace({boxSelectActive,boxSelectDisabled,selectionKind,onToggleBoxSelect,onBoxSelect,onBoxSelectCancel,resolveBoxPanelIds,resolveBoxConnectorIds,snapProbe,snapDirection,snapSettings,setSnapSettings,onPreviewContextMenu,connectorOverrides,selectedConnectorIds,onSelectConnector,panels,connections,selectedIds,choosePanel,onMove,onMoveConnectors,movementEnabled,onDragStart,onDragMove,onDragEnd,dragging,dragSnap,resizeHandles,onResizeStart,onResizeMove,onResizeEnd,resizing,resizeDistance,resizeLimited,previewPanels,previewConnections,view,showGrid,showDimensions,exploded,realisticPreview,fitSignal,frameSignal,zoomSignal,setRealisticPreview,leftOpen,rightOpen,setLeftOpen,setRightOpen,setShowDimensions,setShowGrid,setView,setZoomSignal,setFitSignal,setExploded,onMoveCreation,onRotate,addPanel,onAutoConnect,autoConnectDisabled,isAttaching,attachmentSide,visibleBounds,hasVisiblePanels,onDrillIn,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,suppressedConnectionIds=[],suppressedPanelIds=[],editingAssembly,assemblyHint,attachmentSummary,attachmentWarning}: Props) {
   const [panMode, setPanMode] = useState(false)
   const panelSelectionActive = (selectionKind ?? (selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'panels'
   const previewIds = new Set([...suppressedPanelIds, ...previewPanels.map(panel => panel.id)])
@@ -66,7 +67,7 @@ export function AssemblyWorkspace({boxSelectActive,boxSelectDisabled,selectionKi
       ? <div className={`assembly-workspace-hint ${attachmentWarning ? 'has-warning' : ''}`} role="status">{assemblyHint}{attachmentSummary && <strong>{attachmentSummary}</strong>}</div>
       : undefined
   return <main className="workspace" aria-label="3D assembly workspace">
-      <WorkspaceToolbar snapSettings={snapSettings} setSnapSettings={setSnapSettings} onAutoConnect={onAutoConnect} autoConnectDisabled={autoConnectDisabled} panels={panels} realisticPreview={realisticPreview} setRealisticPreview={setRealisticPreview} onRotate={onRotate} leftOpen={leftOpen} setLeftOpen={setLeftOpen} rightOpen={rightOpen} setRightOpen={setRightOpen} showDimensions={showDimensions} setShowDimensions={setShowDimensions} showGrid={showGrid} setShowGrid={setShowGrid}/>
+      <WorkspaceToolbar snapSettings={snapSettings} setSnapSettings={setSnapSettings} onAutoConnect={onAutoConnect} autoConnectDisabled={autoConnectDisabled} panels={panels} realisticPreview={realisticPreview} setRealisticPreview={setRealisticPreview} onMoveCreation={onMoveCreation} onRotate={onRotate} leftOpen={leftOpen} setLeftOpen={setLeftOpen} rightOpen={rightOpen} setRightOpen={setRightOpen} showDimensions={showDimensions} setShowDimensions={setShowDimensions} showGrid={showGrid} setShowGrid={setShowGrid}/>
       <div className="scene-container"><Scene {...sceneProps} boxSelectActive={boxSelectActive} selectionKind={selectionKind} onBoxSelect={onBoxSelect} onBoxSelectCancel={onBoxSelectCancel} resolveBoxPanelIds={resolveBoxPanelIds} resolveBoxConnectorIds={resolveBoxConnectorIds} snapProbe={snapProbe} snapDirection={snapDirection} snapSettings={snapSettings} onPreviewContextMenu={onPreviewContextMenu} connectorOverrides={connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={onSelectConnector} panMode={panMode} onMove={onMove} onMoveConnectors={onMoveConnectors} movementEnabled={movementEnabled} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} dragging={dragging} dragSnap={dragSnap} resizeHandles={resizeHandles} onResizeStart={onResizeStart} onResizeMove={onResizeMove} onResizeEnd={onResizeEnd} resizing={resizing} resizeDistance={resizeDistance} resizeLimited={resizeLimited}/></div>
       {!realisticPreview&&editingAssembly&&<div className="assembly-edit-breadcrumb"><Box size={15}/><strong>Editing {editingAssembly.name}</strong><span>Updates {editingAssembly.instanceCount} {editingAssembly.instanceCount===1?'instance':'instances'}</span>{!rightOpen&&<button onClick={editingAssembly.onDone}>Done editing</button>}</div>}
       {!realisticPreview&&isAttaching&&<div className="preview-badge"><span className="pulsing-dot"/>Attachment preview <span>·</span> {attachmentSide} side</div>}
@@ -86,7 +87,7 @@ export function AssemblyWorkspace({boxSelectActive,boxSelectDisabled,selectionKi
 }
 
 
-function WorkspaceToolbar({snapSettings,setSnapSettings,onAutoConnect,autoConnectDisabled,panels,realisticPreview,setRealisticPreview,onRotate,leftOpen,setLeftOpen,rightOpen,setRightOpen,showDimensions,setShowDimensions,showGrid,setShowGrid}: Pick<Props, 'snapSettings' | 'setSnapSettings' | 'onAutoConnect' | 'autoConnectDisabled' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onRotate' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
+function WorkspaceToolbar({snapSettings,setSnapSettings,onAutoConnect,autoConnectDisabled,panels,realisticPreview,setRealisticPreview,onMoveCreation,onRotate,leftOpen,setLeftOpen,rightOpen,setRightOpen,showDimensions,setShowDimensions,showGrid,setShowGrid}: Pick<Props, 'snapSettings' | 'setSnapSettings' | 'onAutoConnect' | 'autoConnectDisabled' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onMoveCreation' | 'onRotate' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
   return <div className="workspace-top">
         <div className="preview-mode-switch" role="group" aria-label="Preview mode">
           <button aria-pressed={!realisticPreview} onClick={()=>setRealisticPreview(false)}><Box size={15}/>Studio</button>
@@ -105,6 +106,7 @@ function WorkspaceToolbar({snapSettings,setSnapSettings,onAutoConnect,autoConnec
             </div>
           </details>
           <IconButton label="Auto-add connectors" disabled={autoConnectDisabled} onClick={onAutoConnect}><Link2 size={18}/></IconButton>
+          <IconButton label="Move creation" disabled={!panels.length} onClick={onMoveCreation}><Move size={18}/></IconButton>
           <IconButton label="Rotate creation" disabled={!panels.length} onClick={onRotate}><RotateCw size={18}/></IconButton>
           {!realisticPreview&&!leftOpen&&<IconButton label="Open panel list" onClick={()=>setLeftOpen(true)}><PanelLeftOpen size={18}/></IconButton>}
           <Tooltip label="Show dimensions"><button className={`canvas-toggle ${showDimensions?'active':''}`} aria-label="Show dimensions" aria-pressed={showDimensions} onClick={()=>setShowDimensions(v=>!v)}><Ruler size={18}/></button></Tooltip>

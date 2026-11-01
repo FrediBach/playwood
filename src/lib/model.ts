@@ -211,6 +211,19 @@ export function getProjectBounds(panels: Panel[]) {
   return { width: max.x - min.x, height: max.y - min.y, depth: max.z - min.z, min: tuple(min), max: tuple(max) }
 }
 
+/** Translate all panels and instance origins together; joints remain panel-local. */
+export function moveProject(project: Project, delta: Vec3): Project {
+  if (!delta.every(Number.isFinite)) throw new Error('Movement must be a finite distance.')
+  if (!project.panels.length || delta.every(value => value === 0)) return project
+  const move = (position: Vec3): Vec3 => tuple(vec(position).add(vec(delta)))
+  return { ...project,
+    panels: resolvePanels(project).map(panel => ({ ...panel, position: move(panel.position) })),
+    ...(project.assemblies ? { assemblies: { ...project.assemblies,
+      instances: project.assemblies.instances.map(instance => ({ ...instance, position: move(instance.position) })),
+    } } : {}),
+  }
+}
+
 /** Rotate the entire resolved assembly in world space, retaining its lowest panel height. */
 export function rotateProject(project: Project, axis: RotationAxis, degrees: number): Project {
   if (!Number.isFinite(degrees)) throw new Error('Rotation must be a finite angle.')

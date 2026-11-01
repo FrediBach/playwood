@@ -177,13 +177,13 @@ export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
   useEffect(() => () => { oak.dispose(); linen.dispose(); art.dispose() }, [oak, linen, art])
   useEffect(() => { oak.repeat.set(width / 2.4, depth / 2.4) }, [oak, width, depth])
   const lightTarget = useMemo(() => new THREE.Object3D(), [])
-  const furnitureCenterZ = (bounds.min.z + bounds.max.z) / 2
+  const furnitureCenterZ = 0
   useEffect(() => { lightTarget.position.set(layout.centerX, floorY + 0.55, furnitureCenterZ) }, [lightTarget, layout.centerX, floorY, furnitureCenterZ])
   const windowZ = backZ + 2.1
   const windowWidth = 2.4
   const windowHeight = 2.25
   const windowBottom = 0.35
-  const artY = Math.max(1.85, bounds.max.y - floorY + 0.65)
+  const artY = Math.max(1.85, bounds.max.y - bounds.min.y + 0.65)
   const rugWidth = Math.max(2.5, bounds.max.x - bounds.min.x + 1.3)
   const rugDepth = Math.max(1.8, bounds.max.z - bounds.min.z + 1.3)
   return <group name="Modern home">
@@ -231,6 +231,6 @@ export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
     <LoungeChair position={[chairX, floorY, chairZ]} />
     <FloorLamp position={[chairX + 0.63, floorY, chairZ - 0.34]} />
     <SideTable position={[chairX + 0.68, floorY, chairZ + 0.42]} />
-    <Plant position={[bounds.min.x - 0.7, floorY, bounds.min.z + 0.12]} />
+    <Plant position={[-(bounds.max.x - bounds.min.x) / 2 - 0.7, floorY, -(bounds.max.z - bounds.min.z) / 2 + 0.12]} />
   </group>
 }

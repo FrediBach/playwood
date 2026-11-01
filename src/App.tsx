@@ -48,7 +48,7 @@ import type { BoxSelection } from '@/components/PreviewBoxSelection'
 import { duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, isPanelConnectedToAssembly, moveAssemblies, removeAssembly } from '@/lib/assemblies'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
-import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, rotateProject, validateProject } from '@/lib/model'
+import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, moveProject, rotateProject, validateProject } from '@/lib/model'
 import type { AssemblyDefinition, AttachmentOptions, CameraView, Panel, Project, Vec3, ListKind } from '@/lib/types'
 
 const INITIAL_ATTACHMENT: AttachmentOptions = {side:'right',type:'90',offset:0,inset:0,flip:false,color:DEFAULT_CONNECTOR_COLOR,count:2}
@@ -561,7 +561,7 @@ export default function App() {
       exploded={exploded} realisticPreview={realisticPreview} fitSignal={fitSignal} frameSignal={frameSignal} zoomSignal={zoomSignal}
       setRealisticPreview={setRealisticPreview} leftOpen={leftOpen} rightOpen={rightOpen} setLeftOpen={setLeftOpen} setRightOpen={setRightOpen}
       setShowDimensions={setShowDimensions} setShowGrid={setShowGrid} setView={setView} setZoomSignal={setZoomSignal} setFitSignal={setFitSignal}
-      setExploded={setExploded} onRotate={()=>setDialog('rotate')} addPanel={addPanel} isAttaching={inspectorTab==='attach'&&!!selected}
+      setExploded={setExploded} onMoveCreation={()=>setDialog('move')} onRotate={()=>setDialog('rotate')} addPanel={addPanel} isAttaching={inspectorTab==='attach'&&!!selected}
       attachmentSide={attachment.side} visibleBounds={visibleBounds} hasVisiblePanels={hasVisiblePanels}
       attachmentHandles={!dialog&&!inspectingConnectors?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?(clipboard.inserting?`Attach ${clipboard.inserting} at`:'Paste at'):'Attach'} ${target.label}${target.warning?` · ${target.warning}`:''}`,position:target.position,warning:target.warning,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
       onAttachmentPreview={clipboard.active?clipboard.hover:assembly.hover} onAttachmentCommit={clipboard.active?clipboard.attach:assembly.attach} suppressedConnectionIds={clipboard.active?clipboard.suppressedConnectionIds:assembly.suppressedConnectionIds}
@@ -611,6 +611,7 @@ export default function App() {
       replacementName={pendingTemplate?.project.name??''} onReplace={()=>{if(pendingTemplate)applyTemplate(pendingTemplate.id,pendingTemplate.project)}}
       exportProject={exportProject} onExportParts={()=>{download(projectToCsv(project),`${exportName}-parts.csv`,'text/csv');notify('Parts list exported')}}
       onImport={()=>importRef.current?.click()} importError={importError} project={project} panels={panels} connectorCount={connectorCount} issues={issues}
+      onMoveCreation={delta=>{commit(p=>moveProject(p,delta));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);notify('Creation moved. Undo is available.')}}
       onRotate={(axis,degrees)=>{commit(p=>rotateProject(p,axis,degrees));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify(`Creation rotated ${degrees}° around ${axis.toUpperCase()}. Undo is available.`)}}
       attachNewPanel={!inspectingConnectors&&selectedIds.length>0} onAdd={addDraftPanel}/>
     <input ref={importRef} type="file" accept=".json,.playwood.json" className="visually-hidden" aria-label="Import project file" onChange={e=>{const file=e.target.files?.[0];if(file)void importProject(file);e.target.value=''}}/>
