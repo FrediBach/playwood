@@ -1,0 +1,133 @@
+# Development and verification
+
+[Documentation index](README.md)
+
+## Local setup
+
+The project uses npm and commits [package-lock.json](../package-lock.json). Follow the root README's Node.js 22.12+ baseline; Node 25 is the version documented there as tested. There is no committed Node version-manager file or `engines` declaration in [package.json](../package.json).
+
+For a fresh checkout using the locked dependency graph:
+
+```sh
+npm ci
+npm run dev
+```
+
+Use `npm install` when intentionally updating dependencies and review the accompanying lockfile diff. The development script binds to `127.0.0.1`; use the URL Vite prints. No `.env`, account, database, or API key is required.
+
+Local storage is scoped to the full origin. Development, production, and the browser-test port each have their own project save. Export a `.playwood.json` file when moving work between them.
+
+## Commands provided by the repository
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Starts Vite on localhost |
+| `npm run build` | Runs `tsc -b` and then creates the Vite production bundle in `dist/` |
+| `npm run preview` | Serves an already-built `dist/` locally |
+| `npm test` | Runs the Vitest suite once |
+| `npm run test:e2e` | Runs Playwright browser tests |
+| `npm run doctor` | Runs the installed React Doctor with `--yes --no-score` |
+
+There is no `lint`, formatter, standalone `typecheck`, or library-build script. Do not refer to nonexistent commands in change reports or agent workflows. The build provides TypeScript checking for [tsconfig.json](../tsconfig.json)'s includes (`src` and `vite.config.ts`); it does not type-check the separate `tests/` directory through that configuration.
+
+The `@/` import alias maps to `src/` in TypeScript, [vite.config.ts](../vite.config.ts), and [vitest.config.ts](../vitest.config.ts). If the alias changes, keep all three in sync. Browser specs commonly import source modules using relative paths.
+
+## Choosing verification
+
+Use checks that exercise the changed behavior. Documentation-only changes need source/link/command review and `git diff --check`; they do not require a WebGL test run. For code, start with the relevant domain tests and build. Run browser coverage when changing interaction, focus, rendering, persistence wiring, or layout. For broad changes, the existing full verification sequence is:
+
+```sh
+npm run doctor
+npm test
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+The Chromium installation is a setup step; repeat it only when needed. React Doctor also supports `npm run doctor -- --verbose` and `npm run doctor -- --scope changed`. Treat its findings as diagnostics to investigate, and report remaining findings accurately.
+
+### Focused unit and geometry tests
+
+Vitest discovers `src/**/*.test.ts` and uses its default Node test environment. Domain modules are exercised without mounting the app; geometry tests inspect Three.js data directly. Some tests live beside rendering helpers in `src/components`.
+
+```sh
+npm test -- src/lib/model.test.ts src/lib/structure-edit.test.ts
+npm test -- src/lib/assembly-parameters.test.ts
+npm test -- src/components/scene-geometry.test.ts
+```
+
+Prefer assertions about the physical result: resolved positions and rotations, joint seats, connector quantities, preserved IDs, rejected constraints, and serialization round trips. For rotations, quaternion equivalence or geometric comparisons often express correctness better than exact Euler tuples. Use tolerances for floating-point geometry. Tests that repeat an implementation's intermediate calculations without checking behavior provide little protection.
+
+### Browser tests
+
+[playwright.config.ts](../playwright.config.ts) points at `tests/`, defaults to `http://127.0.0.1:5174`, and starts Vite with `--strictPort`. It reuses an existing server at that address, so verify that the server belongs to this checkout. `fullyParallel` is disabled; the config does not explicitly set a worker count. The default viewport is 1440 × 1000, and individual specs also exercise smaller sizes.
+
+Chromium launches with WebGL/ANGLE/SwiftShader flags for software rendering. The optional environment variables are:
+
+| Variable | Purpose |
+| --- | --- |
+| `PLAYWRIGHT_PORT` | Overrides the browser suite's server port |
+| `PLAYWRIGHT_CHROMIUM_EXECUTABLE` | Uses an existing Chromium binary instead of the Playwright-managed one; also supported by brand-asset generation |
+
+```sh
+npm run test:e2e -- tests/editor.spec.ts
+npm run test:e2e -- tests/preview-resize.spec.ts --workers=1
+PLAYWRIGHT_PORT=5175 npm run test:e2e -- tests/assembly-files.spec.ts
+```
+
+Specs commonly create a real `Project` using domain helpers, load it through the file-import control, operate labeled controls, and read exported JSON or local storage. This verifies the browser wiring as well as the domain command. Use [tests/inspector-helpers.ts](../tests/inspector-helpers.ts) to open named inspector disclosures through their real controls. Prefer accessible roles and labels where possible.
+
+Persistence is debounced: wait for the saved state or poll the stored value before reloading. Rendering tests should wait for the expected scene or observable pixels, rather than relying on a fixed delay. Listen for page errors when a new flow risks runtime/WebGL failures. A click succeeding is insufficient evidence that a candidate project was actually committed.
+
+Screenshots are saved on failures, and some specs explicitly write diagnostic images to `test-results/`. Those images are evidence for inspection, not automatically approved visual snapshots. `test-results/` and `playwright-report/` are ignored.
+
+### Coverage map
+
+| Change area | Representative unit coverage | Representative browser coverage |
+| --- | --- | --- |
+| Attachments and connector profiles | `src/lib/model.test.ts`, `src/components/connector-geometry.test.ts` | `tests/connectors.spec.ts`, `tests/attachment-sides.spec.ts` |
+| Constrained movement and resizing | `src/lib/structure-edit.test.ts`, `src/lib/preview-resize.test.ts` | `tests/panel-movement.spec.ts`, `tests/preview-resize.spec.ts` |
+| Drag, snapping, and selection | `src/lib/preview-drag.test.ts`, `src/lib/preview-snap.test.ts`, `src/lib/box-selection.test.ts` | `tests/preview-drag.spec.ts`, `tests/preview-snap.spec.ts`, `tests/box-selection.spec.ts` |
+| Assemblies and parameters | `src/lib/assemblies.test.ts`, `src/lib/assembly-parameters.test.ts`, `src/lib/assembly-placement.test.ts` | `tests/assemblies.spec.ts`, `tests/assembly-parameters.spec.ts`, `tests/assembly-placement.spec.ts` |
+| Automatic construction tools | `src/lib/auto-connect.test.ts`, `src/lib/close-holes.test.ts`, `src/lib/grid-split.test.ts` | `tests/auto-connect.spec.ts`, `tests/close-holes.spec.ts`, `tests/split-panels.spec.ts` |
+| File compatibility and copy/paste | `src/lib/assembly-file.test.ts`, `src/lib/clipboard.test.ts`, `src/lib/model.test.ts` | `tests/assembly-files.spec.ts`, `tests/copy-paste.spec.ts`, `tests/editor.spec.ts` |
+| Appearance and outlines | `src/lib/custom-colors.test.ts`, `src/lib/finish-coverage.test.ts`, `src/lib/custom-outline.test.ts` | `tests/custom-colors.spec.ts`, `tests/finish-coverage.spec.ts`, `tests/custom-outlines.spec.ts` |
+| List organization and hardware edits | `src/lib/list-groups.test.ts`, `src/lib/connector-selection.test.ts` | `tests/list-groups.spec.ts`, `tests/connector-selection.spec.ts` |
+| Realistic preview | `src/components/room-layout.test.ts`, `src/lib/preview-furnishings.test.ts` | `tests/realistic-preview.spec.ts` |
+| Library and guide content | `src/lib/example-library.test.ts`, `src/lib/guide-scenes.test.ts` | `tests/library.spec.ts`, `tests/build-guide.spec.ts` |
+| Layout, focus, and inspector behavior | Relevant helper tests where applicable | `tests/sidebar-layout.spec.ts`, `tests/inspector-ux.spec.ts`, `tests/editor.spec.ts` |
+
+This is a navigation aid, not an exhaustive test list. Nearby specialized tests often cover important constraints beyond the main feature's filename.
+
+## Implementing common changes
+
+### Add a saved property
+
+Trace the property through [types.ts](../src/lib/types.ts), creation defaults, `parseProject`, and any assembly/file parser that serializes it. Define how older files with the property omitted should behave. Consider shared definitions, per-instance overrides, copy/paste, duplication, selection equality, palette normalization, JSON exports, and CSV only where relevant. Confirm import/export, undo/redo, and reload behavior instead of treating the inspector as the only entry point.
+
+### Add a geometry operation
+
+Implement the transformation in the appropriate `src/lib` module so the UI, previews, workers, and tests can reuse it. Work from resolved geometry where required, preserve structural and assembly identities, and return a candidate/result or a useful failure. Commit through `useProject` at the intended undo boundary. Add behavioral regression coverage for the valid case and the relevant rejected constraint, including rotated and connected cases when the algorithm depends on orientation or graph topology.
+
+### Add an interaction or inspector control
+
+Keep transient drafts in a component or hook and persist the accepted result through the existing command path. Follow the existing focus, modal, attachment, exploded-view, and assembly-editing guards. Test cancellation, one-step undo, and keyboard behavior alongside pointer input. For multi-selection, preserve the existing mixed-value semantics. Check narrow layouts and whether the change affects both studio and realistic preview.
+
+### Add examples or guides
+
+Generate examples through domain functions, preserve source provenance, and document intentional approximations. Update the catalog and its geometry tests. Keep reusable module insertion separate from full-project replacement. Guide steps should refer to actual labels and controls, draw from model geometry, and stay read-only with respect to the active project. Update the root README if the user workflow changes.
+
+## Assets and production checks
+
+To regenerate committed brand PNGs after editing [public/favicon.svg](../public/favicon.svg) or the artwork script:
+
+```sh
+npx playwright install chromium
+node scripts/generate-brand-assets.mjs
+```
+
+The script writes icons and `public/og-image.png`. Inspect those outputs and include intended asset updates in the change. Production builds serve these committed files and do not run Chromium for asset generation.
+
+Use `npm run build` followed by `npm run preview` to inspect production output when changing imports, lazy modules, workers, or asset URLs. [vercel.json](../vercel.json) configures static hosting; domain changes also affect canonical/social metadata, robots rules, and the sitemap. [Architecture overview](architecture.md) describes the deployment boundary.
+
+Generated `dist/`, `node_modules/`, `*.tsbuildinfo`, and test artifacts are ignored by [.gitignore](../.gitignore). Do not edit generated output as the implementation. Preserve supplied CAD/reference files unless a task explicitly changes the underlying resources.

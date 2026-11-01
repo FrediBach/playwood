@@ -1,0 +1,128 @@
+# Architecture overview
+
+[Documentation index](README.md)
+
+## Runtime and product boundary
+
+Playwood is a single-page furniture design application. [index.html](../index.html) loads [src/main.tsx](../src/main.tsx), which mounts [App](../src/App.tsx) inside React Strict Mode and imports the base styles. There is one workspace at `/`, with dialogs and editor modes rather than a client-side router.
+
+The runtime is entirely in the browser. The repository has no application server, authentication service, database, or required environment variables. The current project is saved to local storage; portable project and assembly files are browser downloads and uploads. Local saves belong to the browser origin, so another browser, hostname, or port has a separate save. The web manifest supports standalone launch, but there is no service worker or offline-cache implementation.
+
+The main technologies and their roles are declared in [package.json](../package.json):
+
+| Technology | Responsibility |
+| --- | --- |
+| React 19 and TypeScript | Workspace components, local state, typed model and commands |
+| Three.js | Geometry, matrices, quaternions, collision primitives, meshes, and materials |
+| React Three Fiber and Drei | React-managed WebGL scene, camera controls, helpers, and HTML overlays |
+| Radix and local shadcn-style primitives | Accessible dialogs, tooltips, slots, and buttons |
+| Tailwind CSS 4 and plain CSS | Shared tokens/utilities and component-specific workspace styles |
+| Vite | Development server, TypeScript/JSX transformation, raw CAD imports, worker bundling, and production assets |
+| Vitest and Playwright | Domain/geometry regression tests and browser workflows |
+
+Use the lockfile for exact installed versions; the package manifest contains version ranges for most dependencies.
+
+## Runtime data flow
+
+```mermaid
+flowchart TD
+    Storage[(Browser local storage)] --> History[useProject: project and history]
+    Files[Project and assembly JSON] --> Parse[Parsers and compatibility repairs]
+    Parse --> App[App: editing orchestration]
+    History --> App
+    App --> UI[Sidebars, inspectors, dialogs]
+    UI --> Commands[Domain operations in src/lib]
+    Commands --> Candidate[Validated result or preview candidate]
+    Candidate --> Commit[commit]
+    Commit --> History
+    History --> Storage
+    App --> Derived[Resolved panels, physical hardware, issues]
+    Derived --> Workspace[AssemblyWorkspace and Scene]
+    Candidate --> Workspace
+    Workspace --> Gestures[Selection, drag, resize, camera input]
+    Gestures --> App
+    App --> Export[JSON and cutting-list downloads]
+```
+
+This diagram groups responsibilities; it is not a strict module dependency graph. Several domain modules call each other. In particular, model parsing, assemblies, structural editing, and selection have cross-dependencies. Rendering helpers also live in both `src/lib` and `src/components`. Inspect imports before moving shared code, and avoid adding module-initialization work that depends on a cyclic import already being initialized.
+
+## Source layout and ownership
+
+| Location | Responsibility and useful entry points |
+| --- | --- |
+| [src/App.tsx](../src/App.tsx) | Composition root: selection, inspector modes, dialogs, command routing, import/export, global shortcuts, and feedback |
+| [src/hooks/](../src/hooks/) | React lifecycles around project history, assembly editing, clipboard, attachment previews, drag/resize transactions, and split feasibility |
+| [src/lib/types.ts](../src/lib/types.ts) | Serializable domain contract shared by UI, operations, workers, parsers, and exports |
+| [src/lib/model.ts](../src/lib/model.ts) | Panel creation, attachment transforms, world resolution, joint placement, project validation, parsing, starters, and CSV export |
+| [src/lib/assemblies.ts](../src/lib/assemblies.ts) | Reusable definitions, instances, ports, links, materialization, and shared-source changes |
+| [src/lib/structure-edit.ts](../src/lib/structure-edit.ts) | Constraint-preserving panel movement and dimensional edits |
+| [src/lib/](../src/lib/) feature modules | Auto-connect, splitting, closure, rescaling, selection, clipboard, palette, outlines, snapping, example generation, and guide content |
+| [src/components/](../src/components/) | DOM controls, lists, dialogs, SVG illustrations, R3F scene components, mesh/material helpers, and local CSS |
+| [src/components/ui/](../src/components/ui/) | Editable button, dialog, and tooltip primitives; configuration is in [components.json](../components.json) |
+| [resources/](../resources/) | Supplied CAD, PDF, and image references; selected resources are explicitly imported by application code |
+| [public/](../public/) | Static brand assets, manifest, robots rules, and sitemap copied into production output |
+| [tests/](../tests/) | Playwright browser workflows and an inspector-navigation helper |
+| [scripts/](../scripts/) | Browser-based generation of committed brand PNGs |
+
+The directory split is practical rather than an enforced package boundary. There is no separate backend, shared package, service layer, or global store framework.
+
+## Workspace composition
+
+`App` owns the committed project through `useProject` and passes derived data and callbacks to the UI. It resolves world-space panels, computes validation issues and bounds, builds the installed connector list, and determines which selection the inspector displays. Specialized hooks keep gesture and assembly workflows out of the JSX, but `App` remains the central coordinator.
+
+The principal UI surfaces are:
+
+- [ProjectHeader](../src/components/ProjectHeader.tsx): project name, save status, project actions, undo/redo, and guide access.
+- [ProjectSidebar](../src/components/ProjectSidebar.tsx): library and assembly contents, with panels and connectors as separate list tabs.
+- [GroupedList](../src/components/GroupedList.tsx), [PanelList](../src/components/PanelList.tsx), and [ConnectorList](../src/components/ConnectorList.tsx): ordering, selection, groups, and row actions. Organizational list groups are independent of reusable assemblies and physical connections.
+- [AssemblyWorkspace](../src/components/AssemblyWorkspace.tsx): the scene and viewport controls, preview-mode presentation, and editing overlays.
+- [InspectorSidebar](../src/components/InspectorSidebar.tsx) and specialized inspectors: single/multiple panels, physical connectors, attachment options, whole assembly instances, and source parts while editing a shared design.
+- [ProjectDialogs](../src/components/ProjectDialogs.tsx): project creation/replacement, templates, panel creation, export, parts list, whole-creation transforms, and help.
+- [ProjectStatus](../src/components/ProjectStatus.tsx): dimensions, counts, validation feedback, and shortcut/help access.
+
+The workspace fills the viewport, with independently scrolling sidebars and dialogs. Narrow screens use drawers; realistic preview hides the sidebars. Changes to these surfaces must preserve keyboard focus and avoid outer-document scrolling. The browser suite checks desktop, compact, and phone layouts.
+
+## Domain commands and derived representations
+
+The serialized `Project` contains panels, connections, and optional assembly, palette, hardware-override, and list metadata. It does not contain Three.js objects, React components, DOM nodes, or GPU resources.
+
+Several representations coexist for distinct reasons:
+
+1. **Stored panels and connections** describe the editable construction. Driving connections determine child transforms.
+2. **Resolved panels** come from `resolvePanels(project)` and describe current world placement. They are the basis for geometry-dependent UI, rendering, and many operations.
+3. **Assembly definitions and instances** preserve reusable designs and per-instance configuration. Materialization keeps their physical panels and connections in the project consistent with that metadata.
+4. **Physical connectors** come from [connector-selection.ts](../src/lib/connector-selection.ts). One connection can produce several pieces of hardware; per-piece overrides can alter or remove installed pieces while retaining the structural joint.
+5. **Preview candidates** represent a prospective edit. The scene can show these without replacing the committed project or writing history on every pointer move.
+
+This separation is why a panel's stored position or `connections.length` alone is often the wrong value for a feature. See [domain model and geometry](domain-model-and-geometry.md) for the invariants and [state and persistence](state-and-persistence.md) for transaction behavior.
+
+## Rendering boundary
+
+[Scene](../src/components/Scene.tsx) owns the R3F canvas and composes panels, physical connectors, camera controls, interaction handlers, guides, and optional room elements. Studio and realistic modes use the same scene implementation. The scene uses demand rendering, with explicit invalidation for changes that occur outside React renders.
+
+Domain lengths are millimeters and rotations are Euler radians. Scene lengths are meters. Conversion happens in mesh, placement, camera, and interaction adapters; the project format stays in millimeters. Custom panel outlines use normalized panel-relative coordinates. These distinctions are covered in [rendering and interaction](rendering-and-interaction.md).
+
+Three.js math is also used outside rendering. For example, the domain layer uses vectors, rotations, and bounding volumes to solve joints and constrained edits. A Three.js import therefore does not necessarily imply WebGL or a browser dependency.
+
+## Examples, assemblies, and guides
+
+The app ships editable content as code and local data rather than fetching templates from a service:
+
+- [example-library.ts](../src/lib/example-library.ts) combines starter projects, CAD-derived examples, PDF-derived examples, and the photo-inspired Diamond shelf. `createExampleProject` is the common construction entry point.
+- [cad-examples.ts](../src/lib/cad-examples.ts), [pdf-examples.ts](../src/lib/pdf-examples.ts), [platform-examples.ts](../src/lib/platform-examples.ts), and [photo-examples.ts](../src/lib/photo-examples.ts) build model objects. They do not parse arbitrary uploaded CAD/PDF files at runtime.
+- [assembly-library.ts](../src/lib/assembly-library.ts) defines insertable modules and builds reusable definitions, ports, and editable parameters. Inserting a module is different from replacing the entire project with an example.
+- [ExampleBrowser](../src/components/ExampleBrowser.tsx) presents the catalogs and previews their actual geometry. References in `resources/library-3d` document source provenance and simplifications.
+- [build-guides.ts](../src/lib/build-guides.ts), [build-guides-workflows.ts](../src/lib/build-guides-workflows.ts), and [build-guide-types.ts](../src/lib/build-guide-types.ts) define the illustrated techniques and their four-step structure.
+- [guide-scenes.ts](../src/lib/guide-scenes.ts) prepares example geometry for [GuidePreview](../src/components/GuidePreview.tsx), which produces SVG illustrations. [BuildGuide](../src/components/BuildGuide.tsx) is lazy-loaded by the dialog system; browsing a guide does not commit a project edit or add a WebGL canvas.
+
+Examples are design studies with documented approximations. Rendering holes and custom outlines does not imply that every fabrication or hardware-clearance constraint is modeled. Preserve the limitations described in the user README and the domain documentation.
+
+## Assets and deployment
+
+[src/lib/connector-geometry.ts](../src/lib/connector-geometry.ts) imports `resources/connectors-3d/Connettori sharing.obj` with Vite's `?raw` suffix, parses it locally, normalizes each profile, and caches shared geometry. [src/components/connector-geometry.ts](../src/components/connector-geometry.ts) is a compatibility re-export. Connector rendering makes no external CAD request. Other files under `resources/` are references unless explicitly imported; that directory is not equivalent to `public/`.
+
+Wood grain, metal detail, and room materials are generated procedurally. Brand images under `public/` are committed artifacts generated from the shared SVG mark by [generate-brand-assets.mjs](../scripts/generate-brand-assets.mjs).
+
+`npm run build` runs TypeScript build checking and Vite, producing `dist/`. [vercel.json](../vercel.json) selects Vite, serves `dist`, adds response security headers, and sets year-long immutable caching for `/assets/*`. Public metadata and the configured canonical domain live in [index.html](../index.html) and `public/`; changing the hosting domain requires reviewing those together. Deployment has no application-server migration or environment-secret step.
+
+For setup, verification, and asset regeneration commands, see [development and verification](development.md).

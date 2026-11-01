@@ -2,6 +2,8 @@
 
 A local, full-window furniture design workspace built with Vite, React, TypeScript, Three.js, React Three Fiber, and shadcn/ui components backed by Radix. Warm neutral colors, restrained controls, and independent scrolling inspectors keep the assembly in view.
 
+For implementation details, see the [architecture and development documentation](docs/README.md). Coding agents should start with [AGENTS.md](AGENTS.md).
+
 ## Run
 
 Requires Node.js 22.12+ (tested with Node 25).
@@ -154,7 +156,7 @@ The app stores panels in local XY coordinates, with thickness on local Z. Projec
 - `src/lib/legacy-example-inserts.ts`: conservative repair of original floating library inserts.
 - `src/components/Scene.tsx`: cameras, panel materials, selection, and 3D rendering.
 - `src/components/ConnectorMeshes.tsx`: placement and materials for the supplied connector models.
-- `src/components/connector-geometry.ts`: imported connector parts, source normalization, and shared mesh geometry.
+- `src/lib/connector-geometry.ts`: imported connector parts, source normalization, and shared mesh geometry (`src/components/connector-geometry.ts` re-exports it).
 - `src/components/RoomEnvironment.tsx`: room architecture, furnishings, procedural materials, and lighting for realistic preview.
 - `src/lib/preview-furnishings.ts`: optional surface recognition and clearance-aware furnishing placement.
 - `src/components/PreviewFurnishings.tsx`: procedural books, accessories, decor, seated people, and chairs for the furnished preview.
