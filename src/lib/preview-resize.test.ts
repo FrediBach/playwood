@@ -6,6 +6,7 @@ import { connectorSlide, getConnectorRail } from './connector-movement'
 import { attachPanel, createPanel, createStarterProject, parseProject, resolvePanels, rotateProject, validateProject } from './model'
 import { movePreviewResize, preparePreviewResize, type PreviewResizeSession } from './preview-resize'
 import { gridProject } from './example-geometry'
+import { moveStructureRepeat, prepareStructureRepeat } from './structure-repeat'
 import type { Project, Vec3 } from './types'
 import everydayShelf from './fixtures/everyday-shelf.json'
 
@@ -21,6 +22,42 @@ const piecePosition = (project: Project, index = 0) => {
 }
 
 describe('preview structural resize handles', () => {
+  it('keeps repeat arrows available when a saved dimension fixes the source panel', () => {
+    const original = gridProject('Fixed cube', [350], [350])
+    const panel = named(original, 'Shelf 1.2')
+    const project: Project = { ...original, constraints: [{ id: 'fixed-width', enabled: true, kind: 'dimension', panelId: panel.id, dimension: 'width', value: panel.width }] }
+    const handle = along(preparePreviewResize(project, { panelId: panel.id })!, [1, 0, 0])
+    expect(handle.repeatOnly).toBe(true)
+    const repeat = prepareStructureRepeat(project, panel.id, handle.direction)
+    const result = moveStructureRepeat(repeat, repeat.pitch)
+    expect(result.count).toBe(1)
+    expect(result.project.panels.find(item => item.id === panel.id)!.width).toBe(panel.width)
+    expect(result.project.constraints).toHaveLength(2)
+    valid(result.project)
+  })
+
+  it.each([
+    { direction: [0, 1, 0] as Vec3, added: 3, edge: false },
+    { direction: [0, 0, 1] as Vec3, added: 5, edge: true },
+    { direction: [0, 0, -1] as Vec3, added: 5, edge: true },
+  ])('offers a repeat handle along $direction even when every cut is fixed', ({ direction, added, edge }) => {
+    const original = gridProject('Fixed cube', [350], [350])
+    const panel = named(original, 'Shelf 1.2')
+    const project: Project = { ...original, constraints: original.panels.flatMap(item => (['width', 'height'] as const).map(dimension => ({
+      id: `${item.id}-${dimension}`, enabled: true, kind: 'dimension' as const, panelId: item.id, dimension, value: item[dimension],
+    }))) }
+    const handle = along(preparePreviewResize(project, { panelId: panel.id })!, direction)
+    expect(handle).toMatchObject({ repeatOnly: true, panelHandle: true, panelEdge: edge })
+    const repeat = prepareStructureRepeat(project, panel.id, handle.direction)
+    const result = moveStructureRepeat(repeat, repeat.pitch)
+    expect(result.count).toBe(1)
+    expect(result.project.panels).toHaveLength(project.panels.length + added)
+    for (const originalPanel of resolvePanels(project)) {
+      expect(resolvePanels(result.project).find(item => item.id === originalPanel.id)).toEqual(originalPanel)
+    }
+    valid(result.project)
+  })
+
   it.each([false, true])('resizes only one panel with fixed hardware (rotated: %s)', rotated => {
     const source = createStarterProject()
     const project = rotated ? rotateProject(source, 'y', 27) : source

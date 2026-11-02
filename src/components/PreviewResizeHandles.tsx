@@ -4,7 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { OrthographicCamera, Plane, Raycaster, Vector2, Vector3 } from 'three'
 import type { OrbitControls } from 'three-stdlib'
 import type { Vec3 } from '@/lib/types'
-import type { PreviewResizeHandle } from '@/lib/preview-resize'
+import type { PreviewResizeHandle, PreviewResizeMode } from '@/lib/preview-resize'
 import './preview-resize-handles.css'
 
 export type { PreviewResizeHandle } from '@/lib/preview-resize'
@@ -15,7 +15,7 @@ export interface PreviewResizeProps {
   distance?: number
   limited?: boolean
   keyboardStep?: number
-  onResizeStart: (handleId: string, local?: boolean) => boolean
+  onResizeStart: (handleId: string, mode?: PreviewResizeMode) => boolean
   onResizeMove: (distanceMm: number, keyboard?: boolean) => void
   onResizeEnd: (cancel: boolean) => void
 }
@@ -29,7 +29,7 @@ interface Gesture {
   point: Vector3
   plane: Plane
   axis: Vector3
-  local: boolean
+  mode: PreviewResizeMode
   started: boolean
   controls?: OrbitControls
   controlsEnabled: boolean
@@ -73,7 +73,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     event.preventDefault()
     event.stopPropagation()
     event.nativeEvent.stopImmediatePropagation()
-    if (!enabled || gesture.current || event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey) return
+    if (!enabled || gesture.current || event.button !== 0 || event.metaKey || event.altKey) return
     camera.updateMatrixWorld()
     const axis = new Vector3(...handle.direction).normalize()
     const rootPosition = new Vector3(...handle.position).multiplyScalar(MM)
@@ -88,7 +88,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     const orbit = controls as OrbitControls | undefined
     gesture.current = {
       handleId: handle.id, pointerId: event.pointerId, target: event.currentTarget,
-      x: event.clientX, y: event.clientY, point, plane, axis, started: false, local: event.shiftKey,
+      x: event.clientX, y: event.clientY, point, plane, axis, started: false, mode: event.ctrlKey ? 'repeat' : event.shiftKey ? 'panel' : 'connected',
       controls: orbit, controlsEnabled: orbit?.enabled ?? true, previousCursor: document.body.style.cursor,
       arm: Number(event.currentTarget.parentElement?.dataset.resizeArm) || ARM,
     }
@@ -107,7 +107,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     event.stopImmediatePropagation()
     if (!current.started) {
       if (Math.hypot(event.clientX - current.x, event.clientY - current.y) < 3) return
-      if (!onResizeStart(current.handleId, current.local)) { finish(true); return }
+      if (!onResizeStart(current.handleId, current.mode)) { finish(true); return }
       current.started = true
     }
     const point = pointAt(event.clientX, event.clientY, current.plane)
@@ -134,12 +134,12 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     if (gesture.current) { event.preventDefault(); event.stopImmediatePropagation() }
   })
   const step = (event: KeyboardEvent<HTMLButtonElement>, handle: PreviewResizeHandle) => {
-    if (event.ctrlKey || event.metaKey || event.altKey || gesture.current) return
+    if (event.metaKey || event.altKey || gesture.current) return
     const sign = ['ArrowRight', 'ArrowUp', '+', '='].includes(event.key) ? 1 : ['ArrowLeft', 'ArrowDown', '-'].includes(event.key) ? -1 : 0
     if (!sign) return
     event.preventDefault()
     event.stopPropagation()
-    if (enabled && onResizeStart(handle.id)) {
+    if (enabled && onResizeStart(handle.id, event.ctrlKey ? 'repeat' : 'connected')) {
       onResizeMove(sign * keyboardStep * (event.shiftKey ? 10 : 1), true)
       onResizeEnd(false)
     }
@@ -232,16 +232,17 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
         <span className="preview-resize-root" aria-hidden="true" />
         <span className="preview-resize-stem" aria-hidden="true" />
         <button type="button" className="preview-resize-handle" aria-label={`Resize · ${handle.label}`} data-resize-handle={handle.id}
-          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" title={`${handle.label} · drag to pull or push. Shift-drag: resize only this panel edge, keeping connectors fixed. Arrow keys: ${keyboardStep} mm; Shift: ${keyboardStep * 10} mm.`}
+          aria-keyshortcuts={`ArrowUp ArrowDown ArrowLeft ArrowRight${handle.panelHandle ? ' Control+ArrowUp Control+ArrowRight Control+Plus' : ''}`} title={`${handle.label} · drag to pull or push.${handle.panelEdge ? ' Shift-drag: resize only this panel edge, keeping connectors fixed.' : ''}${handle.panelHandle ? ' Control-drag: repeat a rectangular compartment along this arrow.' : ''} Arrow keys: ${keyboardStep} mm; Shift: ${keyboardStep * 10} mm.${handle.panelHandle ? ' Control + Up/Right/+: add one bay.' : ''}`}
           onPointerDown={event => down(event, handle)} onKeyDown={event => step(event, handle)}
           onPointerEnter={() => invalidate()} onFocus={() => invalidate()}
           onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onContextMenu={event => event.preventDefault()}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h11M10 4l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <span className={`preview-resize-caption${limited && activeId === handle.id ? ' is-limited' : ''}`}>
-          {activeId === handle.id ? <>{shownDistance > 0 ? '+' : ''}{shownDistance} mm{limited ? ' · limit' : ''}
+          {activeId === handle.id ? <>{handle.repeat && <span className="preview-resize-size">Repeat · {handle.repeat.count} new {handle.repeat.count === 1 ? 'bay' : 'bays'}</span>}{shownDistance > 0 ? '+' : ''}{shownDistance} mm{limited ? ' · limit' : ''}
             {handle.sizes?.map((size, index) => <span className="preview-resize-size" key={index}>{size.label} = {Math.round(size.value * 100) / 100} mm</span>)}
-            <small>Release to resize · Esc to cancel</small></> : handle.label}
+            {handle.repeat && <span className="preview-resize-size">{handle.repeat.reason ?? `${Math.round(handle.repeat.pitch * 100) / 100} mm per bay`}</span>}
+            <small>{handle.repeat ? 'Release to add bays' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.label}{handle.repeatOnly && <small>Fixed size · Control-pull to repeat</small>}</>}
         </span>
       </div>)}
     </div>

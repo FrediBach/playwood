@@ -35,6 +35,18 @@ describe('beginner guide project studies', () => {
     expect(getGuideScene('assembly-attach', 2).project.assemblies?.links).toHaveLength(1)
   })
 
+  it('illustrates repeat preview additions around an unchanged source compartment', () => {
+    const source = getGuideScene('resize', 2)
+    const repeated = getGuideScene('resize', 3)
+    expect(repeated.project.panels).toHaveLength(source.project.panels.length + 6)
+    expect(repeated.ghost).toHaveLength(6)
+    expect(repeated.selected).toHaveLength(4)
+    for (const panel of resolvePanels(source.project)) {
+      expect(resolvePanels(repeated.project).find(item => item.id === panel.id)).toEqual(panel)
+    }
+    expect(repeated.project.connections.some(connection => connection.type === 't')).toBe(true)
+  })
+
   it('renders every study as a bounded SVG without WebGL or non-finite coordinates', () => {
     for (const guideId of guideIds) for (let step = 0; step < 4; step++) {
       const markup = renderToStaticMarkup(createElement(GuidePreview, { guideId, step, caption: `${guideId} step ${step + 1}` }))

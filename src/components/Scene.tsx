@@ -24,7 +24,7 @@ import { PreviewDragMovement, type PreviewDragProps } from './PreviewDragMovemen
 import { PreviewResizeHandles } from './PreviewResizeHandles'
 import { AttachmentSideGuide, type AttachmentSideGuideState } from './AttachmentSideGuide'
 import { PreviewBoxSelection, type BoxSelectionProps, type BoxSelectionPreview } from './PreviewBoxSelection'
-import type { PreviewResizeHandle } from '@/lib/preview-resize'
+import type { PreviewResizeHandle, PreviewResizeMode, RepeatPreview } from '@/lib/preview-resize'
 import { Plus } from 'lucide-react'
 import './assemblies.css'
 import './box-selection.css'
@@ -63,12 +63,13 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   movementEnabled?: boolean
   dragging?: boolean
   resizeHandles?: PreviewResizeHandle[]
-  onResizeStart?: (handleId: string, local?: boolean) => boolean
+  onResizeStart?: (handleId: string, mode?: PreviewResizeMode) => boolean
   onResizeMove?: (distance: number, keyboard?: boolean) => void
   onResizeEnd?: (cancel: boolean) => void
   resizing?: boolean
   resizeDistance?: number
   resizeLimited?: boolean
+  repeatPreview?: RepeatPreview
   dragSnap?: { position: Vec3; label: string; warning?: string } | null
   onDrillIn?: (panelId: string) => void
   attachmentHandles?: AssemblyAttachmentHandle[]
@@ -441,13 +442,16 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
   const boxPreview = props.boxSelectActive ? props.boxPreview : null
   const highlightedPanels = boxPreview ? [...(boxPreview.additive ? selectedIds : []), ...boxPreview.panelIds] : selectedIds
   const highlightedConnectors = boxPreview ? [...(boxPreview.additive ? props.selectedConnectorIds ?? [] : []), ...boxPreview.connectorIds] : props.selectedConnectorIds
-  const selectedIdSet = new Set([...highlightedPanels, ...props.constraintPanelIds ?? []])
+  const selectedIdSet = new Set([...highlightedPanels, ...props.constraintPanelIds ?? [], ...props.repeatPreview?.sourcePanelIds ?? []])
+  const repeatPanelIds = new Set(props.repeatPreview?.addedPanelIds)
+  const repeatConnectionIds = new Set(props.repeatPreview?.connectionIds)
   const connectorSelection = (props.selectionKind ?? (props.selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'connectors'
   const activePanelIds = connectorSelection ? [] : selectedIds
   const activeConnectorIds = connectorSelection ? props.selectedConnectorIds ?? [] : []
   const activePanelIdSet = new Set(activePanelIds)
   const [keyboardSnap, setKeyboardSnap] = useState<{ direction: Vec3; selection: string; handleId?: string } | null>(null)
   const resizeHandleId = useRef<string | undefined>(undefined)
+  const resizeMode = useRef<PreviewResizeMode>('connected')
   const selection = JSON.stringify([connectorSelection, activePanelIds, activeConnectorIds])
   useEffect(() => {
     if (!keyboardSnap) return
@@ -492,9 +496,10 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
     }))}
     {showGrid && <GroundGrid floorY={floorY} extent={extent} cellSize={props.snapSettings?.grid ? props.snapSettings.spacing * MM : 0.1} />}
     </>}
-    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
+    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} ghost={repeatPanelIds.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
     {realisticPreview && !!props.furnishings?.length && <PreviewFurnishings placements={props.furnishings} />}
-    {!exploded && <ConnectorMeshes panels={panels} connections={connections} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
+    {!exploded && <ConnectorMeshes panels={panels} connections={connections.filter(connection => !repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
+    {!exploded && !!repeatConnectionIds.size && <ConnectorMeshes panels={panels} connections={connections.filter(connection => repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} ghost />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
@@ -502,14 +507,14 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
     {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
     {!props.boxSelectActive && props.resizeHandles?.length && props.onResizeStart && props.onResizeMove && props.onResizeEnd ? <PreviewResizeHandles
       handles={props.resizeHandles} keyboardStep={props.niceValueStep ?? (props.snapSettings?.grid ? props.snapSettings.spacing : 10)} enabled={props.movementEnabled && !props.dragging && !exploded}
-      onResizeStart={(id, local) => {
-        const started = props.onResizeStart!(id, local)
-        if (started) { resizeHandleId.current = id; setKeyboardSnap(null) }
+      onResizeStart={(id, mode) => {
+        const started = props.onResizeStart!(id, mode)
+        if (started) { resizeHandleId.current = id; resizeMode.current = mode ?? 'connected'; setKeyboardSnap(null) }
         return started
       }} onResizeMove={(distance, keyboard) => {
         props.onResizeMove!(distance, keyboard)
         const handle = props.resizeHandles?.find(item => item.id === resizeHandleId.current)
-        if (keyboard && handle) setKeyboardSnap({ direction: handle.direction, selection, handleId: handle.id })
+        if (keyboard && handle && resizeMode.current !== 'repeat') setKeyboardSnap({ direction: handle.direction, selection, handleId: handle.id })
       }} onResizeEnd={props.onResizeEnd}
       distance={props.resizeDistance} limited={props.resizeLimited}/> : null}
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>

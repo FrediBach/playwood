@@ -4,6 +4,7 @@ import { getPhysicalConnectors } from './connector-selection'
 import { resolvePanels } from './model'
 import { roundNiceValue } from './nice-values'
 import { movePanels, resizePanelEdge } from './structure-edit'
+import { prepareStructureRepeat } from './structure-repeat'
 import type { Panel, Project, Vec3 } from './types'
 
 export interface PreviewResizeHandle {
@@ -12,6 +13,20 @@ export interface PreviewResizeHandle {
   direction: Vec3
   label: string
   sizes?: { label: string; value: number }[]
+  repeat?: { count: number; pitch: number; reason?: string }
+  repeatOnly?: boolean
+  panelEdge?: boolean
+  panelHandle?: boolean
+}
+
+export type PreviewResizeMode = 'connected' | 'panel' | 'repeat'
+
+export interface RepeatPreview {
+  count: number
+  sourcePanelIds: readonly string[]
+  addedPanelIds: readonly string[]
+  connectionIds: readonly string[]
+  reason?: string
 }
 
 export interface PreviewResizeSelection { panelId?: string; connectorId?: string }
@@ -73,10 +88,18 @@ export function preparePreviewResize(project: Project, selection: PreviewResizeS
           actualDirection = delta.normalize()
           if (session.handles.some(handle => vector(handle.direction).dot(actualDirection) > 1 - 1e-6)) return
         }
-        session.handles.push({ id, position, direction: actualDirection.toArray() as Vec3, label })
+        session.handles.push({ id, position, direction: actualDirection.toArray() as Vec3, label, panelHandle: !!selection.panelId, panelEdge: !!selection.panelId && operation.kind === 'edge' })
         session.drivers.set(id, { operation, scale })
         return
       } catch { /* A constrained direction simply has no handle. */ }
+    }
+    // Fixed cuts can still grow through new bays without resizing the source.
+    if (selection.panelId) {
+      try {
+        prepareStructureRepeat(project, selection.panelId, direction.toArray() as Vec3)
+        session.handles.push({ id, position, direction: direction.toArray() as Vec3, label, repeatOnly: true, panelHandle: true, panelEdge: operation.kind === 'edge' })
+        session.drivers.set(id, { operation, scale: 1 })
+      } catch { /* Neither resizing nor repeating is available on this edge. */ }
     }
   }
 

@@ -10,6 +10,7 @@ import { createAssembly, disconnectAssembly, duplicateAssembly, getAssemblyAttac
 import { ASSEMBLY_LIBRARY, insertAssemblyDefinition } from './assembly-library'
 import { createAssemblyFile, parseAssemblyFile } from './assembly-file'
 import { movePreviewResize, preparePreviewResize, type PreviewResizeHandle } from './preview-resize'
+import { moveStructureRepeat, prepareStructureRepeat } from './structure-repeat'
 import { rotateSelection } from './selection-rotation'
 import { editConnectors, getPhysicalConnectors } from './connector-selection'
 import { splitPanelGrid } from './grid-split'
@@ -227,12 +228,20 @@ function buildScenes(id: GuideId): GuideScene[] {
       const connectorResize = preparePreviewResize(wider, { connectorId: connector.id })!
       const upward = connectorResize.handles.find(handle => handle.direction[1] > .999)!
       const heightChange = movePreviewResize(connectorResize, upward.id, 100)
+      const repeat = prepareStructureRepeat(heightChange.project, top.id, edge.direction)
+      const repeated = moveStructureRepeat(repeat, repeat.pitch * 2)
+      const repeatedEdge = preparePreviewResize(heightChange.project, { panelId: top.id })!.handles.find(handle => handle.id === edge.id)!
+      const originalIds = new Set(heightChange.project.panels.map(panel => panel.id))
       const movedHandle = (handle: PreviewResizeHandle, distance: number) => ({ ...handle,
         position: handle.position.map((value, axis) => value + handle.direction[axis] * distance) as Vec3, distance })
       return [scene(p, 'One selected panel reveals the directions you can pull or push.', { selected: [top.id], dimensions: true, resizeHandles: panelResize.handles }),
         scene(wider, 'Pulling this edge by 100 mm widens the frame; the opposite edge stays fixed.', { selected: [top.id], dimensions: true, resizeHandles: [movedHandle(edge, widthChange.distance)] }),
         scene(heightChange.project, 'Pulling one connector upward by 100 mm extends the side panels and keeps the corners joined.', { selectedConnectors: [connector.id], dimensions: true, resizeHandles: [movedHandle(upward, heightChange.distance)] }),
-        scene(heightChange.project, 'Release to apply one undoable resize. Escape during a drag restores the starting shape.', { dimensions: true, view: 'side' })]
+        scene(repeated.project, 'Control-pull adds complete bays. Pull back to retract the preview; Escape cancels every addition.', {
+          selected: repeat.panelIds, ghost: repeated.project.panels.filter(panel => !originalIds.has(panel.id)).map(panel => panel.id),
+          resizeHandles: [movedHandle(repeatedEdge, repeated.distance)],
+          document: { title: 'Repeat', lines: ['2 new bays', 'Shared walls and fitted connectors', 'Release to apply · Esc to cancel'] },
+        })]
     }
     case 'rotate': {
       const p = box()

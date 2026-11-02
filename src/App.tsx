@@ -336,7 +336,7 @@ export default function App() {
     setPanelSelection(ids);assembly.clearPlacement();setInspectorTab('panel');setRightOpen(true)
   }
   const movementEnabled=!constraints.editing&&!clipboard.active&&!modalOpen&&!assembly.editingInstance&&(inspectingConnectors||!(assembly.memberInstance&&!assembly.selectedInstance))&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))
-  const resize=usePreviewResize({project,selectedIds:inspectingConnectors?[]:selectedIds,selectedConnectorIds:inspectingConnectors?selectedConnectorIds:[],snapSettings,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify})
+  const resize=usePreviewResize({project,selectedIds:inspectingConnectors?[]:selectedIds,selectedConnectorIds:inspectingConnectors?selectedConnectorIds:[],snapSettings,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify,select:setSelectedId})
   const boxSelectAvailable=!constraints.editing&&!modalOpen&&!clipboard.active&&!drag.active&&!resize.active&&!assembly.placementActive&&inspectorTab!=='attach'&&hasVisiblePanels
   const cancelBoxSelect=useCallback(()=>setBoxSelectActive(false),[])
   useEffect(()=>{setBoxSelectActive(false)},[project,view,realisticPreview,exploded,boxSelectAvailable])
@@ -681,7 +681,7 @@ export default function App() {
     }} connectorOverrides={(resize.project??drag.project??constraintPreviewProject??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={resize.panels??drag.panels??displayPanels} connections={(resize.project??drag.project??constraintPreviewProject??project).connections} selectedIds={selectedIds} choosePanel={choosePanel}
       hasFloorConstraint={project.constraints?.some(rule=>rule.enabled&&rule.kind==='floor')} designConstraint={constraints.activeRule} constraintPanelIds={constraints.highlightedPanelIds} onConstraints={()=>openConstraints()} constraintEditing={constraints.editing} constraintPicking={pickingConstraint}
       onDragStart={drag.start} onDragMove={drag.move} onDragEnd={drag.end} dragging={drag.active} dragSnap={drag.snap}
-      resizeHandles={resize.handles} onResizeStart={resize.start} onResizeMove={resize.move} onResizeEnd={resize.end} resizing={resize.active} resizeDistance={resize.distance} resizeLimited={resize.limited}
+      resizeHandles={resize.handles} onResizeStart={resize.start} onResizeMove={resize.move} onResizeEnd={resize.end} resizing={resize.active} resizeDistance={resize.distance} resizeLimited={resize.limited} repeatPreview={resize.repeatPreview}
       onAutoConnect={addAutoConnectors} autoConnectDisabled={constraints.editing||modalOpen||!!assembly.editingInstance||panels.length<2}
       onMoveConnectors={(slides,repeat)=>commitWithInsertChecks(current=>{
         let next=current
