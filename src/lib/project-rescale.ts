@@ -3,7 +3,8 @@ import { resizePanelDimensions } from './structure-edit'
 import { rescaleAssemblies } from './assembly-rescale'
 import { getAssemblyParameterRange } from './assembly-parameters'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
-import type { AssemblyParameter, Panel, Project, Vec3 } from './types'
+import { getNiceValueStep, parseNiceValues, roundNiceValue } from './nice-values'
+import type { AssemblyParameter, NiceValuesSettings, Panel, Project, Vec3 } from './types'
 
 export type RescaleValueKind = 'dimension' | 'thickness' | 'cornerRadius' | 'holeSize' | 'holeSpacing'
 export interface RescaleValue {
@@ -44,7 +45,7 @@ function measurements(panel: Panel): { kind: RescaleValueKind; field: 'width' | 
 }
 
 /** Repeated physical measurements; materials, coordinates and hardware are not scale factors. */
-export function getRescaleValues(project: Project): RescaleValue[] {
+export function getRescaleValues(project: Project, includeUnique = false): RescaleValue[] {
   const groups = new Map<string, RescaleValue>()
   const thicknessLimits = new Map<string, { min: number; max: number }>()
   const controlledLimits = new Map<string, { min: number; max: number }>()
@@ -84,7 +85,7 @@ export function getRescaleValues(project: Project): RescaleValue[] {
     }
     if (kind === 'cornerRadius') group.max = Math.min(group.max, panel.width / 2, panel.height / 2)
   }
-  return [...groups.values()].filter(group => group.count > 1)
+  return [...groups.values()].filter(group => includeUnique || group.count > 1)
     .sort((a, b) => kinds.indexOf(a.kind) - kinds.indexOf(b.kind) || a.value - b.value)
 }
 
@@ -93,8 +94,11 @@ export function getRescaleValues(project: Project): RescaleValue[] {
  * lets dependent cuts and inserts adapt without sequential replacement cascades.
  * No saved objects are modified until the complete result has passed validation.
  */
-export function rescaleProject(project: Project, changes: Record<string, number>): Project {
-  const values = new Map(getRescaleValues(project).map(value => [value.id, value]))
+export function rescaleProject(project: Project, changes: Record<string, number>, niceValues?: NiceValuesSettings): Project {
+  const nextSettings = niceValues === undefined ? project.niceValues : parseNiceValues(niceValues)
+  const niceStep = getNiceValueStep(nextSettings)
+  const normalize = niceStep !== undefined && (!project.niceValues?.enabled || project.niceValues.step !== niceStep)
+  const values = new Map(getRescaleValues(project, normalize).map(value => [value.id, value]))
   const replacements = new Map<string, number>()
   for (const [id, amount] of Object.entries(changes)) {
     const value = values.get(id)
@@ -102,9 +106,33 @@ export function rescaleProject(project: Project, changes: Record<string, number>
     if (!Number.isFinite(amount) || amount < value.min || amount > value.max) {
       throw new Error(`${value.label}: enter a value between ${value.min} and ${value.max} mm.`)
     }
-    if (Math.abs(amount - value.value) > EPSILON) replacements.set(id, amount)
   }
-  if (!replacements.size) return project
+  const targetDimension = (value: number) => replacements.get(key('dimension', value)) ?? value
+  // Dimensions precede radii, and hole sizes precede spacing. Coupled bounds
+  // therefore use the final drafted sizes, including explicit replacements.
+  for (const value of values.values()) {
+    const explicit = Object.hasOwn(changes, value.id)
+    if (!explicit && (!normalize || value.kind === 'thickness')) continue
+    const amount = explicit ? changes[value.id] : value.value
+    let min = value.min, max = value.max
+    if (niceStep !== undefined && value.kind === 'cornerRadius') {
+      max = Math.min(settings.cornerRadius.max, ...project.panels
+        .filter(panel => key('cornerRadius', panel.cornerRadius ?? 0) === value.id)
+        .flatMap(panel => [targetDimension(panel.width) / 2, targetDimension(panel.height) / 2]))
+    }
+    if (niceStep !== undefined && value.kind === 'holeSpacing') {
+      min = Math.max(min, ...project.panels.filter(panel => panel.pattern !== 'solid' && key('holeSpacing', panel.holeSpacing) === value.id)
+        .map(panel => Math.max((replacements.get(key('holeSize', panel.holeSize)) ?? panel.holeSize) + 6,
+          Math.ceil(Math.sqrt(targetDimension(panel.width) * targetDimension(panel.height) / 4500)))))
+    }
+    const target = niceStep !== undefined && value.kind !== 'thickness' ? roundNiceValue(amount, niceStep, min, max) : amount
+    // Keep already-nice cuts prescribed on enable: otherwise the joint solver
+    // can redistribute a neighbor's rounding into unchanged measurements.
+    if (Math.abs(target - value.value) > EPSILON || (normalize && value.kind !== 'thickness')) replacements.set(value.id, target)
+  }
+  const withSettings = (next: Project): Project => nextSettings && (nextSettings.enabled !== project.niceValues?.enabled || nextSettings.step !== project.niceValues?.step)
+    ? { ...next, niceValues: nextSettings } : next
+  if (!replacements.size) return withSettings(project)
 
   const resize = (source: Project, parameters: readonly AssemblyParameter[] = [], trofastWorld = true): Project => {
     const dimensions: Record<string, Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>> = Object.create(null)
@@ -166,6 +194,7 @@ export function rescaleProject(project: Project, changes: Record<string, number>
   const issue = validateProject(next).find(item => !previousIssues.has(item.id)
     && (item.severity === 'error' || item.id.startsWith('collision-')))
   if (issue) throw new Error(`These values cannot keep the creation connected: ${issue.message}`)
+  next = withSettings(next)
   parseProject(next)
   return assertDesignConstraintEdit(project, next)
 }

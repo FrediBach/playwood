@@ -2,6 +2,7 @@ import { Euler, Quaternion, Vector3 } from 'three'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { resolvePanels } from './model'
+import { roundNiceValue } from './nice-values'
 import { movePanels, resizePanelEdge } from './structure-edit'
 import type { Panel, Project, Vec3 } from './types'
 
@@ -155,4 +156,39 @@ export function movePreviewResize(session: PreviewResizeSession, handleId: strin
     }
     return { project, distance: distance * lower, limited: true }
   }
+}
+
+/** Round only the released cut, then replay the gesture from its original
+ * snapshot so its fixed edge and structural direction remain authoritative. */
+export function finishPreviewResize(session: PreviewResizeSession, handleId: string, result: ReturnType<typeof movePreviewResize>, local = false): ReturnType<typeof movePreviewResize> {
+  const settings = session.original.niceValues
+  if (!settings?.enabled || Math.abs(result.distance) < 1e-6) return result
+  const driver = session.drivers.get(handleId)
+  if (!driver) return result
+  const operation = driver.operation
+  const changed = session.original.panels.flatMap(panel => {
+    const after = result.project.panels.find(item => item.id === panel.id)
+    return after ? (['width', 'height'] as const).flatMap(dimension => {
+      const change = after[dimension] - panel[dimension]
+      return Math.abs(change) > 1e-6 ? [{ panelId: panel.id, dimension, before: panel[dimension], after: after[dimension], change }] : []
+    }) : []
+  })
+  const cut = operation.kind === 'edge'
+    ? changed.find(item => item.panelId === operation.panelId && item.dimension === operation.dimension)
+    : changed.sort((a, b) => Math.abs(b.change) - Math.abs(a.change))[0]
+  if (!cut) return result
+  const rate = operation.kind === 'edge' ? 1 / (local ? 1 : driver.scale) : cut.change / result.distance
+  const rounded = roundNiceValue(cut.after, settings.step, 40, 4000)
+  // A nearby limit can rule out the closest multiple. Try its neighbors rather
+  // than accepting the off-grid endpoint produced by preview bisection.
+  const targets = [rounded, rounded - settings.step, rounded + settings.step]
+    .filter(value => value >= 40 && value <= 4000)
+    .sort((a, b) => Math.abs(a - cut.after) - Math.abs(b - cut.after))
+  for (const target of targets) {
+    const distance = (target - cut.before) / rate
+    const next = movePreviewResize(session, handleId, distance, local)
+    const panel = next.project.panels.find(item => item.id === cut.panelId)
+    if (!next.limited && panel && Math.abs(panel[cut.dimension] - target) < 1e-5) return next
+  }
+  throw new Error('This resize cannot reach a nice value while preserving its joints and constraints. Try another size or a smaller nice-value step.')
 }

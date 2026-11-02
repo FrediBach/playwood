@@ -205,6 +205,8 @@ Behavior depends on the operation:
 
 [`project-rescale.ts`](../src/lib/project-rescale.ts) replaces repeated measurements, including dimensions, thickness, corner radius, hole size, and pitch. It is not uniform mesh scaling: panel constraints and hardware dimensions still apply. It solves compatible dimensions together and restores the creation's horizontal center and lowest height afterward. An enabled floor-height rule takes precedence over the default vertical grounding shift.
 
+The optional `Project.niceValues` setting applies nearest-multiple rounding to requested editable lengths at input completion. Enabling it or changing its step uses the same rescale solver, including unique panel measurements; stock thickness is excluded. Automatic pitch bounds account for the rounded hole size and panel area, and radius bounds use the rounded cut sizes. A conflicting fixed constraint or assembly relationship rejects the entire settings/rescale edit. Later derived dimensions and placement retain the exact values needed by their domain operations; this is an input policy, not an extra geometric constraint. `finishPreviewResize` solves a rounded final cut from the original gesture driver so an edge resize keeps its opposite edge fixed, trying adjacent legal multiples at a size limit.
+
 For projects containing assemblies, [`assembly-rescale.ts`](../src/lib/assembly-rescale.ts) solves the materialized construction, updates shared definitions and affine parameters, refits suppressed corners, and verifies that every instance is still exactly describable by its source and transform. Inconsistent source/instance changes fail atomically.
 
 ## Higher-level construction operations

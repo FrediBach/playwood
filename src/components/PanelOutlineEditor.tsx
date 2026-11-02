@@ -4,6 +4,8 @@ import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './ui/dialog'
 import { getOutlineError, panelCornerRadius, panelOutlineSvgPath } from '@/lib/panel-shape'
 import type { OutlinePoint, Panel } from '@/lib/types'
+import { roundNiceValue } from '@/lib/nice-values'
+import { useNiceValueStep } from './nice-values-context'
 import './panel-outline.css'
 
 interface EditorPoint extends OutlinePoint { key: string }
@@ -41,6 +43,7 @@ export function PanelOutlineControl({ panel, onChange }: Props) {
 
 /** Local input text allows decimals and intermediate empty values without moving the point. */
 function CoordinateInput({ id, label, value, max, onCommit, onFocus }: { id?: string; label: string; value: number; max: number; onCommit: (value: number) => void; onFocus?: () => void }) {
+  const niceStep = useNiceValueStep()
   const [text, setText] = useState(String(mm(value)))
   const [lastValue, setLastValue] = useState(value)
   const edited = useRef(false)
@@ -49,7 +52,7 @@ function CoordinateInput({ id, label, value, max, onCommit, onFocus }: { id?: st
     if (!edited.current) return
     edited.current = false
     const n = Number(text)
-    const next = text.trim() && Number.isFinite(n) ? clamp(n, 0, max) : value
+    const next = text.trim() && Number.isFinite(n) ? niceStep === undefined ? clamp(n, 0, max) : roundNiceValue(n, niceStep, 0, max) : value
     setText(String(mm(next)))
     if (next !== value) onCommit(next)
   }

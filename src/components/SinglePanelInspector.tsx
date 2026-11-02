@@ -17,7 +17,7 @@ interface Props {
   connected?: boolean
   issues: ValidationIssue[]
   updatePanel: (patch: Partial<Panel>) => boolean | void
-  updateConnection: (patch: Partial<AttachmentOptions>) => void
+  updateConnection: (patch: Partial<AttachmentOptions>) => boolean | void
   onDetach: () => void
   duplicateSelected: () => void
   deleteSelected: () => void
@@ -36,9 +36,9 @@ export function SinglePanelInspector({selected,panels,connection,supportConnecte
     <SelectField label="Orientation" disabled={supportConnected} value={matchesRotation(selected.rotation,[-Math.PI/2,0,0])?'horizontal':matchesRotation(selected.rotation,[0,Math.PI/2,0])?'side':matchesRotation(selected.rotation,[0,0,0])?'vertical':'custom'} onChange={v=>updatePanel({rotation:v==='horizontal'?[-Math.PI/2,0,0]:v==='side'?[0,Math.PI/2,0]:[0,0,0]})}>
       <option value="vertical">Vertical · front facing</option><option value="horizontal">Horizontal · flat</option><option value="side">Vertical · side facing</option><option value="custom" disabled>Custom rotation</option>
     </SelectField>
-    <div className="field-row">{(['X','Y','Z'] as const).map((axis,i)=><NumberField key={axis} label={`Position ${axis}`} disabled={supportConnected} value={selected.position[i]} onChange={v=>{const pos=[...selected.position] as Vec3;pos[i]=v;updatePanel({position:pos})}}/>)}</div>
+    <div className="field-row">{(['X','Y','Z'] as const).map((axis,i)=><NumberField key={axis} label={`Position ${axis}`} disabled={supportConnected} value={selected.position[i]} onChange={v=>{const pos=[...selected.position] as Vec3;pos[i]=v;return updatePanel({position:pos})}}/>)}</div>
     <InspectorDisclosure title="Rotation" summary={selected.rotation.map(angle=>`${Math.round(angle*180/Math.PI)}°`).join(' · ')} preferenceKey="panel-rotation">
-      <div className="field-row">{(['X','Y','Z'] as const).map((axis,i)=><NumberField key={axis} label={`Rotate ${axis}`} disabled={supportConnected} value={selected.rotation[i]*180/Math.PI} min={-360} max={360} unit="°" onChange={v=>{const rot=[...selected.rotation] as Vec3;rot[i]=v*Math.PI/180;updatePanel({rotation:rot})}}/>)}</div>
+      <div className="field-row">{(['X','Y','Z'] as const).map((axis,i)=><NumberField key={axis} label={`Rotate ${axis}`} disabled={supportConnected} value={selected.rotation[i]*180/Math.PI} min={-360} max={360} unit="°" onChange={v=>{const rot=[...selected.rotation] as Vec3;rot[i]=v*Math.PI/180;return updatePanel({rotation:rot})}}/>)}</div>
     </InspectorDisclosure>
   </>
   return <>

@@ -63,6 +63,7 @@ export type ListKind = 'panels' | 'connectors'
 /** Flat organizational folders; independent of physical assemblies and joints. */
 export interface ListGroup { id: string; name: string; kind: ListKind; itemIds: string[] }
 export interface PaletteColor { id: string; name: string; color: string }
+export interface NiceValuesSettings { enabled: boolean; step: number }
 export type ConstraintReference = 'min' | 'center' | 'max'
 /** Omitted relation preserves the original exact floor/dimension save format. */
 export type ConstraintRequirement =
@@ -90,6 +91,8 @@ export interface Project {
   connectorOrder?: string[];
   /** Optional in legacy saves; measurements and status are derived from resolved geometry. */
   constraints?: DesignConstraint[];
+  /** Rounds editable lengths on acceptance; omitted legacy saves leave it off. */
+  niceValues?: NiceValuesSettings;
 }
 export interface AttachmentOptions { side: Side; type: ConnectorType; offset: number; inset: number; flip: boolean; color: string; count: number; material?: ConnectorMaterial }
 export interface ValidationIssue { id: string; severity: 'warning' | 'error'; message: string; panelIds: string[] }

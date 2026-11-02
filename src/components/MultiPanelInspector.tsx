@@ -14,7 +14,7 @@ interface Props {
   connections: Connection[]
   issues: ValidationIssue[]
   onChange: (patch: Partial<Panel>) => boolean | void
-  onConnectionChange: (patch: ConnectionPatch) => void
+  onConnectionChange: (patch: ConnectionPatch) => boolean | void
   onDuplicate: () => void
   onDelete: () => void
   onDetach?: () => void
@@ -52,7 +52,7 @@ export function MultiPanelInspector({ panels, connections, issues, onChange, onC
   const changeAxis = (key: 'position' | 'rotation', index: number, value: number) => {
     const vector = [...first[key]] as Vec3
     vector[index] = value
-    onChange({ [key]: vector })
+    return onChange({ [key]: vector })
   }
   const placement = <>
     <SelectField label="Orientation" value={orientation} mixed={!shared.has('rotation')} disabled={anyAttached} onChange={value=>onChange({rotation:value==='horizontal'?[-Math.PI/2,0,0]:value==='side'?[0,Math.PI/2,0]:[0,0,0]})}><option value="vertical">Vertical · front facing</option><option value="horizontal">Horizontal · flat</option><option value="side">Vertical · side facing</option><option value="custom" disabled>Custom rotation</option></SelectField>

@@ -6,6 +6,7 @@ import { CONNECTOR_PROFILES } from './connector-profile'
 import { getConnectorPlacements, resolvePanels, validateProject } from './model'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { movePanels } from './structure-edit'
+import { roundNiceValue } from './nice-values'
 import type { Connection, ConnectorType, Project, Side, Vec3 } from './types'
 
 const vector = (value: Vec3) => new Vector3(...value)
@@ -236,4 +237,20 @@ export function movePreviewDrag(session: PreviewDragSession, delta: Vec3, snapDi
       position: getConnectorPlacements({ ...connection, count: 1 }, parent, child)[0].position, panelIds, warning } }
   }
   return { project, snap: null }
+}
+
+/** Free drags round a reference panel's final position on release. Every
+ * selected part receives the same translation; attachment geometry stays exact. */
+export function finishPreviewDrag(session: PreviewDragSession, result: ReturnType<typeof movePreviewDrag>, delta: Vec3): ReturnType<typeof movePreviewDrag> {
+  const settings = session.original.niceValues
+  if (!settings?.enabled || result.snap) return result
+  const id = session.movingIds[0]
+  const before = resolvePanels(session.project).find(panel => panel.id === id)!
+  const after = resolvePanels(result.project).find(panel => panel.id === id)!
+  const rounded = delta.map((value, axis) => Math.abs(value) > 1e-6
+    ? roundNiceValue(after.position[axis], settings.step, -100000, 100000) - before.position[axis]
+    : value) as Vec3
+  if (rounded.every(value => Math.abs(value) < 1e-6)) return { project: session.original, snap: null }
+  if (rounded.every((value, axis) => Math.abs(value - delta[axis]) < 1e-6)) return result
+  return movePreviewDrag(session, rounded, 0)
 }

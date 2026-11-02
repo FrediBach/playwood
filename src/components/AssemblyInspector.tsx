@@ -76,7 +76,7 @@ export function AssemblyInspector({ name, definitionName, instanceCount, panelCo
     {parameters.length > 0 && <section className="inspector-section assembly-instance-values" aria-label="Instance values">
       <div className="section-title"><h2>Dimensions</h2><span>mm</span></div>
       {parameters.map(parameter => <div className="assembly-instance-value" key={parameter.id}>
-        <NumberField label={parameter.name} value={isCustom(parameter.id) ? parameterValues[parameter.id] : parameter.defaultValue} precision={3} {...getAssemblyParameterRange(parameter)} commitOnBlur disabled={!onParameterChange} onChange={value => onParameterChange?.(parameter.id, value)}/>
+        <NumberField label={parameter.name} nice={!parameter.bindings.some(binding => binding.dimension === 'thickness')} value={isCustom(parameter.id) ? parameterValues[parameter.id] : parameter.defaultValue} precision={3} {...getAssemblyParameterRange(parameter)} commitOnBlur disabled={!onParameterChange} onChange={value => onParameterChange?.(parameter.id, value)}/>
         <p>{parameter.bindings.length} linked {parameter.bindings.length === 1 ? 'dimension' : 'dimensions'}<span>{isCustom(parameter.id) ? 'Custom' : 'Default'}</span></p>
       </div>)}
       <p className="field-note">Panel cut lengths; connector clearances add to the overall size.{connected && ' Connected neighbors may move to keep joints aligned.'}</p>

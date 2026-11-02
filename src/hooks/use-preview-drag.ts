@@ -1,6 +1,6 @@
 import { snapPanelDelta, type SnapSettings } from '@/lib/preview-snap'
 import { useMemo, useRef, useState } from 'react'
-import { movePreviewDrag, preparePreviewDrag, type PreviewDragSession } from '@/lib/preview-drag'
+import { finishPreviewDrag, movePreviewDrag, preparePreviewDrag, type PreviewDragSession } from '@/lib/preview-drag'
 import { resolvePanels } from '@/lib/model'
 import type { Project, Vec3 } from '@/lib/types'
 
@@ -68,7 +68,7 @@ export function usePreviewDrag({ project, selectedIds, commit, notify, select, s
     end: (cancel: boolean) => {
       if (!cancel && latest.current && session.current?.original === project) {
         try {
-          commit(latest.current.project)
+          commit(finishPreviewDrag(session.current, latest.current, lastDelta.current).project)
           const snap = latest.current.snap
           if (snap) {
             if (snap.warning) select?.(snap.panelIds)

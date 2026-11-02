@@ -4,6 +4,7 @@ import { connectorDisplayColor, getConnectorMaterial } from './connector-options
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import type { AttachmentOptions, Connection, OutlinePoint, Panel, Project, RotationAxis, ValidationIssue, Vec3 } from './types'
+import { parseNiceValues } from './nice-values'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { parseAssemblyData, releaseAssemblyLinksForPanels } from './assemblies'
 import { parseCustomColors } from './custom-colors'
@@ -509,6 +510,7 @@ export function parseProject(input: unknown): Project {
     while (current) { if (visited.has(current)) throw new Error('Circular attachments are not supported.'); visited.add(current); current = parents.get(current) }
   }
   const project: Project = { version: 1, name: stringIn(input.name, 'project name'), panels, connections }
+  if (input.niceValues !== undefined) project.niceValues = parseNiceValues(input.niceValues)
   if (input.constraints !== undefined) project.constraints = parseDesignConstraints(input.constraints, panels)
   if (input.customColors !== undefined) project.customColors = parseCustomColors(input.customColors)
   if (input.assemblies !== undefined) project.assemblies = parseAssemblyData(input.assemblies, project)

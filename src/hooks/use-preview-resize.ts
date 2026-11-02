@@ -1,6 +1,6 @@
 import { snapDistance, snapTargets, type SnapSettings } from '@/lib/preview-snap'
 import { useMemo, useRef, useState } from 'react'
-import { movePreviewResize, preparePreviewResize } from '@/lib/preview-resize'
+import { finishPreviewResize, movePreviewResize, preparePreviewResize } from '@/lib/preview-resize'
 import { resolvePanels } from '@/lib/model'
 import type { Project } from '@/lib/types'
 
@@ -73,7 +73,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
     },
     end: (cancel: boolean) => {
       if (!cancel && latest.current && session.current?.source === prepared && Math.abs(latest.current.distance) > 1e-6) {
-        try { commit(latest.current.project) }
+        try { commit(finishPreviewResize(session.current.source, session.current.handleId, latest.current, session.current.local).project) }
         catch (error) { notify(error instanceof Error ? error.message : 'This resize conflicts with a constraint.') }
       }
       session.current = null

@@ -7,16 +7,26 @@ import { MATERIALS } from '@/lib/materials'
 import { PanelOutlineControl } from './PanelOutlineEditor'
 import { FinishCoverageField } from './FinishCoverageField'
 import { PanelColorField } from './PanelColorField'
+import { useNiceValueStep } from './nice-values-context'
+import { roundNiceValue } from '@/lib/nice-values'
 
-export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false,commitOnBlur=false,precision=1}: {
-  label:string;value:number;onChange:(v:number)=>boolean|void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean;commitOnBlur?:boolean;precision?:number
+export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false,commitOnBlur=false,precision=1,nice=true}: {
+  label:string;value:number;onChange:(v:number)=>boolean|void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean;commitOnBlur?:boolean;precision?:number;nice?:boolean
 }) {
-  const displayScale=10**precision
+  const niceStep=useNiceValueStep()
+  const rounding=nice&&unit==='mm'?niceStep:undefined
+  const deferred=commitOnBlur||rounding!==undefined
+  // Native number spinners use min as their step origin. Align that origin to
+  // zero-based nice multiples too (for example width min 80 with 25 mm steps).
+  const firstNice=rounding===undefined?min:Number((Math.ceil(min/rounding-1e-9)*rounding).toFixed(9))
+  const lastNice=rounding===undefined?max:Number((Math.floor(max/rounding+1e-9)*rounding).toFixed(9))
+  const displayScale=10**Math.max(precision,rounding===undefined?0:(String(rounding).split('.')[1]?.length??0))
   const [text,setText] = useState(String(Math.round(value*displayScale)/displayScale))
+  const [error,setError] = useState('')
   const edited=useRef(false)
   const id=useId()
   const unavailable=disabled||mixed
-  useEffect(()=>{setText(mixed?'':String(Math.round(value*displayScale)/displayScale));edited.current=false},[value,mixed,displayScale])
+  useEffect(()=>{setText(mixed?'':String(Math.round(value*displayScale)/displayScale));edited.current=false;setError('')},[value,mixed,displayScale,rounding])
   const commit=()=>{
     // Display precision must not become a model edit just because a user tabs
     // through the field. In particular, rotated coordinates retain their value.
@@ -24,18 +34,26 @@ export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,un
     edited.current=false
     const n=Number(text)
     if(text.trim()&&Number.isFinite(n)){
-      const v=Math.max(min,Math.min(max,n));const accepted=onChange(v)!==false;setText(String(Math.round((accepted?v:value)*displayScale)/displayScale))
+      try {
+        const v=rounding===undefined?Math.max(min,Math.min(max,n)):roundNiceValue(n,rounding,min,max)
+        const accepted=onChange(v)!==false
+        setText(String(Math.round((accepted?v:value)*displayScale)/displayScale))
+      } catch(cause) {
+        setText(String(Math.round(value*displayScale)/displayScale))
+        setError(cause instanceof Error?cause.message:'This value is unavailable.')
+      }
     }else setText(String(value))
   }
   return <label className={`field ${unavailable?'field-disabled':''}`} htmlFor={id}>
     <span>{label}</span>
     <div className="number-wrap">
       <input id={id} aria-label={label} type="number" value={mixed?'':text} placeholder={mixed?'Mixed':undefined}
-        title={mixed?'Different values in the selection':undefined} min={min} max={max} step={step} disabled={unavailable}
-        onChange={e=>{if(unavailable)return;const text=e.target.value;edited.current=true;setText(text);const n=Number(text);if(!commitOnBlur&&text.trim()&&Number.isFinite(n)&&n>=min&&n<=max){edited.current=false;if(onChange(n)===false)setText(String(Math.round(value*displayScale)/displayScale))}}}
-        onBlur={commit} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/>
+        title={mixed?'Different values in the selection':rounding?`Rounds to ${rounding} mm on Enter or leaving the field`:undefined} min={firstNice<=lastNice?firstNice:min} max={firstNice<=lastNice?lastNice:max} step={rounding??step} disabled={unavailable} aria-invalid={!!error} aria-describedby={error?`${id}-error`:undefined}
+        onChange={e=>{if(unavailable)return;const text=e.target.value;edited.current=true;setText(text);setError('');const n=Number(text);if(!deferred&&text.trim()&&Number.isFinite(n)&&n>=min&&n<=max){edited.current=false;if(onChange(n)===false)setText(String(Math.round(value*displayScale)/displayScale))}}}
+        onBlur={commit} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur()}}}/>
       {!mixed&&<span className="input-unit">{unit}</span>}
     </div>
+    {error&&<span id={`${id}-error`} className="error-message" role="alert">{error}</span>}
   </label>
 }
 
@@ -90,7 +108,7 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
     {(!group || group==='dimensions') && <><div className="field-row">
       <NumberField label="Width" commitOnBlur={resizeOnCommit} value={panel.width} min={80} max={3000} {...numberProps('width')} onChange={width=>onChange({width})}/>
       <NumberField label="Height" commitOnBlur={resizeOnCommit} value={panel.height} min={80} max={3000} {...numberProps('height')} onChange={height=>onChange({height})}/>
-      <NumberField label="Thickness" value={panel.thickness} min={3} max={60} {...numberProps('thickness')} onChange={thickness=>onChange({thickness})}/>
+      <NumberField label="Thickness" nice={false} value={panel.thickness} min={3} max={60} {...numberProps('thickness')} onChange={thickness=>onChange({thickness})}/>
     </div>
     {!compact&&<p className="field-note">Panel cut dimensions, before assembly.</p>}
     </>}

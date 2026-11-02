@@ -83,6 +83,8 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   snapProbe?: { position: Vec3; direction: Vec3 }
   snapDirection?: Vec3
   snapSettings?: SnapSettings
+  /** Accepted nice-value spacing; leaves the separate snapping preferences intact. */
+  niceValueStep?: number
   showGrid: boolean
   showDimensions: boolean
   exploded: boolean
@@ -262,7 +264,7 @@ function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, re
 }
 
 /** Read the live camera on every keypress, including during orbit damping. */
-function PanelKeyboardMovement({onMovement,snapSettings,panels, connections, connectorOverrides, selectedConnectorIds = [], onMoveConnectors, selectedIds, onMove, movementEnabled}: SceneProps & { onMovement: (direction: Vec3) => void }) {
+function PanelKeyboardMovement({onMovement,snapSettings,niceValueStep,panels, connections, connectorOverrides, selectedConnectorIds = [], onMoveConnectors, selectedIds, onMove, movementEnabled}: SceneProps & { onMovement: (direction: Vec3) => void }) {
   const {camera, gl, size} = useThree()
   const gesture = useRef('')
   const move = useEffectEvent((event: KeyboardEvent) => {
@@ -270,7 +272,7 @@ function PanelKeyboardMovement({onMovement,snapSettings,panels, connections, con
     if (selectedConnectorIds.length && onMoveConnectors) {
       camera.updateWorldMatrix(true, false)
       const slides = getConnectorKeyboardSlides({ connections, connectorOverrides }, panels, selectedConnectorIds,
-        { camera, key: event.key, shiftKey: event.shiftKey, viewport: size, snapSettings })
+        { camera, key: event.key, shiftKey: event.shiftKey, viewport: size, snapSettings, keyboardStep: niceValueStep })
       if (!Object.keys(slides).length) return
       event.preventDefault()
       event.stopPropagation()
@@ -296,7 +298,8 @@ function PanelKeyboardMovement({onMovement,snapSettings,panels, connections, con
     event.preventDefault()
     event.stopPropagation()
     const key = `${event.key}:${event.shiftKey}:${selected.map(panel=>panel.id).join(',')}`
-    const stepDelta = snapSettings?.grid ? delta.map(value => value * snapSettings.spacing / 10) as Vec3 : delta
+    const step = niceValueStep ?? (snapSettings?.grid ? snapSettings.spacing : 10)
+    const stepDelta = delta.map(value => value * step / 10) as Vec3
     const keyboardSnap = snapSettings ? { ...snapSettings, tolerance: Math.min(snapSettings.tolerance, new THREE.Vector3(...stepDelta).length() * 0.45) } : undefined
     onMovement(stepDelta)
     onMove(keyboardSnap ? snapPanelDelta(panels, selectedIds, stepDelta, keyboardSnap, true) : stepDelta, event.repeat && gesture.current === key)
@@ -498,7 +501,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
     {!exploded && !realisticPreview && props.designConstraint && <DesignConstraintOverlay constraint={props.designConstraint} panels={panels}/>}
     {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
     {!props.boxSelectActive && props.resizeHandles?.length && props.onResizeStart && props.onResizeMove && props.onResizeEnd ? <PreviewResizeHandles
-      handles={props.resizeHandles} keyboardStep={props.snapSettings?.grid ? props.snapSettings.spacing : 10} enabled={props.movementEnabled && !props.dragging && !exploded}
+      handles={props.resizeHandles} keyboardStep={props.niceValueStep ?? (props.snapSettings?.grid ? props.snapSettings.spacing : 10)} enabled={props.movementEnabled && !props.dragging && !exploded}
       onResizeStart={(id, local) => {
         const started = props.onResizeStart!(id, local)
         if (started) { resizeHandleId.current = id; setKeyboardSnap(null) }

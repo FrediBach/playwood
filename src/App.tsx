@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { ProjectHeader } from '@/components/ProjectHeader'
 import { ProjectDialogs, type ProjectDialog } from '@/components/ProjectDialogs'
 import { PanelPaletteProvider } from '@/components/PanelColorField'
+import { NiceValuesContext } from '@/components/nice-values-context'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AssemblyWorkspace } from '@/components/AssemblyWorkspace'
 import { InspectorDisclosure } from '@/components/InspectorPrimitives'
@@ -47,6 +48,7 @@ import { getPanelGroundExtension } from '@/lib/extend-to-ground'
 import { getConnectorPanelFit } from '@/lib/connect-panel'
 import { movePanels, resizePanelDimensions, resizePanels } from '@/lib/structure-edit'
 import { rescaleProject } from '@/lib/project-rescale'
+import { getNiceValueStep, roundPanelDraft } from '@/lib/nice-values'
 import { rotateSelection } from '@/lib/selection-rotation'
 import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
 import { useProject } from '@/hooks/use-project'
@@ -448,18 +450,20 @@ export default function App() {
     }
     assembly.clearPlacement();updateSelection(ids=>selectPanelIds(ids,id,additive));if(additive||!id)setInspectorTab('panel');if(id)setRightOpen(true)
   }
-  const addPanel=()=>{clipboard.cancel();assembly.close();setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:600,height:360,thickness:18,position:[0,500,0]}));setDialog('add')}
+  const addPanel=()=>{clipboard.cancel();assembly.close();setDraft(roundPanelDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:600,height:360,thickness:18,position:[0,500,0]}),project.niceValues));setDialog('add')}
   const addDraftPanel = () => {
-    const panel = { ...draft, name: draft.name.trim() || 'My panel' }
+    let panel: Panel
+    try { panel = roundPanelDraft({ ...draft, name: draft.name.trim() || 'My panel' },project.niceValues) }
+    catch(error) {notify(error instanceof Error?error.message:'These panel measurements cannot use the chosen nice-value step.');return}
     setDialog(null)
     if (!inspectingConnectors&&selectedIds.length) { clipboard.insert({ kind: 'panel', panel }); return }
     commit(p => ({ ...p, panels: [...p.panels, panel] }))
     setSelectedId(panel.id); setInspectorTab('panel'); setRightOpen(true)
     setFitSignal(v => v + 1); notify('Your panel is ready')
   }
-  const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setAttachmentSideHighlight(null);setRealisticPreview(false);setExploded(false);setDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87',...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}));setInspectorTab('attach');setRightOpen(true)}
+  const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setAttachmentSideHighlight(null);setRealisticPreview(false);setExploded(false);setDraft(roundPanelDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87',...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}),project.niceValues));setInspectorTab('attach');setRightOpen(true)}
   const applyAttachment=()=>{if(!previewProject||attachmentErrors.length)return;commit(previewProject);setSelectedId(attachTarget==='new'?draft.id:attachTarget);setInspectorTab('panel');setDraft(createPanel());notify(`${previewPanels.length===1?'Panel':`${previewPanels.length} panels`} attached`)}
-  const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return;const group=connection.id.replace(/:\d+$/,'');commitWithInsertChecks(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
+  const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return false;const group=connection.id.replace(/:\d+$/,'');return commitWithInsertChecks(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
   const insertModuleDefinition = (definition: AssemblyDefinition) => {
     try {
       if (!inspectingConnectors&&selectedIds.length) {
@@ -636,7 +640,7 @@ export default function App() {
     onPickPanel={onPicked=>{constraintPicker.current=onPicked;setPickingConstraint(true);if(window.innerWidth<=900)setRightOpen(false)}}
     onFindPanels={ids=>{setSelectedIds(ids);setRightOpen(true);setFrameSignal(value=>value+1)}}/>
 
-  return <PanelPaletteProvider project={project}
+  return <NiceValuesContext value={project.niceValues}><PanelPaletteProvider project={project}
     onAddColor={color=>commit(current=>addCustomColor(current,color))}
     onUpdateColor={(id,color)=>{
       const previous=project.customColors?.find(option=>option.id===id)?.color
@@ -669,7 +673,7 @@ export default function App() {
       onImportAssembly={()=>{setAssemblyImportError('');assemblyImportRef.current?.click()}} assemblyImportError={assemblyImportError}/>
 
     {contextMenu&&<PreviewContextMenu {...contextMenu} title={inspectingConnectors?`${selectedConnectors.length} connectors`:instance?.name??(selectedPanels.length===1?selectedPanels[0].name:selectedPanels.length?`${selectedPanels.length} panels`:'Preview')} actions={menuActions} onClose={closeContextMenu}/>}
-    <AssemblyWorkspace boxSelectActive={boxSelectActive&&boxSelectAvailable} boxSelectDisabled={!boxSelectAvailable} selectionKind={selectionKind} onToggleBoxSelect={toggleBoxSelect} onBoxSelect={selectBox} onBoxSelectCancel={cancelBoxSelect} resolveBoxPanelIds={resolveBoxPanelIds} resolveBoxConnectorIds={resolveBoxConnectorIds}
+    <AssemblyWorkspace niceValueStep={getNiceValueStep(project.niceValues)} boxSelectActive={boxSelectActive&&boxSelectAvailable} boxSelectDisabled={!boxSelectAvailable} selectionKind={selectionKind} onToggleBoxSelect={toggleBoxSelect} onBoxSelect={selectBox} onBoxSelectCancel={cancelBoxSelect} resolveBoxPanelIds={resolveBoxPanelIds} resolveBoxConnectorIds={resolveBoxConnectorIds}
       snapProbe={resize.snapProbe} snapDirection={drag.snapDirection} snapSettings={snapSettings} setSnapSettings={setSnapSettings} onPreviewContextMenu={constraints.editing||modalOpen||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
       if(target.connectorId&&!realisticPreview){if(!selectedConnectorIds.includes(target.connectorId))chooseConnector(target.connectorId)}
       else if(target.panelId!==undefined){if(!target.panelId||!selectedIds.includes(target.panelId))choosePanel(target.panelId||null)}
@@ -743,10 +747,10 @@ export default function App() {
       exportProject={exportProject} onExportParts={()=>{download(projectToCsv(project),`${exportName}-parts.csv`,'text/csv');notify('Parts list exported')}}
       onImport={()=>importRef.current?.click()} importError={importError} project={project} panels={panels} connectorCount={connectorCount} issues={issues}
       onMoveCreation={delta=>{commit(p=>moveProject(p,delta));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);notify('Creation moved. Undo is available.')}}
-      onRescale={changes=>{commit(p=>rescaleProject(p,changes));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify('Creation rescaled. Undo is available.')}}
+      onRescale={(changes,niceValues)=>{commit(p=>{if(p!==project)throw new Error('The project changed. Close and reopen Rescale creation.');return rescaleProject(p,changes,niceValues)});assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify('Rescale settings applied. Undo is available.')}}
       onRotate={(axis,degrees)=>{commit(p=>rotateProject(p,axis,degrees));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify(`Creation rotated ${degrees}° around ${axis.toUpperCase()}. Undo is available.`)}}
       attachNewPanel={!inspectingConnectors&&selectedIds.length>0} onAdd={addDraftPanel}/>
     <input ref={importRef} type="file" accept=".json,.playwood.json" className="visually-hidden" aria-label="Import project file" onChange={e=>{const file=e.target.files?.[0];if(file)void importProject(file);e.target.value=''}}/>
     <input ref={assemblyImportRef} type="file" accept=".json,.playwood-assembly.json" className="visually-hidden" aria-label="Import assembly file" onChange={e=>{const file=e.target.files?.[0];if(file)void importAssembly(file);e.target.value=''}}/>
-  </div></TooltipProvider></PanelPaletteProvider>
+  </div></TooltipProvider></PanelPaletteProvider></NiceValuesContext>
 }

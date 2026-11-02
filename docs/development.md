@@ -87,6 +87,7 @@ Screenshots are saved on failures, and some specs explicitly write diagnostic im
 | Change area | Representative unit coverage | Representative browser coverage |
 | --- | --- | --- |
 | Attachments and connector profiles | `src/lib/model.test.ts`, `src/components/connector-geometry.test.ts` | `tests/connectors.spec.ts`, `tests/attachment-sides.spec.ts` |
+| Nice-value settings and input completion | `src/lib/nice-values.test.ts`, `src/lib/preview-nice-values.test.ts` | `tests/nice-values.spec.ts`, `tests/rescale.spec.ts` |
 | Constrained movement and resizing | `src/lib/structure-edit.test.ts`, `src/lib/preview-resize.test.ts` | `tests/panel-movement.spec.ts`, `tests/preview-resize.spec.ts` |
 | User design requirements and rule previews | `src/lib/design-constraints.test.ts`, `src/lib/structure-design-constraints.test.ts`, `src/lib/design-constraint-commands.test.ts`, `src/lib/design-constraint-interactions.test.ts` | `tests/design-constraints.spec.ts` |
 | Drag, snapping, and selection | `src/lib/preview-drag.test.ts`, `src/lib/preview-snap.test.ts`, `src/lib/box-selection.test.ts` | `tests/preview-drag.spec.ts`, `tests/preview-snap.spec.ts`, `tests/box-selection.spec.ts` |

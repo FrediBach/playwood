@@ -62,9 +62,9 @@ function TrofastForm({ project, panel, existing, onApply, onPreview, onClose }: 
     onPreview(panel.id, issue ? null : [...(panel.trofastInserts ?? []).filter(insert => insert.id !== draft.id), draft])
     return () => onPreview(panel.id, null)
   }, [draft, issue, panel.id, panel.trofastInserts, onPreview])
-  const position = (x: number, y: number) => setDraft(value => ({ ...value,
-    x: bounds ? Math.max(bounds.minX, Math.min(bounds.maxX, Math.round(x))) : Math.round(x),
-    y: bounds ? Math.max(bounds.minY, Math.min(bounds.maxY, Math.round(y))) : Math.round(y),
+  const position = (x: number, y: number, exact = false) => setDraft(value => ({ ...value,
+    x: bounds ? Math.max(bounds.minX, Math.min(bounds.maxX, exact ? x : Math.round(x))) : exact ? x : Math.round(x),
+    y: bounds ? Math.max(bounds.minY, Math.min(bounds.maxY, exact ? y : Math.round(y))) : exact ? y : Math.round(y),
   }))
   const turn = () => {
     const quarterTurn = !draft.quarterTurn
@@ -114,8 +114,8 @@ function TrofastForm({ project, panel, existing, onApply, onPreview, onClose }: 
     </button>
     <p id={hintId} className="field-note trofast-map-help">Panel face, from its top-left corner. Click or drag to place; arrow keys move 10 mm, Shift moves 1 mm.</p>
     <div className="field-row">
-      <NumberField label="TROFAST center X" value={draft.x} min={bounds?.minX ?? 0} max={bounds?.maxX ?? panel.width} commitOnBlur onChange={x => position(x, draft.y)}/>
-      <NumberField label="TROFAST center Y" value={draft.y} min={bounds?.minY ?? 0} max={bounds?.maxY ?? panel.height} commitOnBlur onChange={y => position(draft.x, y)}/>
+      <NumberField label="TROFAST center X" value={draft.x} min={bounds?.minX ?? 0} max={bounds?.maxX ?? panel.width} commitOnBlur onChange={x => position(x, draft.y, !!project.niceValues?.enabled)}/>
+      <NumberField label="TROFAST center Y" value={draft.y} min={bounds?.minY ?? 0} max={bounds?.maxY ?? panel.height} commitOnBlur onChange={y => position(draft.x, y, !!project.niceValues?.enabled)}/>
     </div>
     <div className={`trofast-fit-status ${issue ? 'is-blocked' : ''}`} role="status"><Box size={15}/><span>{issue || 'Fits here · clearance below is available'}</span></div>
     <div className="trofast-form-actions"><Button size="sm" disabled={!!issue} onClick={() => {

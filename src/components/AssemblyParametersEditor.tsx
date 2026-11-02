@@ -48,7 +48,7 @@ export function AssemblyParametersEditor({ panels, parameters, onChange }: {
         </div>
         {expanded && <div className="assembly-parameter-body">
           <label className="field"><span>Value name</span><input aria-label="Value name" value={parameter.name} maxLength={60} placeholder="e.g. Width" onChange={event => update(parameter.id, { name: event.target.value })}/></label>
-          <NumberField label="Default value" value={parameter.defaultValue} precision={3} min={0.01} max={10000} onChange={defaultValue => { editedDefaults.current.add(parameter.id); update(parameter.id, { defaultValue }) }}/>
+          <NumberField label="Default value" nice={!parameter.bindings.some(binding => binding.dimension === 'thickness')} value={parameter.defaultValue} precision={3} min={0.01} max={10000} onChange={defaultValue => { editedDefaults.current.add(parameter.id); update(parameter.id, { defaultValue }) }}/>
           <div className="assembly-binding-label"><Link2 size={13}/><span>Dimensions controlled by this value</span></div>
           <p className="assembly-binding-note">Choose several to change them together. Panel dimensions are measured before assembly.</p>
           <div className="assembly-binding-list">
@@ -73,7 +73,7 @@ export function AssemblyParametersEditor({ panels, parameters, onChange }: {
                 <strong>{panel?.name ?? 'Missing panel'} · {binding.dimension}</strong>
                 <div className="field-row">
                   <NumberField label="Multiplier" value={binding.scale} precision={3} min={0.01} max={1000} step={0.01} unit="×" onChange={scale => update(parameter.id, { bindings: parameter.bindings.map((item, i) => i === bindingIndex ? { ...item, scale } : item) })}/>
-                  <NumberField label="Offset" value={binding.offset} precision={3} min={-100000} max={100000} onChange={offset => update(parameter.id, { bindings: parameter.bindings.map((item, i) => i === bindingIndex ? { ...item, offset } : item) })}/>
+                  <NumberField label="Offset" nice={binding.dimension !== 'thickness'} value={binding.offset} precision={3} min={-100000} max={100000} onChange={offset => update(parameter.id, { bindings: parameter.bindings.map((item, i) => i === bindingIndex ? { ...item, offset } : item) })}/>
                 </div>
                 <p>{parameter.name || 'Value'}{binding.scale !== 1 && ` × ${rounded(binding.scale)}`}{binding.offset !== 0 && ` ${binding.offset > 0 ? '+' : '−'} ${rounded(Math.abs(binding.offset))}`} = {rounded(parameter.defaultValue * binding.scale + binding.offset)} mm</p>
               </div>

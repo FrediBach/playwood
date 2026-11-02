@@ -18,6 +18,7 @@ The main entry points are [App.tsx](../src/App.tsx), [use-project.ts](../src/hoo
 | `useDesignConstraints` / `DesignConstraintsInspector` | Rule form draft, reference-panel preference, source-bound candidate, measurement highlight, and feedback | Only the accepted rule and geometry |
 | `useAttachmentPreview` | Derived candidate project, preview panels/hardware, validation issues | No |
 | Local form components | Unapplied outline, parameter, color, and field drafts | No |
+| `Project.niceValues` | Optional enabled flag and millimeter step for committed length inputs | Yes |
 | `App` snap settings | Grid/geometry snapping flags, spacing, tolerance | Separate browser preference |
 
 The `Project` includes user-visible organization as well as geometry: names, panel visibility/order, connector order, list groups, custom palette colors, and per-piece connector overrides. Those edits go through history just like resizing a panel. Flat list groups are independent of physical assembly membership.
@@ -80,6 +81,14 @@ Control-drag preparation releases joints crossing the selection boundary in the 
 ### TROFAST placement drafts
 
 [`TrofastInspector.tsx`](../src/components/TrofastInspector.tsx) holds a new or edited insert locally. Item, color, turn, and center controls update the panel diagram and a candidate scene panel, without changing the committed project. `App` ties this preview to the current project identity and selected panel and suppresses it during conflicting modes. Apply uses a functional project commit with clearance validation; Cancel, Escape, selection changes, or unmount discard the preview. Existing inserts remain editable/removable from the panel inspector. Shared assembly edits use the definition API and validate every rebuilt instance. Undo/redo, autosave, project files, standalone assemblies, and panel duplication retain the nested data.
+
+### Nice-value input boundaries
+
+[`nice-values.ts`](../src/lib/nice-values.ts) validates the optional `{ enabled, step }` project setting and rounds measurements to the nearest legal multiple. Legacy projects omit it and retain unrestricted input. `RescaleCreation` holds the setting as a local draft; applying an enable/step change calls `rescaleProject` with all unique and repeated panel sizes, radii and active perforations before saving the setting and geometry together. Cancellation or a rejected solve saves neither. Undo, redo, autosave and project export retain the setting. Standalone assembly files do not carry this project preference. Parsing validates the setting without rescaling imported geometry.
+
+`NiceValuesContext` supplies the setting to length fields. `NumberField` defers eligible millimeter inputs until blur/Enter while enabled, rounds before invoking the existing domain callback, and restores the displayed committed value on rejection or a rounded no-op. Stock thickness, thickness-bound assembly controls, non-length units and workspace snap preferences are excluded. Outline coordinate inputs use the same final rounding. New panel drafts receive rounded dimensions before insertion.
+
+Resize and control-drag hooks call their finish helpers only on release, retaining smooth transient previews and one history entry. Resize finalization replays the original driver with a rounded target cut, preserving the opposite edge and independent-resize rules. Free drags round the reference panel position on moved axes and carry the selection rigidly; attachment candidates retain their exact joint geometry. Nice values do not run a blanket normalization on every project commit: derived positions/cuts, fixed hardware, assembly allowances and saved constraints remain authoritative. Library/imported assembly sources retain their exact authored geometry until their measurements are edited or rescaled.
 
 ### Local form drafts
 
@@ -154,6 +163,7 @@ Project
   listGroups?         flat panel/connector groups
   connectorOrder?     physical connector ordering
   constraints?        enabled/disabled project design requirements
+  niceValues?         enabled boolean and finite step from 1–100 mm
 ```
 
 The UI rejects files larger than 2,000,000 bytes before reading them. `JSON.parse` is followed by [parseProject in model.ts](../src/lib/model.ts), which constructs a validated object rather than treating a type assertion as validation. Its responsibilities include:

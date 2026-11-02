@@ -15,6 +15,23 @@ const id = connectorId('joint', 0)
 const move = (project: Project, key = 'ArrowRight', shiftKey = false) => getConnectorKeyboardSlides(project, resolvePanels(project), [id], { camera, key, shiftKey, viewport: { width: 800, height: 800 } })
 
 describe('connector keyboard sliding', () => {
+  it('uses nice-value increments while keeping exact rail limits and separate grid settings', () => {
+    const project = fixture()
+    const options = { camera, key: 'ArrowRight', shiftKey: false, viewport: { width: 800, height: 800 }, keyboardStep: 25,
+      snapSettings: { grid: true, geometry: false, spacing: 50, tolerance: 10 } }
+    expect(getConnectorKeyboardSlides(project, resolvePanels(project), [id], options)).toEqual({ [id]: 25 })
+    expect(getConnectorKeyboardSlides(project, resolvePanels(project), [id], { ...options, shiftKey: true })).toEqual({ [id]: 250 })
+    expect(options.snapSettings.spacing).toBe(50)
+    const moved = editConnectors(project, [id], { slide: 25 })
+    expect(getConnectorKeyboardSlides(moved, resolvePanels(moved), [id], options)).toEqual({ [id]: 50 })
+    const narrow = fixture()
+    narrow.panels[1].width = 143
+    const rail = getConnectorRail(narrow.connections[0], resolvePanels(narrow), narrow.connections)!
+    const nearEnd = editConnectors(narrow, [id], { slide: 50 })
+    expect(getConnectorKeyboardSlides(nearEnd, resolvePanels(nearEnd), [id], options)).toEqual({ [id]: rail.upper })
+    expect(rail.upper % options.keyboardStep).not.toBe(0)
+  })
+
   it('steps on the global grid without sticking and still respects rail limits', () => {
     const project = fixture()
     const options = { camera, key: 'ArrowRight', shiftKey: false, viewport: { width: 800, height: 800 },

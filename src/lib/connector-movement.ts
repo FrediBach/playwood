@@ -37,7 +37,7 @@ export function connectorSlide(rail: NonNullable<ReturnType<typeof getConnectorR
 }
 
 export function getConnectorKeyboardSlides(project: Pick<Project, 'connections' | 'connectorOverrides'>, panels: Panel[], ids: readonly string[],
-  options: { camera: Camera; key: string; shiftKey: boolean; viewport: { width: number; height: number }; snapSettings?: SnapSettings }) {
+  options: { camera: Camera; key: string; shiftKey: boolean; viewport: { width: number; height: number }; snapSettings?: SnapSettings; keyboardStep?: number }) {
   const slides: Record<string, number> = {}
   const selectedIds = new Set(ids)
   for (const piece of getPhysicalConnectors(project).filter(piece => selectedIds.has(piece.id))) {
@@ -47,7 +47,8 @@ export function getConnectorKeyboardSlides(project: Pick<Project, 'connections' 
     const position = new Vector3(...rail.placements[piece.index].position).addScaledVector(new Vector3(...rail.tangent), current).toArray() as Vec3
     const delta = getPanelMovementDelta({ ...options, position, axes: [rail.tangent] })
     if (!delta) continue
-    const requested = new Vector3(...delta).dot(new Vector3(...rail.tangent)) * (options.snapSettings?.grid ? options.snapSettings.spacing / 10 : 1)
+    const step = options.keyboardStep ?? (options.snapSettings?.grid ? options.snapSettings.spacing : 10)
+    const requested = new Vector3(...delta).dot(new Vector3(...rail.tangent)) * step / 10
     const amount = options.snapSettings ? snapDistance(position, rail.tangent, requested,
       snapTargets({ ...project, version: 1, name: '', panels }, [], ids, true), { ...options.snapSettings, tolerance: Math.min(options.snapSettings.tolerance, Math.abs(requested) * 0.45) }) : requested
     let next = connectorSlide(rail, piece.index, current + amount)
