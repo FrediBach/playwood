@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
+import { Euler, Quaternion, Vector3 } from 'three'
 import { gridProject } from '../src/lib/example-geometry'
 import { createPanel, getProjectBounds, moveProject, parseProject, resolvePanels, validateProject } from '../src/lib/model'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
+import { samePanelPlacement } from '../src/lib/assembly-placement'
 import { preparePreviewResize } from '../src/lib/preview-resize'
 import type { Project, Vec3 } from '../src/lib/types'
 
@@ -12,6 +14,10 @@ async function savedProject(page: Page): Promise<Project> {
   return page.evaluate(key => JSON.parse(localStorage.getItem(key)!), STORAGE_KEY)
 }
 
+async function settleScene(page: Page) {
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))))
+}
+
 async function openCube(page: Page, project = gridProject('Repeat cubby', [350], [350]), view = 'front', panelName = 'Shelf 1.2', direction: Vec3 = [1, 0, 0]) {
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles({ name: 'repeat.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
@@ -20,7 +26,7 @@ async function openCube(page: Page, project = gridProject('Repeat cubby', [350],
   await page.locator('.panel-list-select').getByText(panelName, { exact: true }).click()
   // Leave enough space to see two added compartments without moving the camera mid-gesture.
   for (let index = 0; index < 8; index++) await page.getByRole('button', { name: 'Zoom out', exact: true }).click()
-  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))))
+  await settleScene(page)
   const panel = project.panels.find(panel => panel.name === panelName)!
   const handle = preparePreviewResize(project, { panelId: panel.id })!.handles.find(handle => handle.direction.reduce((sum, value, axis) => sum + value * direction[axis], 0) > .999)!
   expect(handle).toBeDefined()
@@ -86,9 +92,9 @@ test('Control-pull previews two connected bays and saves one undoable, exportabl
   const { project, panel, handle } = await openCube(page)
   const move = await beginRepeat(page, handle)
   await move(PITCH)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 new bay' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
   await move(PITCH * 2)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 new bays' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 bays' })).toBeVisible()
   // A preview lasting beyond the autosave debounce must still leave the saved model alone.
   await page.waitForTimeout(500)
   expect(await savedProject(page)).toEqual(project)
@@ -123,17 +129,17 @@ test('pulling back retracts preview bays and Escape restores the original select
   const { project, panel, handle } = await openCube(page)
   let move = await beginRepeat(page, handle)
   await move(PITCH * 2)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 new bays' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 bays' })).toBeVisible()
   await move(PITCH)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 new bay' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
   await move(0)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 0 new bays' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 0 bays' })).toBeVisible()
   await releaseRepeat(page)
   expect(await savedProject(page)).toEqual(project)
 
   move = await beginRepeat(page, handle)
   await move(PITCH)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 new bay' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
   await page.keyboard.press('Escape')
   await releaseRepeat(page)
   await expect(page.locator('.preview-resize-anchor.is-active')).toHaveCount(0)
@@ -185,9 +191,10 @@ test('repeat feedback stays inside a narrow workspace with the inspectors closed
   await page.getByRole('button', { name: 'Collapse panel list', exact: true }).click()
   await page.getByRole('button', { name: 'Collapse inspector', exact: true }).click()
   await page.setViewportSize({ width: 390, height: 844 })
+  await settleScene(page)
   const move = await beginRepeat(page, handle)
   await move(PITCH)
-  const caption = page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 new bay' })
+  const caption = page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 bay' })
   await expect(caption).toBeVisible()
   const box = (await caption.boundingBox())!
   expect(box.x).toBeGreaterThanOrEqual(0)
@@ -222,11 +229,11 @@ for (const { sign, view, label } of [
   const { project, panel, handle } = await openCube(page, undefined, view, 'Shelf 1.2', [0, 0, sign])
   let move = await beginRepeat(page, handle)
   await move(PITCH * 2)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 new bays' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 bays' })).toBeVisible()
   await move(PITCH)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 new bay' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
   await move(PITCH * 2)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 new bays' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 bays' })).toBeVisible()
   expect(await savedProject(page)).toEqual(project)
   await page.screenshot({ path: `test-results/preview-repeat-depth-${label}.png` })
   await page.keyboard.press('Escape')
@@ -270,9 +277,9 @@ for (const { sign, panelName, label, elevation } of [
   expect(handle.id).toMatch(/^panel-normal-/)
   const move = await beginRepeat(page, handle)
   await move(PITCH * 2)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 new bays' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 bays' })).toBeVisible()
   await move(PITCH)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 new bay' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
   await page.screenshot({ path: `test-results/preview-repeat-normal-${label}.png` })
   expect(await savedProject(page)).toEqual(project)
   await releaseRepeat(page)
@@ -308,12 +315,155 @@ test('fixed panel cuts still expose a Control-pull normal arrow for adding a bay
   expect(handle.repeatOnly).toBe(true)
   const move = await beginRepeat(page, handle)
   await move(PITCH)
-  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 new bay' })).toBeVisible()
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
   await releaseRepeat(page)
   await expect.poll(async () => (await savedProject(page)).panels.length).toBe(7)
   const repeated = await savedProject(page)
   expectSourcePanelsUnchanged(project, repeated)
   expect(validateProject(repeated)).toEqual([])
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
+})
+
+test('Control-pull fills a lower row using the existing upper-row ceilings and shared cross joints', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  const staircase = gridProject('Complete lower row', [350, 350, 350], [350, 350], { cells: [[0, 0], [0, 1], [1, 1], [2, 1]] })
+  const ceilingNames = ['Shelf 2.2', 'Shelf 3.2']
+  staircase.panels = staircase.panels.map(panel => ceilingNames.includes(panel.name)
+    ? { ...panel, material: 'birch', color: panel.name === ceilingNames[0] ? '#b88b54' : '#76523b', finishCoverage: .35 }
+    : panel)
+  expect(staircase.panels).toHaveLength(13)
+  expect(validateProject(staircase)).toEqual([])
+  const { project, panel, handle } = await openCube(page, staircase, 'perspective', 'Shelf 1.1')
+  // Filling the lower row keeps the same overall width, so show its existing ceilings clearly.
+  for (let index = 0; index < 5; index++) await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
+  let move = await beginRepeat(page, handle)
+  await move(PITCH * 2)
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 bays' })).toBeVisible()
+  await move(PITCH)
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
+  await move(PITCH * 2)
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 2 bays' })).toBeVisible()
+  await page.waitForTimeout(500)
+  expect(await savedProject(page)).toEqual(project)
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: '2 existing panels reused' })).toBeVisible()
+  await page.screenshot({ path: 'test-results/preview-repeat-reused-ceilings.png' })
+  await page.keyboard.press('Escape')
+  await releaseRepeat(page)
+  expect(await savedProject(page)).toEqual(project)
+  await expect(page.getByLabel('Panel name')).toHaveValue(panel.name)
+
+  move = await beginRepeat(page, handle)
+  await move(PITCH * 2)
+  await releaseRepeat(page)
+  await expect.poll(async () => (await savedProject(page)).panels.length).toBe(17)
+  const completed = await savedProject(page)
+  expectSourcePanelsUnchanged(project, completed)
+  const resolved = resolvePanels(completed)
+  for (const before of project.panels.filter(panel => ceilingNames.includes(panel.name))) {
+    const after = completed.panels.find(panel => panel.id === before.id)!
+    expect(after.name).toBe(before.name)
+    expect(after.material).toBe(before.material)
+    expect(after.color).toBe(before.color)
+    expect(after.finishCoverage).toBe(before.finishCoverage)
+  }
+  for (let index = 0; index < resolved.length; index++) {
+    expect(resolved.slice(index + 1).some(panel => samePanelPlacement(resolved[index], panel))).toBe(false)
+  }
+  const connectors = getPhysicalConnectors(completed)
+  expect(connectors).toHaveLength(24)
+  expect(connectors.filter(connector => connector.type === 'cross')).toHaveLength(4)
+  expect(validateProject(completed)).toEqual([])
+  expect(parseProject(completed)).toEqual(completed)
+  await expect(page.getByLabel('Panel name')).toHaveValue(`${panel.name} (repeat 2)`)
+  await expect(page.locator(`[data-resize-handle="${handle.id}"]`)).toBeFocused()
+  await page.screenshot({ path: 'test-results/preview-repeat-reused-ceilings-committed.png' })
+  await page.keyboard.press('Control+ArrowRight')
+  await expect.poll(async () => (await savedProject(page)).panels.length).toBe(20)
+  expect(validateProject(await savedProject(page))).toEqual([])
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(completed)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect.poll(() => savedProject(page)).toEqual(completed)
+  expect(await exportedProject(page)).toEqual(completed)
+  await page.reload()
+  await expect.poll(() => savedProject(page)).toEqual(completed)
+  expect(errors).toEqual([])
+})
+
+test('Control-pull can pass through an existing bay without an edit, then add a bay beyond it', async ({ page }) => {
+  await page.goto('/')
+  await expect.poll(async () => !!(await savedProject(page))?.panels.length).toBe(true)
+  const beforeImport = await savedProject(page)
+  const row = gridProject('Continue existing row', [350, 350], [350])
+  const { project, panel, handle } = await openCube(page, row, 'front', 'Shelf 1.1')
+  const caption = page.locator('.preview-resize-caption')
+  let move = await beginRepeat(page, handle)
+  await move(PITCH)
+  await expect(caption.filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
+  await expect(caption.filter({ hasText: '3 existing panels reused' })).toBeVisible()
+  await move(0)
+  await expect(caption.filter({ hasText: 'Repeat · 0 bays' })).toBeVisible()
+  await move(PITCH)
+  await expect(caption.filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
+  await releaseRepeat(page)
+  expect(await savedProject(page)).toEqual(project)
+  await expect(page.locator('.toast').filter({ hasText: /Added/ })).toHaveCount(0)
+  // With no added geometry or hardware, Undo should reach the import immediately.
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(beforeImport)
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
+  await page.locator('.panel-list-select').getByText(panel.name, { exact: true }).click()
+
+  move = await beginRepeat(page, handle)
+  await move(PITCH * 2)
+  await expect(caption.filter({ hasText: 'Repeat · 2 bays' })).toBeVisible()
+  await expect(caption.filter({ hasText: '3 existing panels reused' })).toBeVisible()
+  expect(await savedProject(page)).toEqual(project)
+  await releaseRepeat(page)
+  await expect.poll(async () => (await savedProject(page)).panels.length).toBe(10)
+  const extended = await savedProject(page)
+  expectSourcePanelsUnchanged(project, extended)
+  expect(getPhysicalConnectors(extended)).toHaveLength(16)
+  expect(validateProject(extended)).toEqual([])
+  await expect(page.getByLabel('Panel name')).toHaveValue(`${panel.name} (repeat 2)`)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
+})
+
+test('keyboard repetition keeps its world direction when the selected reused floor has different local axes', async ({ page }) => {
+  const cube = gridProject('Reuse turned floor', [350], [350], { depth: 260 })
+  const floor = resolvePanels(cube).find(panel => panel.name === 'Shelf 1.1')!
+  const rotation = new Euler().setFromQuaternion(new Quaternion().setFromEuler(new Euler(...floor.rotation))
+    .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2)))
+  const existingFloor = createPanel({ ...floor, id: 'existing-turned-floor', name: 'Existing turned floor',
+    width: floor.height, height: floor.width, rotation: [rotation.x, rotation.y, rotation.z],
+    position: [floor.position[0] + PITCH, floor.position[1], floor.position[2]],
+  })
+  const { project, handle } = await openCube(page, { ...cube, panels: [...cube.panels, existingFloor] }, 'front', floor.name)
+  await page.locator(`[data-resize-handle="${handle.id}"]`).focus()
+  await page.keyboard.press('Control+ArrowRight')
+  await expect.poll(async () => (await savedProject(page)).panels.length).toBe(7)
+  const first = await savedProject(page)
+  expectSourcePanelsUnchanged(project, first)
+  expect(validateProject(first)).toEqual([])
+  await expect(page.getByLabel('Panel name')).toHaveValue(existingFloor.name)
+  const continuedHandle = preparePreviewResize(first, { panelId: existingFloor.id })!.handles.find(candidate => candidate.direction[0] > .999)!
+  expect(continuedHandle.id).not.toBe(handle.id)
+  await expect(page.locator(`[data-resize-handle="${continuedHandle.id}"]`)).toBeFocused()
+  await page.screenshot({ path: 'test-results/preview-repeat-reused-floor-focus.png' })
+  await page.keyboard.press('Control+ArrowRight')
+  await expect.poll(async () => (await savedProject(page)).panels.length).toBe(10)
+  const second = await savedProject(page)
+  expect(validateProject(second)).toEqual([])
+  expect(getProjectBounds(resolvePanels(second)).max[0] - getProjectBounds(resolvePanels(first)).max[0]).toBeCloseTo(PITCH, 5)
+  expect(getProjectBounds(resolvePanels(second)).max[2]).toBeCloseTo(getProjectBounds(resolvePanels(first)).max[2], 5)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(first)
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(project)
 })

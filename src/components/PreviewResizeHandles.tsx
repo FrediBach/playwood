@@ -49,6 +49,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
   const projection = useMemo(() => ({ position: new Vector3(), origin: new Vector3(), tip: new Vector3(), axis: new Vector3(), towards: new Vector3() }), [])
   const elements = useRef(new Map<string, HTMLDivElement>())
   const gesture = useRef<Gesture | null>(null)
+  const repeatFocus = useRef<{ direction: Vec3; target: HTMLButtonElement } | null>(null)
   const [raycaster] = useState(() => new Raycaster())
   const [activeId, setActiveId] = useState<string | null>(null)
   const [requestedDistance, setRequestedDistance] = useState(0)
@@ -66,7 +67,10 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     document.body.style.cursor = current.previousCursor
     setActiveId(null)
     setRequestedDistance(0)
-    if (current.started) onResizeEnd(cancel)
+    if (current.started) {
+      if (!cancel && current.mode === 'repeat') repeatFocus.current = { direction: current.axis.toArray(), target: current.target }
+      onResizeEnd(cancel)
+    }
     invalidate()
   })
   const down = (event: PointerEvent<HTMLButtonElement>, handle: PreviewResizeHandle) => {
@@ -141,6 +145,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     event.stopPropagation()
     if (enabled && onResizeStart(handle.id, event.ctrlKey ? 'repeat' : 'connected')) {
       onResizeMove(sign * keyboardStep * (event.shiftKey ? 10 : 1), true)
+      if (event.ctrlKey) repeatFocus.current = { direction: handle.direction, target: event.currentTarget }
       onResizeEnd(false)
     }
   }
@@ -219,7 +224,18 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
   }, [activeId, camera, enabled, handles, projection, size.height, size.width])
   // Cancellation restores the handles before the next demand-rendered frame.
   // Keep their DOM hit targets in sync so an immediate second drag can start.
-  useLayoutEffect(() => { positionHandles(); invalidate() }, [positionHandles, invalidate])
+  useLayoutEffect(() => {
+    positionHandles()
+    const pending = repeatFocus.current
+    repeatFocus.current = null
+    // An existing panel can occupy the same space with different local axes.
+    // Keep the next keyboard pull pointing in the completed gesture's direction.
+    if (pending && document.activeElement === pending.target) {
+      const handle = handles.find(item => item.direction.reduce((sum, value, axis) => sum + value * pending.direction[axis], 0) > .99999)
+      if (handle) elements.current.get(handle.id)?.querySelector('button')?.focus({ preventScroll: true })
+    }
+    invalidate()
+  }, [positionHandles, invalidate, handles])
   useFrame(positionHandles)
   if (!handles.length || !enabled) return null
   const shownDistance = Math.round(distance ?? requestedDistance)
@@ -239,10 +255,11 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h11M10 4l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <span className={`preview-resize-caption${limited && activeId === handle.id ? ' is-limited' : ''}`}>
-          {activeId === handle.id ? <>{handle.repeat && <span className="preview-resize-size">Repeat · {handle.repeat.count} new {handle.repeat.count === 1 ? 'bay' : 'bays'}</span>}{shownDistance > 0 ? '+' : ''}{shownDistance} mm{limited ? ' · limit' : ''}
+          {activeId === handle.id ? <>{handle.repeat && <span className="preview-resize-size">Repeat · {handle.repeat.count} {handle.repeat.count === 1 ? 'bay' : 'bays'}</span>}{shownDistance > 0 ? '+' : ''}{shownDistance} mm{limited ? ' · limit' : ''}
+            {!!handle.repeat?.reused && <span className="preview-resize-size">{handle.repeat.reused} existing {handle.repeat.reused === 1 ? 'panel' : 'panels'} reused</span>}
             {handle.sizes?.map((size, index) => <span className="preview-resize-size" key={index}>{size.label} = {Math.round(size.value * 100) / 100} mm</span>)}
             {handle.repeat && <span className="preview-resize-size">{handle.repeat.reason ?? `${Math.round(handle.repeat.pitch * 100) / 100} mm per bay`}</span>}
-            <small>{handle.repeat ? 'Release to add bays' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.label}{handle.repeatOnly && <small>Fixed size · Control-pull to repeat</small>}</>}
+            <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.label}{handle.repeatOnly && <small>Fixed size · Control-pull to repeat</small>}</>}
         </span>
       </div>)}
     </div>

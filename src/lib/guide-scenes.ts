@@ -240,7 +240,7 @@ function buildScenes(id: GuideId): GuideScene[] {
         scene(repeated.project, 'Control-pull adds complete bays. Pull back to retract the preview; Escape cancels every addition.', {
           selected: repeat.panelIds, ghost: repeated.project.panels.filter(panel => !originalIds.has(panel.id)).map(panel => panel.id),
           resizeHandles: [movedHandle(repeatedEdge, repeated.distance)],
-          document: { title: 'Repeat', lines: ['2 new bays', 'Shared walls and fitted connectors', 'Release to apply · Esc to cancel'] },
+          document: { title: 'Repeat', lines: ['2 bays', 'Shared walls and fitted connectors', 'Release to apply · Esc to cancel'] },
         })]
     }
     case 'rotate': {

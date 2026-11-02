@@ -1,6 +1,7 @@
 import { Euler, Quaternion, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { createAssembly } from './assemblies'
+import { autoConnect } from './auto-connect'
 import { closePanelHole, findPanelHoles } from './close-holes'
 import { connectorId, getPhysicalConnectors } from './connector-selection'
 import { gridProject } from './example-geometry'
@@ -12,6 +13,199 @@ const box = () => gridProject('Repeat box', [350], [350], { connectorColor: '#22
 const top = (project: Project) => project.panels.find(panel => panel.name === 'Shelf 1.2')!
 
 describe('structure repeat', () => {
+  it('fills the lower row of a staircase by reusing the upper row ceilings and promoting cross joints', () => {
+    const initial = box(), bottomId = initial.panels.find(panel => panel.name === 'Shelf 1.1')!.id
+    const vertical = prepareStructureRepeat(initial, top(initial).id, [0, 1, 0])
+    const stacked = moveStructureRepeat(vertical, vertical.pitch)
+    const horizontal = prepareStructureRepeat(stacked.project, stacked.selectedPanelId, [1, 0, 0])
+    const upper = moveStructureRepeat(horizontal, horizontal.pitch * 2)
+    expect(upper.project.panels).toHaveLength(13)
+    const original = { ...upper.project, panels: upper.project.panels.map(panel => ({ ...panel, finishCoverage: .35 })) }
+    const snapshot = structuredClone(original)
+    const lower = prepareStructureRepeat(original, bottomId, [1, 0, 0])
+    const result = moveStructureRepeat(lower, lower.pitch * 2)
+    expect(result.count, result.reason).toBe(2)
+    expect(result.project.panels).toHaveLength(17)
+    expect(result.reusedPanelIds).toHaveLength(2)
+    expect(getPhysicalConnectors(result.project)).toHaveLength(24)
+    expect(getPhysicalConnectors(result.project).filter(piece => piece.type === 'cross')).toHaveLength(4)
+    const before = resolvePanels(original), after = resolvePanels(result.project)
+    expect(after.filter(panel => before.some(old => old.id === panel.id))).toEqual(before)
+    expect(validateProject(result.project)).toEqual([])
+    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(moveStructureRepeat(lower, 0)).toMatchObject({ project: original, reusedPanelIds: [] })
+    expect(moveStructureRepeat(lower, lower.pitch * 2).project).toBe(result.project)
+    expect(original).toEqual(snapshot)
+  })
+
+  it('traverses already complete bays without duplicate panels, hardware, constraints, or project edits', () => {
+    const original = gridProject('Full row', [350, 350, 350], [350])
+    const selected = original.panels.find(panel => panel.name === 'Shelf 1.1')!
+    original.constraints = [{ id: 'cut', kind: 'dimension', panelId: selected.id, dimension: 'width', value: 350, enabled: true }]
+    const session = prepareStructureRepeat(original, selected.id, [1, 0, 0])
+    const traversed = moveStructureRepeat(session, session.pitch * 2)
+    expect(traversed.count).toBe(2)
+    expect(traversed.project).toBe(original)
+    expect(traversed.reusedPanelIds).toHaveLength(6)
+    expect(traversed.selectedPanelId).toBe(original.panels.find(panel => panel.name === 'Shelf 3.1')!.id)
+    const extended = moveStructureRepeat(session, session.pitch * 3)
+    expect(extended.count, extended.reason).toBe(3)
+    expect(extended.project.panels).toHaveLength(13)
+    expect(extended.project.constraints).toHaveLength(2)
+    expect(moveStructureRepeat(session, session.pitch * 2).project).toBe(original)
+    expect(moveStructureRepeat(session, session.pitch * 3).project).toBe(extended.project)
+    expect(validateProject(extended.project)).toEqual([])
+  })
+
+  it('reuses equivalent local axes and existing dimension rules, but rejects an unrepresentable copied equality', () => {
+    const base = gridProject('Wide source', [200], [450], { depth: 600 })
+    const selected = base.panels.find(panel => panel.name === 'Shelf 1.1')!
+    const originalTop = resolvePanels(base).find(panel => panel.id === top(base).id)!
+    const turn = new Euler().setFromQuaternion(new Quaternion().setFromEuler(new Euler(...originalTop.rotation))
+      .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2)))
+    const ceiling = createPanel({ ...originalTop, id: crypto.randomUUID(), name: 'Existing ceiling', width: 600, height: 200,
+      position: [originalTop.position[0] + 235, originalTop.position[1], originalTop.position[2]], rotation: [turn.x, turn.y, turn.z], color: '#123456', finishCoverage: .6 })
+    const original: Project = { ...base, panels: [...base.panels, ceiling], constraints: [
+      { id: 'existing-cut', kind: 'dimension', panelId: ceiling.id, dimension: 'width', value: 600, enabled: true },
+      { id: 'source-cut', kind: 'dimension', panelId: selected.id, dimension: 'width', value: 200, enabled: true },
+    ] }
+    const session = prepareStructureRepeat(original, selected.id, [1, 0, 0])
+    const result = moveStructureRepeat(session, session.pitch)
+    expect(result.count, result.reason).toBe(1)
+    expect(result.reusedPanelIds).toEqual([ceiling.id])
+    expect(result.project.panels.find(panel => panel.id === ceiling.id)).toEqual(ceiling)
+    expect(result.project.constraints).toHaveLength(3)
+    expect(result.project.constraints!.slice(0, 2)).toEqual(original.constraints)
+    expect(validateProject(result.project)).toEqual([])
+    const continued = prepareStructureRepeat(parseProject(JSON.parse(JSON.stringify(result.project))), result.selectedPanelId, [1, 0, 0])
+    expect(moveStructureRepeat(continued, continued.pitch).count).toBe(1)
+    const constrained: Project = { ...original, constraints: [...original.constraints!,
+      { id: 'matching', kind: 'equal-dimension', panelIds: [originalTop.id, selected.id], dimension: 'width', enabled: true }] }
+    const blocked = prepareStructureRepeat(constrained, selected.id, [1, 0, 0])
+    expect(moveStructureRepeat(blocked, blocked.pitch)).toMatchObject({ project: constrained, count: 0, limited: true,
+      reason: expect.stringContaining('different local axes') })
+  })
+
+  it.each([0, 37])('reuses matching depth frames and preserves their hardware (%i degree rotation)', angle => {
+    const source = box(), destination = box()
+    const targetPanels = resolvePanels(destination).map(panel => ({ ...panel, position: [panel.position[0], panel.position[1], panel.position[2] + 385] as Vec3, finishCoverage: .7 }))
+    const targetConnection = destination.connections[0]
+    const combined: Project = { ...source, panels: [...source.panels, ...targetPanels], connections: [...source.connections, ...destination.connections],
+      connectorOverrides: { [connectorId(targetConnection.id, 0)]: { color: '#123456', material: 'metal' } } }
+    const original = angle ? rotateProject(combined, 'y', angle) : combined
+    const direction = new Vector3(0, 0, 1).applyAxisAngle(new Vector3(0, 1, 0), angle * Math.PI / 180).toArray()
+    const session = prepareStructureRepeat(original, top(source).id, direction)
+    const result = moveStructureRepeat(session, session.pitch)
+    expect(result.count, result.reason).toBe(1)
+    expect(result.project.panels).toHaveLength(9)
+    expect(result.reusedPanelIds).toHaveLength(4)
+    expect(result.project.connections.filter(connection => destination.connections.some(old => old.id === connection.id)))
+      .toEqual(original.connections.filter(connection => destination.connections.some(old => old.id === connection.id)))
+    expect(result.project.connectorOverrides?.[connectorId(targetConnection.id, 0)]).toEqual(combined.connectorOverrides![connectorId(targetConnection.id, 0)])
+    expect(validateProject(result.project)).toEqual([])
+    const traverse = prepareStructureRepeat(result.project, top(source).id, direction)
+    const traversed = moveStructureRepeat(traverse, traverse.pitch)
+    expect(traversed.project).toBe(result.project)
+    expect(traversed.reusedPanelIds).toHaveLength(5)
+    expect(moveStructureRepeat(traverse, traverse.pitch * 2).project.panels).toHaveLength(14)
+  })
+
+  it('reuses an existing outgoing closing face as the shared depth divider', () => {
+    const base = box()
+    const hole = findPanelHoles(resolvePanels(base)).find(item => item.label === 'Front')!
+    const closed = closePanelHole(base, base.panels.map(panel => panel.id), hole.id)
+    const session = prepareStructureRepeat(closed.project, top(base).id, [0, 0, 1])
+    const result = moveStructureRepeat(session, session.pitch)
+    expect(result.count, result.reason).toBe(1)
+    expect(result.reusedPanelIds).toEqual([closed.panelId])
+    expect(result.project.panels).toHaveLength(9)
+    expect(validateProject(result.project)).toEqual([])
+  })
+
+  it('traverses an existing floor with swapped local axes and can continue from that selection', () => {
+    const grid = gridProject('Existing row', [350, 350], [350])
+    const selected = grid.panels.find(panel => panel.name === 'Shelf 1.1')!
+    const destination = grid.panels.find(panel => panel.name === 'Shelf 2.1')!
+    const panels = resolvePanels(grid).map(panel => {
+      if (panel.id !== destination.id) return panel
+      const turn = new Euler().setFromQuaternion(new Quaternion().setFromEuler(new Euler(...panel.rotation))
+        .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2)))
+      return { ...panel, width: panel.height, height: panel.width, rotation: [turn.x, turn.y, turn.z] as Vec3 }
+    })
+    const original = autoConnect({ ...grid, panels, connections: [] }, panels.map(panel => panel.id)).project
+    expect(validateProject(original)).toEqual([])
+    const session = prepareStructureRepeat(original, selected.id, [1, 0, 0])
+    const traversed = moveStructureRepeat(session, session.pitch)
+    expect(traversed.count, traversed.reason).toBe(1)
+    expect(traversed.project).toBe(original)
+    expect(traversed.selectedPanelId).toBe(destination.id)
+    const next = prepareStructureRepeat(original, destination.id, [1, 0, 0])
+    const extended = moveStructureRepeat(next, next.pitch)
+    expect(extended.count, extended.reason).toBe(1)
+    expect(validateProject(extended.project)).toEqual([])
+  })
+
+  it('reuses staircase ceilings after a whole-creation rotation', () => {
+    const grid = gridProject('Staircase', [350, 350, 350], [350, 350], { cells: [[0, 0], [0, 1], [1, 1], [2, 1]] })
+    const selected = grid.panels.find(panel => panel.name === 'Shelf 1.1')!
+    const original = rotateProject(rotateProject(grid, 'y', 37), 'z', 90)
+    const direction = new Vector3(1, 0, 0).applyAxisAngle(new Vector3(0, 1, 0), 37 * Math.PI / 180).applyAxisAngle(new Vector3(0, 0, 1), Math.PI / 2).toArray()
+    const session = prepareStructureRepeat(original, selected.id, direction)
+    const result = moveStructureRepeat(session, session.pitch * 2)
+    expect(result.count, result.reason).toBe(2)
+    expect(result.project.panels).toHaveLength(17)
+    expect(result.reusedPanelIds).toHaveLength(2)
+    expect(validateProject(result.project)).toEqual([])
+  })
+
+  it('counts only missing panels toward the document limit and still traverses existing bays at the limit', () => {
+    const base = box()
+    const sourceTop = resolvePanels(base).find(panel => panel.id === top(base).id)!
+    const ceiling = createPanel({ ...sourceTop, id: crypto.randomUUID(), position: [sourceTop.position[0] + 385, sourceTop.position[1], sourceTop.position[2]], visible: false })
+    const filler = (count: number) => Array.from({ length: count }, (_, index) => createPanel({ width: 40, height: 40, position: [20000 + index * 50, 1000, 0] }))
+    const original = { ...base, panels: [...base.panels, ceiling, ...filler(193)] }
+    const session = prepareStructureRepeat(original, top(base).id, [1, 0, 0])
+    const result = moveStructureRepeat(session, session.pitch)
+    expect(result.count, result.reason).toBe(1)
+    expect(result.project.panels).toHaveLength(200)
+    expect(result.project.panels.find(panel => panel.id === ceiling.id)?.visible).toBe(false)
+    expect(result.reusedPanelIds).toEqual([ceiling.id])
+    const full = gridProject('Existing row', [350, 350, 350], [350])
+    full.panels.push(...filler(190))
+    const traverse = prepareStructureRepeat(full, top(full).id, [1, 0, 0])
+    const bounded = moveStructureRepeat(traverse, 1e12)
+    expect(bounded).toMatchObject({ project: full, count: 2, limited: true, reason: expect.stringContaining('200 panels') })
+  })
+
+  it.each(['size', 'outline', 'slots', 'inserts', 'radius'] as const)('rejects incompatible destination %s without changing the project', kind => {
+    const base = box(), sourceTop = resolvePanels(base).find(panel => panel.id === top(base).id)!
+    const candidate = createPanel({ ...sourceTop, id: crypto.randomUUID(), position: [sourceTop.position[0] + 385, sourceTop.position[1], sourceTop.position[2]] })
+    if (kind === 'size') candidate.width += 20
+    if (kind === 'outline') candidate.customOutline = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: .2, y: 1 }]
+    if (kind === 'slots') candidate.pattern = 'slots'
+    if (kind === 'inserts') candidate.trofastInserts = [{ id: 'insert', itemId: 'box', colorId: 'white', x: 175, y: 175, face: 1 }]
+    if (kind === 'radius') candidate.cornerRadius = 20
+    const original = { ...base, panels: [...base.panels, candidate] }, snapshot = structuredClone(original)
+    const session = prepareStructureRepeat(original, top(base).id, [1, 0, 0])
+    const result = moveStructureRepeat(session, session.pitch)
+    expect(result.count).toBe(0)
+    expect(result.limited).toBe(true)
+    expect(result.project).toBe(original)
+    expect(original).toEqual(snapshot)
+  })
+
+  it('rejects matching panels owned by linked assemblies instead of changing their ownership', () => {
+    const base = box(), destination = box()
+    const shifted = { ...destination, panels: resolvePanels(destination).map(panel => ({ ...panel,
+      position: [panel.position[0] + 385, panel.position[1], panel.position[2]] as Vec3 })) }
+    const assembly = createAssembly(shifted, shifted.panels.map(panel => panel.id))
+    const original: Project = { ...base, panels: [...base.panels, ...assembly.panels], connections: [...base.connections, ...assembly.connections], assemblies: assembly.assemblies }
+    const session = prepareStructureRepeat(original, top(base).id, [1, 0, 0])
+    const result = moveStructureRepeat(session, session.pitch)
+    expect(result).toMatchObject({ project: original, count: 0, limited: true, reason: expect.stringContaining('linked assembly') })
+  })
+
+
   it('shares the boundary panel, installs complete joints, and preserves the source and unrelated parts', () => {
     const original = box()
     const unrelated = createPanel({ position: [-2000, 1000, 0] })

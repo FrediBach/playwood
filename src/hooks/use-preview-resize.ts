@@ -23,7 +23,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
     return preparePreviewResize(project, { panelId, connectorId })
   }, [project, panelId, connectorId, enabled])
   type Session = NonNullable<typeof prepared>
-  type Result = ReturnType<typeof movePreviewResize> & { count?: number; reason?: string; selectedPanelId?: string }
+  type Result = ReturnType<typeof movePreviewResize> & { count?: number; reason?: string; selectedPanelId?: string; reusedPanelIds?: string[] }
   const session = useRef<{ source: Session; handleId: string; mode: PreviewResizeMode; repeat?: StructureRepeatSession } | null>(null)
   const latest = useRef<Result | null>(null)
   const [preview, setPreview] = useState<Result | null>(null)
@@ -37,6 +37,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
     return {
       count: current.count ?? 0, sourcePanelIds: session.current.repeat.panelIds,
       addedPanelIds: current.project.panels.filter(panel => !originalPanelIds.has(panel.id)).map(panel => panel.id),
+      reusedPanelIds: current.reusedPanelIds ?? [],
       connectionIds: current.project.connections.filter(connection => originalConnections.get(connection.id) !== JSON.stringify(connection)).map(connection => connection.id),
       reason: current.reason,
     }
@@ -44,7 +45,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
   const handles = useMemo(() => (prepared?.handles ?? []).map(handle => {
     if (!current || !panels || handle.id !== session.current?.handleId) return handle
     const position = handle.position.map((value, axis) => value + handle.direction[axis] * current.distance) as typeof handle.position
-    if (session.current.repeat) return { ...handle, position, repeat: { count: current.count ?? 0, pitch: session.current.repeat.pitch, reason: current.reason } }
+    if (session.current.repeat) return { ...handle, position, repeat: { count: current.count ?? 0, pitch: session.current.repeat.pitch, reused: current.reusedPanelIds?.length ?? 0, reason: current.reason } }
     const operation = prepared!.drivers.get(handle.id)!.operation
     const sizes = operation.kind === 'edge'
       ? panels.filter(panel => panel.id === operation.panelId).map(panel => ({
@@ -92,7 +93,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
         if (session.current.repeat) {
           const result = moveStructureRepeat(session.current.repeat, keyboard ? Math.sign(distance) * session.current.repeat.pitch : distance)
           latest.current = result
-          setPreview(previous => previous?.project === result.project && previous.limited === result.limited && previous.reason === result.reason ? previous : result)
+          setPreview(previous => previous?.project === result.project && previous.count === result.count && previous.limited === result.limited && previous.reason === result.reason ? previous : result)
           return
         }
         const source = session.current.source
@@ -112,13 +113,17 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
           const source = session.current.source
           const candidate = session.current.repeat ? latest.current.project
             : finishPreviewResize(source, session.current.handleId, latest.current, session.current.mode === 'panel').project
+          const changed = JSON.stringify(candidate) !== JSON.stringify(source.original)
           commit(current => {
             if (current !== source.original) throw new Error('The project changed during this drag. Try again.')
             return candidate
           })
           if (session.current.repeat) {
             if (latest.current.selectedPanelId) select(latest.current.selectedPanelId)
-            notify(`Added ${latest.current.count} ${latest.current.count === 1 ? 'bay' : 'bays'}. Undo is available.`)
+            const reused = latest.current.reusedPanelIds?.length ?? 0
+            notify(!changed ? 'These bays already exist; no changes were needed.'
+              : reused ? `Completed ${latest.current.count} ${latest.current.count === 1 ? 'bay' : 'bays'}, reusing ${reused} existing ${reused === 1 ? 'panel' : 'panels'}. Undo is available.`
+                : `Added ${latest.current.count} ${latest.current.count === 1 ? 'bay' : 'bays'}. Undo is available.`)
           }
         }
         catch (error) { notify(error instanceof Error ? error.message : 'This resize conflicts with a constraint.') }

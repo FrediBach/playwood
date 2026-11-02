@@ -6,7 +6,7 @@ import { autoConnect } from './auto-connect'
 import { findPanelHoles } from './close-holes'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { connectorId } from './connector-selection'
-import { copyDesignConstraints, MAX_DESIGN_CONSTRAINTS } from './design-constraints'
+import { copyDesignConstraints, designConstraintPanelIds, MAX_DESIGN_CONSTRAINTS } from './design-constraints'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { gridPanelCut } from './grid-split'
 import { resolvePanels, validateProject } from './model'
@@ -18,6 +18,7 @@ export interface StructureRepeatResult {
   limited: boolean
   count: number
   selectedPanelId: string
+  reusedPanelIds: string[]
   reason?: string
 }
 
@@ -32,7 +33,7 @@ export interface StructureRepeatSession {
   separator?: Panel
   trailingId: string
   leadingId: string
-  candidates: { project: Project; leadingId: string; selectedPanelId: string; panelIds: string[] }[]
+  candidates: { project: Project; leadingId: string; selectedPanelId: string; panelIds: string[]; reusedPanelIds: string[] }[]
   blocked?: string
 }
 
@@ -47,6 +48,23 @@ function jointMembers(project: Project) {
     members.add(connection.parentId); members.add(connection.childId); groups.set(id, members)
   }
   return [...groups.values()]
+}
+
+/** Equivalent quarter-turned stock may swap local cut axes without changing a cell. */
+function repeatFrame(panels: Panel[]) {
+  const normalized = panels.map((panel, index) => {
+    const orientation = rotation(panel)
+    const normal = axes[2].clone().applyQuaternion(orientation)
+    const reference = panels.slice(0, index).find(other => Math.abs(normal.dot(axes[2].clone().applyQuaternion(rotation(other)))) > .99999)
+    if (!reference || Math.abs(axes[0].clone().applyQuaternion(orientation).dot(axes[0].clone().applyQuaternion(rotation(reference)))) > .99999) return panel
+    const turned = new Euler().setFromQuaternion(orientation.multiply(new Quaternion().setFromAxisAngle(axes[2], Math.PI / 2)))
+    return { ...panel, width: panel.height, height: panel.width, rotation: [turned.x, turned.y, turned.z] as Vec3 }
+  })
+  const frame = gridPanelCut(normalized)
+  if (!frame) return undefined
+  const actual = new Map(panels.map(panel => [panel.id, panel]))
+  return { ...frame, x: { ...frame.x, panels: frame.x.panels.map(panel => actual.get(panel.id)!) },
+    y: { ...frame.y, panels: frame.y.panels.map(panel => actual.get(panel.id)!) } }
 }
 
 /** Recognize one existing compartment along any of its three orthogonal axes. */
@@ -77,7 +95,7 @@ export function prepareStructureRepeat(project: Project, panelId: string, direct
   for (const hole of findPanelHoles(aligned, panels)) {
     if (!hole.boundaryIds.includes(panelId)) continue
     const source = hole.boundaryIds.map(id => panels.find(panel => panel.id === id)!)
-    const frame = gridPanelCut(source)
+    const frame = repeatFrame(source)
     if (!frame) continue
     const across = [frame.x, frame.y].find(pair => Math.abs(pair.axis.dot(axis)) > .99999)
     if (!across && Math.abs(frame.x.axis.clone().cross(frame.y.axis).dot(axis)) < .99999) continue
@@ -116,11 +134,14 @@ export function prepareStructureRepeat(project: Project, panelId: string, direct
         { ...rim, position: new Vector3(...rim.position).addScaledVector(axis, -pitch).toArray() }))
       return prior && members.some(group => group.has(panel.id) && group.has(rim.id) && group.has(prior.id))
     }))
+  // An exact outgoing face is the divider this depth repeat needs, so reuse it.
+  // Other closing faces remain unsupported instead of being omitted from copies.
+  const leadingDivider = separator && panels.find(panel => !source.some(item => item.id === panel.id) && samePanelPlacement(panel, separator))
   const interior = new OBB(frame.center.clone(), new Vector3((frame.x.span - minimumThickness) / 2 - .5,
     (frame.y.span - minimumThickness) / 2 - .5, depth / 2 + 2 * CONNECTOR_PROFILES['90'].seat),
   new Matrix3().setFromMatrix4(new Matrix4().makeBasis(frame.x.axis, frame.y.axis, depthAxis)))
   const sourceIds = new Set(source.map(panel => panel.id))
-  if (panels.some(panel => !sourceIds.has(panel.id) && panel.id !== trailingDivider?.id && interior.intersectsOBB(new OBB(new Vector3(...panel.position),
+  if (panels.some(panel => !sourceIds.has(panel.id) && panel.id !== trailingDivider?.id && panel.id !== leadingDivider?.id && interior.intersectsOBB(new OBB(new Vector3(...panel.position),
     new Vector3(panel.width / 2, panel.height / 2, panel.thickness / 2), new Matrix3().setFromMatrix4(new Matrix4().makeRotationFromQuaternion(rotation(panel))))))) {
     throw new Error('Repeat currently supports open, empty rectangular compartments. Remove internal panels and closing faces before repeating.')
   }
@@ -128,28 +149,60 @@ export function prepareStructureRepeat(project: Project, panelId: string, direct
   const leadingId = ordered?.[1].id ?? panelId
   const panelIds = source.map(panel => panel.id)
   return { original: project, panelIds, selectedPanelId: panelId, pitch, direction: axis.toArray(), source, mode, separator,
-    trailingId: ordered?.[0].id ?? panelId, leadingId, candidates: [{ project, leadingId, selectedPanelId: panelId, panelIds }] }
+    trailingId: ordered?.[0].id ?? panelId, leadingId, candidates: [{ project, leadingId, selectedPanelId: panelId, panelIds, reusedPanelIds: [] }] }
+}
+
+function assertReusablePanel(project: Project, existing: Panel, template: Panel) {
+  if (isPanelConnectedToAssembly(project, existing.id)) throw new Error('This destination belongs to or connects to a linked assembly. Disassemble and disconnect it before repeating here.')
+  const radius = (panel: Panel) => Math.min(panel.cornerRadius ?? 0, panel.width / 2, panel.height / 2)
+  const parallelWidth = Math.abs(axes[0].clone().applyQuaternion(rotation(existing)).dot(axes[0].clone().applyQuaternion(rotation(template)))) > .99999
+  if (existing.customOutline || existing.trofastInserts?.length || existing.pattern !== template.pattern
+    || Math.abs(radius(existing) - radius(template)) > .01
+    || existing.pattern !== 'solid' && (existing.holeSize !== template.holeSize || existing.holeSpacing !== template.holeSpacing)
+    || existing.pattern === 'slots' && !parallelWidth) {
+    throw new Error('An existing panel matches this position but has a different outline or surface. Repeat can only reuse matching panel shapes.')
+  }
 }
 
 function addCompartment(session: StructureRepeatSession, count: number) {
   const previous = session.candidates[count - 1]
   const project = previous.project
-  const depth = session.mode === 'depth', addedCount = depth ? 5 : 3
-  if (project.panels.length + addedCount > 200) throw new Error('Repeating further would exceed the project limit of 200 panels.')
+  const depth = session.mode === 'depth'
+  const world = resolvePanels(project)
+  const added: Panel[] = []
+  const reused = new Set(previous.reusedPanelIds)
+  const place = (template: Panel) => {
+    const matches = world.filter(panel => samePanelPlacement(panel, template))
+    if (matches.length > 1) throw new Error('More than one existing panel occupies this repeated position. Remove the duplicate before repeating here.')
+    if (matches.length) {
+      assertReusablePanel(project, matches[0], template)
+      reused.add(matches[0].id)
+      return matches[0]
+    }
+    const panel = { ...template, id: crypto.randomUUID() }
+    added.push(panel)
+    return panel
+  }
   const ids = new Map<string, string>(depth ? [] : [[session.trailingId, previous.leadingId]])
-  const added = session.source.filter(panel => depth || panel.id !== session.trailingId).map(panel => {
-    const id = crypto.randomUUID(); ids.set(panel.id, id)
-    return { ...panel, id, name: `${panel.name.slice(0, 108)} (repeat ${count})`,
-      position: new Vector3(...panel.position).addScaledVector(new Vector3(...session.direction), count * session.pitch).toArray() }
-  })
-  const separator = depth ? { ...session.separator!, id: crypto.randomUUID(), name: `Depth divider ${count}`,
-    position: new Vector3(...session.separator!.position).addScaledVector(new Vector3(...session.direction), (count - 1) * session.pitch).toArray() } : undefined
+  for (const panel of session.source.filter(item => depth || item.id !== session.trailingId)) {
+    const placed = place({ ...panel, name: `${panel.name.slice(0, 108)} (repeat ${count})`,
+      position: new Vector3(...panel.position).addScaledVector(new Vector3(...session.direction), count * session.pitch).toArray() })
+    ids.set(panel.id, placed.id)
+  }
+  const separator = depth ? place({ ...session.separator!, name: `Depth divider ${count}`,
+    position: new Vector3(...session.separator!.position).addScaledVector(new Vector3(...session.direction), (count - 1) * session.pitch).toArray() }) : undefined
+  if (project.panels.length + added.length > 200) throw new Error('Repeating further would exceed the project limit of 200 panels.')
   const scope = [...ids.values(), ...(separator ? [separator.id, ...previous.panelIds] : [])]
-  const connected = autoConnect({ ...project, panels: [...project.panels, ...added, ...(separator ? [separator] : [])] }, scope)
-  if (connected.disassembledNames.length || connected.splits || connected.project.panels.length !== project.panels.length + addedCount) {
+  // Hidden panels still occupy their physical slots. Restore visibility after
+  // fitting so reuse never changes an existing panel's presentation or record.
+  const fitting = { ...project, panels: [...project.panels, ...added].map(panel => panel.visible ? panel : { ...panel, visible: true }) }
+  const connected = autoConnect(fitting, scope)
+  if (connected.disassembledNames.length || connected.splits || connected.project.panels.length !== project.panels.length + added.length) {
     throw new Error('This repeat would change a neighboring construction. Choose an unobstructed outside edge.')
   }
-  let next = connected.project
+  const visibility = new Map(project.panels.map(panel => [panel.id, panel.visible]))
+  let next = !added.length && !connected.joints ? project : { ...connected.project,
+    panels: connected.project.panels.map(panel => visibility.get(panel.id) === false ? { ...panel, visible: false } : panel) }
   const members = jointMembers(next)
   if (separator && session.source.some((panel, index) => !members.some(group => group.has(separator.id)
     && group.has(previous.panelIds[index]) && group.has(ids.get(panel.id)!)))) {
@@ -166,9 +219,10 @@ function addCompartment(session: StructureRepeatSession, count: number) {
   // Shared joints keep autoConnect's refit and compatible-finish upgrade behavior.
   const reverse = new Map([...ids].map(([source, target]) => [target, source]))
   const oldConnections = new Set(project.connections.map(connection => connection.id))
+  const addedIds = new Set(added.map(panel => panel.id))
   const overrides = { ...next.connectorOverrides }
   next = { ...next, connections: next.connections.map(connection => {
-    if (oldConnections.has(connection.id) || connection.type !== '90') return connection
+    if (oldConnections.has(connection.id) || connection.type !== '90' || !addedIds.has(connection.parentId) || !addedIds.has(connection.childId)) return connection
     const a = reverse.get(connection.parentId), b = reverse.get(connection.childId)
     const original = session.original.connections.find(item => item.type === '90'
       && (item.parentId === a && item.childId === b || item.parentId === b && item.childId === a))
@@ -181,7 +235,25 @@ function addCompartment(session: StructureRepeatSession, count: number) {
     return { ...original, id: connection.id, parentId: ids.get(original.parentId)!, childId: ids.get(original.childId)!, role: 'support' }
   }) }
   if (next.connectorOverrides || Object.keys(overrides).length) next = { ...next, connectorOverrides: overrides }
-  const rules = copyDesignConstraints(session.original.constraints, ids)
+  // Existing-only destinations keep their own rules. A rule involving a new
+  // piece follows the source, with local dimension references remapped on reuse.
+  const rules = copyDesignConstraints(session.original.constraints?.filter(rule =>
+    designConstraintPanelIds(rule).some(id => addedIds.has(ids.get(id)!))), ids)
+  const targets = new Map(resolvePanels(next).map(panel => [panel.id, panel]))
+  const dimension = (id: string, value: 'width' | 'height') => {
+    const source = session.source.find(panel => panel.id === reverse.get(id))!
+    const target = targets.get(id)!
+    const basis = axes[value === 'width' ? 0 : 1].clone().applyQuaternion(rotation(source))
+    return Math.abs(basis.dot(axes[0].clone().applyQuaternion(rotation(target)))) > .99999 ? 'width' : 'height'
+  }
+  for (const rule of rules) {
+    if (rule.kind === 'dimension') rule.dimension = dimension(rule.panelId, rule.dimension)
+    if (rule.kind === 'equal-dimension') {
+      const dimensions = rule.panelIds.map(id => dimension(id, rule.dimension))
+      if (dimensions[0] !== dimensions[1]) throw new Error('A copied equal-dimension constraint would compare different local axes on an existing panel. Adjust that rule before repeating here.')
+      rule.dimension = dimensions[0]
+    }
+  }
   if ((next.constraints?.length ?? 0) + rules.length > MAX_DESIGN_CONSTRAINTS) throw new Error('This repeat would exceed the project limit for design constraints.')
   if (rules.length) next = { ...next, constraints: [...next.constraints ?? [], ...rules] }
   const resolved = new Map(resolvePanels(next).map(panel => [panel.id, panel]))
@@ -193,19 +265,22 @@ function addCompartment(session: StructureRepeatSession, count: number) {
   const issue = validateProject(next).find(item => !previousIssues.has(item.id) && (item.severity === 'error' || item.id.startsWith('collision-')))
   if (issue) throw new Error(issue.message)
   next = assertDesignConstraintEdit(project, next)
+  if (!added.length && !connected.joints && !rules.length) next = project
   return { project: next, leadingId: ids.get(session.leadingId)!, selectedPanelId: ids.get(session.selectedPanelId)!,
-    panelIds: session.source.map(panel => ids.get(panel.id)!) }
+    panelIds: session.source.map(panel => ids.get(panel.id)!), reusedPanelIds: [...reused] }
 }
 
 /** Whole-cell previews always derive from the initial snapshot; retraction only removes preview additions. */
 export function moveStructureRepeat(session: StructureRepeatSession, distance: number): StructureRepeatResult {
   const requested = Number.isFinite(distance) ? Math.max(0, Math.round(distance / session.pitch)) : 0
-  while (session.candidates.length <= requested && !session.blocked) {
+  const bounded = Math.min(requested, 200)
+  while (session.candidates.length <= bounded && !session.blocked) {
     try { session.candidates.push(addCompartment(session, session.candidates.length)) }
     catch (error) { session.blocked = error instanceof Error ? error.message : 'Another compartment cannot fit here.' }
   }
-  const count = Math.min(requested, session.candidates.length - 1)
+  const count = Math.min(bounded, session.candidates.length - 1)
   return { project: session.candidates[count].project, selectedPanelId: session.candidates[count].selectedPanelId,
+    reusedPanelIds: session.candidates[count].reusedPanelIds,
     distance: count * session.pitch, limited: count < requested, count,
-    ...(count < requested ? { reason: session.blocked } : {}) }
+    ...(count < requested ? { reason: session.blocked ?? 'Repeat supports up to 200 compartments in one pull.' } : {}) }
 }

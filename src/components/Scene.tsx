@@ -442,7 +442,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
   const boxPreview = props.boxSelectActive ? props.boxPreview : null
   const highlightedPanels = boxPreview ? [...(boxPreview.additive ? selectedIds : []), ...boxPreview.panelIds] : selectedIds
   const highlightedConnectors = boxPreview ? [...(boxPreview.additive ? props.selectedConnectorIds ?? [] : []), ...boxPreview.connectorIds] : props.selectedConnectorIds
-  const selectedIdSet = new Set([...highlightedPanels, ...props.constraintPanelIds ?? [], ...props.repeatPreview?.sourcePanelIds ?? []])
+  const selectedIdSet = new Set([...highlightedPanels, ...props.constraintPanelIds ?? [], ...props.repeatPreview?.sourcePanelIds ?? [], ...props.repeatPreview?.reusedPanelIds ?? []])
   const repeatPanelIds = new Set(props.repeatPreview?.addedPanelIds)
   const repeatConnectionIds = new Set(props.repeatPreview?.connectionIds)
   const connectorSelection = (props.selectionKind ?? (props.selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'connectors'

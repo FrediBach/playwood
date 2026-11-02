@@ -13,7 +13,7 @@ export interface PreviewResizeHandle {
   direction: Vec3
   label: string
   sizes?: { label: string; value: number }[]
-  repeat?: { count: number; pitch: number; reason?: string }
+  repeat?: { count: number; pitch: number; reused: number; reason?: string }
   repeatOnly?: boolean
   panelEdge?: boolean
   panelHandle?: boolean
@@ -25,6 +25,7 @@ export interface RepeatPreview {
   count: number
   sourcePanelIds: readonly string[]
   addedPanelIds: readonly string[]
+  reusedPanelIds: readonly string[]
   connectionIds: readonly string[]
   reason?: string
 }
