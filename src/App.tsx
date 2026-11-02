@@ -1,14 +1,15 @@
+import { buildPreviewMenuActions } from '@/components/preview-menu-actions'
 import { panelSvgFilename, panelToSvg } from '@/lib/panel-svg'
 import { readSnapSettings } from '@/lib/preview-snap'
 import { createListGroup, moveListItems, orderedConnectors, renameListGroup, ungroupList } from '@/lib/list-groups'
 import type { ListGroupingProps } from '@/components/GroupedList'
-import { PreviewContextMenu, type PreviewMenuAction } from '@/components/PreviewContextMenu'
+import { PreviewContextMenu } from '@/components/PreviewContextMenu'
 import { ConnectorInspector } from '@/components/ConnectorInspector'
 import { CloseHoles } from '@/components/CloseHoles'
 import { closePanelHole, findPanelHoles } from '@/lib/close-holes'
 import { editConnectors } from '@/lib/connector-selection'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
-import { ArrowDownToLine, Box, Check, CheckCheck, Clipboard, Copy, FolderPlus, Grid2X2, Link2, Maximize, MousePointer2, Pencil, Plus, Rows3, Scan, Scissors, SlidersHorizontal, Square, Unlink, Ungroup, Trash2, type LucideIcon } from 'lucide-react'
+import { Box, Check, CheckCheck, Copy, Link2, MousePointer2, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ProjectHeader } from '@/components/ProjectHeader'
 import { ProjectDialogs, type ProjectDialog } from '@/components/ProjectDialogs'
@@ -564,7 +565,6 @@ export default function App() {
     } catch { return false }
   }, [contextMenu, inspectingConnectors, assembly.editingInstance, project, selectedIds])
 
-  const menuActions: PreviewMenuAction[] = []
   const openConstraints=(add=false)=>{
     if(assembly.editingInstance){notify('Finish editing the shared assembly before managing project constraints.');return}
     clipboard.cancel();assembly.clearPlacement();closeContextMenu();setSelectedConnectorIds([])
@@ -573,51 +573,22 @@ export default function App() {
     if(window.innerWidth<=900)setLeftOpen(false)
     if(add)constraints.open();else constraints.manage()
   }
-  const menuAction = (label: string, icon: LucideIcon, run: () => void, danger = false, disabled = false) => menuActions.push({ label, icon, run, danger, disabled })
-  if (inspectingConnectors) {
-    if(!assembly.editingInstance&&!modalOpen)menuAction('Connect with a panel',Link2,connectWithPanel,false,!connectorPanelFit.result)
-    menuAction('Group selected',FolderPlus,()=>groupSelected('connectors',selectedConnectorIds),false,selectedConnectorIds.length<2)
-    menuAction('Inspect connectors',SlidersHorizontal,()=>setRightOpen(true))
-    menuAction('Remove connectors',Trash2,removeSelectedConnectors,true)
-  } else if (assembly.editingInstance) {
-    menuAction('Inspect assembly parts',SlidersHorizontal,()=>setRightOpen(true))
-    menuAction('Done editing assembly',Check,assembly.done)
-  } else {
-    if (selectedPanels.length) {
-      menuAction('Inspect selection',SlidersHorizontal,()=>{setInspectorTab('panel');setRightOpen(true)})
-      if (instance) {
-        menuAction('Edit assembly',Pencil,()=>assembly.edit(instance.id))
-        if (validTargets.length) menuAction('Attach a copy',Copy,()=>{clipboard.cancel();assembly.startAttach()})
-        if (project.assemblies?.links.some(link=>link.a.instanceId===instance.id||link.b.instanceId===instance.id)) menuAction('Disconnect from neighbors',Unlink,()=>assembly.disconnect(instance.id))
-        menuAction('Make independent',Unlink,()=>assembly.independent(instance.id))
-        menuAction('Disassemble',Ungroup,()=>assembly.disassemble(instance.id))
-      } else if (assembly.memberInstance) {
-        const memberInstance = assembly.memberInstance
-        menuAction('Select assembly',Box,()=>assembly.select(memberInstance.id))
-        menuAction('Edit assembly',Pencil,()=>assembly.edit(memberInstance.id))
-      } else if (!assembly.hasMembers) {
-        menuAction('Add constraint',SlidersHorizontal,()=>openConstraints(true))
-        menuAction('Group selected',FolderPlus,()=>groupSelected('panels',selectedIds),false,selectedPanels.length<2)
-        if (selected) menuAction('Attach panel',Link2,startAttach)
-        menuAction('Extend to ground',ArrowDownToLine,extendToGround,false,!groundPanelFit.result)
-        if (selectedPanels.length>1) menuAction('Create assembly',Box,()=>{setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'assembly',selection:selectedIds.join('/'),token:Date.now()})},false,!!assemblySelectionError(project,selectedIds))
-        if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Disconnect panels',Unlink,detachSelection)
-        if (splitCounts.includes(1)) menuAction('Split in the middle',Scissors,()=>splitSelection())
-        if (gridCut) menuAction('Divide into a grid',Grid2X2,()=>{setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'grid',selection:selectedIds.join('/'),token:Date.now()})})
-        if (parallelPanelCut(selectedPanels)) menuAction('Split x times',Rows3,()=>{setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'parallel',selection:selectedIds.join('/'),token:Date.now()})},false,checkingSplits||!splitCounts.length)
-      }
-      if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`Fill hole · ${hole.label}`,Square,()=>closeHole(hole.id))
-      if (!assembly.memberInstance || instance) {
-        menuAction('Copy',Clipboard,clipboard.copy)
-        menuAction('Duplicate',Copy,duplicateSelected)
-        menuAction('Delete selection',Trash2,deleteSelected,true)
-      }
-    } else menuAction('Add panel',Plus,addPanel)
-    if (panels.length>1) menuAction('Auto-connect',Link2,addAutoConnectors,false,!canMenuAutoConnect)
-  }
-  if (panels.length) menuAction('Select all panels',Scan,()=>selectAll(),false,!inspectingConnectors&&(assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):panels.map(panel=>panel.id)).every(id=>selectedIdSet.has(id)))
-  if(!assembly.editingInstance)menuAction('All constraints',SlidersHorizontal,()=>openConstraints())
-  menuAction('Fit view',Maximize,()=>setFitSignal(v=>v+1),false,!hasVisiblePanels)
+  const menuActions = buildPreviewMenuActions({
+    project, panels, selectedPanels, selectedIds, selectedConnectorIds, selectedIdSet,
+    inspectingConnectors, modalOpen, assembly, splitCounts, checkingSplits, canDivideGrid: !!gridCut, holes,
+    canMenuAutoConnect, hasVisiblePanels, canConnectWithPanel: !!connectorPanelFit.result,
+    canExtendToGround: !!groundPanelFit.result, canAttachCopy: validTargets.length > 0,
+    actions: {
+      connectWithPanel, groupSelected, removeSelectedConnectors, openConstraints, startAttach,
+      extendToGround, detachSelection, splitSelection, closeHole, duplicateSelected, deleteSelected,
+      addPanel, addAutoConnectors, selectAll, copy: clipboard.copy,
+      inspectConnectors: ()=>setRightOpen(true),
+      inspectPanels: ()=>{setInspectorTab('panel');setRightOpen(true)},
+      attachCopy: ()=>{clipboard.cancel();assembly.startAttach()},
+      fitView: ()=>setFitSignal(v=>v+1),
+      openTool: tool=>{setInspectorTab('panel');setRightOpen(true);setToolRequest({tool,selection:selectionKey,token:Date.now()})},
+    },
+  })
 
   const buildTools = !assembly.editingInstance && !clipboard.active && !assembly.placementActive && inspectorTab==='panel' && selectedPanels.length>0 ? <section className="inspector-section inspector-build-tools" aria-label="Build tools" key={`tools:${selectedIds.join('/')}`}>
     <div className="section-title"><h2>Build tools</h2><Plus size={16}/></div>

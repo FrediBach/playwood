@@ -1,8 +1,9 @@
+import { DesignConstraintFields } from './DesignConstraintFields'
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeftRight, Check, CircleAlert, LocateFixed, MousePointer2, Pencil, Plus, Ruler, Trash2 } from 'lucide-react'
 import { Button } from './ui/button'
-import { NumberField, SelectField } from './fields'
+import { SelectField } from './fields'
 import { InspectorDisclosure } from './InspectorPrimitives'
 import { DESIGN_CONSTRAINT_TOLERANCE, describeDesignConstraint, designConstraintCoordinate, designConstraintPanelIds, evaluateDesignConstraints, measureDesignConstraint } from '@/lib/design-constraints'
 import type { ConstraintReference, DesignConstraint, Panel } from '@/lib/types'
@@ -181,7 +182,6 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
     update({ ...next, enabled: draft.enabled })
     setAnchor('panelIds' in next ? next.panelIds[0] : undefined)
   }
-  const referenceOptions = <><option value="max">Top surface / edge</option><option value="min">Bottom surface / edge</option><option value="center">Center</option></>
   const eligiblePanels = panels.filter(panel => !unavailable.has(panel.id))
   const panelChoice = (index: number, label: string) => <div className="constraint-panel-choice">
     <SelectField label={label} value={draftIds[index] ?? ''} onChange={id => choosePanel(index, id)}>
@@ -240,47 +240,7 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
       </SelectField>
       {panelChoice(0, draft.kind === 'gap' ? draft.axis === 'y' ? 'Lower panel' : draft.axis === 'x' ? 'Left panel' : 'Back panel' : isPair(draft.kind) ? 'First panel' : 'Constrained panel')}
       {isPair(draft.kind) && panelChoice(1, draft.kind === 'gap' ? draft.axis === 'y' ? 'Upper panel' : draft.axis === 'x' ? 'Right panel' : 'Front panel' : 'Second panel')}
-      {draft.kind === 'floor' && <SelectField label="Measure from" value={draft.reference} onChange={value => {
-        const reference = value as ConstraintReference
-        const panel = panels.find(panel => panel.id === draft.panelId)
-        if (panel) resetMeasurement({ ...draft, reference }, Math.max(0, designConstraintCoordinate(panel, reference)))
-        else update({ ...draft, reference })
-      }}>{referenceOptions}</SelectField>}
-      {(draft.kind === 'dimension' || draft.kind === 'equal-dimension') && <>
-        <SelectField label="Panel cut dimension" value={draft.dimension} onChange={value => {
-          const dimension = value as 'width' | 'height'
-          const panel = panels.find(panel => panel.id === draftIds[0])
-          if (draft.kind === 'dimension' && panel) resetMeasurement({ ...draft, dimension }, panel[dimension])
-          else update({ ...draft, dimension })
-        }}><option value="height">Height</option><option value="width">Width</option></SelectField>
-        <p className="field-note">Cut dimensions follow each panel’s face. Use Same level above floor to align their placement.</p>
-      </>}
-      {draft.kind === 'level' && <>
-        <SelectField label="First panel reference" value={draft.references[0]} onChange={value => update({ ...draft, references: [value as ConstraintReference, draft.references[1]] })}>{referenceOptions}</SelectField>
-        <SelectField label="Second panel reference" value={draft.references[1]} onChange={value => update({ ...draft, references: [draft.references[0], value as ConstraintReference] })}>{referenceOptions}</SelectField>
-      </>}
-      {draft.kind === 'gap' && <>
-        <SelectField label="Gap direction" value={draft.axis} onChange={value => {
-          const axis = value as 'x' | 'y' | 'z'
-          const next = { ...draft, axis }
-          const [a, b] = draft.panelIds.map(id => panels.find(panel => panel.id === id))
-          if (a && b && designConstraintCoordinate(a, 'center', axis) > designConstraintCoordinate(b, 'center', axis)) next.panelIds = [draft.panelIds[1], draft.panelIds[0]]
-          const current = measureDesignConstraint(next, panels).actual
-          if (Number.isFinite(current)) resetMeasurement(next, Math.max(0, current))
-          else update(next)
-        }}><option value="y">Vertical · lower to upper (Y)</option><option value="x">Horizontal · left to right (X)</option><option value="z">Depth · back to front (Z)</option></SelectField>
-        <p className="field-note">Clear distance between panel boundaries along the chosen world direction. Includes panel thickness; openings and hardware are not measured.</p>
-      </>}
-      {numericDraft && <>
-        <SelectField label={numericDraft.kind === 'gap' ? 'Gap requirement' : 'Measurement requirement'} value={numericDraft.relation ?? 'exact'} onChange={value => changeRequirement(value as RequirementMode)}>
-          <option value="exact">Exactly</option><option value="minimum">At least</option><option value="maximum">At most</option><option value="range">Between</option>
-        </SelectField>
-        {numericDraft.relation === 'range' ? <div className="field-row constraint-range-fields">
-          <NumberField label={`Minimum ${numericDraft.kind === 'floor' ? 'height' : numericDraft.kind === 'dimension' ? 'dimension' : 'gap'}`} value={numericDraft.min} min={numericDraft.kind === 'dimension' ? 40 : 0} max={numericDraft.kind === 'dimension' ? 4000 : numericDraft.kind === 'floor' ? 100000 : 200000} commitOnBlur onChange={min => update({ ...numericDraft, min })}/>
-          <NumberField label={`Maximum ${numericDraft.kind === 'floor' ? 'height' : numericDraft.kind === 'dimension' ? 'dimension' : 'gap'}`} value={numericDraft.max} min={numericDraft.kind === 'dimension' ? 40 : 0} max={numericDraft.kind === 'dimension' ? 4000 : numericDraft.kind === 'floor' ? 100000 : 200000} commitOnBlur onChange={max => update({ ...numericDraft, max })}/>
-        </div> : <NumberField label={numericDraft.kind === 'floor' ? 'Height above floor' : numericDraft.kind === 'dimension' ? numericDraft.relation === 'minimum' ? 'Minimum dimension' : numericDraft.relation === 'maximum' ? 'Maximum dimension' : 'Fixed dimension' : 'Required gap'} value={numericDraft.value} min={numericDraft.kind === 'dimension' ? 40 : 0} max={numericDraft.kind === 'dimension' ? 4000 : numericDraft.kind === 'floor' ? 100000 : 200000} commitOnBlur onChange={value => update({ ...numericDraft, value })}/>}
-        {numericDraft.relation && numericDraft.relation !== 'exact' && <p className="field-note">Measurements may change freely within these limits. Panels adjust only when a limit would be crossed.</p>}
-      </>}
+      <DesignConstraintFields draft={draft} panels={panels} update={update} resetMeasurement={resetMeasurement} changeRequirement={changeRequirement}/>
       {'panelIds' in draft && <div className="constraint-reference">
         <SelectField label="Keep in place for this adjustment" value={anchor ?? draft.panelIds[0]} onChange={setAnchor}>
           {draft.panelIds.filter(Boolean).map(id => <option key={id} value={id}>{panels.find(panel => panel.id === id)?.name ?? 'Missing panel'}</option>)}

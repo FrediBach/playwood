@@ -70,6 +70,10 @@ The directory split is practical rather than an enforced package boundary. There
 
 `App` owns the committed project through `useProject` and passes derived data and callbacks to the UI. It resolves world-space panels, computes validation issues and bounds, builds the installed connector list, and determines which selection the inspector displays. Specialized hooks keep gesture and assembly workflows out of the JSX, but `App` remains the central coordinator.
 
+Context-menu availability and ordering live in [preview-menu-actions.ts](../src/components/preview-menu-actions.ts), with separate branches for connector selection, shared assembly editing, and panel construction tools. `App` supplies current selection/capabilities and command callbacks; the menu builder does not commit edits or own React state.
+
+[DesignConstraintsInspector](../src/components/DesignConstraintsInspector.tsx) owns the constraint draft, preview lifecycle, reference panel, and focus restoration. [DesignConstraintFields](../src/components/DesignConstraintFields.tsx) renders kind-specific controls and shared numeric requirement fields; it sends draft changes back to the inspector. Numeric labels and bounds are defined once per constraint kind.
+
 The principal UI surfaces are:
 
 - [ProjectHeader](../src/components/ProjectHeader.tsx): project name, save status, project actions, undo/redo, and guide access.
