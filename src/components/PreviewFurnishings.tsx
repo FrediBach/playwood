@@ -31,11 +31,15 @@ function Ellipsoid({ position, size, color, rotation, roughness = 0.9 }: {
 function Stem({ from, to, radius, color, endRadius = radius }: {
   from: Vec3; to: Vec3; radius: number; color: string; endRadius?: number
 }) {
-  const start = new THREE.Vector3(...from), end = new THREE.Vector3(...to)
-  const delta = end.clone().sub(start)
-  const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.clone().normalize())
-  return <mesh position={start.add(end).multiplyScalar(0.5)} quaternion={quaternion} castShadow receiveShadow raycast={noRaycast}>
-    <cylinderGeometry args={[endRadius, radius, delta.length(), 12]}/><meshStandardMaterial color={color} roughness={0.8}/>
+  const [fromX, fromY, fromZ] = from, [toX, toY, toZ] = to
+  const { position, quaternion, length } = useMemo(() => {
+    const start = new THREE.Vector3(fromX, fromY, fromZ), end = new THREE.Vector3(toX, toY, toZ)
+    const delta = end.clone().sub(start)
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.clone().normalize())
+    return { position: start.add(end).multiplyScalar(0.5), quaternion, length: delta.length() }
+  }, [fromX, fromY, fromZ, toX, toY, toZ])
+  return <mesh position={position} quaternion={quaternion} castShadow receiveShadow raycast={noRaycast}>
+    <cylinderGeometry args={[endRadius, radius, length, 12]}/><meshStandardMaterial color={color} roughness={0.8}/>
   </mesh>
 }
 

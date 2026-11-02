@@ -112,7 +112,9 @@ export function AssemblyInspector({ name, definitionName, instanceCount, panelCo
   </>
 }
 
-export function CreateAssemblyForm({ panelCount, panels = [], onCreate, disabled = false, reason }: { panelCount: number; panels?: Panel[]; onCreate: (name: string, parameters: AssemblyParameter[]) => void; disabled?: boolean; reason?: string }) {
+const EMPTY_PANELS: Panel[] = []
+
+export function CreateAssemblyForm({ panelCount, panels = EMPTY_PANELS, onCreate, disabled = false, reason }: { panelCount: number; panels?: Panel[]; onCreate: (name: string, parameters: AssemblyParameter[]) => void; disabled?: boolean; reason?: string }) {
   const [name, setName] = useState('My assembly')
   const [parameters, setParameters] = useState<AssemblyParameter[]>([])
   const error = assemblyParametersError(parameters, panels)

@@ -8,7 +8,9 @@ import { PanelSecondaryFields } from './PanelInspectorFields'
 import type { AssemblyParameter, Panel } from '@/lib/types'
 import './inspector-assembly.css'
 
-export function AssemblyEditingInspector({ panels, definitionPanels = panels, parameters = [], onChange, onParametersChange, accessories }: {
+const EMPTY_PARAMETERS: AssemblyParameter[] = []
+
+export function AssemblyEditingInspector({ panels, definitionPanels = panels, parameters = EMPTY_PARAMETERS, onChange, onParametersChange, accessories }: {
   panels: Panel[]; definitionPanels?: Panel[]; parameters?: AssemblyParameter[]; name: string; count: number;
   onChange: (patch: Partial<Panel>) => boolean; onParametersChange?: (parameters: AssemblyParameter[]) => boolean
   accessories?: ReactNode
