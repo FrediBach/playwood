@@ -14,8 +14,9 @@ export const matchesCommon = (filters: ListFiltersState, name: string, color: st
   (!filters.visibility || visible === (filters.visibility === 'visible')) && (!filters.selection || selected === (filters.selection === 'selected'))
 
 export function FilterChoices({ label, values, selected, onChange, colors = false }: { label: string; values: { value: string; label: string }[]; selected: string[]; onChange: (values: string[]) => void; colors?: boolean }) {
-  return <fieldset className="filter-field"><legend>{label}</legend><div className="filter-choices">{values.map(option => <label key={option.value} className={`filter-choice ${selected.includes(option.value) ? 'active' : ''}`}>
-    <input type="checkbox" checked={selected.includes(option.value)} onChange={event => onChange(event.target.checked ? [...selected, option.value] : selected.filter(value => value !== option.value))}/>
+  const selectedValues = new Set(selected)
+  return <fieldset className="filter-field"><legend>{label}</legend><div className="filter-choices">{values.map(option => <label key={option.value} className={`filter-choice ${selectedValues.has(option.value) ? 'active' : ''}`}>
+    <input type="checkbox" checked={selectedValues.has(option.value)} onChange={event => onChange(event.target.checked ? [...selected, option.value] : selected.filter(value => value !== option.value))}/>
     {colors && <i style={{ background: option.value }}/>}<span>{option.label}</span>
   </label>)}</div></fieldset>
 }

@@ -53,7 +53,10 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
   const [announcement, setAnnouncement] = useState('')
   const instructionsId = useId()
   const membership = new Map(groups.flatMap(group => group.itemIds.map(id => [id, group.id] as const)))
-  const selected = items.filter(item => selectedIds.includes(item.id)).map(item => item.id)
+  const selectedIdSet = new Set(selectedIds)
+  const collapsedIds = new Set(collapsed)
+  const sortingIds = new Set(sort?.ids)
+  const selected = items.filter(item => selectedIdSet.has(item.id)).map(item => item.id)
   const sections = [
     ...groups.map(group => ({ group, items: items.filter(item => membership.get(item.id) === group.id) })),
     { group: null, items: items.filter(item => !membership.has(item.id)) },
@@ -79,7 +82,8 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
       const sections = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-list-section]') ?? [])]
       const section = sections.find(section => pointerY < section.getBoundingClientRect().bottom) ?? sections.at(-1)
       if (section) {
-        const rows = [...section.querySelectorAll<HTMLElement>('[data-list-item]')].filter(row => !current.ids.includes(row.dataset.listItem!))
+        const movingIds = new Set(current.ids)
+        const rows = [...section.querySelectorAll<HTMLElement>('[data-list-item]')].filter(row => !movingIds.has(row.dataset.listItem!))
         const before = rows.find(row => { const bounds = row.getBoundingClientRect(); return pointerY < bounds.top + bounds.height / 2 })
         target = { groupId: section.dataset.listSection || null, beforeId: before?.dataset.listItem ?? null }
       }
@@ -123,7 +127,7 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
   const openMenu = (target: HTMLElement, x: number, y: number) => {
     const itemId = target.closest<HTMLElement>('[data-list-item]')?.dataset.listItem
     const groupId = target.closest<HTMLElement>('[data-group-header]')?.dataset.groupHeader
-    const ids = itemId ? selected.includes(itemId) ? selected : [itemId] : selected
+    const ids = itemId ? selectedIdSet.has(itemId) ? selected : [itemId] : selected
     setMenu({ x, y, ids, groupId })
   }
   const menuActions: PreviewMenuAction[] = []
@@ -153,10 +157,10 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
     <div className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
     {sections.map(({ group, items: sectionItems }) => {
       const groupId = group?.id ?? null
-      const open = !group || !collapsed.includes(group.id)
+      const open = !group || !collapsedIds.has(group.id)
       const targeted = sort?.active && sort.groupId === groupId
-      const lastOther = sectionItems.filter(item => !sort?.ids.includes(item.id)).at(-1)?.id
-      const selectedCount = sectionItems.filter(item => selectedIds.includes(item.id)).length
+      const lastOther = sectionItems.filter(item => !sortingIds.has(item.id)).at(-1)?.id
+      const selectedCount = sectionItems.filter(item => selectedIdSet.has(item.id)).length
       const allSelected = sectionItems.length > 0 && selectedCount === sectionItems.length
       const partiallySelected = selectedCount > 0 && !allSelected
       return <div key={groupId ?? 'ungrouped'} data-list-section={groupId ?? ''} className={`list-group ${group ? 'named-group' : ''} ${targeted ? 'is-drop-target' : ''}`}>
@@ -179,10 +183,11 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
         </div> : !!groups.length && <div className="list-ungrouped-label">Ungrouped</div>}
         {open && <div className={`${kind === 'panels' ? 'panel' : 'connector'}-list ${sort?.active ? 'is-sorting' : ''}`} role="list" aria-label={group?.name ?? (kind === 'panels' ? 'Panels' : 'Connectors')}>
           {sectionItems.map((item, index) => {
-            const dragging = !!dragged && !!sort?.ids.includes(item.id)
+            const dragging = !!dragged && sortingIds.has(item.id)
             const begin = (mode: SortSession['mode'], bounds?: DOMRect, pointerY = 0): SortSession => {
-              const ids = selected.includes(item.id) ? selected : [item.id]
-              return { id: item.id, ids, groupId, beforeId: sectionItems.slice(index + 1).find(item => !ids.includes(item.id))?.id ?? null, mode, active: mode === 'keyboard', startY: pointerY, pointerY, offsetY: bounds ? pointerY - bounds.top : 0, left: bounds?.left ?? 0, width: bounds?.width ?? 0 }
+              const ids = selectedIdSet.has(item.id) ? selected : [item.id]
+              const movingIds = new Set(ids)
+              return { id: item.id, ids, groupId, beforeId: sectionItems.slice(index + 1).find(item => !movingIds.has(item.id))?.id ?? null, mode, active: mode === 'keyboard', startY: pointerY, pointerY, offsetY: bounds ? pointerY - bounds.top : 0, left: bounds?.left ?? 0, width: bounds?.width ?? 0 }
             }
             const handle: ButtonHTMLAttributes<HTMLButtonElement> = {
               title: 'Drag to reorder or move between groups · Space for keyboard', 'aria-label': `Reorder ${label(item)}`, 'aria-describedby': instructionsId, 'aria-pressed': dragging,
@@ -210,8 +215,9 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
                   else { updateSort(begin('keyboard')); setAnnouncement(`${label(item)} picked up. Use arrow keys to move between positions and groups.`) }
                 } else if (current?.mode === 'keyboard' && ['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
                   event.preventDefault(); event.stopPropagation()
+                  const movingIds = new Set(current.ids)
                   const targets: Target[] = sections.flatMap(section => [
-                    ...(section.group && collapsed.includes(section.group.id) ? [] : section.items.filter(item => !current.ids.includes(item.id)).map(item => ({ groupId: section.group?.id ?? null, beforeId: item.id }))),
+                    ...(section.group && collapsedIds.has(section.group.id) ? [] : section.items.filter(item => !movingIds.has(item.id)).map(item => ({ groupId: section.group?.id ?? null, beforeId: item.id }))),
                     { groupId: section.group?.id ?? null, beforeId: null },
                   ])
                   const position = targets.findIndex(target => target.groupId === current.groupId && target.beforeId === current.beforeId)

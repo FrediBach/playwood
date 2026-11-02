@@ -43,14 +43,14 @@ export function ProjectSidebar({panelListProps,connectorListProps,assemblyTab,on
   const [expanded,setExpanded]=useState<string[]>([])
   const { panels } = panelListProps
   const [filters, setFilters] = useState(emptyFilters)
+  const selectedIds = new Set(panelListProps.selectedIds)
   const filtering = filterCount(filters) > 0
-  const matchingPanels = panels.filter(panel => matchesCommon(filters, panel.name, panel.color, panel.visible, panelListProps.selectedIds.includes(panel.id)) && matchesChoice(filters.materials, panel.material) && matchesChoice(filters.patterns, panel.pattern) && matchesChoice(filters.thicknesses, String(panel.thickness)) && panel.width * panel.height / 1e6 >= filters.minArea && (filters.maxArea === null || panel.width * panel.height / 1e6 <= filters.maxArea))
+  const matchingPanels = panels.filter(panel => matchesCommon(filters, panel.name, panel.color, panel.visible, selectedIds.has(panel.id)) && matchesChoice(filters.materials, panel.material) && matchesChoice(filters.patterns, panel.pattern) && matchesChoice(filters.thicknesses, String(panel.thickness)) && panel.width * panel.height / 1e6 >= filters.minArea && (filters.maxArea === null || panel.width * panel.height / 1e6 <= filters.maxArea))
   const matchingIds = new Set(matchingPanels.map(panel => panel.id))
   const maxArea = Math.max(0.01, Math.ceil(Math.max(0, ...panels.map(panel => panel.width * panel.height / 1e6), filters.minArea, filters.maxArea ?? 0) * 100) / 100)
   const choices = (values: string[]) => [...new Set(values)].sort().map(value => ({ value, label: value }))
-  const matchingSelected = matchingPanels.filter(panel => panelListProps.selectedIds.includes(panel.id)).length
+  const matchingSelected = matchingPanels.filter(panel => selectedIds.has(panel.id)).length
   const panelsById = new Map(panels.map(panel => [panel.id, panel]))
-  const selectedIds = new Set(panelListProps.selectedIds)
   const expandedIds = new Set(expanded)
   const memberIds = new Set(assemblies.flatMap(assembly => assembly.panelIds))
   const loosePanels = matchingPanels.filter(panel => !memberIds.has(panel.id))
