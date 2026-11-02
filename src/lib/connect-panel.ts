@@ -159,8 +159,8 @@ export function connectSelectedConnectors(project: Project, ids: readonly string
   const options = pieces.map(piece => openings(project, panels, piece))
   if (options.some(choices => !choices.length)) throw new Error('Each selected connector needs a free, compatible opening. Use T or cross connectors on straight, visible 18–19 mm panel edges.')
   const previousErrors = new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id))
+  const source = panels.find(panel => panel.id === pieces[0].connection.parentId)!
   for (const first of options[0]) {
-    const source = panels.find(p => p.id === first.piece.connection.parentId)!
     const fit = fitRectangle(options, first, source)
     if (!fit) continue
     if (fit.panel.position.some(value => Math.abs(value) > 100000) || hitsOtherHardware(project, panels, wanted, fit.panel)) continue

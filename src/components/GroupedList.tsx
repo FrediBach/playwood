@@ -181,7 +181,7 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
           <span className="list-group-count">{sectionItems.length}</span>
           <button className="list-group-rename" aria-label={`Rename group ${group.name}`} onClick={() => setEditingId(group.id)}><Pencil size={12}/></button>
         </div> : !!groups.length && <div className="list-ungrouped-label">Ungrouped</div>}
-        {open && <div className={`${kind === 'panels' ? 'panel' : 'connector'}-list ${sort?.active ? 'is-sorting' : ''}`} role="list" aria-label={group?.name ?? (kind === 'panels' ? 'Panels' : 'Connectors')}>
+        {open && <><ul className={`${kind === 'panels' ? 'panel' : 'connector'}-list ${sort?.active ? 'is-sorting' : ''}`} role="list" aria-label={group?.name ?? (kind === 'panels' ? 'Panels' : 'Connectors')}>
           {sectionItems.map((item, index) => {
             const dragging = !!dragged && sortingIds.has(item.id)
             const begin = (mode: SortSession['mode'], bounds?: DOMRect, pointerY = 0): SortSession => {
@@ -229,10 +229,11 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
                 } else if (current) { if (event.key === 'Tab') finishSort(false); else event.stopPropagation() }
               },
             }
-            return <div key={item.id} role="listitem" data-list-item={item.id} className={`group-list-item ${dragging ? 'is-dragging' : ''} ${targeted && sort?.beforeId === item.id ? 'drop-before' : ''} ${targeted && sort?.beforeId === null && item.id === lastOther ? 'drop-after' : ''}`}>{renderItem(item, handle)}</div>
+            return <li key={item.id} data-list-item={item.id} className={`group-list-item ${dragging ? 'is-dragging' : ''} ${targeted && sort?.beforeId === item.id ? 'drop-before' : ''} ${targeted && sort?.beforeId === null && item.id === lastOther ? 'drop-after' : ''}`}>{renderItem(item, handle)}</li>
           })}
+        </ul>
           {!!groups.length && !sectionItems.length && <div className="list-group-empty">Drag {kind} here</div>}
-        </div>}
+        </>}
       </div>
     })}
     {menu && <PreviewContextMenu {...menu} ariaLabel="List actions" title={menu.groupId ? groups.find(group => group.id === menu.groupId)?.name ?? 'Group' : `${menu.ids.length} ${kind}`} actions={menuActions} onClose={() => setMenu(null)}/>}

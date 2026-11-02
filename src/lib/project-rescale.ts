@@ -53,8 +53,9 @@ export function getRescaleValues(project: Project, includeUnique = false): Resca
     const min = connection.type === 't' || connection.type === 'cross' ? 18 : 16
     thicknessLimits.set(id, { min: Math.max(min, thicknessLimits.get(id)?.min ?? 3), max: 19 })
   }
+  const definitions = new Map(project.assemblies?.definitions.map(definition => [definition.id, definition]))
   for (const instance of project.assemblies?.instances ?? []) {
-    const definition = project.assemblies!.definitions.find(item => item.id === instance.definitionId)
+    const definition = definitions.get(instance.definitionId)
     for (const parameter of definition?.parameters ?? []) {
       const range = getAssemblyParameterRange(parameter)
       for (const binding of parameter.bindings) if (binding.dimension === 'thickness') {

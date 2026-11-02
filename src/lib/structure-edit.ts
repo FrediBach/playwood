@@ -232,11 +232,12 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   // A relation between loose panels should move its peer, not make that panel
   // thinner/shorter merely because resizing has a lower objective weight.
   const physicallySupported = new Set(connections.flatMap(connection => [connection.parentId, connection.childId]))
+  const constrainedPanelIds = new Set(constraints.flatMap(designConstraintPanelIds))
   contacts.forEach(contact => { physicallySupported.add(frames[contact.a].panel.id); physicallySupported.add(frames[contact.b].panel.id) })
   for (const [index, item] of frames.entries()) {
     if (!constraints.length) continue
     for (const [dimension, field] of (['width', 'height'] as const).entries()) {
-      const preservesOwnSize = edit.kind === 'reconcile' ? constraints.some(rule => designConstraintPanelIds(rule).includes(item.panel.id))
+      const preservesOwnSize = edit.kind === 'reconcile' ? constrainedPanelIds.has(item.panel.id)
         : !physicallySupported.has(item.panel.id) && !ids.has(item.panel.id)
       if (preservesOwnSize && !controlledDimensions.has(`${item.panel.id}/${field}`)) add(row(), index * 5 + 3 + dimension, 1)
       // Bounds belong in the same solve, so another feasible placement can be
@@ -546,9 +547,10 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     || next.connections.some(connection => !Number.isFinite(connection.offset) || Math.abs(connection.offset) > 10000)) throw new Error('This move would exceed the project placement limits. Try a smaller step.')
   if (edit.kind === 'resize' && edit.local) {
     const overrides = { ...project.connectorOverrides }
+    const connectionsById = new Map(next.connections.map(connection => [connection.id, connection]))
     for (const piece of getPhysicalConnectors(project)) {
       const before = getConnectorRail(piece.connection, panels, project.connections)
-      const connection = next.connections.find(item => item.id === piece.connection.id)!
+      const connection = connectionsById.get(piece.connection.id)!
       const after = getConnectorRail(connection, next.panels, next.connections)
       if (!before || !after) continue
       const original = new Vector3(...before.placements[piece.index].position).addScaledVector(new Vector3(...before.tangent),
