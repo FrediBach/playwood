@@ -7,7 +7,8 @@ import { ConnectorList } from './ConnectorList'
 import { ExampleBrowser } from './ExampleBrowser'
 import './assemblies.css'
 import { getProjectPalette } from '@/lib/custom-colors'
-import { ListFilters, FilterChoices, FilterResults, emptyFilters, filterCount, matchesCommon, matchesChoice } from './ListFilters'
+import { ListFilters, FilterChoices, FilterResults } from './ListFilters'
+import { emptyFilters, filterCount, matchesCommon, matchesChoice } from '@/lib/list-filters'
 
 export interface SidebarAssembly { id: string; name: string; definitionName: string; panelIds: string[] }
 export interface LibraryAssembly { id: string; name: string; instanceCount: number; panelCount: number }

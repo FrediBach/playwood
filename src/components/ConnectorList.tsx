@@ -7,7 +7,8 @@ import { ConnectorGlyph } from './editor-controls'
 import './connector-list.css'
 import { GroupedList, type ListGroupingProps } from './GroupedList'
 
-import { ListFilters, FilterChoices, FilterResults, emptyFilters, filterCount, matchesCommon, matchesChoice } from './ListFilters'
+import { ListFilters, FilterChoices, FilterResults } from './ListFilters'
+import { emptyFilters, filterCount, matchesCommon, matchesChoice } from '@/lib/list-filters'
 
 interface Props extends ListGroupingProps {
   connectors: ReturnType<typeof getPhysicalConnectors>

@@ -449,6 +449,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
   const activePanelIds = connectorSelection ? [] : selectedIds
   const activeConnectorIds = connectorSelection ? props.selectedConnectorIds ?? [] : []
   const activePanelIdSet = new Set(activePanelIds)
+  const activeConnectorIdSet = new Set(activeConnectorIds)
   const [keyboardSnap, setKeyboardSnap] = useState<{ direction: Vec3; selection: string; handleId?: string } | null>(null)
   const resizeHandleId = useRef<string | undefined>(undefined)
   const resizeMode = useRef<PreviewResizeMode>('connected')
@@ -465,7 +466,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
     ? props.resizeHandles?.find(handle => handle.id === keyboardSnap.handleId) : undefined
   const probe = props.snapProbe ?? keyboardProbe
   const guideSources = probe ? [probe.position] : connectorSelection
-    ? snapTargets(guideProject, [], getPhysicalConnectors(guideProject).filter(piece => !activeConnectorIds.includes(piece.id)).map(piece => piece.id), true)
+    ? snapTargets(guideProject, [], getPhysicalConnectors(guideProject).filter(piece => !activeConnectorIdSet.has(piece.id)).map(piece => piece.id), true)
     : panels.filter(panel => panel.visible && activePanelIdSet.has(panel.id)).flatMap(panelSnapPoints)
   const guideDirection = props.snapProbe?.direction ?? props.snapDirection ?? (keyboardSnap?.selection === selection ? keyboardSnap.direction : [0, 0, 0]) as Vec3
   return <>

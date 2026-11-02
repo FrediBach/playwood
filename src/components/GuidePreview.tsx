@@ -142,13 +142,14 @@ function drawingFor(scene: GuideScene, guideId: GuideId) {
     }
   }
   const connectorPositions: { point: Point; selected: boolean }[] = []
+  const selectedConnectors = new Set(scene.selectedConnectors)
   for (const piece of getPhysicalConnectors(scene.project)) {
     const rail = getConnectorRail(piece.connection, panels, scene.project.connections)
     if (!rail) continue
     const pose = rail.placements[piece.index], rotation = new Euler(...pose.rotation)
     const slide = connectorSlide(rail, piece.index, scene.project.connectorOverrides?.[piece.id]?.slide)
     const center = new Vector3(...pose.position).addScaledVector(new Vector3(...rail.tangent), slide)
-    const selected = scene.selectedConnectors?.includes(piece.id)
+    const selected = selectedConnectors.has(piece.id)
     connectorPositions.push({ point: project(center), selected: !!selected })
     const ghost = [piece.connection.parentId, piece.connection.childId].some(id => ghosts.has(id))
     for (const [index, vertices] of connectorVertices(piece.type).entries()) {
@@ -211,7 +212,8 @@ function drawingFor(scene: GuideScene, guideId: GuideId) {
     for (let x = lowX; x <= highX; x += spacing) gridLines.push({ points: [project(new Vector3(x, lowY, 0)), project(new Vector3(x, highY, 0))], origin: x === 0 })
     for (let y = lowY; y <= highY; y += spacing) gridLines.push({ points: [project(new Vector3(lowX, y, 0)), project(new Vector3(highX, y, 0))], origin: y === 0 })
   }
-  const selectionPoints = panels.filter(panel => !scene.selectionBox || scene.selectionBox.includes(panel.id)).flatMap(panel => {
+  const selectionBoxIds = scene.selectionBox ? new Set(scene.selectionBox) : null
+  const selectionPoints = panels.filter(panel => !selectionBoxIds || selectionBoxIds.has(panel.id)).flatMap(panel => {
     const rotation = new Euler(...panel.rotation)
     return Array.from({ length: 8 }, (_, index) => project(new Vector3(
       (index & 1 ? 1 : -1) * panel.width / 2, (index & 2 ? 1 : -1) * panel.height / 2, (index & 4 ? 1 : -1) * panel.thickness / 2,

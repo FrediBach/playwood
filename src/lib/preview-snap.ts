@@ -26,9 +26,13 @@ export function panelSnapPoints(panel: Panel): Vec3[] {
 }
 export function snapTargets(project: Project, excludedPanels: readonly string[] = [], excludedConnectors: readonly string[] = [], connectors = false): Vec3[] {
   const panels = resolvePanels(project)
-  if (!connectors) return panels.filter(p => p.visible && !excludedPanels.includes(p.id)).flatMap(panelSnapPoints)
+  if (!connectors) {
+    const excludedPanelIds = new Set(excludedPanels)
+    return panels.filter(p => p.visible && !excludedPanelIds.has(p.id)).flatMap(panelSnapPoints)
+  }
+  const excludedConnectorIds = new Set(excludedConnectors)
   return getPhysicalConnectors(project).flatMap(piece => {
-    if (excludedConnectors.includes(piece.id)) return []
+    if (excludedConnectorIds.has(piece.id)) return []
     const rail = getConnectorRail(piece.connection, panels, project.connections)
     if (!rail) return []
     return [new Vector3(...rail.placements[piece.index].position).addScaledVector(new Vector3(...rail.tangent),
@@ -54,8 +58,9 @@ export function snapDistance(origin: Vec3, direction: Vec3, distance: number, ta
 }
 export function snapPanelDelta(panels: Panel[], ids: readonly string[], delta: Vec3, settings: SnapSettings, constrained = false): Vec3 {
   if (!settings.grid && !settings.geometry) return delta
-  const sources = panels.filter(p => p.visible && ids.includes(p.id)).flatMap(panelSnapPoints)
-  const targets = panels.filter(p => p.visible && !ids.includes(p.id)).flatMap(panelSnapPoints)
+  const selectedIds = new Set(ids)
+  const sources = panels.filter(p => p.visible && selectedIds.has(p.id)).flatMap(panelSnapPoints)
+  const targets = panels.filter(p => p.visible && !selectedIds.has(p.id)).flatMap(panelSnapPoints)
   if (constrained) {
     const vector = new Vector3(...delta), length = vector.length()
     if (length < 1e-6) return delta

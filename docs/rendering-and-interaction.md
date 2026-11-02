@@ -17,6 +17,8 @@ The editor combines a React DOM interface with one React Three Fiber viewport. P
 
 [`main.tsx`](../src/main.tsx) mounts the application under `React.StrictMode`. Global layout and theme rules live in [`index.css`](../src/index.css); feature styles are colocated under `src/components/`. Radix-backed dialog, tooltip, and button primitives live in [`components/ui/`](../src/components/ui/). Feature components also use native controls and disclosures. [`InspectorDisclosure`](../src/components/InspectorPrimitives.tsx) remembers expansion in an in-memory map and can defer mounting expensive content until first opened.
 
+Panel and connector lists share filter defaults, active-filter counting, and matching helpers from [`list-filters.ts`](../src/lib/list-filters.ts). [`ListFilters.tsx`](../src/components/ListFilters.tsx) owns the popover and filter controls; its runtime exports are React components so edits can use Fast Refresh.
+
 ## From project data to a frame
 
 ```mermaid

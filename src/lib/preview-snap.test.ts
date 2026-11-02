@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createPanel } from './model'
+import { connectorId } from './connector-selection'
 import { DEFAULT_SNAP, isGeometryGuideActive, panelSnapPoints, snapDistance, snapPanelDelta, snapTargets } from './preview-snap'
 import { movePreviewResize, preparePreviewResize } from './preview-resize'
 import type { Project } from './types'
@@ -35,6 +36,22 @@ describe('preview snapping', () => {
     expect(snapTargets(project, [a.id])).toEqual(panelSnapPoints(b))
     expect(snapPanelDelta(project.panels, [a.id], [103, 0, 0], geometry)).toEqual([109, 0, 0])
     expect(snapPanelDelta([a, b], [a.id, b.id], [103, 0, 0], geometry)).toEqual([103, 0, 0])
+  })
+  it('excludes individual hardware without excluding other pieces on the same joint', () => {
+    const project: Project = {
+      version: 1, name: 'Snap hardware',
+      panels: [createPanel({ id: 'parent' }), createPanel({ id: 'child' })],
+      connections: [{ id: 'joint', parentId: 'parent', childId: 'child', type: '90', side: 'top', offset: 0, inset: 0, flip: false, color: '#ffffff', count: 3 }],
+    }
+    const all = snapTargets(project, [], [], true)
+    expect(all).toHaveLength(3)
+    const excluded = [connectorId('joint', 0), connectorId('joint', 0), 'stale-id']
+    expect(snapTargets(project, [], excluded, true)).toEqual(all.slice(1))
+
+    const removed: Project = { ...project, connectorOverrides: { [connectorId('joint', 1)]: { removed: true } } }
+    expect(snapTargets(removed, [], excluded, true)).toEqual([all[2]])
+    const hidden: Project = { ...project, panels: project.panels.map(panel => panel.id === 'child' ? { ...panel, visible: false } : panel) }
+    expect(snapTargets(hidden, [], excluded, true)).toEqual([])
   })
   it('keeps an already aligned boundary instead of snapping a different boundary', () => {
     const panel = createPanel({ width: 107, position: [3.5, 0, 0] })

@@ -52,7 +52,14 @@ const corner = (type: AttachmentOptions['type'] = '90', extra: Partial<Attachmen
   return attachPanel(project, project.panels[0].id, createPanel({ id: 'guide-side', name: 'Side panel', width: 350, height: 360 }), { ...options, type, ...extra })
 }
 const frozen = (project: Project): Project => ({ ...project, panels: resolvePanels(project), connections: [] })
-const finish = (project: Project, selected: string[], color: string): Project => ({ ...project, panels: project.panels.map(panel => selected.includes(panel.id) ? { ...panel, color } : panel) })
+const finish = (project: Project, selected: string[], color: string): Project => {
+  const selectedIds = new Set(selected)
+  return { ...project, panels: project.panels.map(panel => selectedIds.has(panel.id) ? { ...panel, color } : panel) }
+}
+const addedPanels = (original: Project, updated: Project) => {
+  const originalIds = new Set(ids(original))
+  return updated.panels.filter(panel => !originalIds.has(panel.id))
+}
 
 function buildScenes(id: GuideId): GuideScene[] {
   switch (id) {
@@ -76,7 +83,7 @@ function buildScenes(id: GuideId): GuideScene[] {
       return [scene(p, 'Export a project file before replacing the current build if you want a separate backup.', { document: { title: 'Project file · JSON', lines: ['Editable backup', 'Keep your current build'] } }),
         scene(p, 'The current build remains until you confirm Start new project in the dialog.', { document: { title: 'Start a new project?', lines: ['Export current project', 'Start new project', 'Cancel'] } }),
         scene(cube, 'A full build replaces the workspace. Undo restores the previous project.', { labels: [{ text: 'Cube · full build', point: [0, 200, 0] }] }),
-        scene(added, 'An assembly adds a reusable module beside the existing build when nothing is selected.', { selected: added.panels.filter(panel => !ids(cube).includes(panel.id)).map(panel => panel.id) })]
+        scene(added, 'An assembly adds a reusable module beside the existing build when nothing is selected.', { selected: addedPanels(cube, added).map(panel => panel.id) })]
     }
     case 'box-select': {
       const p = box(), hardware = getPhysicalConnectors(p).map(piece => piece.id)
@@ -101,7 +108,7 @@ function buildScenes(id: GuideId): GuideScene[] {
     }
     case 'grid-split': {
       const p = box(), divided = splitPanelGrid(p, ids(p), 1, 1).project
-      const added = divided.panels.filter(panel => !ids(p).includes(panel.id)).map(panel => panel.id)
+      const added = addedPanels(p, divided).map(panel => panel.id)
       return [scene(p, 'A rectangular opening has two pairs of matching opposite panels.', { view: 'front' }),
         scene(p, 'Select all four frame panels to offer Divide into a grid.', { selected: ids(p), view: 'front' }),
         scene(divided, 'One X divider and one Y divider create two columns and two rows.', { ghost: added, view: 'front', document: { title: 'Divide into a grid', lines: ['X dividers: 1', 'Y dividers: 1', '2 × 2 compartments'] } }),
@@ -203,7 +210,7 @@ function buildScenes(id: GuideId): GuideScene[] {
       const p = box()
       const pair = p.panels.filter(panel => panel.name.startsWith('Shelf'))
       const result = splitParallelPanels(p, pair.map(panel => panel.id))
-      const added = result.project.panels.filter(panel => !ids(p).includes(panel.id))
+      const added = addedPanels(p, result.project)
       return [scene(p, 'Start with a compartment and matching top and bottom.', { labels: [label(pair[0], '350 mm cut length')] }),
         scene(p, 'Only the two parallel panels are selected.', { selected: pair.map(panel => panel.id) }),
         scene(result.project, 'Split in the middle adds a divider and space for T bodies.', { ghost: added.map(panel => panel.id), labels: [label(added.find(panel => panel.name === 'Center divider')!, 'Center divider')] }),
@@ -298,7 +305,7 @@ function buildScenes(id: GuideId): GuideScene[] {
       return [scene(p, 'Begin with a connected box made from separate panels.'),
         scene(p, 'Select every panel that belongs to the reusable design.', { selected: ids(p) }),
         scene(assembly, 'Create assembly turns this selection into its first instance.', { selected: ids(p), labels: [{ text: 'My box · linked instance', point: [0, 200, 0] }] }),
-        scene(duplicated, 'Duplicate creates another instance of the same source design.', { selected: ids(duplicated).filter(panelId => !ids(p).includes(panelId)), document: { title: 'My box', lines: ['One shared design', 'Two linked instances'] } })]
+        scene(duplicated, 'Duplicate creates another instance of the same source design.', { selected: addedPanels(p, duplicated).map(panel => panel.id), document: { title: 'My box', lines: ['One shared design', 'Two linked instances'] } })]
     }
     case 'assembly-attach': {
       const original = box(), p = createAssembly(original, ids(original), 'My box'), first = p.assemblies!.instances[0]

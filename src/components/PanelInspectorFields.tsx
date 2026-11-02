@@ -4,12 +4,12 @@ import { InspectorDisclosure } from './InspectorPrimitives'
 import { MATERIALS, COLORS } from '@/lib/materials'
 import type { Panel } from '@/lib/types'
 
-export function panelShapeSummary(panels: Panel[]) {
+function panelShapeSummary(panels: Panel[]) {
   const labels = panels.map(panel => `${panel.customOutline ? 'Custom outline' : 'Rectangle'} · ${panel.pattern === 'solid' ? (panel.cornerRadius ? 'Rounded corners' : 'Solid') : panel.pattern === 'pegboard' ? 'Pegboard' : 'Slots'}`)
   return labels.every(label => label === labels[0]) ? labels[0] : 'Mixed shapes & surfaces'
 }
 
-export function panelAppearanceSummary(panels: Panel[]) {
+function panelAppearanceSummary(panels: Panel[]) {
   const labels = panels.map(panel => {
     const material = MATERIALS.find(material => material.id === panel.material)?.name ?? panel.material
     const coverage = panel.material === 'painted' ? 1 : panel.finishCoverage ?? 0
