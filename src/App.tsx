@@ -73,6 +73,7 @@ export default function App() {
   const setSelectedId=useCallback((id:string|null)=>setSelectedIds(id?[id]:[]),[])
   const [contextMenu,setContextMenu]=useState<{x:number;y:number}|null>(null)
   const [constraintFooter,setConstraintFooter]=useState<HTMLDivElement|null>(null)
+  const [projectConstraintsOpen,setProjectConstraintsOpen]=useState(false)
   const constraintPicker=useRef<((id:string)=>boolean)|null>(null)
   const [pickingConstraint,setPickingConstraint]=useState(false)
   const [panelEditError,setPanelEditError]=useState<{selection:string;message:string}|null>(null)
@@ -124,6 +125,7 @@ export default function App() {
   const panels=useMemo(()=>resolvePanels(project),[project])
   const selectionKey=selectedIds.join('/')
   useEffect(()=>setToolRequest(undefined),[selectionKey])
+  useEffect(()=>{if(selectionKey||selectedConnectorIds.length)setProjectConstraintsOpen(false)},[selectionKey,selectedConnectorIds])
   const selectedIdSet=useMemo(()=>new Set(selectedIds),[selectedIds])
   const selectedPanels=panels.filter(p=>selectedIdSet.has(p.id))
   const {counts:splitCounts,checking:checkingSplits}=useParallelPanelSplitCounts(project,selectedIds)
@@ -148,12 +150,17 @@ export default function App() {
   const selectedConnectorIdSet=useMemo(()=>new Set(selectedConnectorIds),[selectedConnectorIds])
   const selectedConnectors=physicalConnectors.filter(connector=>selectedConnectorIdSet.has(connector.id))
   const inspectingConnectors=selectedConnectors.length>0&&(!selectedPanels.length||assemblyTab==='connectors')
+  const managingProjectConstraints=projectConstraintsOpen&&!selectedPanels.length&&!inspectingConnectors
   const selectionKind=inspectingConnectors?'connectors':'panels'
   const connectorPanelFit=useMemo(()=>getConnectorPanelFit(project,selectedConnectorIds),[project,selectedConnectorIds])
   const connectorCount=physicalConnectors.length
   const connectorSummary=CONNECTORS.map(type=>({name:type.name,count:physicalConnectors.filter(c=>c.type===type.id).length})).filter(type=>type.count>0).map(type=>`${type.count} × ${type.name}`).join(' · ')
   const notify=useCallback((message:string)=>setToast(message),[])
   const constraints=useDesignConstraints({project,commit,notify})
+  const closeProjectConstraints=()=>{
+    setProjectConstraintsOpen(false);constraints.cancel()
+    window.setTimeout(()=>document.querySelector<HTMLButtonElement>('button[aria-label="All constraints"]')?.focus(),0)
+  }
   const commitWithInsertChecks=(change:(current:Project)=>Project,options?:{group:string;repeat:boolean})=>{
     try { commit(current=>assertNoNewTrofastIssues(current,change(current)),options);return true }
     catch(error){notify(error instanceof Error?error.message:'This edit needs more clearance for the TROFAST inserts.');return false}
@@ -361,6 +368,7 @@ export default function App() {
       const target=e.target as HTMLElement
       if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||target.closest('[role="dialog"]')||modalOpen)return
       if(constraints.editing){if(e.key==='Escape'){e.preventDefault();if(pickingConstraint){constraintPicker.current=null;setPickingConstraint(false);setRightOpen(true)}else constraints.cancel()}return}
+      if(managingProjectConstraints&&e.key==='Escape'){e.preventDefault();closeProjectConstraints();return}
       if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='b'){
         if(boxSelectAvailable){e.preventDefault();if(!e.repeat)toggleBoxSelect()}
         return
@@ -497,12 +505,12 @@ export default function App() {
     } })
   }
   const loadTemplate=(template:string)=>{setPendingTemplate({id:template,project:createExampleProject(template),returnTo:dialog});setDialog('replace')}
-  const applyTemplate=(template:string,next:Project)=>{constraints.cancel();clipboard.cancel();commit(next,{replace:true});assembly.close();const instance=next.assemblies?.instances[0];setSelectedIds(instance?Object.values(instance.panelIds):next.panels.slice(0,1).map(p=>p.id));setInspectorTab('panel');setDialog(null);setPendingTemplate(null);setExploded(false);setFitSignal(v=>v+1);notify(template==='blank'?'A fresh start. Add your first panel.':'Template loaded. Make it your own.')}
+  const applyTemplate=(template:string,next:Project)=>{setProjectConstraintsOpen(false);constraints.cancel();clipboard.cancel();commit(next,{replace:true});assembly.close();const instance=next.assemblies?.instances[0];setSelectedIds(instance?Object.values(instance.panelIds):next.panels.slice(0,1).map(p=>p.id));setInspectorTab('panel');setDialog(null);setPendingTemplate(null);setExploded(false);setFitSignal(v=>v+1);notify(template==='blank'?'A fresh start. Add your first panel.':'Template loaded. Make it your own.')}
   const closeProjectDialog=()=>{setDialog(dialog==='replace'?pendingTemplate?.returnTo??null:null);setPendingTemplate(null)}
   const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
   const startNewProject=()=>{closeContextMenu();applyTemplate('blank',createExampleProject('blank'));setRealisticPreview(false);setView('perspective');setAttachTarget('new');setAttachment(INITIAL_ATTACHMENT);setImportError('');notify('New project started. Undo to restore your previous project.')}
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
-  const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=imported.constraints?.length?imported:repairLegacyShelf(imported);const repaired=imported.constraints?.length?shelf:repairLegacyExampleInserts(shelf);constraints.cancel();commit(repaired,{replace:true});assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
+  const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=imported.constraints?.length?imported:repairLegacyShelf(imported);const repaired=imported.constraints?.length?shelf:repairLegacyExampleInserts(shelf);setProjectConstraintsOpen(false);constraints.cancel();commit(repaired,{replace:true});assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
   const instance=assembly.selectedInstance
   const holes=useMemo(()=>findPanelHoles(panels.filter(panel=>selectedIdSet.has(panel.id)),panels),[panels,selectedIdSet])
   const closeHole=(id:string)=>{
@@ -555,6 +563,7 @@ export default function App() {
   const openConstraints=(add=false)=>{
     if(assembly.editingInstance){notify('Finish editing the shared assembly before managing project constraints.');return}
     clipboard.cancel();assembly.clearPlacement();closeContextMenu();setSelectedConnectorIds([])
+    setProjectConstraintsOpen(!selectedPanels.length)
     setInspectorTab('panel');setRightOpen(true);setRealisticPreview(false);setExploded(false)
     if(window.innerWidth<=900)setLeftOpen(false)
     if(add)constraints.open();else constraints.manage()
@@ -689,14 +698,14 @@ export default function App() {
       onDrillIn={constraints.editing?undefined:assembly.drillIn} assemblyHint={assemblyHint} attachmentSummary={attachmentSummary} attachmentWarning={!!attachmentWarning}
       editingAssembly={assembly.editingDefinition?{name:assembly.editingDefinition.name,instanceCount:assemblyCount(assembly.editingDefinition.id),onDone:assembly.done}:undefined}/>
 
-    <InspectorSidebar selectionKey={`${inspectingConnectors?selectedConnectorIds.join('/'):selectionKey}:${inspectorTab}:${instance?.id??assembly.memberInstance?.id??''}:${assembly.editingInstance?.id??''}:${assembly.placementActive}:${clipboard.active}`} inspectorTab={inspectorTab} selectedCount={selectedPanels.length} hasSelection={!!selected}
+    <InspectorSidebar selectionKey={`${inspectingConnectors?selectedConnectorIds.join('/'):selectionKey}:${inspectorTab}:${instance?.id??assembly.memberInstance?.id??''}:${assembly.editingInstance?.id??''}:${assembly.placementActive}:${clipboard.active}:${managingProjectConstraints}`} inspectorTab={inspectorTab} selectedCount={selectedPanels.length} hasSelection={!!selected}
       onCollapse={()=>setRightOpen(false)} onPanel={()=>setInspectorTab('panel')} startAttach={startAttach} applyAttachment={applyAttachment}
       canAttach={!!previewProject&&!attachmentErrors.length} attachmentType={attachment.type}
-      contextLabel={inspectingConnectors?'Connectors':assembly.editingInstance?'Shared assembly':assembly.hasMembers?'Assembly':undefined}
+      contextLabel={managingProjectConstraints?'All constraints':inspectingConnectors?'Connectors':assembly.editingInstance?'Shared assembly':assembly.hasMembers?'Assembly':undefined}
       onDoneEditing={assembly.editingInstance?assembly.done:undefined}
       contextDetail={assembly.editingDefinition?`${assembly.editingDefinition.name} · affects ${assemblyCount(assembly.editingDefinition.id)} linked ${assemblyCount(assembly.editingDefinition.id)===1?'instance':'instances'}`:undefined}
       attachmentStatus={previewResult.error||attachmentErrors[0]?.message||(previewProject?'Panel thickness is compatible · Ready to attach':undefined)}
-      footer={constraints.editing?<div ref={setConstraintFooter}/>:clipboard.active?<><p className="inspector-task-status" role="status">{attachmentSummary||'Choose a + in the workspace to attach.'}</p><Button variant="outline" className="full-button" onClick={clipboard.cancel}>Cancel placement</Button></>:assembly.placementActive?<><p className={`inspector-task-status ${attachmentWarning?'is-blocked':''}`} role="status">{attachmentSummary||assemblyHint}</p><Button variant="outline" className="full-button" onClick={assembly.clearPlacement}>Cancel attachment</Button></>:undefined}>
+      footer={constraints.editing?<div ref={setConstraintFooter}/>:clipboard.active?<><p className="inspector-task-status" role="status">{attachmentSummary||'Choose a + in the workspace to attach.'}</p><Button variant="outline" className="full-button" onClick={clipboard.cancel}>Cancel placement</Button></>:assembly.placementActive?<><p className={`inspector-task-status ${attachmentWarning?'is-blocked':''}`} role="status">{attachmentSummary||assemblyHint}</p><Button variant="outline" className="full-button" onClick={assembly.clearPlacement}>Cancel attachment</Button></>:managingProjectConstraints?<Button variant="outline" className="full-button" aria-label="Done managing constraints" onClick={closeProjectConstraints}>Done</Button>:undefined}>
         {inspectingConnectors?<ConnectorInspector panels={panels} fitSummary={fittedConnectorPanel?`${Math.round(fittedConnectorPanel.width)} × ${Math.round(fittedConnectorPanel.height)} × ${fittedConnectorPanel.thickness} mm`:undefined} connectors={selectedConnectors} onChange={patch=>commitWithInsertChecks(current=>editConnectors(current,selectedConnectorIds,patch))} onRemove={removeSelectedConnectors} onConnectPanel={connectWithPanel} panelFitReason={assembly.editingInstance?'Finish editing the assembly before connecting a panel.':modalOpen?'Close the dialog before connecting a panel.':connectorPanelFit.reason}/>:<>
         {clipboard.active?<div className="multi-selection-heading"><h2>Place {clipboard.inserting||'copy'}</h2><p>Hover a + in the workspace to preview. Click to attach, or cancel to return.</p></div>:assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
           panels={assembly.editingDefinition.panels.filter(panel=>selectedIdSet.has(assembly.editingInstance!.panelIds[panel.id]))}
@@ -718,9 +727,9 @@ export default function App() {
         :<>
           {selectedPanels.length>1&&<MultiPanelInspector editError={panelEditError?.selection===selectionKey?panelEditError.message:undefined} onManageConstraints={()=>openConstraints()} constraints={constraintsInspector} buildTools={buildTools} panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commitWithInsertChecks(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
           {selected&&(inspectorTab==='panel'?<SinglePanelInspector editError={panelEditError?.selection===selectionKey?panelEditError.message:undefined} onManageConstraints={()=>openConstraints()} constraints={constraintsInspector} accessories={trofastInspector} onExtendToGround={extendToGround} groundFitReason={groundPanelFit.reason} buildTools={buildTools} selected={selected} connected={project.connections.some(c=>c.parentId===selected.id||c.childId===selected.id)} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewIssues={previewIssues} sideGuide={attachmentSideGuide!}/>)}
-          {!selectedPanels.length&&<div className="no-selection"><MousePointer2 size={28}/><h2>A little more detail.</h2><p>Select a panel or connector in the workspace<br/>to make it your own.</p><Button variant="outline" onClick={addPanel}><Plus size={16}/>Add a panel</Button></div>}
+          {!selectedPanels.length&&!managingProjectConstraints&&<div className="no-selection"><MousePointer2 size={28}/><h2>A little more detail.</h2><p>Select a panel or connector in the workspace<br/>to make it your own.</p><Button variant="outline" onClick={addPanel}><Plus size={16}/>Add a panel</Button></div>}
         </>}
-        {!clipboard.active&&!assembly.editingInstance&&inspectorTab==='panel'&&(assembly.hasMembers||!selectedPanels.length)&&constraintsInspector}
+        {!clipboard.active&&!assembly.editingInstance&&inspectorTab==='panel'&&(assembly.hasMembers||managingProjectConstraints)&&constraintsInspector}
         </>}
     </InspectorSidebar>
 

@@ -30,6 +30,58 @@ const shelfProject = (): Project => ({ version: 1, name: 'Shelf constraints', co
   createPanel({ id: 'upper', name: 'Upper shelf', width: 600, height: 400, thickness: 18, position: [0, 609, 0], rotation: [-Math.PI / 2, 0, 0] }),
 ] })
 
+for (const width of [1440, 390]) test(`constraints stay hidden without selection unless explicitly opened at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const project = shelfProject()
+  project.constraints = [{ id: 'floor', enabled: true, kind: 'floor', panelId: 'lower', reference: 'max', value: 218 }]
+  await importProject(page, project)
+  const original = await exportedProject(page)
+  if (width < 680) await page.getByRole('button', { name: 'Open inspector', exact: true }).click()
+  await openInspectorSection(page, 'Constraints')
+  await page.locator('canvas').focus()
+  await page.keyboard.press('Escape')
+  const empty = page.getByRole('heading', { name: 'A little more detail.', exact: true })
+  const section = page.locator('summary').and(page.getByLabel('Constraints', { exact: true }))
+  await expect(empty).toBeVisible()
+  await expect(section).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Add constraint', exact: true })).toHaveCount(0)
+  await page.screenshot({ path: test.info().outputPath('empty-inspector.png') })
+
+  if (width < 680) await page.getByRole('button', { name: 'Collapse inspector', exact: true }).click()
+  await page.getByRole('button', { name: 'All constraints', exact: true }).click()
+  await expect(section).toBeVisible()
+  await expect(empty).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Edit constraint:/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  await page.getByLabel('Constraint type', { exact: true }).press('Escape')
+  await expect(page.getByRole('group', { name: 'New constraint', exact: true })).toHaveCount(0)
+  await expect(section).toBeVisible()
+  await page.getByRole('button', { name: 'Done managing constraints', exact: true }).click()
+  await expect(empty).toBeVisible()
+  await expect(section).toHaveCount(0)
+
+  if (width < 680) await page.getByRole('button', { name: 'Collapse inspector', exact: true }).click()
+  await page.getByRole('button', { name: 'All constraints', exact: true }).click()
+  await page.locator('canvas').focus()
+  await page.keyboard.press('Escape')
+  await expect(empty).toBeVisible()
+  await expect(section).toHaveCount(0)
+
+  if (width === 1440) {
+    await page.getByRole('button', { name: 'All constraints', exact: true }).click()
+    await page.locator('.panel-list-select').first().click()
+    await expect(page.getByLabel('Panel name', { exact: true })).toHaveValue('Lower shelf')
+    await page.locator('canvas').focus()
+    await page.keyboard.press('Escape')
+    await expect(section).toHaveCount(0)
+    await page.getByRole('button', { name: 'Select all', exact: true }).click()
+    await page.getByRole('button', { name: 'Clear', exact: true }).click()
+    await expect(empty).toBeVisible()
+    await expect(section).toHaveCount(0)
+  }
+  expect(await exportedProject(page)).toEqual(original)
+})
+
 test('floor rules preview, reject conflicts, and persist as one undoable edit', async ({ page }) => {
   await importProject(page, shelfProject())
   await page.locator('.panel-list-select').first().click()
