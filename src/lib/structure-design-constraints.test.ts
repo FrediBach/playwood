@@ -1,16 +1,146 @@
 import { describe, expect, it } from 'vitest'
-import { createPanel, createStarterProject, resolvePanels } from './model'
+import { createPanel, createStarterProject, resolvePanels, validateProject } from './model'
 import { evaluateDesignConstraints, getDesignConstraintBounds } from './design-constraints'
-import { movePanels, reconcileDesignConstraints, resizePanelEdge, resizePanels } from './structure-edit'
+import { movePanels, reconcileDesignConstraints, resizePanelDimensions, resizePanelEdge, resizePanels } from './structure-edit'
 import { gridProject } from './example-geometry'
-import type { DesignConstraint, Panel, Project } from './types'
+import type { ConstraintRequirement, DesignConstraint, Panel, Project } from './types'
 
 const shelf = (id: string, y: number): Panel => createPanel({ id, name: id, width: 600, height: 300, thickness: 18, position: [0, y, 0], rotation: [-Math.PI / 2, 0, 0] })
 const project = (panels: Panel[], constraints: DesignConstraint[]): Project => ({ version: 1, name: 'Design rules', panels, connections: [], constraints })
 const byId = (value: Project, id: string) => resolvePanels(value).find(panel => panel.id === id)!
 const satisfied = (value: Project) => expect(evaluateDesignConstraints(value.constraints, resolvePanels(value)).filter(result => result.constraint.enabled).map(result => result.violation)).toEqual(value.constraints?.filter(rule => rule.enabled).map(() => 0))
+const boundedMeasurements: { requirement: ConstraintRequirement; initial: number; expected: number }[] = [
+  { requirement: { relation: 'minimum', value: 500 }, initial: 400, expected: 500 },
+  { requirement: { relation: 'minimum', value: 500 }, initial: 600, expected: 600 },
+  { requirement: { relation: 'maximum', value: 500 }, initial: 600, expected: 500 },
+  { requirement: { relation: 'maximum', value: 500 }, initial: 400, expected: 400 },
+  { requirement: { relation: 'range', min: 400, max: 600 }, initial: 300, expected: 400 },
+  { requirement: { relation: 'range', min: 400, max: 600 }, initial: 700, expected: 600 },
+  { requirement: { relation: 'range', min: 400, max: 600 }, initial: 500, expected: 500 },
+  { requirement: { relation: 'range', min: 500, max: 500 }, initial: 400, expected: 500 },
+]
 
 describe('automatic design rules in structural edits', () => {
+  it.each(boundedMeasurements)('reconciles floor $requirement.relation from $initial to $expected without removing slack', ({ requirement, initial, expected }) => {
+    const before = project([shelf('shelf', initial - 9)], [{ id: 'floor', enabled: true, kind: 'floor', panelId: 'shelf', reference: 'max', ...requirement }])
+    const next = reconcileDesignConstraints(before)
+    expect(getDesignConstraintBounds(byId(next, 'shelf')).max[1]).toBeCloseTo(expected)
+    expect([byId(next, 'shelf').width, byId(next, 'shelf').height]).toEqual([600, 300])
+    if (initial === expected) expect(next).toBe(before)
+    satisfied(next)
+  })
+
+  it.each(boundedMeasurements)('reconciles cut dimension $requirement.relation from $initial to $expected without removing slack', ({ requirement, initial, expected }) => {
+    const before = project([{ ...shelf('shelf', 400), width: initial }], [{ id: 'width', enabled: true, kind: 'dimension', panelId: 'shelf', dimension: 'width', ...requirement }])
+    const next = reconcileDesignConstraints(before)
+    expect(byId(next, 'shelf').width).toBeCloseTo(expected)
+    expect(byId(next, 'shelf').position).toEqual([0, 400, 0])
+    if (initial === expected) expect(next).toBe(before)
+    satisfied(next)
+  })
+
+  it('allows edits inside a floor range and blocks moves through either boundary', () => {
+    const before = project([shelf('shelf', 491)], [{ id: 'floor', enabled: true, kind: 'floor', panelId: 'shelf', reference: 'max', relation: 'range', min: 400, max: 600 }])
+    const higher = movePanels(before, ['shelf'], [0, 50, 0])
+    expect(byId(higher, 'shelf').position[1]).toBe(541)
+    expect(() => movePanels(higher, ['shelf'], [0, 60, 0])).toThrow(/design rules/)
+    const lower = movePanels(higher, ['shelf'], [0, -100, 0])
+    expect(byId(lower, 'shelf').position[1]).toBe(441)
+    expect(() => movePanels(lower, ['shelf'], [0, -60, 0])).toThrow(/design rules/)
+    satisfied(lower)
+  })
+
+  it('allows cut dimension edits within a range and rejects either out-of-range target atomically', () => {
+    const before = project([shelf('shelf', 400)], [{ id: 'width', enabled: true, kind: 'dimension', panelId: 'shelf', dimension: 'width', relation: 'range', min: 400, max: 700 }])
+    const next = resizePanels(before, ['shelf'], { width: 650 })
+    expect(byId(next, 'shelf').width).toBe(650)
+    const snapshot = JSON.stringify(next)
+    expect(() => resizePanels(next, ['shelf'], { width: 800 })).toThrow(/design rules/)
+    expect(() => resizePanels(next, ['shelf'], { width: 300 })).toThrow(/design rules/)
+    expect(JSON.stringify(next)).toBe(snapshot)
+    satisfied(next)
+  })
+
+  it('keeps maximum gaps slack, activates at the upper boundary, and releases when closed', () => {
+    const before = project([shelf('a', 500), shelf('b', 800)], [{ id: 'gap', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'maximum', value: 300 }])
+    const slack = movePanels(before, ['a'], [0, -10, 0])
+    expect(byId(slack, 'b').position[1]).toBe(800)
+    const boundary = movePanels(slack, ['a'], [0, -100, 0])
+    expect(byId(boundary, 'a').position[1]).toBe(390)
+    expect(byId(boundary, 'b').position[1]).toBe(708)
+    const closed = movePanels(boundary, ['a'], [0, 50, 0])
+    expect(byId(closed, 'b').position[1]).toBe(708)
+    expect(evaluateDesignConstraints(closed.constraints, resolvePanels(closed))[0].actual).toBeCloseTo(250)
+    satisfied(closed)
+  })
+
+  it('switches between both gap boundaries and releases each when moving into the permitted range', () => {
+    const before = project([shelf('a', 100), shelf('b', 400)], [{ id: 'gap', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'range', min: 200, max: 300 }])
+    const lower = movePanels(before, ['a'], [0, 100, 0])
+    expect(byId(lower, 'b').position[1]).toBe(418)
+    const slack = movePanels(lower, ['a'], [0, -50, 0])
+    expect(byId(slack, 'b').position[1]).toBe(418)
+    const upper = movePanels(slack, ['a'], [0, -100, 0])
+    expect(byId(upper, 'b').position[1]).toBe(368)
+    const released = movePanels(upper, ['a'], [0, 50, 0])
+    expect(byId(released, 'b').position[1]).toBe(368)
+    expect(byId(released, 'b').width).toBe(600)
+    expect(byId(released, 'b').height).toBe(300)
+    expect(evaluateDesignConstraints(released.constraints, resolvePanels(released))[0].actual).toBeCloseTo(250)
+    satisfied(released)
+  })
+
+  it.each([{ initial: 200, expected: 318 }, { initial: 500, expected: 418 }])('reconciles a gap range from panel center $initial to the nearer edge at $expected', ({ initial, expected }) => {
+    const before = project([shelf('a', 100), shelf('b', initial)], [{ id: 'gap', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'range', min: 200, max: 300 }])
+    const next = reconcileDesignConstraints(before, 'a')
+    expect(byId(next, 'a').position[1]).toBe(100)
+    expect(byId(next, 'b').position[1]).toBe(expected)
+    satisfied(next)
+  })
+
+  it.each([{ thickness: 22, expected: 199 }, { thickness: 4, expected: 203 }])('includes prescribed thickness $thickness when enforcing both floor range bounds', ({ thickness, expected }) => {
+    const before = project([shelf('shelf', 200)], [{ id: 'floor', enabled: true, kind: 'floor', panelId: 'shelf', reference: 'max', relation: 'range', min: 205, max: 210 }])
+    const next = resizePanelDimensions(before, { shelf: { thickness } })
+    expect(byId(next, 'shelf').position[1]).toBe(expected)
+    expect(byId(next, 'shelf').thickness).toBe(thickness)
+    satisfied(next)
+  })
+
+  it('releases weaker upper bounds when a stricter maximum sets the same gap', () => {
+    const before = project([shelf('a', 1000), shelf('b', 1318)], [
+      { id: 'wide', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'maximum', value: 500 },
+      { id: 'narrow', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'maximum', value: 400 },
+    ])
+    const next = movePanels(before, ['a'], [0, -600, 0])
+    expect(byId(next, 'a').position[1]).toBe(400)
+    expect(byId(next, 'b').position[1]).toBe(818)
+    satisfied(next)
+  })
+
+  it('rejects incompatible ranges without modifying the source', () => {
+    const before = project([shelf('shelf', 400)], [
+      { id: 'small', enabled: true, kind: 'dimension', panelId: 'shelf', dimension: 'width', relation: 'range', min: 400, max: 600 },
+      { id: 'large', enabled: true, kind: 'dimension', panelId: 'shelf', dimension: 'width', relation: 'range', min: 700, max: 900 },
+    ])
+    const snapshot = JSON.stringify(before)
+    expect(() => reconcileDesignConstraints(before)).toThrow(/design rules/)
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it('maintains physical joints when a connected shelf moves within a floor range', () => {
+    const original = createStarterProject()
+    const middle = resolvePanels(original).find(panel => panel.name === 'Middle shelf')!
+    const initial = getDesignConstraintBounds(middle).max[1]
+    const before: Project = { ...original, constraints: [{ id: 'floor', enabled: true, kind: 'floor', panelId: middle.id, reference: 'max', relation: 'range', min: initial + 40, max: initial + 80 }] }
+    const reconciled = reconcileDesignConstraints(before)
+    expect(getDesignConstraintBounds(byId(reconciled, middle.id)).max[1]).toBeCloseTo(initial + 40)
+    const next = movePanels(reconciled, [middle.id], [0, 20, 0])
+    expect(getDesignConstraintBounds(byId(next, middle.id)).max[1]).toBeCloseTo(initial + 60)
+    expect(next.connections.map(connection => connection.id)).toEqual(before.connections.map(connection => connection.id))
+    expect(validateProject(next).filter(issue => issue.severity === 'error')).toEqual([])
+    satisfied(next)
+  })
+
   it('places the top of a shelf above the floor including its thickness', () => {
     const before = project([shelf('shelf', 200)], [{ id: 'floor', enabled: true, kind: 'floor', panelId: 'shelf', reference: 'max', value: 800 }])
     const snapshot = JSON.stringify(before)

@@ -30,16 +30,29 @@ interface Props {
 }
 
 const EMPTY_IDS: string[] = []
+type NumericConstraint = Extract<DesignConstraint, { kind: 'floor' | 'dimension' | 'gap' }>
+type RequirementMode = 'exact' | 'minimum' | 'maximum' | 'range'
+const isNumeric = (rule: DesignConstraint): rule is NumericConstraint => rule.kind === 'floor' || rule.kind === 'dimension' || rule.kind === 'gap'
 const format = (value: number) => `${Number(value.toFixed(1))} mm`
 const isPair = (kind: DesignConstraint['kind']) => kind === 'equal-dimension' || kind === 'level' || kind === 'gap'
 const referenceLabel = (reference: ConstraintReference) => reference === 'min' ? 'Bottom surface / edge' : reference === 'max' ? 'Top surface / edge' : 'Center'
 const ruleTypes: { value: DesignConstraint['kind']; label: string }[] = [
   { value: 'floor', label: 'Height above floor' },
-  { value: 'dimension', label: 'Fixed panel dimension' },
+  { value: 'dimension', label: 'Panel dimension' },
   { value: 'equal-dimension', label: 'Equal panel dimensions' },
   { value: 'level', label: 'Same level above floor' },
   { value: 'gap', label: 'Gap between panels' },
 ]
+
+function withRequirement(rule: NumericConstraint, relation: RequirementMode, value: number, maximum = value): NumericConstraint {
+  const requirement = relation === 'range' ? { relation, min: value, max: maximum } : { relation, value }
+  if (rule.relation === 'range') {
+    const { relation: _relation, min: _min, max: _max, ...identity } = rule
+    return { ...identity, ...requirement } as NumericConstraint
+  }
+  const { relation: _relation, value: _value, ...identity } = rule
+  return { ...identity, ...requirement } as NumericConstraint
+}
 
 function defaultRule(kind: DesignConstraint['kind'], panels: Panel[], ids: string[], id: string = crypto.randomUUID()): DesignConstraint {
   const first = panels.find(panel => panel.id === ids[0]) ?? panels[0]
@@ -70,6 +83,7 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
   const cancelledRequest = useRef(0)
   const managedRequest = useRef(0)
   const formWasOpen = useRef(false)
+  const previousRange = useRef<{ min: number; max: number } | null>(null)
   const statusId = useId()
   const selected = new Set(selectedIds)
   const unavailable = new Set(unavailablePanelIds)
@@ -78,15 +92,17 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
   const existing = draft ? constraints.some(rule => rule.id === draft.id) : false
   const draftIds = draft ? designConstraintPanelIds(draft) : []
   const measurement = draft ? measureDesignConstraint(draft, panels) : undefined
+  const numericDraft = draft && isNumeric(draft) ? draft : null
+  const rangeError = numericDraft?.relation === 'range' && numericDraft.min > numericDraft.max ? 'Minimum must be less than or equal to maximum.' : undefined
   const localError = draftIds.some(id => !id) ? draft && isPair(draft.kind) ? 'Choose two different panels for this constraint.' : 'Choose a panel for this constraint.'
     : draftIds.some(id => unavailable.has(id)) ? 'These panels belong to or connect to a linked assembly. Use its editable values, or disassemble and disconnect the panels before adding a panel constraint.'
-      : measurement?.issue
+      : rangeError || measurement?.issue
   const error = localError || previewError
 
   const notifyPreview = useEffectEvent((rule: DesignConstraint | null, anchorId?: string) => onPreview(rule, anchorId))
   const notifyEditing = useEffectEvent((editing: boolean) => onEditingChange?.(editing))
   const notifyHighlight = useEffectEvent((rule: DesignConstraint | null) => onHighlight?.(rule))
-  useEffect(() => { notifyPreview(draft, anchor) }, [draft, anchor])
+  useEffect(() => { notifyPreview(localError ? null : draft, anchor) }, [draft, anchor, localError])
   useEffect(() => {
     notifyEditing(!!draft)
     const focus = draft && !formWasOpen.current ? window.setTimeout(() => form.current?.querySelector<HTMLElement>('select, input, button')?.focus(), 0) : undefined
@@ -105,6 +121,7 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const initialIds = selectedIds.filter(id => !unavailable.has(id))
     const next = rule ?? defaultRule(initialIds.length === 2 ? 'equal-dimension' : 'floor', panels.filter(panel => !unavailable.has(panel.id)), initialIds)
+    previousRange.current = isNumeric(next) && next.relation === 'range' ? { min: next.min, max: next.max } : null
     setDraft(next)
     setAnchor('panelIds' in next ? next.panelIds[0] : undefined)
     setReveal(value => value + 1)
@@ -125,7 +142,27 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
       setReveal(value => value + 1)
     }
   }, [manageRequest])
-  const update = (next: DesignConstraint) => { setDraft(next); onHighlight?.(next) }
+  const update = (next: DesignConstraint) => {
+    if (isNumeric(next) && next.relation === 'range') previousRange.current = { min: next.min, max: next.max }
+    setDraft(next); onHighlight?.(next)
+  }
+  const changeRequirement = (relation: RequirementMode) => {
+    if (!numericDraft) return
+    if (numericDraft.relation === 'range') {
+      const current = measurement && Number.isFinite(measurement.actual) ? measurement.actual : numericDraft.min
+      const value = relation === 'minimum' ? numericDraft.min : relation === 'maximum' ? numericDraft.max : Math.max(numericDraft.min, Math.min(numericDraft.max, current))
+      update(withRequirement(numericDraft, relation, value))
+    } else if (relation === 'range') {
+      const remembered = previousRange.current
+      const min = numericDraft.relation !== 'minimum' && remembered ? remembered.min : numericDraft.value
+      const max = numericDraft.relation !== 'maximum' && remembered ? remembered.max : numericDraft.value
+      update(withRequirement(numericDraft, relation, min, max))
+    } else update(withRequirement(numericDraft, relation, numericDraft.value))
+  }
+  const resetMeasurement = (rule: NumericConstraint, value: number) => {
+    previousRange.current = null
+    update(withRequirement(rule, rule.relation ?? 'exact', value))
+  }
   const choosePanel = (index: number, id: string) => {
     if (!draft) return
     if ('panelId' in draft) update({ ...draft, panelId: id })
@@ -139,6 +176,7 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
   const changeType = (kind: DesignConstraint['kind']) => {
     if (!draft) return
     const next = defaultRule(kind, panels, designConstraintPanelIds(draft), draft.id)
+    previousRange.current = null
     update({ ...next, enabled: draft.enabled })
     setAnchor('panelIds' in next ? next.panelIds[0] : undefined)
   }
@@ -204,13 +242,15 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
       {draft.kind === 'floor' && <SelectField label="Measure from" value={draft.reference} onChange={value => {
         const reference = value as ConstraintReference
         const panel = panels.find(panel => panel.id === draft.panelId)
-        update({ ...draft, reference, value: panel ? Math.max(0, designConstraintCoordinate(panel, reference)) : draft.value })
+        if (panel) resetMeasurement({ ...draft, reference }, Math.max(0, designConstraintCoordinate(panel, reference)))
+        else update({ ...draft, reference })
       }}>{referenceOptions}</SelectField>}
       {(draft.kind === 'dimension' || draft.kind === 'equal-dimension') && <>
         <SelectField label="Panel cut dimension" value={draft.dimension} onChange={value => {
           const dimension = value as 'width' | 'height'
           const panel = panels.find(panel => panel.id === draftIds[0])
-          update(draft.kind === 'dimension' ? { ...draft, dimension, value: panel?.[dimension] ?? draft.value } : { ...draft, dimension })
+          if (draft.kind === 'dimension' && panel) resetMeasurement({ ...draft, dimension }, panel[dimension])
+          else update({ ...draft, dimension })
         }}><option value="height">Height</option><option value="width">Width</option></SelectField>
         <p className="field-note">Cut dimensions follow each panel’s face. Use Same level above floor to align their placement.</p>
       </>}
@@ -225,12 +265,21 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
           const [a, b] = draft.panelIds.map(id => panels.find(panel => panel.id === id))
           if (a && b && designConstraintCoordinate(a, 'center', axis) > designConstraintCoordinate(b, 'center', axis)) next.panelIds = [draft.panelIds[1], draft.panelIds[0]]
           const current = measureDesignConstraint(next, panels).actual
-          update({ ...next, value: Number.isFinite(current) ? Math.max(0, current) : draft.value })
+          if (Number.isFinite(current)) resetMeasurement(next, Math.max(0, current))
+          else update(next)
         }}><option value="y">Vertical · lower to upper (Y)</option><option value="x">Horizontal · left to right (X)</option><option value="z">Depth · back to front (Z)</option></SelectField>
-        <SelectField label="Gap requirement" value={draft.relation} onChange={value => update({ ...draft, relation: value as 'exact' | 'minimum' })}><option value="minimum">At least</option><option value="exact">Exactly</option></SelectField>
         <p className="field-note">Clear distance between panel boundaries along the chosen world direction. Includes panel thickness; openings and hardware are not measured.</p>
       </>}
-      {'value' in draft && <NumberField label={draft.kind === 'floor' ? 'Height above floor' : draft.kind === 'dimension' ? 'Fixed dimension' : 'Required gap'} value={draft.value} min={draft.kind === 'dimension' ? 40 : 0} max={draft.kind === 'dimension' ? 4000 : draft.kind === 'floor' ? 100000 : 200000} commitOnBlur onChange={value => update({ ...draft, value })}/>}
+      {numericDraft && <>
+        <SelectField label={numericDraft.kind === 'gap' ? 'Gap requirement' : 'Measurement requirement'} value={numericDraft.relation ?? 'exact'} onChange={value => changeRequirement(value as RequirementMode)}>
+          <option value="exact">Exactly</option><option value="minimum">At least</option><option value="maximum">At most</option><option value="range">Between</option>
+        </SelectField>
+        {numericDraft.relation === 'range' ? <div className="field-row constraint-range-fields">
+          <NumberField label={`Minimum ${numericDraft.kind === 'floor' ? 'height' : numericDraft.kind === 'dimension' ? 'dimension' : 'gap'}`} value={numericDraft.min} min={numericDraft.kind === 'dimension' ? 40 : 0} max={numericDraft.kind === 'dimension' ? 4000 : numericDraft.kind === 'floor' ? 100000 : 200000} commitOnBlur onChange={min => update({ ...numericDraft, min })}/>
+          <NumberField label={`Maximum ${numericDraft.kind === 'floor' ? 'height' : numericDraft.kind === 'dimension' ? 'dimension' : 'gap'}`} value={numericDraft.max} min={numericDraft.kind === 'dimension' ? 40 : 0} max={numericDraft.kind === 'dimension' ? 4000 : numericDraft.kind === 'floor' ? 100000 : 200000} commitOnBlur onChange={max => update({ ...numericDraft, max })}/>
+        </div> : <NumberField label={numericDraft.kind === 'floor' ? 'Height above floor' : numericDraft.kind === 'dimension' ? numericDraft.relation === 'minimum' ? 'Minimum dimension' : numericDraft.relation === 'maximum' ? 'Maximum dimension' : 'Fixed dimension' : 'Required gap'} value={numericDraft.value} min={numericDraft.kind === 'dimension' ? 40 : 0} max={numericDraft.kind === 'dimension' ? 4000 : numericDraft.kind === 'floor' ? 100000 : 200000} commitOnBlur onChange={value => update({ ...numericDraft, value })}/>}
+        {numericDraft.relation && numericDraft.relation !== 'exact' && <p className="field-note">Measurements may change freely within these limits. Panels adjust only when a limit would be crossed.</p>}
+      </>}
       {'panelIds' in draft && <div className="constraint-reference">
         <SelectField label="Keep in place for this adjustment" value={anchor ?? draft.panelIds[0]} onChange={setAnchor}>
           {draft.panelIds.filter(Boolean).map(id => <option key={id} value={id}>{panels.find(panel => panel.id === id)?.name ?? 'Missing panel'}</option>)}

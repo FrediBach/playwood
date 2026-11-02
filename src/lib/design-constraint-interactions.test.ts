@@ -20,6 +20,27 @@ function connectedShelf(): Project {
 }
 
 describe('design rules across alternate geometry commands', () => {
+  it('allows whole-project movement within a floor range and rejects movement past either edge', () => {
+    const a = shelf('a', 791)
+    const rule: DesignConstraint = { id: 'floor-range', enabled: true, kind: 'floor', panelId: 'a', reference: 'max', relation: 'range', min: 700, max: 900 }
+    const original = project([a], [rule]), snapshot = JSON.stringify(original)
+    expect(panel(moveProject(original, [0, 50, 0]), 'a').position[1]).toBe(841)
+    satisfied(moveProject(original, [0, -100, 0]))
+    satisfied(moveProject(original, [0, 100, 0]))
+    expect(() => moveProject(original, [0, -101, 0])).toThrow(/between 700.*900/)
+    expect(() => moveProject(original, [0, 101, 0])).toThrow(/between 700.*900/)
+    expect(JSON.stringify(original)).toBe(snapshot)
+  })
+
+  it('measures imported maximum violations numerically and explains the upper limit', () => {
+    const a = shelf('a', 791)
+    const rule: DesignConstraint = { id: 'floor-max', enabled: true, kind: 'floor', panelId: 'a', reference: 'max', relation: 'maximum', value: 700 }
+    const original = project([a], [rule])
+    expect(panel(moveProject(original, [100, 0, 0]), 'a').position[1]).toBe(791)
+    expect(panel(moveProject(original, [0, -50, 0]), 'a').position[1]).toBe(741)
+    expect(() => moveProject(original, [0, 1, 0])).toThrow(/at most 700/)
+  })
+
   it('rejects dangling references even when a saved rule is disabled', () => {
     const a = shelf('a', 300), original = project([a], [{ ...floor(a), enabled: false }])
     expect(() => assertDesignConstraintEdit(original, { ...original, panels: [] })).toThrow(/referenced by a saved constraint/)

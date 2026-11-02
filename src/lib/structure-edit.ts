@@ -3,7 +3,7 @@ import { resolvePanels, validateProject } from './model'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { isPanelConnectedToAssembly } from './assemblies'
-import { designConstraintPanelIds, describeDesignConstraint, evaluateDesignConstraints } from './design-constraints'
+import { designConstraintLimits, designConstraintPanelIds, describeDesignConstraint, evaluateDesignConstraints } from './design-constraints'
 import type { Connection, ConstraintReference, Panel, Project, Vec3 } from './types'
 
 const EPSILON = 1e-6
@@ -203,7 +203,9 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   for (const evaluation of evaluateDesignConstraints(constraints, frames.map(item => item.panel))) {
     const rule = evaluation.constraint
     if (evaluation.issue) throw new Error(evaluation.issue)
-    const target = row(evaluation.target - evaluation.actual)
+    // Build the change in the measured quantity once. Edge contributions also
+    // subtract prescribed thickness changes from the right-hand side.
+    const target = row(-evaluation.actual)
     if (rule.kind === 'floor') {
       edge(target, indices.get(rule.panelId)!, worldAxes[1], referenceSide(rule.reference))
     } else if (rule.kind === 'dimension') {
@@ -218,7 +220,13 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       const axis = worldAxes[['x', 'y', 'z'].indexOf(rule.axis)]
       edge(target, indices.get(rule.panelIds[1])!, axis, -1)
       edge(target, indices.get(rule.panelIds[0])!, axis, 1, -1)
-      if (rule.relation === 'minimum') { rows.pop(); bounds.push(target) }
+    }
+    const limits = designConstraintLimits(rule)
+    if (limits.min !== undefined && limits.min === limits.max) target.value += limits.min
+    else {
+      rows.pop()
+      if (limits.min !== undefined) bounds.push({ entries: target.entries, value: target.value + limits.min })
+      if (limits.max !== undefined) bounds.push({ entries: new Map([...target.entries].map(([index, value]) => [index, -value])), value: -target.value - limits.max })
     }
   }
   // A relation between loose panels should move its peer, not make that panel

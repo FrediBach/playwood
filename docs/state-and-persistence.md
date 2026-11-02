@@ -164,7 +164,7 @@ The UI rejects files larger than 2,000,000 bytes before reading them. `JSON.pars
 - Optional palette parsing and assembly metadata validation.
 - Well-formed per-piece override keys/values. Removed hardware is represented by an override, not by deleting the structural joint.
 - Valid list groups/order, with stale or duplicate item references filtered out instead of recreating deleted parts.
-- Up to 1,000 design constraints with unique IDs, explicit boolean enabled states, supported kinds/references, finite target values, and references to existing panels. Pair rules require two distinct panels. Unknown kinds and dangling references reject the import rather than silently dropping requirements.
+- Up to 1,000 design constraints with unique IDs, explicit boolean enabled states, supported kinds/references, finite target values, and references to existing panels. Pair rules require two distinct panels. Numeric floor/dimension/gap rules use `relation: 'exact' | 'minimum' | 'maximum'` with `value`, or `relation: 'range'` with `min` and `max`. Range endpoints must be ordered; mixed scalar/range fields reject the import. Omitted relations on legacy floor/dimension rules retain exact semantics; gap relations remain required. Unknown kinds and dangling references reject the import rather than silently dropping requirements.
 
 `parseProject` checks serialized structure and topology; it does not run every warning/error check in `validateProject`. The latter produces the editor's geometric diagnostics. Do not assume that parsing a document means every physical joint, overlap, or fabrication constraint has passed.
 

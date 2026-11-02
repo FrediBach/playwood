@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { copyDesignConstraints, designConstraintCoordinate, evaluateDesignConstraints, measureDesignConstraint } from './design-constraints'
+import { copyDesignConstraints, designConstraintCoordinate, designConstraintLimits, describeDesignConstraintRequirement, evaluateDesignConstraints, measureDesignConstraint } from './design-constraints'
 import { createPanel, duplicatePanel, moveProject, parseProject, removePanel, resolvePanels, rotateProject, validateProject } from './model'
 import { copySelection, getPasteTargets } from './clipboard'
 import { createAssembly, disassembleAssembly, duplicateAssembly, makeAssemblyIndependent, moveAssemblies, removeAssembly, updateAssemblyParameterValues } from './assemblies'
@@ -38,6 +38,35 @@ describe('design rule measurements', () => {
     expect(measureDesignConstraint({ ...floor, value: 800.05 }, source.panels).violation).toBe(0)
   })
 
+  it.each([floor, dimension, gap])('measures minimum, maximum and both limits for $kind', rule => {
+    const panels = project().panels
+    const actual = measureDesignConstraint(rule, panels).actual
+    const { value: originalValue, ...identity } = rule
+    expect(originalValue).toBe(actual)
+    const minimum = { ...identity, relation: 'minimum', value: actual - 20 } as DesignConstraint
+    const maximum = { ...identity, relation: 'maximum', value: actual + 20 } as DesignConstraint
+    const range = { ...identity, relation: 'range', min: actual - 20, max: actual + 20 } as DesignConstraint
+    expect(evaluateDesignConstraints([minimum, maximum, range], panels).map(row => row.violation)).toEqual([0, 0, 0])
+    expect(measureDesignConstraint({ ...minimum, value: actual + 20 } as DesignConstraint, panels)).toMatchObject({ target: actual + 20, violation: 20 })
+    expect(measureDesignConstraint({ ...maximum, value: actual - 20 } as DesignConstraint, panels)).toMatchObject({ target: actual - 20, violation: 20 })
+    expect(measureDesignConstraint({ ...range, min: actual + 20, max: actual + 30 } as DesignConstraint, panels)).toMatchObject({ target: actual + 20, violation: 20 })
+    expect(measureDesignConstraint({ ...range, min: actual - 30, max: actual - 20 } as DesignConstraint, panels)).toMatchObject({ target: actual - 20, violation: 20 })
+    expect(measureDesignConstraint({ ...range, min: actual, max: actual } as DesignConstraint, panels).violation).toBe(0)
+    expect(measureDesignConstraint({ ...minimum, value: actual + .05 } as DesignConstraint, panels).violation).toBe(0)
+    expect(measureDesignConstraint({ ...maximum, value: actual - .05 } as DesignConstraint, panels).violation).toBe(0)
+  })
+
+  it('describes each bound without presenting slack as an exact target', () => {
+    expect(designConstraintLimits(floor)).toEqual({ min: 800, max: 800 })
+    expect(designConstraintLimits(equal)).toEqual({ min: 0, max: 0 })
+    expect(describeDesignConstraintRequirement(floor)).toBe('exactly 800 mm')
+    expect(describeDesignConstraintRequirement(gap)).toBe('at least 200 mm')
+    expect(describeDesignConstraintRequirement({ ...gap, relation: 'maximum' })).toBe('at most 200 mm')
+    const range: DesignConstraint = { id: 'range', enabled: true, kind: 'dimension', panelId: 'a', dimension: 'width', relation: 'range', min: 500, max: 700 }
+    expect(describeDesignConstraintRequirement(range)).toBe('between 500 mm and 700 mm')
+    expect(measureDesignConstraint(range, project().panels)).toMatchObject({ actual: 600, target: 600, violation: 0 })
+  })
+
   it('explains unsupported geometry while retaining local dimension rules', () => {
     const tilted = project().panels.map(panel => ({ ...panel, rotation: [0, 0, Math.PI / 4] as [number, number, number] }))
     expect(measureDesignConstraint(floor, tilted).issue).toContain('world axes')
@@ -66,10 +95,49 @@ describe('design rule persistence', () => {
     expect(source.panels).toEqual(project().panels)
   })
 
+  it('round-trips all numeric requirement modes while retaining legacy exact rules', () => {
+    const constraints: DesignConstraint[] = [floor, dimension, gap,
+      { ...floor, id: 'floor-min', relation: 'minimum', value: 700 },
+      { ...floor, id: 'floor-max', relation: 'maximum', value: 900 },
+      { id: 'floor-range', enabled: true, kind: 'floor', panelId: 'a', reference: 'max', relation: 'range', min: 700, max: 900 },
+      { ...dimension, id: 'width-exact', relation: 'exact' },
+      { ...dimension, id: 'width-min', relation: 'minimum', value: 500 },
+      { ...dimension, id: 'width-max', relation: 'maximum', value: 700 },
+      { id: 'width-range', enabled: true, kind: 'dimension', panelId: 'a', dimension: 'width', relation: 'range', min: 500, max: 700 },
+      { ...gap, id: 'gap-max', relation: 'maximum', value: 300 },
+      { id: 'gap-range', enabled: false, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'range', min: 100, max: 300 },
+    ]
+    const source = { ...project(), constraints }
+    const parsed = parseProject(JSON.parse(JSON.stringify(source)))
+    expect(parsed).toEqual(source)
+    expect(parsed.constraints![0]).not.toHaveProperty('relation')
+    expect(parsed.constraints![1]).not.toHaveProperty('relation')
+    expect(parsed.panels).toEqual(source.panels)
+  })
+
+  it('accepts inclusive equal endpoints as a range and keeps disabled range settings', () => {
+    const range = { id: 'range', enabled: false, kind: 'floor', panelId: 'a', reference: 'max', relation: 'range', min: 800, max: 800 }
+    const source = parseProject({ ...project(), constraints: [range] })
+    expect(source.constraints).toEqual([range])
+    expect(validateProject(source).filter(issue => issue.id.startsWith('constraint-'))).toEqual([])
+  })
+
   it.each([
     [{ ...floor, panelId: 'missing' }], [floor, floor], [{ ...floor, enabled: 'yes' }], [{ ...floor, value: Infinity }],
     [{ ...floor, reference: 'left' }], [{ ...gap, panelIds: ['a', 'a'] }], [{ ...gap, axis: 'w' }],
-    [{ ...gap, relation: 'maximum' }], [{ ...equal, dimension: 'thickness' }], [{ ...floor, kind: 'future-kind' }],
+    [{ ...gap, relation: 'approximately' }], [{ ...equal, dimension: 'thickness' }], [{ ...floor, kind: 'future-kind' }],
+    [{ ...floor, relation: 'approximately' }], [{ ...floor, relation: 'range', min: 700, max: 900 }],
+    [{ ...gap, relation: undefined }], [{ ...dimension, relation: 'maximum', value: 4001 }],
+    [{ ...floor, min: 700 }], [{ ...dimension, relation: 'maximum', max: 800 }],
+    [{ id: 'range', enabled: true, kind: 'floor', panelId: 'a', reference: 'max', relation: 'range', min: 900, max: 800 }],
+    [{ id: 'range', enabled: true, kind: 'floor', panelId: 'a', reference: 'max', relation: 'range', min: 700 }],
+    [{ id: 'range', enabled: true, kind: 'floor', panelId: 'a', reference: 'max', relation: 'range', min: -1, max: 800 }],
+    [{ id: 'range', enabled: true, kind: 'floor', panelId: 'a', reference: 'max', relation: 'range', min: 700, max: 100001 }],
+    [{ id: 'range', enabled: true, kind: 'dimension', panelId: 'a', dimension: 'width', relation: 'range', min: 39, max: 600 }],
+    [{ id: 'range', enabled: true, kind: 'dimension', panelId: 'a', dimension: 'width', relation: 'range', min: 600, max: Infinity }],
+    [{ id: 'range', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'range', min: 100, max: '200' }],
+    [{ id: 'range', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'range', min: 100, max: 200001 }],
+    [{ ...equal, relation: 'maximum', value: 200 }],
   ].map(constraints => ({ constraints })))('rejects malformed or dangling serialized rules $constraints', ({ constraints }) => {
     expect(() => parseProject({ ...project(), constraints })).toThrow()
   })
@@ -102,6 +170,17 @@ describe('design rule lifecycle', () => {
     const rules = copyDesignConstraints(source.constraints, new Map([['a', 'copy-a'], ['b', 'copy-b']]))
     expect(rules.map(rule => rule.kind)).toEqual(['dimension', 'equal-dimension', 'gap'])
     expect(rules[2]).toMatchObject({ panelIds: ['copy-a', 'copy-b'], axis: 'y' })
+  })
+
+  it('copies both endpoints without changing range semantics or the source', () => {
+    const range: DesignConstraint = { id: 'range', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'range', min: 180, max: 240 }
+    const source = structuredClone(range)
+    const copied = copyDesignConstraints([range], new Map([['a', 'copy-a'], ['b', 'copy-b']]))
+    expect(copied).toHaveLength(1)
+    expect(copied[0]).toMatchObject({ kind: 'gap', relation: 'range', min: 180, max: 240, panelIds: ['copy-a', 'copy-b'] })
+    expect(copied[0].id).not.toBe(range.id)
+    expect(range).toEqual(source)
+    expect(copyDesignConstraints([range], new Map([['a', 'copy-a']]))).toEqual([])
   })
 
   it('snapshots dimension rules in the clipboard and remaps a pasted panel', () => {

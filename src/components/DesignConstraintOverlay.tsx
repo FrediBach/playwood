@@ -1,6 +1,6 @@
 import { Html, Line } from '@react-three/drei'
 import { Euler, Vector3 } from 'three'
-import { designConstraintCoordinate, getDesignConstraintBounds, measureDesignConstraint } from '@/lib/design-constraints'
+import { describeDesignConstraintRequirement, designConstraintCoordinate, getDesignConstraintBounds, measureDesignConstraint } from '@/lib/design-constraints'
 import type { DesignConstraint, Panel, Vec3 } from '@/lib/types'
 
 interface Props {
@@ -64,8 +64,9 @@ export function DesignConstraintOverlay({ constraint, panels }: Props) {
     const first: Vec3 = [...boundsA.max]
     const second: Vec3 = [...boundsB.max]
     second[axis] = boundsB.min[axis]
-    lines.push({ from, to, label: `${constraint.axis.toUpperCase()} gap · ${format(result.actual)}${constraint.relation === 'minimum' ? ` (min ${format(constraint.value)})` : ''}`, leaders: [[first, from], [second, to]] })
+    lines.push({ from, to, label: `${constraint.axis.toUpperCase()} gap · ${format(result.actual)}`, leaders: [[first, from], [second, to]] })
   }
+  const requirement = constraint.kind === 'floor' || constraint.kind === 'dimension' || constraint.kind === 'gap' ? describeDesignConstraintRequirement(constraint) : undefined
   const color = !constraint.enabled ? '#92988a' : result.violation ? '#af753e' : '#6a8750'
   return <group>{lines.map((line, index) => {
     const from = meters(line.from), to = meters(line.to)
@@ -74,7 +75,7 @@ export function DesignConstraintOverlay({ constraint, panels }: Props) {
       <Line points={[from, to]} color={color} lineWidth={1.5} depthTest={false}/>
       {line.leaders?.map((points, leader) => <Line key={leader} points={points.map(meters)} color={color} lineWidth={0.7} transparent opacity={0.6} depthTest={false}/>)}
       {[from, to].map((point, endpoint) => <mesh key={endpoint} position={point}><sphereGeometry args={[0.003, 8, 8]}/><meshBasicMaterial color={color} depthTest={false}/></mesh>)}
-      <Html position={midpoint} center style={{ pointerEvents: 'none' }}><span className="constraint-overlay-label">{line.label}</span></Html>
+      <Html position={midpoint} center style={{ pointerEvents: 'none' }}><span className="constraint-overlay-label">{line.label}{requirement && <small>{requirement}</small>}</span></Html>
     </group>
   })}</group>
 }

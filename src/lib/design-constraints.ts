@@ -1,5 +1,5 @@
 import { Euler, Quaternion, Vector3 } from 'three'
-import type { ConstraintReference, DesignConstraint, Panel, Vec3 } from './types'
+import type { ConstraintReference, ConstraintRequirement, DesignConstraint, Panel, Vec3 } from './types'
 
 export const DESIGN_CONSTRAINT_TOLERANCE = 0.1
 export const MAX_DESIGN_CONSTRAINTS = 1000
@@ -10,6 +10,7 @@ const format = (value: number) => `${Number(value.toFixed(2))} mm`
 export interface DesignConstraintEvaluation {
   constraint: DesignConstraint
   actual: number
+  /** Closest permitted measurement; equals actual while inside the limits. */
   target: number
   /** Positive error in millimeters; zero within the shared numerical tolerance. */
   violation: number
@@ -18,6 +19,25 @@ export interface DesignConstraintEvaluation {
 
 export function designConstraintPanelIds(constraint: DesignConstraint): string[] {
   return 'panelId' in constraint ? [constraint.panelId] : [...constraint.panelIds]
+}
+
+/** Inclusive limits in millimeters; missing limits leave that direction free. */
+export function designConstraintLimits(constraint: DesignConstraint): { min?: number; max?: number } {
+  if (constraint.kind === 'equal-dimension' || constraint.kind === 'level') return { min: 0, max: 0 }
+  switch (constraint.relation) {
+    case 'minimum': return { min: constraint.value }
+    case 'maximum': return { max: constraint.value }
+    case 'range': return { min: constraint.min, max: constraint.max }
+    default: return { min: constraint.value, max: constraint.value }
+  }
+}
+
+export function describeDesignConstraintRequirement(constraint: DesignConstraint): string {
+  const { min, max } = designConstraintLimits(constraint)
+  if (min === max) return `exactly ${format(min!)}`
+  if (max === undefined) return `at least ${format(min!)}`
+  if (min === undefined) return `at most ${format(max)}`
+  return `between ${format(min)} and ${format(max)}`
 }
 
 /** World extents of rectangular stock, including thickness. Input must be resolved. */
@@ -50,18 +70,19 @@ export function designConstraintGeometryIssue(panel: Panel): string | undefined 
 
 export function measureDesignConstraint(constraint: DesignConstraint, resolvedPanels: readonly Panel[]): DesignConstraintEvaluation {
   const panels = designConstraintPanelIds(constraint).map(id => resolvedPanels.find(panel => panel.id === id))
-  const target = 'value' in constraint ? constraint.value : 0
+  const { min, max } = designConstraintLimits(constraint)
   const issue = panels.some(panel => !panel) ? 'This rule refers to a missing panel.'
     : constraint.kind === 'dimension' || constraint.kind === 'equal-dimension' ? undefined
       : panels.map(panel => designConstraintGeometryIssue(panel!)).find(Boolean)
-  if (issue) return { constraint, actual: NaN, target, violation: Infinity, issue }
+  if (issue) return { constraint, actual: NaN, target: min ?? max ?? 0, violation: Infinity, issue }
   const [a, b] = panels as Panel[]
   const actual = constraint.kind === 'floor' ? designConstraintCoordinate(a, constraint.reference)
     : constraint.kind === 'dimension' ? a[constraint.dimension]
       : constraint.kind === 'equal-dimension' ? b[constraint.dimension] - a[constraint.dimension]
         : constraint.kind === 'level' ? designConstraintCoordinate(b, constraint.references[1]) - designConstraintCoordinate(a, constraint.references[0])
           : designConstraintCoordinate(b, 'min', constraint.axis) - designConstraintCoordinate(a, 'max', constraint.axis)
-  const error = constraint.kind === 'gap' && constraint.relation === 'minimum' ? Math.max(0, target - actual) : Math.abs(actual - target)
+  const target = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, actual))
+  const error = Math.abs(actual - target)
   return { constraint, actual, target, violation: error <= DESIGN_CONSTRAINT_TOLERANCE ? 0 : error }
 }
 
@@ -73,11 +94,11 @@ export function describeDesignConstraint(constraint: DesignConstraint, panels: r
   const name = (id: string) => panels.find(panel => panel.id === id)?.name ?? 'Missing panel'
   const reference = (value: ConstraintReference) => value === 'min' ? 'bottom' : value === 'max' ? 'top' : 'center'
   switch (constraint.kind) {
-    case 'floor': return `${name(constraint.panelId)} ${reference(constraint.reference)} = ${format(constraint.value)} above floor`
-    case 'dimension': return `${name(constraint.panelId)} ${constraint.dimension} = ${format(constraint.value)}`
+    case 'floor': return `${name(constraint.panelId)} ${reference(constraint.reference)}: ${describeDesignConstraintRequirement(constraint)} above floor`
+    case 'dimension': return `${name(constraint.panelId)} ${constraint.dimension}: ${describeDesignConstraintRequirement(constraint)}`
     case 'equal-dimension': return `${name(constraint.panelIds[0])} and ${name(constraint.panelIds[1])}: equal ${constraint.dimension}`
     case 'level': return `${name(constraint.panelIds[0])} ${reference(constraint.references[0])} level with ${name(constraint.panelIds[1])} ${reference(constraint.references[1])}`
-    case 'gap': return `${name(constraint.panelIds[0])} → ${name(constraint.panelIds[1])}: ${constraint.relation === 'minimum' ? 'at least' : 'exactly'} ${format(constraint.value)} along ${constraint.axis.toUpperCase()}`
+    case 'gap': return `${name(constraint.panelIds[0])} → ${name(constraint.panelIds[1])}: ${describeDesignConstraintRequirement(constraint)} along ${constraint.axis.toUpperCase()}`
   }
 }
 
@@ -106,23 +127,44 @@ export function parseDesignConstraints(raw: unknown, panels: readonly Panel[]): 
     if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) throw new Error(`Design rule values must be between ${min} and ${max} mm.`)
     return value
   }
+  const requirement = (value: Record<string, unknown>, min: number, max: number): ConstraintRequirement => {
+    if (value.relation === 'range') {
+      if ('value' in value) throw new Error('A range rule needs minimum and maximum values, without an exact value.')
+      const lower = amount(value.min, min, max), upper = amount(value.max, min, max)
+      if (lower > upper) throw new Error('The minimum constraint value must not exceed its maximum.')
+      return { relation: 'range', min: lower, max: upper }
+    }
+    if ('min' in value || 'max' in value) throw new Error('Minimum and maximum values require a range rule.')
+    if (value.relation !== undefined && value.relation !== 'exact' && value.relation !== 'minimum' && value.relation !== 'maximum') throw new Error('Invalid design rule relation.')
+    const target = amount(value.value, min, max)
+    return value.relation === undefined ? { value: target } : { relation: value.relation, value: target }
+  }
+  const equality = (value: Record<string, unknown>) => {
+    if (['relation', 'value', 'min', 'max'].some(field => field in value)) throw new Error('Matching panel dimensions and levels use equality, without numeric limits.')
+  }
   return raw.map(value => {
     if (!record(value) || typeof value.id !== 'string' || !value.id.trim() || value.id.length > 200 || ids.has(value.id)) throw new Error('Design rule IDs must be unique and nonempty.')
     if (typeof value.enabled !== 'boolean') throw new Error('Invalid design rule enabled state.')
     ids.add(value.id)
     const base = { id: value.id, enabled: value.enabled }
     switch (value.kind) {
-      case 'floor': return { ...base, kind: 'floor', panelId: panel(value.panelId), reference: reference(value.reference), value: amount(value.value, 0, 100000) }
-      case 'dimension': return { ...base, kind: 'dimension', panelId: panel(value.panelId), dimension: dimension(value.dimension), value: amount(value.value, 40, 4000) }
-      case 'equal-dimension': return { ...base, kind: 'equal-dimension', panelIds: pair(value.panelIds), dimension: dimension(value.dimension) }
+      case 'floor': return { ...base, kind: 'floor', panelId: panel(value.panelId), reference: reference(value.reference), ...requirement(value, 0, 100000) }
+      case 'dimension': return { ...base, kind: 'dimension', panelId: panel(value.panelId), dimension: dimension(value.dimension), ...requirement(value, 40, 4000) }
+      case 'equal-dimension': {
+        equality(value)
+        return { ...base, kind: 'equal-dimension', panelIds: pair(value.panelIds), dimension: dimension(value.dimension) }
+      }
       case 'level': {
+        equality(value)
         if (!Array.isArray(value.references) || value.references.length !== 2) throw new Error('A level rule needs two measurement references.')
         return { ...base, kind: 'level', panelIds: pair(value.panelIds), references: [reference(value.references[0]), reference(value.references[1])] }
       }
       case 'gap': {
         if (value.axis !== 'x' && value.axis !== 'y' && value.axis !== 'z') throw new Error('Invalid design rule axis.')
-        if (value.relation !== 'exact' && value.relation !== 'minimum') throw new Error('Invalid design rule relation.')
-        return { ...base, kind: 'gap', panelIds: pair(value.panelIds), axis: value.axis, relation: value.relation, value: amount(value.value) }
+        if (value.relation === undefined) throw new Error('Invalid design rule relation.')
+        const limits = requirement(value, 0, 200000)
+        return { ...base, kind: 'gap', panelIds: pair(value.panelIds), axis: value.axis,
+          ...(limits.relation === 'range' ? limits : { relation: limits.relation ?? 'exact', value: limits.value }) }
       }
       default: throw new Error('Unsupported design rule kind.')
     }

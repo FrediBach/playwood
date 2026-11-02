@@ -20,6 +20,8 @@
 .constraint-form{padding-top:3px;min-width:0}
 .constraint-form .field{margin-bottom:12px}
 .constraint-form .field select{max-width:100%;text-overflow:ellipsis;padding-right:28px}
+.constraint-range-fields{min-width:0}
+.constraint-range-fields>.field{min-width:0;flex:1}
 .constraint-panel-choice{margin-bottom:12px}
 .constraint-panel-choice .field{margin-bottom:3px}
 .constraint-panel-choice>.ui-button{padding:3px 0;height:auto;min-height:25px;font-size:11px}
@@ -37,4 +39,5 @@
 .constraint-form-actions>.ui-button:first-child{flex:1}
 .design-constraints button:focus-visible,.constraint-row-actions input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .constraint-overlay-label{display:block;white-space:nowrap;background:#fafcf4ed;color:#435731;border:1px solid #a4b58d;border-radius:5px;padding:4px 7px;font-size:12px;font-variant-numeric:tabular-nums;box-shadow:0 2px 8px #0001}
+.constraint-overlay-label small{display:block;margin-top:2px;font-size:10px;color:#647653}
 @media(max-width:680px){.constraint-form-actions>.ui-button{font-size:12px}.constraint-description{font-size:12px}.constraint-scope button{min-height:32px}}

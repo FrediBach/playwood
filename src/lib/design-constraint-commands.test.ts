@@ -9,6 +9,27 @@ const floorRule = (panelId: string, value: number): DesignConstraint => ({ id: '
 const emptyWithPanel = (): Project => ({ version: 1, name: 'Rules', panels: [createPanel({ id: 'side', width: 400, height: 600, position: [0, 500, 0] })], connections: [] })
 
 describe('design rule command transactions', () => {
+  it('keeps a floor height inside a range unchanged and adjusts to the nearest permitted edge outside it', () => {
+    const before = emptyWithPanel(), snapshot = JSON.stringify(before)
+    const range: DesignConstraint = { id: 'floor', enabled: true, kind: 'floor', panelId: 'side', reference: 'max', relation: 'range', min: 700, max: 900 }
+    const within = setDesignConstraint(before, range)
+    expect(within.panels).toEqual(before.panels)
+    const below = setDesignConstraint(before, { ...range, min: 900, max: 1100 })
+    expect(below.panels[0].position[1]).toBeCloseTo(600)
+    const above = setDesignConstraint(before, { ...range, min: 500, max: 700 })
+    expect(above.panels[0].position[1]).toBeCloseTo(400)
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it('reactivates a maximum dimension by adjusting geometry without rewriting the target', () => {
+    const rule: DesignConstraint = { id: 'width', enabled: false, kind: 'dimension', panelId: 'side', dimension: 'width', relation: 'maximum', value: 300 }
+    const before = { ...emptyWithPanel(), constraints: [rule] }
+    const after = setDesignConstraint(before, { ...rule, enabled: true })
+    expect(after.panels[0].width).toBeCloseTo(300)
+    expect(after.constraints).toEqual([{ ...rule, enabled: true }])
+    expect(before.panels[0].width).toBe(400)
+  })
+
   it('previews a floor rule on a vertical panel by moving it without shrinking its cut height', () => {
     const before = emptyWithPanel(), snapshot = JSON.stringify(before)
     const candidate = setDesignConstraint(before, floorRule('side', 1000))

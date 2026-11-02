@@ -64,15 +64,20 @@ export type ListKind = 'panels' | 'connectors'
 export interface ListGroup { id: string; name: string; kind: ListKind; itemIds: string[] }
 export interface PaletteColor { id: string; name: string; color: string }
 export type ConstraintReference = 'min' | 'center' | 'max'
+/** Omitted relation preserves the original exact floor/dimension save format. */
+export type ConstraintRequirement =
+  | { relation?: 'exact'; value: number }
+  | { relation: 'minimum' | 'maximum'; value: number }
+  | { relation: 'range'; min: number; max: number }
 interface DesignConstraintBase { id: string; enabled: boolean }
 /** User-authored design requirements, distinct from physical connector joints. */
 export type DesignConstraint = DesignConstraintBase & (
-  | { kind: 'floor'; panelId: string; reference: ConstraintReference; value: number }
-  | { kind: 'dimension'; panelId: string; dimension: 'width' | 'height'; value: number }
+  | ({ kind: 'floor'; panelId: string; reference: ConstraintReference } & ConstraintRequirement)
+  | ({ kind: 'dimension'; panelId: string; dimension: 'width' | 'height' } & ConstraintRequirement)
   | { kind: 'equal-dimension'; panelIds: [string, string]; dimension: 'width' | 'height' }
   | { kind: 'level'; panelIds: [string, string]; references: [ConstraintReference, ConstraintReference] }
   /** Ordered from the first panel's maximum to the second panel's minimum. */
-  | { kind: 'gap'; panelIds: [string, string]; axis: 'x' | 'y' | 'z'; relation: 'exact' | 'minimum'; value: number }
+  | ({ kind: 'gap'; panelIds: [string, string]; axis: 'x' | 'y' | 'z'; relation: 'exact' | 'minimum' | 'maximum' | 'range' } & ConstraintRequirement)
 )
 export interface Project {
   version: 1; name: string; panels: Panel[]; connections: Connection[]; assemblies?: AssemblyData;
