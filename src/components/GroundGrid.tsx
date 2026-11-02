@@ -6,7 +6,7 @@ import type { Vec3 } from '@/lib/types'
 
 function MeterMark({ position, label }: { position: Vec3; label: string }) {
   const sprite = useRef<Sprite>(null)
-  const direction = useRef(new Vector3())
+  const direction = useMemo(() => new Vector3(), [])
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d')!
@@ -31,7 +31,7 @@ function MeterMark({ position, label }: { position: Vec3; label: string }) {
   useFrame(({ camera, viewport, size }) => {
     if (!sprite.current) return
     // Ground labels overlap when the floor is viewed edge-on.
-    sprite.current.visible = camera.getWorldDirection(direction.current).y < -0.08
+    sprite.current.visible = camera.getWorldDirection(direction).y < -0.08
     // Keep the lettering at 11 screen pixels as the camera zooms or changes view.
     const factor = size.width / viewport.getCurrentViewport(camera, sprite.current.position, size).width * 3
     sprite.current.scale.set(texture.image.width / factor, texture.image.height / factor, 1)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Box3, Vector3 } from 'three'
 import { Button } from './ui/button'
 import { DialogDescription, DialogTitle } from './ui/dialog'
@@ -13,13 +13,14 @@ export function MoveCreation({ panels, onMove, onCancel }: {
   onCancel: () => void
 }) {
   const [delta, setDelta] = useState<Vec3>([0, 0, 0])
-  const bounds = getProjectBounds(panels)
-  const visiblePanels = panels.filter(panel => panel.visible)
-  const visibleBounds = getProjectBounds(visiblePanels)
-  const roomBounds = visiblePanels.length
-    ? new Box3(new Vector3(...visibleBounds.min).multiplyScalar(0.001), new Vector3(...visibleBounds.max).multiplyScalar(0.001))
-    : new Box3(new Vector3(-0.4, 0, -0.3), new Vector3(0.4, 0.7, 0.3))
-  const room = getRoomLayout(roomBounds)
+  const { bounds, room } = useMemo(() => {
+    const visiblePanels = panels.filter(panel => panel.visible)
+    const visibleBounds = getProjectBounds(visiblePanels)
+    const roomBounds = visiblePanels.length
+      ? new Box3(new Vector3(...visibleBounds.min).multiplyScalar(0.001), new Vector3(...visibleBounds.max).multiplyScalar(0.001))
+      : new Box3(new Vector3(-0.4, 0, -0.3), new Vector3(0.4, 0.7, 0.3))
+    return { bounds: getProjectBounds(panels), room: getRoomLayout(roomBounds) }
+  }, [panels])
   return <>
     <DialogTitle>Move creation</DialogTitle>
     <DialogDescription>Move all panels and connectors together, including hidden panels.</DialogDescription>

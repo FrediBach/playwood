@@ -23,25 +23,26 @@ export function AttachmentSideGuide({ panel, guide }: { panel: Panel; guide: Att
   const portal = useMemo(() => ({ current: gl.domElement.parentElement! }), [gl])
   const elements = useRef(new Map<Side, HTMLDivElement>())
   const anchors = useMemo(() => attachmentSideAnchors(panel), [panel])
-  const projection = useMemo(() => ({ world: new Vector3(), point: new Vector3(), tip: new Vector3(), towards: new Vector3() }), [])
+  const projection = useMemo(() => ({ world: new Vector3(), point: new Vector3(), tip: new Vector3(), towards: new Vector3(), direction: new Vector3() }), [])
   useLayoutEffect(() => { invalidate() }, [anchors, guide.side, guide.highlightedSide, camera, size, invalidate])
   useFrame(() => {
     camera.updateMatrixWorld()
     const points: SideLabelPoint[] = []
-    const { world, point, tip, towards } = projection
+    const { world, point, tip, towards, direction } = projection
     for (const anchor of anchors) {
       const element = elements.current.get(anchor.side)
       if (!element) continue
       world.set(...anchor.position).multiplyScalar(MM)
+      direction.set(...anchor.direction)
       point.copy(world).project(camera)
-      tip.copy(world).addScaledVector(new Vector3(...anchor.direction), 0.01).project(camera)
+      tip.copy(world).addScaledVector(direction, 0.01).project(camera)
       const x = (point.x + 1) * size.width / 2, y = (1 - point.y) * size.height / 2
       const visible = point.z >= -1 && point.z <= 1 && x >= 0 && x <= size.width && y >= 0 && y <= size.height
       element.style.visibility = visible ? 'visible' : 'hidden'
       if (!visible) continue
       if (camera instanceof OrthographicCamera) camera.getWorldDirection(towards).negate()
       else towards.copy(camera.position).sub(world).normalize()
-      const rear = towards.dot(new Vector3(...anchor.direction)) < -0.04
+      const rear = towards.dot(direction) < -0.04
       element.classList.toggle('is-rear', rear)
       element.dataset.rear = String(rear)
       // Keep anchors out of separate stacking contexts so every label sits
