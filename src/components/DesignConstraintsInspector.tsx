@@ -88,7 +88,8 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
   const selected = new Set(selectedIds)
   const unavailable = new Set(unavailablePanelIds)
   const applicable = constraints.filter(rule => designConstraintPanelIds(rule).some(id => selected.has(id)))
-  const rows = evaluateDesignConstraints(showAll || !selectedIds.length ? constraints : applicable, panels)
+  const visibleConstraints = showAll || !selectedIds.length ? constraints : applicable
+  const rows = evaluateDesignConstraints(visibleConstraints, panels)
   const existing = draft ? constraints.some(rule => rule.id === draft.id) : false
   const draftIds = draft ? designConstraintPanelIds(draft) : []
   const measurement = draft ? measureDesignConstraint(draft, panels) : undefined
@@ -203,7 +204,7 @@ export function DesignConstraintsInspector({ panels, constraints, selectedIds, u
     <div className="constraint-form-actions"><Button size="sm" disabled={!!error} aria-describedby={statusId} onClick={() => { if (onApply(draft, anchor)) close() }}>{existing ? 'Save constraint' : 'Add constraint'}</Button><Button size="sm" variant="ghost" onClick={close}>Cancel</Button></div>
   </div>
 
-  return <InspectorDisclosure title="Constraints" summary={`${constraints.filter(rule => rule.enabled).length} active`} preferenceKey="design-constraints" openRequest={reveal || openRequest} className="design-constraints">
+  return <InspectorDisclosure title="Constraints" badge={visibleConstraints.length ? { label: String(visibleConstraints.length), description: `${visibleConstraints.length} saved constraints, ${visibleConstraints.filter(rule => !rule.enabled).length} disabled` } : undefined} summary={`${visibleConstraints.filter(rule => rule.enabled).length} active`} preferenceKey="design-constraints" openRequest={reveal || openRequest} className="design-constraints">
     <p className="field-note">Keep dimensions and distances as you edit. Connected panels adapt while their joints stay intact.</p>
     {selectedIds.length > 0 && constraints.length > 0 && <div className="constraint-scope" role="group" aria-label="Constraints shown">
       <button type="button" aria-pressed={!showAll} onClick={() => setShowAll(false)}>Selection ({applicable.length})</button>

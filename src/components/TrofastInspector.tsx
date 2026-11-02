@@ -25,7 +25,7 @@ export function TrofastInspector({ project, panel, onApply, onPreview }: Props) 
     : inserts.length >= MAX_TROFAST_INSERTS ? `A panel supports up to ${MAX_TROFAST_INSERTS} inserts.` : '')
   const existing = inserts.find(insert => insert.id === editing)
   const close = () => { setEditing(null); onPreview(panel.id, null) }
-  return <InspectorDisclosure title="TROFAST inserts" preferenceKey="panel-trofast" summary={inserts.length ? `${inserts.length} fitted ${inserts.length === 1 ? 'item' : 'items'}` : 'Drop-in boxes & trays'}>
+  return <InspectorDisclosure title="TROFAST inserts" badge={inserts.length ? { label: String(inserts.length), description: `${inserts.length} fitted TROFAST items` } : undefined} preferenceKey="panel-trofast" summary={inserts.length ? `${inserts.length} fitted ${inserts.length === 1 ? 'item' : 'items'}` : 'Drop-in boxes & trays'}>
     <p className="field-note">Fit IKEA storage into a horizontal panel, with the rim resting on top and the box below.</p>
     {!!inserts.length && <div className="trofast-installed" aria-label="Installed TROFAST items">
       {inserts.map(insert => <div className="trofast-installed-row" key={insert.id}>

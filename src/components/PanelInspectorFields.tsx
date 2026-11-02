@@ -21,8 +21,9 @@ export function panelAppearanceSummary(panels: Panel[]) {
 
 export function PanelSecondaryFields(props: ComponentProps<typeof PanelFields>) {
   const panels = props.panels?.length ? props.panels : [props.panel]
+  const customized = panels.filter(panel => panel.customOutline || (panel.cornerRadius ?? 0) > 0 || panel.pattern !== 'solid')
   return <>
-    <InspectorDisclosure title="Shape & surface" summary={panelShapeSummary(panels)} preferenceKey="panel-shape">
+    <InspectorDisclosure title="Shape & surface" badge={customized.length ? { label: 'Custom', description: `${customized.length} of ${panels.length} selected panels have a custom outline, rounded corners, or patterned surface` } : undefined} summary={panelShapeSummary(panels)} preferenceKey="panel-shape">
       <PanelFields {...props} group="shape" compact/>
     </InspectorDisclosure>
     <InspectorDisclosure title="Material & finish" summary={panelAppearanceSummary(panels)} preferenceKey="panel-appearance">

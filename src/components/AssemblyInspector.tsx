@@ -83,7 +83,7 @@ export function AssemblyInspector({ name, definitionName, instanceCount, panelCo
       {hasParameterOverrides && onResetParameters && <button type="button" className="assembly-reset-values" onClick={onResetParameters}><RotateCcw size={13}/>Reset to assembly defaults</button>}
     </section>}
 
-    <InspectorDisclosure title="Appearance" summary={appearanceSummary} preferenceKey="assembly-appearance" className="assembly-finish-disclosure">
+    <InspectorDisclosure title="Appearance" badge={hasColorOverride || hasFinishCoverageOverride ? { label: 'Custom', description: [hasColorOverride && 'Panel color override', hasFinishCoverageOverride && 'Finish coverage override'].filter(Boolean).join(', ') } : undefined} summary={appearanceSummary} preferenceKey="assembly-appearance" className="assembly-finish-disclosure">
       <PanelColorField color={color} label="Panel color" onChange={onColorChange}/>
       <div className="assembly-override-status"><span>{hasColorOverride ? 'Custom color' : 'Using assembly color'}</span>{hasColorOverride && <button onClick={onResetColor}><RotateCcw size={12}/>Reset</button>}</div>
       {onFinishCoverageChange && <>
