@@ -73,7 +73,8 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
     },
     end: (cancel: boolean) => {
       if (!cancel && latest.current && session.current?.source === prepared && Math.abs(latest.current.distance) > 1e-6) {
-        commit(latest.current.project)
+        try { commit(latest.current.project) }
+        catch (error) { notify(error instanceof Error ? error.message : 'This resize conflicts with a constraint.') }
       }
       session.current = null
       latest.current = null

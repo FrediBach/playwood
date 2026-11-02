@@ -53,6 +53,7 @@ Vitest discovers `src/**/*.test.ts` and uses its default Node test environment. 
 ```sh
 npm test -- src/lib/model.test.ts src/lib/structure-edit.test.ts
 npm test -- src/lib/assembly-parameters.test.ts
+npm test -- src/lib/design-constraints.test.ts src/lib/structure-design-constraints.test.ts src/lib/design-constraint-commands.test.ts src/lib/design-constraint-interactions.test.ts
 npm test -- src/components/scene-geometry.test.ts
 ```
 
@@ -87,6 +88,7 @@ Screenshots are saved on failures, and some specs explicitly write diagnostic im
 | --- | --- | --- |
 | Attachments and connector profiles | `src/lib/model.test.ts`, `src/components/connector-geometry.test.ts` | `tests/connectors.spec.ts`, `tests/attachment-sides.spec.ts` |
 | Constrained movement and resizing | `src/lib/structure-edit.test.ts`, `src/lib/preview-resize.test.ts` | `tests/panel-movement.spec.ts`, `tests/preview-resize.spec.ts` |
+| User design requirements and rule previews | `src/lib/design-constraints.test.ts`, `src/lib/structure-design-constraints.test.ts`, `src/lib/design-constraint-commands.test.ts`, `src/lib/design-constraint-interactions.test.ts` | `tests/design-constraints.spec.ts` |
 | Drag, snapping, and selection | `src/lib/preview-drag.test.ts`, `src/lib/preview-snap.test.ts`, `src/lib/box-selection.test.ts` | `tests/preview-drag.spec.ts`, `tests/preview-snap.spec.ts`, `tests/box-selection.spec.ts` |
 | Assemblies and parameters | `src/lib/assemblies.test.ts`, `src/lib/assembly-parameters.test.ts`, `src/lib/assembly-placement.test.ts` | `tests/assemblies.spec.ts`, `tests/assembly-parameters.spec.ts`, `tests/assembly-placement.spec.ts` |
 | Automatic construction tools | `src/lib/auto-connect.test.ts`, `src/lib/close-holes.test.ts`, `src/lib/grid-split.test.ts` | `tests/auto-connect.spec.ts`, `tests/close-holes.spec.ts`, `tests/split-panels.spec.ts` |
@@ -108,6 +110,8 @@ Trace the property through [types.ts](../src/lib/types.ts), creation defaults, `
 ### Add a geometry operation
 
 Implement the transformation in the appropriate `src/lib` module so the UI, previews, workers, and tests can reuse it. Work from resolved geometry where required, preserve structural and assembly identities, and return a candidate/result or a useful failure. Commit through `useProject` at the intended undo boundary. Add behavioral regression coverage for the valid case and the relevant rejected constraint, including rotated and connected cases when the algorithm depends on orientation or graph topology.
+
+For user design rules, distinguish equality from minimum bounds, local cut dimensions from world references, and physical connectivity from solve-component relationships. Preserve rules through candidate reconstruction; explicit removal uses `constraints: []`. Normal edits must pass `assertDesignConstraintEdit`, while document replacement uses the explicit history replacement option. Cover imported unsatisfied rules numerically so an unchanged diagnostic ID cannot conceal a worsening result. Keep current joint/collision/insert checks alongside this guard.
 
 ### Add an interaction or inspector control
 

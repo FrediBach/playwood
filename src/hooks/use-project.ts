@@ -3,6 +3,7 @@ import { createStarterProject, parseProject } from '@/lib/model'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { ensureProjectPalette } from '@/lib/custom-colors'
+import { assertDesignConstraintEdit } from '@/lib/design-constraint-edits'
 import type { Project } from '@/lib/types'
 const STORAGE_KEY = 'playwood-studio-project-v1'
 interface ProjectHistory {past:Project[];present:Project;future:Project[];repairNotice:string;group?:string}
@@ -15,8 +16,8 @@ export function useProject() {
   // initial autosave share one version. Retain the saved original for Undo.
   const [history, setHistory] = useState<ProjectHistory>(() => {
     const original = ensureProjectPalette(initialProject())
-    const shelf = repairLegacyShelf(original)
-    const repaired = repairLegacyExampleInserts(shelf)
+    const shelf = original.constraints?.length ? original : repairLegacyShelf(original)
+    const repaired = original.constraints?.length ? shelf : repairLegacyExampleInserts(shelf)
     const present = ensureProjectPalette(repaired)
     const repairNotice = repaired === original ? '' : repaired !== shelf
       ? 'Library inserts fitted to their compartments. Undo is available.'
@@ -31,8 +32,13 @@ export function useProject() {
     const next=change(latest.current)
     if(next!==latest.current){latest.current=next;setHistory(next)}
   },[])
-  const commit = useCallback((next:Project|((current:Project)=>Project), options?:{group:string;repeat:boolean}) => {
-    changeHistory(h=>{ const present = ensureProjectPalette(typeof next === 'function' ? next(h.present) : next); if (JSON.stringify(present) === JSON.stringify(h.present)) return h; return {...h,past:options?.repeat&&h.group===options.group?h.past:[...h.past.slice(-59),h.present],present,future:[],group:options?.group} })
+  const commit = useCallback((next:Project|((current:Project)=>Project), options?:{group?:string;repeat?:boolean;replace?:boolean}) => {
+    changeHistory(h=>{
+      const candidate = typeof next === 'function' ? next(h.present) : next
+      const present = ensureProjectPalette(options?.replace ? candidate : assertDesignConstraintEdit(h.present, candidate))
+      if (JSON.stringify(present) === JSON.stringify(h.present)) return h
+      return {...h,past:options?.repeat&&h.group===options.group?h.past:[...h.past.slice(-59),h.present],present,future:[],group:options?.group}
+    })
   },[changeHistory])
   const undo = useCallback(()=>changeHistory(h=>h.past.length ? {...h,past:h.past.slice(0,-1),present:h.past[h.past.length-1],future:[h.present,...h.future],group:undefined} : h),[changeHistory])
   const redo = useCallback(()=>changeHistory(h=>h.future.length ? {...h,past:[...h.past,h.present],present:h.future[0],future:h.future.slice(1),group:undefined} : h),[changeHistory])

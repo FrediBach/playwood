@@ -30,7 +30,7 @@ test('every building technique has four illustrated steps without another WebGL 
       expect(await illustration.locator('polygon, path').count()).toBeGreaterThan(0)
       await expect(article.getByText('What you should see', { exact: true })).toBeVisible()
       if (id === 'connect-panel' && (step === 2 || step === 4)) await page.screenshot({ path: `test-results/guide-connect-panel-step-${step}.png` })
-      if (id === 'resize' || ['projects', 'box-select', 'grid-split', 'snap-settings', 'palette', 'move-creation', 'rescale', 'room-preview'].includes(id)) await page.screenshot({ path: `test-results/guide-${id}-step-${step}.png` })
+      if (id === 'resize' || ['projects', 'box-select', 'grid-split', 'snap-settings', 'constraints', 'palette', 'move-creation', 'rescale', 'room-preview'].includes(id)) await page.screenshot({ path: `test-results/guide-${id}-step-${step}.png` })
       if (step < 4) await article.getByRole('button', { name: 'Next step', exact: true }).click()
     }
     await expect(article.getByRole('button', { name: 'Read again', exact: true })).toBeVisible()
@@ -45,7 +45,7 @@ test('search, direct step selection, related guides and keyboard reference are u
   const search = page.getByRole('searchbox', { name: 'Search guides' })
   await search.fill('auto-add')
   await expect(page.locator('[data-guide-id="auto-connect"]')).toBeVisible()
-  for (const [query, id] of [['Auto furnish', 'room-preview'], ['Finish coverage', 'finishes'], ['Shift before', 'resize'], ['50 mm clearance', 'move-creation'], ['Replacement color', 'palette'], ['grid spacings', 'snap-settings'], ['X dividers', 'grid-split']]) {
+  for (const [query, id] of [['Auto furnish', 'room-preview'], ['Finish coverage', 'finishes'], ['Shift before', 'resize'], ['50 mm clearance', 'move-creation'], ['Replacement color', 'palette'], ['grid spacings', 'snap-settings'], ['X dividers', 'grid-split'], ['20 cm', 'constraints'], ['Same level above floor', 'constraints']]) {
     await search.fill(query)
     await expect(page.locator(`[data-guide-id="${id}"]`)).toBeVisible()
   }

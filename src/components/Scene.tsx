@@ -16,6 +16,7 @@ import { RoomEnvironment } from './RoomEnvironment'
 import { PreviewFurnishings } from './PreviewFurnishings'
 import type { FurnishingPlacement } from '@/lib/preview-furnishings'
 import { GroundGrid } from './GroundGrid'
+import { DesignConstraintOverlay } from './DesignConstraintOverlay'
 import { getRoomLayout } from './room-layout'
 import { getConnectorKeyboardSlides, getConnectorRail } from '@/lib/connector-movement'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
@@ -47,6 +48,9 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   panels: Panel[]
   connections: Connection[]
   connectorOverrides?: Project['connectorOverrides']
+  designConstraint?: NonNullable<Project['constraints']>[number] | null
+  constraintPanelIds?: readonly string[]
+  hasFloorConstraint?: boolean
   selectedConnectorIds?: readonly string[]
   /** Inspector category used for movement; both categories remain highlighted. */
   selectionKind?: 'panels' | 'connectors'
@@ -417,17 +421,24 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
     return panels.map(panel => ({ ...panel, position: vector(panel.position).sub(center).multiplyScalar(1.45).add(center).multiplyScalar(1 / MM).toArray() as Vec3 }))
   }, [panels, exploded])
   const bounds = useMemo(() => boundsOf(displayPanels), [displayPanels])
-  const cameraBounds = useMemo(() => boundsOf([...displayPanels, ...previewPanels, ...attachmentBoundsPanels]), [displayPanels, previewPanels, attachmentBoundsPanels])
+  const cameraBounds = useMemo(() => {
+    const bounds = boundsOf([...displayPanels, ...previewPanels, ...attachmentBoundsPanels])
+    if (props.designConstraint) {
+      bounds.expandByScalar(0.1)
+      if (props.designConstraint.kind === 'floor') bounds.min.y = Math.min(bounds.min.y, 0)
+    }
+    return bounds
+  }, [displayPanels, previewPanels, attachmentBoundsPanels, props.designConstraint])
   const center = useMemo(() => bounds.getCenter(new THREE.Vector3()), [bounds])
   const shownPanels = displayPanels.filter(panel => panel.visible)
   const sideGuidePanel = props.attachmentSideGuide && !realisticPreview && !exploded && !props.boxSelectActive
     ? shownPanels.find(panel => panel.id === props.attachmentSideGuide!.panelId) : undefined
-  const floorY = bounds.min.y - 0.012
+  const floorY = props.hasFloorConstraint || props.designConstraint?.kind === 'floor' ? -0.012 : bounds.min.y - 0.012
   const extent = useMemo(() => Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5), [bounds])
   const boxPreview = props.boxSelectActive ? props.boxPreview : null
   const highlightedPanels = boxPreview ? [...(boxPreview.additive ? selectedIds : []), ...boxPreview.panelIds] : selectedIds
   const highlightedConnectors = boxPreview ? [...(boxPreview.additive ? props.selectedConnectorIds ?? [] : []), ...boxPreview.connectorIds] : props.selectedConnectorIds
-  const selectedIdSet = new Set(highlightedPanels)
+  const selectedIdSet = new Set([...highlightedPanels, ...props.constraintPanelIds ?? []])
   const connectorSelection = (props.selectionKind ?? (props.selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'connectors'
   const activePanelIds = connectorSelection ? [] : selectedIds
   const activeConnectorIds = connectorSelection ? props.selectedConnectorIds ?? [] : []
@@ -484,6 +495,7 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
+    {!exploded && !realisticPreview && props.designConstraint && <DesignConstraintOverlay constraint={props.designConstraint} panels={panels}/>}
     {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
     {!props.boxSelectActive && props.resizeHandles?.length && props.onResizeStart && props.onResizeMove && props.onResizeEnd ? <PreviewResizeHandles
       handles={props.resizeHandles} keyboardStep={props.snapSettings?.grid ? props.snapSettings.spacing : 10} enabled={props.movementEnabled && !props.dragging && !exploded}

@@ -2,18 +2,21 @@ import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { getAssemblyCopyPanelPlacement, getAssemblyAttachmentTargets, getAssemblyInstance, type AssemblyAttachmentTarget } from './assemblies'
 import { attachPanel, createPanel, resolvePanels, validateProject } from './model'
-import type { AssemblyDefinition, AssemblyInstance, AttachmentOptions, Panel, Project, Side, Vec3 } from './types'
+import type { AssemblyDefinition, AssemblyInstance, AttachmentOptions, DesignConstraint, Panel, Project, Side, Vec3 } from './types'
+import { copyDesignConstraints, designConstraintPanelIds } from './design-constraints'
 
-export type CopiedItem = { kind: 'panel'; panel: Panel } | { kind: 'assembly'; instance: AssemblyInstance; definition: AssemblyDefinition }
+export type CopiedItem = ({ kind: 'panel'; panel: Panel } | { kind: 'assembly'; instance: AssemblyInstance; definition: AssemblyDefinition }) & { constraints?: DesignConstraint[] }
 
 export function copySelection(project: Project, ids: string[]): CopiedItem {
   const selected = new Set(ids)
+  const constraints = project.constraints?.filter(constraint => constraint.kind !== 'floor' && designConstraintPanelIds(constraint).every(id => selected.has(id)))
+  const rules = constraints?.length ? { constraints } : {}
   const instance = ids.length ? getAssemblyInstance(project, ids[0]) : undefined
   if (instance && ids.length === Object.keys(instance.panelIds).length && Object.values(instance.panelIds).every(id => selected.has(id))) {
-    return structuredClone({ kind: 'assembly', instance, definition: project.assemblies!.definitions.find(item => item.id === instance.definitionId)! })
+    return structuredClone({ kind: 'assembly', instance, definition: project.assemblies!.definitions.find(item => item.id === instance.definitionId)!, ...rules })
   }
   const panel = ids.length === 1 ? resolvePanels(project).find(item => item.id === ids[0]) : undefined
-  if (panel) return structuredClone({ kind: 'panel', panel })
+  if (panel) return structuredClone({ kind: 'panel', panel, ...rules })
   throw new Error('Select one panel or one assembly to copy.')
 }
 
@@ -27,7 +30,7 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
     const data = project.assemblies ?? { definitions: [], instances: [], links: [] }
     // Keep copies linked to an existing design; restore the copied design if its source was removed.
     base = { ...project, assemblies: { ...data, definitions: data.definitions.some(item => item.id === copied.definition.id) ? data.definitions : [...data.definitions, copied.definition] } }
-    if (instance) return getAssemblyAttachmentTargets(base, instance.id, undefined, copied.instance)
+    if (instance) return getAssemblyAttachmentTargets(base, instance.id, undefined, copied.instance, copied.constraints ?? [])
   }
   const parents = resolvePanels(project).filter(panel => selected.has(panel.id))
   const oldErrors = new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id))
@@ -47,7 +50,9 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
     const label = `${instance ? `${parent.name} · ` : ''}${edge.side}${flip ? ' · reverse' : ''}`
     const options: AttachmentOptions = { side: edge.side, flip, type: '90', offset: 0, inset: 0, color: DEFAULT_CONNECTOR_COLOR, count: 2 }
     try {
-      const placement = copied.kind === 'assembly' ? getAssemblyCopyPanelPlacement(base, copied.instance, parent.id, options) : { project: attachPanel(base, parent.id, child!, options) }
+      const constraints = copied.kind === 'panel' ? copyDesignConstraints(copied.constraints, new Map([[copied.panel.id, child!.id]])) : []
+      const placement = copied.kind === 'assembly' ? getAssemblyCopyPanelPlacement(base, copied.instance, parent.id, options, copied.constraints ?? [])
+        : { project: attachPanel(constraints.length ? { ...base, constraints: [...base.constraints ?? [], ...constraints] } : base, parent.id, child!, options) }
       const next = placement.project
       const newIds = new Set(next.panels.filter(panel => !project.panels.some(old => old.id === panel.id)).map(panel => panel.id))
       const issue = validateProject(next).find(item => item.severity === 'error' && !oldErrors.has(item.id) || item.id.startsWith('collision-') && item.panelIds.some(panelId => newIds.has(panelId)))

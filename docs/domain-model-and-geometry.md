@@ -38,6 +38,7 @@ Use quaternions or matrices to compose rotations, then convert back to Euler tup
 | `AssemblyLoosePort` | Suppressed ordinary corner retained when an instance is disassembled while still attached to another instance |
 | `ListGroup` | One level of panel or connector organization, independent of physical connectivity and assembly membership |
 | `PaletteColor` | Named custom finish swatch stored with the project |
+| `DesignConstraint` | Enabled or disabled project requirement for a cut dimension, floor elevation, matching dimensions/levels, or a gap between two panels |
 
 Saved panel arrays contain both ordinary panels and materialized assembly panels. Rendering, selection, validation, and parts lists can operate on this common representation. Assembly metadata remains authoritative for its managed subset: editing the materialized panels alone would leave the definition, instance, and physical geometry inconsistent.
 
@@ -132,10 +133,33 @@ Important parser limits include:
 - Support alignment against the expected attachment pose. A half-turn of a rectangular panel can occupy the same slot; a width/height quarter-turn is not interchangeable unless explicitly encoded.
 - Valid outlines and perforation density.
 - Pairwise overlap warnings using oriented rectangular bounding boxes.
+- Enabled user design requirements, measured from resolved panels including hidden parts. Unsatisfied or unsupported rules produce `constraint-<id>` errors.
 
 Collision boxes shrink each half-extent by 0.5 mm, with a small minimum, to avoid reporting ordinary touching as overlap. They do not follow custom outlines, rounded corners, or holes. `getProjectBounds` also uses rectangular extents. Rendered cut geometry can therefore be more detailed than placement and collision calculations.
 
 Mutation modules often compare issue IDs before and after an edit and reject newly introduced problems. Some operations additionally treat collisions as blockers, while general project validation labels them warnings. Preserve the operation's existing policy instead of assuming every warning should reject every edit.
+
+## User-defined design constraints
+
+`Project.constraints` is an optional array of `DesignConstraint` values. These rules express design intent without adding physical joints or changing the driving attachment graph. Each has a stable ID and an `enabled` flag. [`design-constraints.ts`](../src/lib/design-constraints.ts) parses and evaluates the rules without importing the model resolver; callers supply resolved panels. Derived measurements, numerical residuals, and unsupported-geometry messages are not persisted. Evaluation uses a 0.1 mm tolerance.
+
+| Kind | Measurement |
+| --- | --- |
+| `floor` | World Y of the panel's minimum, center, or maximum reference equals a target |
+| `dimension` | One local cut `width` or `height` equals a target |
+| `equal-dimension` | Two panels have equal local cut widths or heights |
+| `level` | Chosen minimum, center, or maximum Y references have equal elevation |
+| `gap` | Ordered second-panel minimum minus first-panel maximum along world X, Y, or Z equals or exceeds a target |
+
+Coordinate rules require rectangular outlines with panel axes aligned to world axes. Ninety-degree orientations are supported; arbitrary tilts and custom outlines are rejected explicitly. Local dimension rules remain valid for rotated panels and custom outlines. Gap measurements include thickness but use panel extents: they are directed axis distances, not a shortest-distance or obstacle-clearance calculation. Holes, rounded details, connectors, and other furniture do not reduce that measurement. Negative gaps identify overlap or reversed ordering along the chosen axis.
+
+[`setDesignConstraint`](../src/lib/design-constraint-commands.ts) validates a rule draft, creates a candidate, and invokes `reconcileDesignConstraints` when the new requirement is unsatisfied. It returns the rule and adjusted geometry together. Two-panel reconciliation accepts a transient reference panel for the initial adjustment: equal-dimension rules keep its selected cut dimension fixed, while level and gap rules keep its center position fixed. This choice is not stored as a permanent driver. An incompatible reference choice rejects the preview. Reconciliation is scoped to the edited rule and its dependent component, leaving unrelated imported violations unchanged.
+
+The structural solver joins panels related by enabled rules into the same solve component while retaining their separate physical component boundaries. It adds equalities for exact rules and lower bounds for minimum gaps and panel size limits. Minimum bounds can activate or release; a gap with spare room is not forced back to its minimum. Existing placement preferences can relax when necessary to satisfy hard rules, joints, and the requested edit. Unrelated loose panel sizes remain fixed unless a dimension rule controls them. Solving retains prescribed rotations, thicknesses, connector dimensions, and current physical supports. Control-drag explicitly releases external joints and incidental contacts at the selection boundary while still enforcing user rules.
+
+[`assertDesignConstraintEdit`](../src/lib/design-constraint-edits.ts) checks the final candidate using actual measurements. Normal history commits and relevant domain transforms call it, so editing through another tool cannot silently bypass a rule. A valid imported project may contain unsatisfied rules: an unchanged rule may remain unsatisfied or improve, but cannot worsen. Unsupported rules can remain while their referenced geometry is unchanged. This comparison must use residuals and references, not only stable validation-issue IDs.
+
+New rule authoring currently excludes linked assembly members and ordinary panels connected to them. Use assembly configurable values for those dimensions; source-owned rules and general cross-instance solving are not implemented. Saved/imported project rules remain checked during assembly updates. Whole-project moves and rotations keep world references fixed rather than rewriting targets. Deletion, copying, and standalone assembly-file scope are described in [state and persistence](state-and-persistence.md#design-rule-lifecycle).
 
 ## TROFAST inserts and panel openings
 
@@ -155,15 +179,15 @@ The solver follows this flow:
 
 1. Resolve current panel world poses and construct each panel's three world-space local axes.
 2. Detect existing surface contacts. These act as implicit supports for loose inserts such as shelves, dividers, and doors.
-3. Partition panels into connected components using both connection edges and detected contacts.
-4. For each affected component, form sparse linear constraints for joint alignment, existing contacts, requested movement/dimensions, and fixed boundaries.
+3. Partition panels into solve components using connection edges, detected contacts, and enabled design-rule relationships.
+4. For each affected component, form sparse linear constraints for joint alignment, existing contacts, requested movement/dimensions, design rules, and placement preferences. Minimum-gap and stock-size bounds participate in the solve.
 5. Solve for the minimum weighted change, re-resolve the result, and check limits, new errors, and continued insert support.
 
 Each panel contributes three translation variables and two size variables. Thickness is prescribed when requested, never a free solver variable. Rotations and connector seat dimensions remain fixed, which keeps the problem linear even for angled connectors. Connection offsets can adapt along seams. The internal solver uses conjugate gradients for the weighted constraint system and rejects nonfinite values or residual errors above tolerance.
 
 Behavior depends on the operation:
 
-- Moving every panel in a component translates it rigidly. Moving a subset can resize neighboring spans while retaining joints and outer boundaries.
+- Moving every panel in a component without user rules translates it rigidly. Moving a subset can resize neighboring spans while retaining joints and outer boundaries. Enabled rules add their own conditions and may require adapting other related panels or rejecting the edit.
 - Numeric width/height changes anchor the selected center, or average center for a selection.
 - An edge resize moves the center by half the growth to anchor the opposite edge.
 - Local edge resizing additionally fixes other panels and computes connector slide overrides so existing hardware remains in its original world position. If the rail cannot preserve that position, the edit fails.
@@ -177,7 +201,7 @@ Behavior depends on the operation:
 
 [`rotateSelection`](../src/lib/selection-rotation.ts) instead rotates a complete selection around its own bounding-box center. It requires every panel in a selected instance and every panel across an incident physical connection to be selected. It preserves unselected panels and updates selected instance transforms. It does not apply the whole-project grounding adjustment.
 
-[`project-rescale.ts`](../src/lib/project-rescale.ts) replaces repeated measurements, including dimensions, thickness, corner radius, hole size, and pitch. It is not uniform mesh scaling: panel constraints and hardware dimensions still apply. It solves compatible dimensions together and restores the creation's horizontal center and lowest height afterward.
+[`project-rescale.ts`](../src/lib/project-rescale.ts) replaces repeated measurements, including dimensions, thickness, corner radius, hole size, and pitch. It is not uniform mesh scaling: panel constraints and hardware dimensions still apply. It solves compatible dimensions together and restores the creation's horizontal center and lowest height afterward. An enabled floor-height rule takes precedence over the default vertical grounding shift.
 
 For projects containing assemblies, [`assembly-rescale.ts`](../src/lib/assembly-rescale.ts) solves the materialized construction, updates shared definitions and affine parameters, refits suppressed corners, and verifies that every instance is still exactly describable by its source and transform. Inconsistent source/instance changes fail atomically.
 

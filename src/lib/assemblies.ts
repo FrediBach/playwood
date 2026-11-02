@@ -1,11 +1,13 @@
 import { Euler, Quaternion, Vector3 } from 'three'
-import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyLoosePort, AssemblyParameter, AssemblyPort, AttachmentOptions, Connection, Panel, Project, Vec3 } from './types'
+import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyLoosePort, AssemblyParameter, AssemblyPort, AttachmentOptions, Connection, DesignConstraint, Panel, Project, Vec3 } from './types'
 import { attachPanel, getConnectorPlacements, getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
 import { connectClosingPanel } from './closure-connectors'
 import { resizePanels } from './structure-edit'
 import { evaluateAssemblyDefinition, parseAssemblyParameters, parseAssemblyParameterValues } from './assembly-parameters'
 import { reconcileAssemblyPlacement, samePanelPlacement } from './assembly-placement'
 import { panelValuesEqual } from './selection'
+import { copyDesignConstraints, designConstraintPanelIds } from './design-constraints'
+import { assertDesignConstraintEdit } from './design-constraint-edits'
 
 const uid = () => crypto.randomUUID()
 const v = (value: Vec3) => new Vector3(...value)
@@ -190,7 +192,7 @@ function ensureValid(next: Project, previous?: Project, collisionIds?: Set<strin
   const issue = validateProject(next, { trofastWorld }).find(item => (item.severity === 'error' && !previousErrors.has(item.id))
     || (item.id.startsWith('collision-') && (!collisionIds || item.panelIds.some(id => collisionIds.has(id)))))
   if (issue) throw new Error(issue.message)
-  return next
+  return previous ? assertDesignConstraintEdit(previous, next) : next
 }
 
 export function assemblySelectionError(project: Project, selectedPanelIds: readonly string[]): string {
@@ -240,6 +242,12 @@ function newInstance(data: AssemblyData, definition: AssemblyDefinition, source?
     ...(parameterValues && Object.keys(parameterValues).length ? { parameterValues } : {}) }
 }
 
+function withCopiedConstraints(project: Project, source: AssemblyInstance, instance: AssemblyInstance, rules = project.constraints): Project {
+  const mapping = new Map(Object.entries(source.panelIds).flatMap(([local, id]) => instance.panelIds[local] ? [[id, instance.panelIds[local]] as const] : []))
+  const constraints = copyDesignConstraints(rules, mapping)
+  return constraints.length ? { ...project, constraints: [...project.constraints ?? [], ...constraints] } : project
+}
+
 function separateInstance(project: Project, data: AssemblyData, instanceId: string): AssemblyData {
   const instance = data.instances.find(item => item.id === instanceId)!
   const definition = evaluatedFor(data, instance)
@@ -264,7 +272,7 @@ export function duplicateAssembly(project: Project, instanceId: string): Project
   const source = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, source)
   const instance = newInstance(data, definition, source)
   const nextData = separateInstance(project, { ...data, instances: [...data.instances, instance] }, instance.id)
-  return ensureValid(rebuild(project, nextData), project, new Set(Object.values(instance.panelIds)))
+  return ensureValid(rebuild(withCopiedConstraints(project, source, instance), nextData), project, new Set(Object.values(instance.panelIds)))
 }
 
 export interface AssemblyAttachmentTarget {
@@ -294,10 +302,11 @@ function withMatchingLinks(data: AssemblyData, instanceId: string): AssemblyData
   return { ...data, links }
 }
 
-export function getAssemblyAttachmentTargets(project: Project, instanceId: string, sourceInstanceId?: string, copiedSource?: AssemblyInstance): AssemblyAttachmentTarget[] {
+export function getAssemblyAttachmentTargets(project: Project, instanceId: string, sourceInstanceId?: string, copiedSource?: AssemblyInstance, copiedConstraints?: DesignConstraint[]): AssemblyAttachmentTarget[] {
   const target = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, target)
   if (sourceInstanceId === instanceId) return []
   const source = sourceInstanceId ? instanceFor(project, sourceInstanceId) : copiedSource ? newInstance(data, definitionFor(data, copiedSource), copiedSource) : newInstance(data, definition, target)
+  const candidateBase = sourceInstanceId ? project : withCopiedConstraints(project, copiedSource ?? target, source, copiedConstraints ?? project.constraints)
   if (sourceInstanceId && data.links.some(link => link.a.instanceId === sourceInstanceId || link.b.instanceId === sourceInstanceId)) return [{ id: 'connected', label: 'Disconnect first', position: source.position, error: 'Disconnect this instance before attaching it somewhere else.' }]
   const sourceDefinition = definitionFor(data, source)
   const occupied = new Set(data.links.flatMap(link => [endpointKey(link.a), endpointKey(link.b)]))
@@ -319,7 +328,7 @@ export function getAssemblyAttachmentTargets(project: Project, instanceId: strin
     try {
       const nextData = { ...data, instances: sourceInstanceId ? data.instances.map(item => item.id === source.id ? placed : item) : [...data.instances, placed] }
       const ids = Object.values(placed.panelIds)
-      const result = reconcileAssemblyPlacement(rebuild(project, nextData), ids)
+      const result = reconcileAssemblyPlacement(rebuild(candidateBase, nextData), ids)
       if (!result.warning || !result.project.panels.some(panel => sourcePanelIds.has(panel.id))) continue
       targets.push({ id: `${instanceId}/shared-panel/${parent.id}/${child.id}`, label: `${parent.name} · shared panel`, position: parent.position,
         ...result, placement: { position: placed.position, rotation: placed.rotation } })
@@ -348,13 +357,13 @@ export function getAssemblyAttachmentTargets(project: Project, instanceId: strin
             try {
               const linked = withMatchingLinks(nextData, placed.id)
               if (!linked.links.some(link => endpointKey(link.a) === endpointKey(endpoint) || endpointKey(link.b) === endpointKey(endpoint))) continue
-              result = { project: ensureValid(rebuild(project, linked), project, new Set(ids)), panelIds: ids }
+              result = { project: ensureValid(rebuild(candidateBase, linked), project, new Set(ids)), panelIds: ids }
             } catch {
-              result = reconcileAssemblyPlacement(rebuild(project, nextData), ids)
+              result = reconcileAssemblyPlacement(rebuild(candidateBase, nextData), ids)
               if (!result.warning) continue
             }
           } else {
-            result = reconcileAssemblyPlacement(rebuild(project, nextData), ids)
+            result = reconcileAssemblyPlacement(rebuild(candidateBase, nextData), ids)
             if (!result.warning || !result.project.panels.some(panel => sourcePanelIds.has(panel.id))) continue
           }
           const resultPanelIds = new Set(result.project.panels.map(panel => panel.id))
@@ -388,7 +397,7 @@ export function attachAssemblyCopyToPanel(project: Project, source: AssemblyInst
   return getAssemblyCopyPanelPlacement(project, source, parentId, options).project
 }
 
-export function getAssemblyCopyPanelPlacement(project: Project, source: AssemblyInstance, parentId: string, options: AttachmentOptions): ReturnType<typeof reconcileAssemblyPlacement> {
+export function getAssemblyCopyPanelPlacement(project: Project, source: AssemblyInstance, parentId: string, options: AttachmentOptions, copiedConstraints?: DesignConstraint[]): ReturnType<typeof reconcileAssemblyPlacement> {
   const data = project.assemblies!, currentDefinition = definitionFor(data, source)
   const parameterValues = Object.fromEntries(Object.entries(source.parameterValues ?? {})
     .filter(([id]) => currentDefinition.parameters?.some(parameter => parameter.id === id)))
@@ -405,7 +414,7 @@ export function getAssemblyCopyPanelPlacement(project: Project, source: Assembly
       const rotation = q(placed.rotation).multiply(q(panel.rotation).invert())
       instance.rotation = angles(rotation)
       instance.position = tuple(v(placed.position).sub(v(panel.position).applyQuaternion(rotation)))
-      const next = rebuild(project, { ...data, instances: [...data.instances, instance] })
+      const next = rebuild(withCopiedConstraints(project, source, instance, copiedConstraints ?? project.constraints), { ...data, instances: [...data.instances, instance] })
       next.connections.push({ ...attached.connections.at(-1)!, role: 'support' })
       const result = reconcileAssemblyPlacement(next, Object.values(instance.panelIds))
       if (!result.warning) return result
@@ -420,7 +429,8 @@ export function removeAssembly(project: Project, instanceId: string): Project {
   const removed = instanceFor(project, instanceId)
   const data = project.assemblies!
   const removedIds = new Set(Object.values(removed.panelIds))
-  const base = { ...project, connections: project.connections.filter(connection => !removedIds.has(connection.parentId) && !removedIds.has(connection.childId)) }
+  const base = { ...project, connections: project.connections.filter(connection => !removedIds.has(connection.parentId) && !removedIds.has(connection.childId)),
+    ...(project.constraints ? { constraints: project.constraints.filter(constraint => !designConstraintPanelIds(constraint).some(id => removedIds.has(id))) } : {}) }
   return rebuild(base, { ...data, instances: data.instances.filter(instance => instance.id !== instanceId), links: data.links.filter(link => link.a.instanceId !== instanceId && link.b.instanceId !== instanceId) })
 }
 
@@ -429,7 +439,7 @@ export function disconnectAssembly(project: Project, instanceId: string): Projec
   const data = project.assemblies!
   const links = data.links.filter(link => link.a.instanceId !== instanceId && link.b.instanceId !== instanceId)
   if (links.length === data.links.length) return project
-  return rebuild(project, separateInstance(project, { ...data, links }, instanceId))
+  return assertDesignConstraintEdit(project, rebuild(project, separateInstance(project, { ...data, links }, instanceId)))
 }
 
 /** Bake only this instance; mixed corner joints retain their existing hardware. */
@@ -618,7 +628,7 @@ export function moveAssemblies(project: Project, instanceIds: readonly string[],
   const nextData = { ...data, instances: data.instances.map(instance => Object.values(instance.panelIds).some(id => panelIds.has(id)) ? { ...instance, position: tuple(v(instance.position).add(v(delta))) } : instance) }
   const next = rebuild(base, nextData)
   if (next.panels.some(panel => panel.position.some(value => Math.abs(value) > 100000))) throw new Error('This move exceeds the project placement limits.')
-  return next
+  return assertDesignConstraintEdit(project, next)
 }
 
 /** Validate authoritative metadata and require its materialized geometry to agree. */

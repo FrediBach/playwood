@@ -15,6 +15,7 @@ The main entry points are [App.tsx](../src/App.tsx), [use-project.ts](../src/hoo
 | `useAssemblyEditor` | Which instance is being edited, assembly placement mode, hovered placement target | No |
 | `useCopyPaste` | In-memory copied panel/assembly, insertion candidates, hovered candidate | No |
 | `usePreviewDrag` / `usePreviewResize` | Gesture source, latest candidate project, transient displayed geometry | No |
+| `useDesignConstraints` / `DesignConstraintsInspector` | Rule form draft, reference-panel preference, source-bound candidate, measurement highlight, and feedback | Only the accepted rule and geometry |
 | `useAttachmentPreview` | Derived candidate project, preview panels/hardware, validation issues | No |
 | Local form components | Unapplied outline, parameter, color, and field drafts | No |
 | `App` snap settings | Grid/geometry snapping flags, spacing, tolerance | Separate browser preference |
@@ -46,7 +47,9 @@ In [use-project.ts](../src/hooks/use-project.ts):
 4. An ordinary commit appends the previous present to `past`, keeping at most 60 past snapshots, and clears `future`.
 5. `{ group, repeat }` can fold successive commits into one undo step when `repeat` is true and the group matches. Panel and connector keyboard movement use separate group names. The first non-repeat event starts a new step.
 
-History stores complete project snapshots, not commands or geometry diffs. Mutating an earlier project object in place would corrupt both undo and preview comparisons; model operations must preserve prior snapshots. `commit` itself is not a universal geometry validator: callers and domain operations enforce the relevant constraints before accepting a candidate. Exceptions from an operation propagate synchronously to the caller, where UI flows generally catch them and show a message without replacing the project.
+History stores complete project snapshots, not commands or geometry diffs. Mutating an earlier project object in place would corrupt both undo and preview comparisons; model operations must preserve prior snapshots. Normal `commit` calls use `assertDesignConstraintEdit` as a final guard on user rules. This is not universal geometry validation: domain operations still enforce joints, stock limits, collisions, and insert fit. Exceptions propagate synchronously to the caller, where UI flows generally show a message without replacing the project.
+
+The rule guard preserves existing constraints when a reconstructed candidate omits the property. Explicit rule removal uses an empty array. Starting a new project, replacing a template, and importing use `{ replace: true }`, which bypasses comparison with the old document's rules while preserving ordinary history. Undo and redo restore complete saved snapshots directly.
 
 Undo moves the current project to the front of `future` and restores the last past snapshot. Redo reverses that movement. Both reset the repeat-group token and trigger autosave of the restored project. Selection and camera state are not part of these snapshots; effects remove selections whose IDs no longer exist.
 
@@ -62,7 +65,7 @@ Starting a blank project, applying a template, and importing a project also use 
 
 [use-preview-drag.ts](../src/hooks/use-preview-drag.ts) prepares a drag session from the source project. Pointer movement computes candidates with the geometry/snap helpers in [preview-drag.ts](../src/lib/preview-drag.ts) and [preview-snap.ts](../src/lib/preview-snap.ts). React state makes the candidate visible, while a ref retains the latest result for pointer release. The hook only displays or commits a candidate while its original project is still the current project. A canceled gesture discards its candidate; an accepted gesture commits once. Dragging can also finish with a supported attachment candidate.
 
-Control-drag preparation releases joints crossing the selection boundary in the candidate while preserving the construction's world poses and internal joints. It then translates the selection and can fit new attachment hardware. This differs from keyboard movement and connected resize, which solve changes while preserving the existing joints. Canceling a drag restores the original connections because the released construction was never committed.
+Control-drag preparation releases joints crossing the selection boundary in the candidate while preserving the construction's world poses and internal joints. Movement also releases incidental contacts across that boundary while preserving user rules. It then translates the selection and can fit new attachment hardware. This differs from keyboard movement and connected resize, which solve changes while preserving the existing joints. Canceling a drag restores the original connections because the released construction was never committed.
 
 [use-preview-resize.ts](../src/hooks/use-preview-resize.ts) follows the same pattern with a prepared resize source, selected handle, and optional independent-panel mode. It verifies that the gesture still refers to the current prepared source. Distances pass through snapping and [preview-resize.ts](../src/lib/preview-resize.ts), which can return a size-limited result. Release commits a nonzero valid result once; Escape/cancel restores the committed view. Transient resize projects never enter autosave.
 
@@ -79,6 +82,8 @@ Control-drag preparation releases joints crossing the selection boundary in the 
 [`TrofastInspector.tsx`](../src/components/TrofastInspector.tsx) holds a new or edited insert locally. Item, color, turn, and center controls update the panel diagram and a candidate scene panel, without changing the committed project. `App` ties this preview to the current project identity and selected panel and suppresses it during conflicting modes. Apply uses a functional project commit with clearance validation; Cancel, Escape, selection changes, or unmount discard the preview. Existing inserts remain editable/removable from the panel inspector. Shared assembly edits use the definition API and validate every rebuilt instance. Undo/redo, autosave, project files, standalone assemblies, and panel duplication retain the nested data.
 
 ### Local form drafts
+
+[`DesignConstraintsInspector.tsx`](../src/components/DesignConstraintsInspector.tsx) edits one rule locally. [`use-design-constraints.ts`](../src/hooks/use-design-constraints.ts) calls `setDesignConstraint` to derive a complete candidate and a summary of moved/resized panels. Scene previews and measurement highlights remain transient. Add constraint / Save constraint rechecks source identity and commits the rule with all geometry changes once. Cancel/Escape discards both. An external project change makes the draft stale and requires reopening; re-enabling a rule opens the same preview workflow. Disabling or removing a rule changes project state without moving geometry.
 
 Several forms intentionally have a narrower transaction boundary than the project:
 
@@ -148,6 +153,7 @@ Project
   connectorOverrides? per-piece color/type/material/removal/slide
   listGroups?         flat panel/connector groups
   connectorOrder?     physical connector ordering
+  constraints?        enabled/disabled project design requirements
 ```
 
 The UI rejects files larger than 2,000,000 bytes before reading them. `JSON.parse` is followed by [parseProject in model.ts](../src/lib/model.ts), which constructs a validated object rather than treating a type assertion as validation. Its responsibilities include:
@@ -158,6 +164,7 @@ The UI rejects files larger than 2,000,000 bytes before reading them. `JSON.pars
 - Optional palette parsing and assembly metadata validation.
 - Well-formed per-piece override keys/values. Removed hardware is represented by an override, not by deleting the structural joint.
 - Valid list groups/order, with stale or duplicate item references filtered out instead of recreating deleted parts.
+- Up to 1,000 design constraints with unique IDs, explicit boolean enabled states, supported kinds/references, finite target values, and references to existing panels. Pair rules require two distinct panels. Unknown kinds and dangling references reject the import rather than silently dropping requirements.
 
 `parseProject` checks serialized structure and topology; it does not run every warning/error check in `validateProject`. The latter produces the editor's geometric diagnostics. Do not assume that parsing a document means every physical joint, overlap, or fabrication constraint has passed.
 
@@ -175,6 +182,8 @@ These are conservative repairs for recognized old geometry, not blanket reconstr
 - The insert repair matches known example geometry/topology and fits unchanged legacy inserts; added, removed, moved, or resized pieces opt out.
 
 File import applies the same two repairs after parsing, then commits the repaired result as one import action. Undo of an import restores the project that was open before import; startup repair Undo restores the saved original.
+
+Projects containing design rules skip these automatic legacy geometry repairs on startup and import. Loading preserves their saved geometry and reports unsatisfied rules for explicit review; it does not reconcile the rules automatically. Older projects with no `constraints` property behave as before.
 
 Older optional fields have explicit fallbacks, including visible panels by default, zero corner radius, natural finish coverage when omitted, and plastic connector material. Palette parsing also accepts the earlier array of unnamed hex swatches. `ensureProjectPalette` adopts unlisted panel colors from project panels, assembly definitions, and instance finishes, preserving their visible colors. It runs at startup and on every commit.
 
@@ -196,10 +205,18 @@ The assembly import UI uses the same 2,000,000-byte limit. With an eligible pane
 
 Copy/paste is internal to the current app session; [use-copy-paste.ts](../src/hooks/use-copy-paste.ts) does not use the operating-system clipboard API. [clipboard.ts](../src/lib/clipboard.ts) clones one resolved panel or one whole assembly. Assembly copies retain their definition ID and use the existing source when it remains available; if that source was removed, the captured definition can be restored. Paste requires a target and offers validated attachment candidates. Reloading loses this clipboard.
 
+### Design-rule lifecycle
+
+Rules reference stable materialized panel IDs. Renaming, visibility, list order, and grouping do not alter their meaning; hidden panels still participate. Deleting a panel or assembly removes its incident rules in the same history snapshot. Detaching physical joints does not remove user requirements. Make independent and Disassemble preserve project rules because their panel identities remain stable.
+
+Panel/assembly duplication and clipboard placement copy eligible requirements whose complete panel set is copied, using fresh rule IDs and remapped panel references. Absolute floor rules and relationships to outside panels are omitted. World-axis relationships retain their axes and must validate at the new placement; they are not reinterpreted to fit a rotated copy. Clipboard rules are snapshots alongside the copied geometry. A shared-panel assembly placement that would discard a referenced panel is rejected rather than silently dropping or guessing a reference remapping.
+
+Project JSON includes active and disabled rules. Standalone `.playwood-assembly.json` files contain reusable local construction, not project constraints; exported placement rules do not follow a module into another project. Creating an assembly from constrained panels retains their project rules without promoting them into the shared definition. CSV and panel cutting SVGs retain their existing fabrication/parts scope and do not serialize the rule graph.
+
 `projectToCsv` in [model.ts](../src/lib/model.ts) is a parts/cutting-list export, not an importable project format. It writes one row per project panel and groups installed physical connectors by type, material, and display color. Panel rows include dimensions, finish coverage, perforation information, radius, and custom-outline coordinates converted to millimeters. It uses a UTF-8 BOM, CRLF lines, quoted/escaped cells, and prefixes formula-like string values to avoid interpreting user names as spreadsheet formulas.
 
 `panel-svg.ts` exports individual panel cutting SVGs from the Export dialog, without changing the project file format. Eligibility includes perforations, TROFAST inserts, custom outlines, and rounded corners. Each SVG uses explicit millimeter dimensions, top-left panel coordinates, closed paths with circular arcs, black outside contours, and white inside cuts. Names are XML-escaped; filenames include the project panel index to distinguish duplicate names. All materialized project panels, including hidden panels, participate. Tool offsets and depths are set by the cutter operator; TROFAST cut profiles remain approximate.
 
 ## Relevant regression coverage
 
-The state boundary is exercised through model tests and browser flows. Useful starting points are [editor.spec.ts](../tests/editor.spec.ts), [new-project.spec.ts](../tests/new-project.spec.ts), [preview-drag.spec.ts](../tests/preview-drag.spec.ts), [preview-resize.spec.ts](../tests/preview-resize.spec.ts), [copy-paste.spec.ts](../tests/copy-paste.spec.ts), [assembly-files.spec.ts](../tests/assembly-files.spec.ts), [assembly-parameters.spec.ts](../tests/assembly-parameters.spec.ts), and the [palette](../tests/custom-colors.spec.ts), [list-group](../tests/list-groups.spec.ts), and [box-selection](../tests/box-selection.spec.ts) suites. Parser and round-trip cases also live in [model.test.ts](../src/lib/model.test.ts), [assembly-file.test.ts](../src/lib/assembly-file.test.ts), and the assembly tests under `src/lib`.
+The state boundary is exercised through model tests and browser flows. Useful starting points are [editor.spec.ts](../tests/editor.spec.ts), [new-project.spec.ts](../tests/new-project.spec.ts), [preview-drag.spec.ts](../tests/preview-drag.spec.ts), [preview-resize.spec.ts](../tests/preview-resize.spec.ts), [copy-paste.spec.ts](../tests/copy-paste.spec.ts), [assembly-files.spec.ts](../tests/assembly-files.spec.ts), [assembly-parameters.spec.ts](../tests/assembly-parameters.spec.ts), [design-constraints.spec.ts](../tests/design-constraints.spec.ts), and the [palette](../tests/custom-colors.spec.ts), [list-group](../tests/list-groups.spec.ts), and [box-selection](../tests/box-selection.spec.ts) suites. Parser and round-trip cases also live in [model.test.ts](../src/lib/model.test.ts), [design-constraints.test.ts](../src/lib/design-constraints.test.ts), [assembly-file.test.ts](../src/lib/assembly-file.test.ts), and the assembly tests under `src/lib`.

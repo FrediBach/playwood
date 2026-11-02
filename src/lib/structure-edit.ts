@@ -3,7 +3,8 @@ import { resolvePanels, validateProject } from './model'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { isPanelConnectedToAssembly } from './assemblies'
-import type { Connection, Panel, Project, Vec3 } from './types'
+import { designConstraintPanelIds, describeDesignConstraint, evaluateDesignConstraints } from './design-constraints'
+import type { Connection, ConstraintReference, Panel, Project, Vec3 } from './types'
 
 const EPSILON = 1e-6
 const CONTACT_TOLERANCE = 1e-4
@@ -15,7 +16,7 @@ type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
 type Row = { entries: Map<number, number>; value: number }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3 } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; local?: boolean }
+type Edit = { kind: 'move'; delta: Vec3; releaseContacts?: boolean } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; local?: boolean } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 interface ValidationContext { trofastWorld?: boolean }
 
@@ -53,18 +54,18 @@ function findContacts(frames: Frame[]): Contact[] {
  * connectors. Solve A W^-1 Aᵀ λ = b with conjugate gradients; redundant support
  * rows are harmless and do not require a dense cubic matrix decomposition.
  */
-function solve(rows: Row[], weights: number[]): number[] {
+function solve(rows: Row[], weights: number[], dual?: number[]): number[] {
   const size = weights.length
   const inverseScale = weights.map(weight => 1 / Math.sqrt(weight))
-  const equations = rows.map(row => {
+  const equations = rows.map((row, sourceIndex) => {
     const entries = [...row.entries].filter(([, value]) => Math.abs(value) > 1e-10)
       .map(([index, value]) => [index, value * inverseScale[index]] as const)
     const norm = Math.hypot(...entries.map(([, value]) => value))
     if (norm < 1e-10) {
       if (Math.abs(row.value) > EPSILON) throw new Error(CONSTRAINT_MESSAGE)
-      return { entries: [], value: 0 }
+      return { entries: [], value: 0, sourceIndex, norm: 1 }
     }
-    return { entries: entries.map(([index, value]) => [index, value / norm] as const), value: row.value / norm }
+    return { entries: entries.map(([index, value]) => [index, value / norm] as const), value: row.value / norm, sourceIndex, norm }
   }).filter(row => row.entries.length)
   const count = equations.length
   const multiply = (values: Float64Array): Float64Array => {
@@ -96,14 +97,72 @@ function solve(rows: Row[], weights: number[]): number[] {
   if (output.some(value => !Number.isFinite(value)) || rows.some(row => Math.abs([...row.entries].reduce((sum, [index, value]) => sum + value * output[index], 0) - row.value) > 1e-5)) {
     throw new Error(CONSTRAINT_MESSAGE)
   }
+  if (dual) {
+    dual.length = rows.length
+    dual.fill(0)
+    equations.forEach((row, index) => { dual[row.sourceIndex] = solution[index] / row.norm })
+  }
   return output
+}
+
+const rowValue = (row: Row, values: number[]) => [...row.entries].reduce((sum, [index, coefficient]) => sum + coefficient * values[index], 0)
+
+/** Dual coordinate projections enforce lower bounds without making slack bounds
+ * equalities. A multiplier can return to zero, releasing a previously active
+ * bound. Directions preserve every hard equality and are computed lazily. */
+function solveWithBounds(rows: Row[], bounds: Row[], weights: number[]): number[] {
+  const output = solve(rows, weights)
+  if (!bounds.length) return output
+  const directions = new Map<number, number[]>()
+  const multipliers = bounds.map(() => 0)
+  const homogeneous = rows.map(row => ({ ...row, value: 0 }))
+  for (let iteration = 0; iteration < 256; iteration++) {
+    let largestChange = 0
+    for (const [index, bound] of bounds.entries()) {
+      const deficit = bound.value - rowValue(bound, output)
+      const next = Math.max(0, multipliers[index] + deficit)
+      const change = next - multipliers[index]
+      if (Math.abs(change) < 1e-8) continue
+      let direction = directions.get(index)
+      if (!direction) {
+        direction = solve([...homogeneous, { ...bound, value: 1 }], weights)
+        directions.set(index, direction)
+      }
+      multipliers[index] = next
+      direction.forEach((value, variable) => { output[variable] += change * value })
+      largestChange = Math.max(largestChange, Math.abs(change))
+    }
+    // Once projections identify the active set, solve it together. The dual
+    // signs certify that none of these bounds should release; this avoids slow
+    // one-neighbor-at-a-time convergence through long chains of minimum gaps.
+    if (iteration % 8 === 0 && multipliers.some(value => value > 1e-8)) {
+      const active = new Set(bounds.flatMap((_, index) => multipliers[index] > 1e-8 ? [index] : []))
+      try {
+        for (let expansion = 0; expansion <= bounds.length; expansion++) {
+          const activeIndices = [...active]
+          const dual: number[] = []
+          const candidate = solve([...rows, ...activeIndices.map(index => bounds[index])], weights, dual)
+          const negative = activeIndices.filter((_, index) => dual[rows.length + index] < -1e-7)
+          if (negative.length) { negative.forEach(index => active.delete(index)); continue }
+          const violated = bounds.flatMap((bound, index) => rowValue(bound, candidate) < bound.value - 1e-5 && !active.has(index) ? [index] : [])
+          if (!violated.length) return candidate
+          violated.forEach(index => active.add(index))
+        }
+      } catch { /* Keep projecting: a redundant or incompatible active set can release. */ }
+    }
+    if (largestChange < 1e-7 && output.every(Number.isFinite)
+      && rows.every(row => Math.abs(rowValue(row, output) - row.value) <= 1e-5)
+      && bounds.every(bound => rowValue(bound, output) >= bound.value - 1e-5)) return output
+  }
+  throw new Error(CONSTRAINT_MESSAGE)
 }
 
 function editComponent(project: Project, frames: Frame[], contacts: Contact[], ids: Set<string>, edit: Edit): Project {
   const indices = new Map(frames.map((item, index) => [item.panel.id, index]))
   const selected = frames.filter(item => ids.has(item.panel.id))
   if (!selected.length) return project
-  if (edit.kind === 'move' && selected.length === frames.length) {
+  const constraints = (project.constraints ?? []).filter(rule => rule.enabled && designConstraintPanelIds(rule).every(id => indices.has(id)))
+  if (edit.kind === 'move' && selected.length === frames.length && !constraints.length) {
     return { ...project, panels: project.panels.map(panel => indices.has(panel.id) ? {
       ...panel, position: panel.position.map((value, axis) => value + edit.delta[axis]) as Vec3,
     } : panel) }
@@ -121,9 +180,12 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     weights.push(4)
   }
   const rows: Row[] = []
+  const preferences = new Set<Row>()
+  const bounds: Row[] = []
   const thicknessChange = (index: number) => edit.kind === 'resize'
     ? (edit.patches?.[frames[index].panel.id]?.thickness ?? frames[index].panel.thickness) - frames[index].panel.thickness : 0
   const row = (value = 0): Row => { const next = { entries: new Map<number, number>(), value }; rows.push(next); return next }
+  const preference = (value = 0): Row => { const next = row(value); preferences.add(next); return next }
   const add = (target: Row, index: number, value: number) => target.entries.set(index, (target.entries.get(index) ?? 0) + value)
   const center = (target: Row, index: number, axis: Vector3, scale = 1) => {
     frames[index].axes.forEach((own, dimension) => add(target, index * 5 + dimension, own.dot(axis) * scale))
@@ -135,6 +197,46 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     target.value -= side * Math.abs(frames[index].axes[2].dot(axis)) * scale * thicknessChange(index) / 2
   }
   const worldAxes = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)]
+  const referenceSide = (reference: ConstraintReference) => reference === 'min' ? -1 : reference === 'max' ? 1 : 0
+  const controlledDimensions = new Set(constraints.flatMap(rule => rule.kind === 'dimension' || rule.kind === 'equal-dimension'
+    ? designConstraintPanelIds(rule).map(id => `${id}/${rule.dimension}`) : []))
+  for (const evaluation of evaluateDesignConstraints(constraints, frames.map(item => item.panel))) {
+    const rule = evaluation.constraint
+    if (evaluation.issue) throw new Error(evaluation.issue)
+    const target = row(evaluation.target - evaluation.actual)
+    if (rule.kind === 'floor') {
+      edge(target, indices.get(rule.panelId)!, worldAxes[1], referenceSide(rule.reference))
+    } else if (rule.kind === 'dimension') {
+      add(target, indices.get(rule.panelId)! * 5 + (rule.dimension === 'width' ? 3 : 4), 1)
+    } else if (rule.kind === 'equal-dimension') {
+      add(target, indices.get(rule.panelIds[1])! * 5 + (rule.dimension === 'width' ? 3 : 4), 1)
+      add(target, indices.get(rule.panelIds[0])! * 5 + (rule.dimension === 'width' ? 3 : 4), -1)
+    } else if (rule.kind === 'level') {
+      edge(target, indices.get(rule.panelIds[1])!, worldAxes[1], referenceSide(rule.references[1]))
+      edge(target, indices.get(rule.panelIds[0])!, worldAxes[1], referenceSide(rule.references[0]), -1)
+    } else {
+      const axis = worldAxes[['x', 'y', 'z'].indexOf(rule.axis)]
+      edge(target, indices.get(rule.panelIds[1])!, axis, -1)
+      edge(target, indices.get(rule.panelIds[0])!, axis, 1, -1)
+      if (rule.relation === 'minimum') { rows.pop(); bounds.push(target) }
+    }
+  }
+  // A relation between loose panels should move its peer, not make that panel
+  // thinner/shorter merely because resizing has a lower objective weight.
+  const physicallySupported = new Set(connections.flatMap(connection => [connection.parentId, connection.childId]))
+  contacts.forEach(contact => { physicallySupported.add(frames[contact.a].panel.id); physicallySupported.add(frames[contact.b].panel.id) })
+  for (const [index, item] of frames.entries()) {
+    if (!constraints.length) continue
+    for (const [dimension, field] of (['width', 'height'] as const).entries()) {
+      const preservesOwnSize = edit.kind === 'reconcile' ? constraints.some(rule => designConstraintPanelIds(rule).includes(item.panel.id))
+        : !physicallySupported.has(item.panel.id) && !ids.has(item.panel.id)
+      if (preservesOwnSize && !controlledDimensions.has(`${item.panel.id}/${field}`)) add(row(), index * 5 + 3 + dimension, 1)
+      // Bounds belong in the same solve, so another feasible placement can be
+      // found instead of rejecting an unconstrained optimum beyond stock limits.
+      bounds.push({ entries: new Map([[index * 5 + 3 + dimension, 1]]), value: 40 - item.panel[field] },
+        { entries: new Map([[index * 5 + 3 + dimension, -1]]), value: item.panel[field] - 4000 })
+    }
+  }
 
   for (const connection of connections) {
     const parentIndex = indices.get(connection.parentId)!, childIndex = indices.get(connection.childId)!
@@ -277,6 +379,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   })
 
   for (const item of selected) {
+    if (edit.kind === 'reconcile') continue
     const index = indices.get(item.panel.id)!
     for (const [dimension, field] of (['width', 'height'] as const).entries()) {
       const patch = edit.kind === 'resize' ? edit.patches?.[item.panel.id] ?? edit.patch : undefined
@@ -292,22 +395,52 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     // An edge pull shifts the center by half the growth to anchor its opposite
     // edge. Numeric dimension edits keep the selected center stationary.
     for (const [dimension, axis] of worldAxes.entries()) {
-      const constraint = row(edit.centerDelta?.[dimension] ?? 0)
+      const constraint = (edit.centerDelta || edit.local ? row : preference)(edit.centerDelta?.[dimension] ?? 0)
       selected.forEach(item => center(constraint, indices.get(item.panel.id)!, axis, 1 / selected.length))
     }
-  } else {
+  } else if (edit.kind === 'move') {
     const axis = new Vector3(...edit.delta).normalize()
-    const minimum = Math.min(...frames.map(item => coordinate(item, axis, -1)))
-    const maximum = Math.max(...frames.map(item => coordinate(item, axis, 1)))
-    const touchesMin = selected.some(item => Math.abs(coordinate(item, axis, -1) - minimum) < CONTACT_TOLERANCE)
-    const touchesMax = selected.some(item => Math.abs(coordinate(item, axis, 1) - maximum) < CONTACT_TOLERANCE)
+    const physicalRoots = frames.map((_, index) => index)
+    const physicalRoot = (index: number): number => { while (physicalRoots[index] !== index) { physicalRoots[index] = physicalRoots[physicalRoots[index]]; index = physicalRoots[index] } return index }
+    for (const connection of connections) physicalRoots[physicalRoot(indices.get(connection.parentId)!)] = physicalRoot(indices.get(connection.childId)!)
+    for (const contact of contacts) physicalRoots[physicalRoot(contact.a)] = physicalRoot(contact.b)
+    const physicalGroups = new Map<number, number[]>()
+    frames.forEach((_, index) => { const key = constraints.length ? physicalRoot(index) : 0; physicalGroups.set(key, [...physicalGroups.get(key) ?? [], index]) })
     // Move an outer boundary against its opposite boundary. Interior shelves
     // divide the existing opening, keeping both outside boundaries stationary.
-    for (const [side, boundary, touched] of [[-1, minimum, touchesMin], [1, maximum, touchesMax]] as const) {
-      if (touched && !(touchesMin && touchesMax)) continue
-      frames.forEach((item, index) => {
-        if (!ids.has(item.panel.id) && Math.abs(coordinate(item, axis, side) - boundary) < CONTACT_TOLERANCE) edge(row(), index, axis, side)
-      })
+    // A rule joins solve groups, but does not make their separate physical
+    // structures into one opening with an artificial fixed outside boundary.
+    for (const group of physicalGroups.values()) {
+      const moving = group.filter(index => ids.has(frames[index].panel.id))
+      if (!moving.length) continue
+      const minimum = Math.min(...group.map(index => coordinate(frames[index], axis, -1)))
+      const maximum = Math.max(...group.map(index => coordinate(frames[index], axis, 1)))
+      const touchesMin = moving.some(index => Math.abs(coordinate(frames[index], axis, -1) - minimum) < CONTACT_TOLERANCE)
+      const touchesMax = moving.some(index => Math.abs(coordinate(frames[index], axis, 1) - maximum) < CONTACT_TOLERANCE)
+      for (const [side, boundary, touched] of [[-1, minimum, touchesMin], [1, maximum, touchesMax]] as const) {
+        if (touched && !(touchesMin && touchesMax)) continue
+        for (const index of group) {
+          const item = frames[index]
+          if (!ids.has(item.panel.id) && Math.abs(coordinate(item, axis, side) - boundary) < CONTACT_TOLERANCE) edge(preference(), index, axis, side)
+        }
+      }
+    }
+  } else {
+    // A first/reference panel gives a new relationship a predictable direction.
+    // A user-selected reference is fixed; only inferred anchors may yield.
+    for (const rule of constraints) {
+      const anchored = edit.anchorPanelId && designConstraintPanelIds(rule).includes(edit.anchorPanelId)
+        && (!edit.ruleId || rule.id === edit.ruleId)
+      const anchorRow = anchored ? row : preference
+      if (rule.kind === 'equal-dimension') {
+        const id = rule.panelIds.includes(edit.anchorPanelId ?? '') ? edit.anchorPanelId! : rule.panelIds[0]
+        add(anchorRow(), indices.get(id)! * 5 + (rule.dimension === 'width' ? 3 : 4), 1)
+      } else if (rule.kind === 'level' || rule.kind === 'gap') {
+        const id = rule.panelIds.includes(edit.anchorPanelId ?? '') ? edit.anchorPanelId! : rule.panelIds[0]
+        worldAxes.forEach(axis => center(anchorRow(), indices.get(id)!, axis))
+      } else if (rule.kind === 'floor') {
+        for (const axis of [worldAxes[0], worldAxes[2]]) center(preference(), indices.get(rule.panelId)!, axis)
+      }
     }
   }
 
@@ -316,7 +449,19 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     for (let variable = 0; variable < 5; variable++) add(row(), index * 5 + variable, 1)
   })
 
-  const changes = solve(rows, weights)
+  let changes: number[]
+  try {
+    try { changes = constraints.length ? solveWithBounds(rows, bounds, weights) : solve(rows, weights) }
+    catch (error) {
+      if (!constraints.length || !preferences.size) throw error
+      // Explicit design intent outranks automatic center/exterior anchoring.
+      // Joints, supported contacts, gesture targets and local-edit locks remain.
+      changes = solveWithBounds(rows.filter(row => !preferences.has(row)), bounds, weights)
+    }
+  } catch (error) {
+    if (!constraints.length) throw error
+    throw new Error(`This edit cannot keep the design rules and joints satisfied. ${constraints.slice(0, 3).map(rule => describeDesignConstraint(rule, frames.map(item => item.panel))).join('; ')}. Edit or pause a rule first.`)
+  }
   const changedPanels = new Map(frames.map((item, index) => {
     const moved = position(item.panel)
     item.axes.forEach((axis, dimension) => moved.addScaledVector(axis, changes[index * 5 + dimension]))
@@ -345,9 +490,20 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     // the loose-panel solver deform their materialized, linked source panels.
     const looseConnections = project.connections.filter(connection => !managed.has(connection.parentId) && !managed.has(connection.childId))
     const boundary = new Set(project.panels.filter(panel => !managed.has(panel.id) && isPanelConnectedToAssembly(project, panel.id)).map(panel => panel.id))
+    const affected = new Set(wanted)
+    const relations = [...project.connections.map(connection => [connection.parentId, connection.childId]),
+      ...(project.constraints ?? []).filter(rule => rule.enabled).map(designConstraintPanelIds)]
+    for (let changed = true; changed;) {
+      changed = false
+      for (const relation of relations) if (relation.some(id => affected.has(id))) for (const id of relation) {
+        if (!affected.has(id)) { affected.add(id); changed = true }
+      }
+    }
+    if ([...affected].some(id => managed.has(id) || boundary.has(id))) throw new Error('This design rule reaches a linked assembly. Edit its shared values or disassemble it before adjusting these panels.')
     const loose: Project = { version: 1, name: project.name, connectorOverrides: project.connectorOverrides, panels: project.panels.filter(panel => !managed.has(panel.id) && !boundary.has(panel.id)),
-      connections: looseConnections.filter(connection => !boundary.has(connection.parentId) && !boundary.has(connection.childId)) }
-    const edited = editStructure(loose, ids, edit)
+      connections: looseConnections.filter(connection => !boundary.has(connection.parentId) && !boundary.has(connection.childId)),
+      constraints: project.constraints?.filter(rule => designConstraintPanelIds(rule).every(id => !managed.has(id) && !boundary.has(id))) }
+    const edited = editStructure(loose, ids, edit, validation)
     const byId = new Map(edited.panels.map(panel => [panel.id, panel]))
     const connectionById = new Map(edited.connections.map(connection => [connection.id, connection]))
     return { ...project, connectorOverrides: edited.connectorOverrides, panels: project.panels.map(panel => byId.get(panel.id) ?? panel), connections: project.connections.map(connection => connectionById.get(connection.id) ?? connection) }
@@ -355,13 +511,19 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   const panels = resolvePanels(project)
   if (!panels.some(panel => wanted.has(panel.id))) return project
   const frames = panels.map(frame)
-  const contacts = findContacts(frames)
+  const contacts = findContacts(frames).filter(contact => edit.kind !== 'move' || !edit.releaseContacts
+    || wanted.has(frames[contact.a].panel.id) === wanted.has(frames[contact.b].panel.id))
   const indices = new Map(panels.map((panel, index) => [panel.id, index]))
   const groups = panels.map((_, index) => index)
   const root = (index: number): number => { while (groups[index] !== index) { groups[index] = groups[groups[index]]; index = groups[index] } return index }
   const join = (a: number, b: number) => { groups[root(a)] = root(b) }
   project.connections.forEach(connection => { const a = indices.get(connection.parentId), b = indices.get(connection.childId); if (a !== undefined && b !== undefined) join(a, b) })
   contacts.forEach(contact => join(contact.a, contact.b))
+  for (const rule of project.constraints ?? []) {
+    if (!rule.enabled) continue
+    const [first, ...rest] = designConstraintPanelIds(rule).map(id => indices.get(id))
+    if (first !== undefined) for (const index of rest) if (index !== undefined) join(first, index)
+  }
   const components = new Map<number, number[]>()
   panels.forEach((_, index) => { const key = root(index); components.set(key, [...components.get(key) ?? [], index]) })
   let next: Project = { ...project, panels }
@@ -394,6 +556,10 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   const previousErrors = new Set(validateProject(project, validation).filter(issue => issue.severity === 'error').map(issue => issue.id))
   const newError = validateProject(next, validation).find(issue => issue.severity === 'error' && !previousErrors.has(issue.id))
   if (newError) throw new Error(`Cannot keep this edit connected: ${newError.message}`)
+  const affectedRoots = new Set([...wanted].flatMap(id => indices.has(id) ? [root(indices.get(id)!)] : []))
+  const violatedRule = evaluateDesignConstraints(next.constraints, next.panels).find(result => result.constraint.enabled && result.violation > 0
+    && designConstraintPanelIds(result.constraint).some(id => indices.has(id) && affectedRoots.has(root(indices.get(id)!))))
+  if (violatedRule) throw new Error(`Cannot satisfy this design rule: ${describeDesignConstraint(violatedRule.constraint, next.panels)}.`)
   const nextFrames = next.panels.map(frame)
   for (const contact of contacts) {
     const first = nextFrames[contact.a], second = nextFrames[contact.b]
@@ -406,11 +572,28 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   return next
 }
 
+/** Apply new or re-enabled rules as one immutable structural edit. The anchor
+ * panel is the reference when bringing a pair's values into agreement. */
+export function reconcileDesignConstraints(project: Project, anchorPanelId?: string, ruleId?: string): Project {
+  const evaluations = evaluateDesignConstraints(project.constraints, resolvePanels(project)).filter(result => result.constraint.enabled
+    && (!ruleId || result.constraint.id === ruleId))
+  const invalid = evaluations.find(result => result.issue)
+  if (invalid) throw new Error(invalid.issue)
+  const changed = evaluations.filter(result => result.violation > 0)
+  if (!changed.length) return project
+  const ids = [...new Set(changed.flatMap(result => designConstraintPanelIds(result.constraint)))]
+  const next = editStructure(project, ids, { kind: 'reconcile', anchorPanelId, ruleId })
+  const remaining = evaluateDesignConstraints(next.constraints, resolvePanels(next)).find(result => result.constraint.enabled && result.violation > 0
+    && (!ruleId || result.constraint.id === ruleId))
+  if (remaining) throw new Error(`Cannot satisfy this design rule: ${describeDesignConstraint(remaining.constraint, next.panels)}.`)
+  return next
+}
+
 /** Move selected panels by an exact world-space displacement, adapting connected spans. */
-export function movePanels(project: Project, ids: readonly string[], delta: Vec3): Project {
+export function movePanels(project: Project, ids: readonly string[], delta: Vec3, options: { releaseContacts?: boolean } = {}): Project {
   if (delta.some(value => !Number.isFinite(value))) throw new Error('Panel movement must be a finite distance.')
   if (delta.every(value => Math.abs(value) < EPSILON)) return project
-  return editStructure(project, ids, { kind: 'move', delta })
+  return editStructure(project, ids, { kind: 'move', delta, releaseContacts: options.releaseContacts })
 }
 
 /** Resize a selection while keeping structural joints and existing inserts fitted. */

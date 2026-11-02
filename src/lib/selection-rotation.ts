@@ -2,6 +2,7 @@ import { Euler, Quaternion, Vector3 } from 'three'
 import { getProjectBounds, resolvePanels } from './model'
 import type { Panel, Project, RotationAxis, Vec3 } from './types'
 import { assertNoNewTrofastIssues } from './trofast'
+import { assertDesignConstraintEdit } from './design-constraint-edits'
 
 /** Turn a complete selection rigidly around its center in world space. */
 export function rotateSelection(project: Project, selectedIds: readonly string[], axis: RotationAxis, degrees = 90): Project {
@@ -42,5 +43,5 @@ export function rotateSelection(project: Project, selectedIds: readonly string[]
   // Keep stored driving-child poses in agreement with their roots while
   // preserving every unselected panel exactly as it was.
   const resolved = new Map(resolvePanels(next).map(panel => [panel.id, panel]))
-  return assertNoNewTrofastIssues(project, { ...next, panels: next.panels.map(panel => wanted.has(panel.id) ? resolved.get(panel.id)! : panel) })
+  return assertDesignConstraintEdit(project, assertNoNewTrofastIssues(project, { ...next, panels: next.panels.map(panel => wanted.has(panel.id) ? resolved.get(panel.id)! : panel) }))
 }

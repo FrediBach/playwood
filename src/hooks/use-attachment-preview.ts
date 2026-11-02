@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { attachPanel, attachExistingPanel, resolvePanels, validateProject } from '@/lib/model'
+import { assertDesignConstraintEdit } from '@/lib/design-constraint-edits'
 import type { AttachmentOptions, Panel, Project } from '@/lib/types'
 
 interface Options {
@@ -17,7 +18,8 @@ export function useAttachmentPreview({project,selected,panels,draft,attachment,i
     if(inspectorTab!=='attach'||!selected)return {project:null,error:''}
     try {
       const base=attachTarget==='new'?project:{...project,panels:project.panels.map(p=>p.id===attachTarget?{...p,...draft,id:attachTarget}:p)}
-      return {project:attachTarget==='new'?attachPanel(base,selected.id,draft,attachment):attachExistingPanel(base,selected.id,attachTarget,attachment),error:''}
+      const next=attachTarget==='new'?attachPanel(base,selected.id,draft,attachment):attachExistingPanel(base,selected.id,attachTarget,attachment)
+      return {project:assertDesignConstraintEdit(project,next),error:''}
     }catch(error){return {project:null,error:error instanceof Error?error.message:'This panel cannot be attached here.'}}
   },[project,selected,draft,attachment,inspectorTab,attachTarget])
   const previewProject=previewResult.project

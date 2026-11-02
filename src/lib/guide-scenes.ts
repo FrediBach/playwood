@@ -17,6 +17,7 @@ import { getRescaleValues, rescaleProject } from './project-rescale'
 import { addCustomColor, removeCustomColor, updateCustomColor } from './custom-colors'
 import { snapPanelDelta } from './preview-snap'
 import { detectPreviewFurnishings, type FurnishingPlacement } from './preview-furnishings'
+import { setDesignConstraint } from './design-constraint-commands'
 
 export interface GuideScene {
   project: Project
@@ -54,6 +55,19 @@ const finish = (project: Project, selected: string[], color: string): Project =>
 
 function buildScenes(id: GuideId): GuideScene[] {
   switch (id) {
+    case 'constraints': {
+      const lower = createPanel({ id: 'guide-constraint-lower', name: 'Lower shelf', width: 600, height: 300, position: [0, 600, 0], rotation: [-Math.PI / 2, 0, 0] })
+      const upper = createPanel({ ...lower, id: 'guide-constraint-upper', name: 'Upper shelf', position: [0, 850, 0] })
+      const p: Project = { ...single(lower), panels: [lower, upper] }
+      const raised = setDesignConstraint(p, { id: 'guide-floor', kind: 'floor', enabled: true, panelId: lower.id, reference: 'max', value: 800 })
+      const spaced = setDesignConstraint(raised, { id: 'guide-gap', kind: 'gap', enabled: true, panelIds: [lower.id, upper.id], axis: 'y', relation: 'minimum', value: 200 }, lower.id)
+      const matched = setDesignConstraint(spaced, { id: 'guide-equal', kind: 'equal-dimension', enabled: true, panelIds: [lower.id, upper.id], dimension: 'height' }, lower.id)
+      const finished = setDesignConstraint(matched, { id: 'guide-width', kind: 'dimension', enabled: true, panelId: lower.id, dimension: 'width', value: 600 })
+      return [scene(p, 'Choose a placement measurement or a panel cut dimension before adding a rule.', { selected: [lower.id], document: { title: 'Design rules', lines: ['Height above floor', 'Fixed cut size', 'Equal cut sizes', 'Same level', 'Exact or min gap'] } }),
+        scene(raised, 'Preview the lower shelf with its top surface 800 mm above the floor.', { ghost: [lower.id], document: { title: 'Height above floor', lines: ['Top surface / edge', '800 mm = 80 cm', 'Add constraint · Cancel'] }, labels: [label(raised.panels[0], 'Top surface: 800 mm')] }),
+        scene(spaced, 'The upper shelf moves until its bottom is at least 200 mm above the lower shelf’s top.', { ghost: [upper.id], selected: [lower.id], alignment: [[[330, 800, 0], [330, 1000, 0]]], document: { title: 'Gap between panels', lines: ['Vertical · Y', 'At least 200 mm', 'Keep Lower shelf in place'] } }),
+        scene(finished, 'Both cut heights match while the shelves keep their different elevations and clear opening.', { selected: ids(finished), document: { title: '4 active rules', lines: ['Top: 800 mm', 'Gap: ≥200 mm', 'Cut heights: equal', 'Cut width: 600 mm'] } })]
+    }
     case 'projects': {
       const p = createStarterProject('shelf'), cube = box()
       const module = ASSEMBLY_LIBRARY.find(example => example.id === 'assembly-cube')!.create().assemblies!.definitions[0]

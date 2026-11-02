@@ -25,10 +25,13 @@ interface Props {
   groundFitReason: string
   buildTools?: ReactNode
   accessories?: ReactNode
+  constraints?: ReactNode
+  editError?: string
+  onManageConstraints?: () => void
 }
 const matchesRotation = (rotation:Vec3, reference:Vec3)=>rotation.every((angle,i)=>Math.abs(angle-reference[i])<.001)
 
-export function SinglePanelInspector({selected,panels,connection,supportConnected=false,connected=false,issues,updatePanel,updateConnection,onDetach,duplicateSelected,deleteSelected,onExtendToGround,groundFitReason,buildTools,accessories}: Props) {
+export function SinglePanelInspector({selected,panels,connection,supportConnected=false,connected=false,issues,updatePanel,updateConnection,onDetach,duplicateSelected,deleteSelected,onExtendToGround,groundFitReason,buildTools,accessories,constraints,editError,onManageConstraints}: Props) {
   const placement = <>
     <SelectField label="Orientation" disabled={supportConnected} value={matchesRotation(selected.rotation,[-Math.PI/2,0,0])?'horizontal':matchesRotation(selected.rotation,[0,Math.PI/2,0])?'side':matchesRotation(selected.rotation,[0,0,0])?'vertical':'custom'} onChange={v=>updatePanel({rotation:v==='horizontal'?[-Math.PI/2,0,0]:v==='side'?[0,Math.PI/2,0]:[0,0,0]})}>
       <option value="vertical">Vertical · front facing</option><option value="horizontal">Horizontal · flat</option><option value="side">Vertical · side facing</option><option value="custom" disabled>Custom rotation</option>
@@ -45,6 +48,7 @@ export function SinglePanelInspector({selected,panels,connection,supportConnecte
     <section className="inspector-section" aria-label="Panel dimensions">
       <div className="section-title"><h2>Dimensions</h2><span>mm</span></div>
       <PanelFields group="dimensions" compact resizeOnCommit panel={selected} onChange={updatePanel}/>
+      {editError&&<div className="validation-note error" role="status"><span>{editError}{onManageConstraints&&<button className="text-button" onClick={onManageConstraints}>Review constraints</button>}</span></div>}
       <Button variant="outline" size="sm" onClick={onExtendToGround} disabled={!!groundFitReason} aria-describedby="extend-ground-help"><ArrowDownToLine size={15}/>Extend to ground</Button>
       <p id="extend-ground-help" className="field-note ground-fit-note">{groundFitReason || 'Extend the lower edge to ground level (Y = 0), keeping the upper edge and existing joints in place.'}</p>
       <InspectorDisclosure title="About panel dimensions" className="inspector-help"><PanelDimensionsDiagram/><p className="field-note">Dimensions follow the panel's face, before assembly. Connected panels resize together.</p></InspectorDisclosure>
@@ -63,6 +67,7 @@ export function SinglePanelInspector({selected,panels,connection,supportConnecte
         <InspectorDisclosure title="Placement details">{placement}</InspectorDisclosure>
       </>:placement}
     </section>
+    {constraints}
     <PanelSecondaryFields resizeOnCommit panel={selected} onChange={updatePanel}/>
     {accessories}
     {buildTools}

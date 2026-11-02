@@ -19,6 +19,9 @@ interface Props {
   onDelete: () => void
   onDetach?: () => void
   buildTools?: ReactNode
+  constraints?: ReactNode
+  editError?: string
+  onManageConstraints?: () => void
 }
 const SIDES: Side[] = ['left', 'right', 'top', 'bottom', 'front', 'back']
 const AXES = ['X', 'Y', 'Z'] as const
@@ -36,7 +39,7 @@ function SharedConnectionFields({connections,onChange}: {connections:(Connection
   </section>
 }
 
-export function MultiPanelInspector({ panels, connections, issues, onChange, onConnectionChange, onDuplicate, onDelete, onDetach, buildTools }: Props) {
+export function MultiPanelInspector({ panels, connections, issues, onChange, onConnectionChange, onDuplicate, onDelete, onDetach, buildTools, constraints, editError, onManageConstraints }: Props) {
   const first = panels[0]
   const shared = getSharedPanelFields(panels)
   const selectedConnections = panels.map(panel => connections.find(c => c.childId === panel.id && c.role !== 'support'))
@@ -64,6 +67,7 @@ export function MultiPanelInspector({ panels, connections, issues, onChange, onC
     {shared.has('name')&&<label className="field"><span>Name</span><input key={`${panels.map(p=>p.id).join(',')}-${first.name}`} defaultValue={first.name} aria-label="Panel name" maxLength={60} onBlur={e=>onChange({name:e.target.value.trim()||'Untitled panel'})} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/></label>}
     {issues.filter(issue=>issue.panelIds.some(id=>selectedIds.has(id))).map(issue=><div className={`validation-note ${issue.severity}`} role="status" key={issue.id}><CircleHelp size={16}/><span>{issue.message}</span></div>)}
     <section className="inspector-section" aria-label="Panel dimensions"><div className="section-title"><h2>Dimensions</h2><span>mm</span></div><PanelFields group="dimensions" compact resizeOnCommit panel={first} panels={panels} onChange={onChange}/></section>
+    {editError&&<div className="validation-note error" role="status"><span>{editError}{onManageConstraints&&<button className="text-button" onClick={onManageConstraints}>Review constraints</button>}</span></div>}
     {hasDriving&&<SharedConnectionFields connections={selectedConnections} onChange={onConnectionChange}/>}
     <section className="inspector-section"><div className="section-title"><h2>Placement</h2><Move3D size={16}/></div>
       {anyAttached?<>
@@ -72,6 +76,7 @@ export function MultiPanelInspector({ panels, connections, issues, onChange, onC
         <InspectorDisclosure title="Placement details">{placement}</InspectorDisclosure>
       </>:placement}
     </section>
+    {constraints}
     <PanelSecondaryFields resizeOnCommit panel={first} panels={panels} onChange={onChange}/>
     {buildTools}
     <div className="panel-actions"><Button variant="outline" size="sm" onClick={onDuplicate}><Copy size={15}/>Duplicate {panels.length}</Button><Button variant="ghost" size="icon" aria-label="Delete selected panels" className="delete-button" onClick={onDelete}><Trash2 size={16}/></Button></div>

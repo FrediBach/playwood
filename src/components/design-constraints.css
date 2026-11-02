@@ -1,0 +1,40 @@
+.design-constraints .inspector-disclosure-summary{font-variant-numeric:tabular-nums}
+.constraint-scope{display:flex;gap:4px;padding:3px;background:#edf0e6;border-radius:5px;margin-bottom:12px}
+.constraint-scope button{flex:1;padding:6px;background:none;border-radius:3px;color:#6b775c;font-size:11px}
+.constraint-scope button[aria-pressed=true]{background:var(--paper);color:#3f5131;box-shadow:0 1px 3px #0001}
+.constraint-list{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:8px}
+.constraint-list li{border:1px solid var(--line);border-radius:6px;background:#f8f9f3;overflow:hidden}
+.constraint-list li.has-issue{border-color:#d8b996;background:#fff8ed}
+.constraint-list li.is-disabled{background:#f4f4ef}
+.constraint-description{display:flex;align-items:flex-start;gap:8px;padding:10px;width:100%;background:none;text-align:left;color:#4c5a3f;font-size:12px;line-height:1.4}
+.constraint-description>svg{flex-shrink:0;margin-top:2px}
+.constraint-description>svg:last-child{margin-left:auto}
+.constraint-description>span{min-width:0;overflow-wrap:anywhere}
+.constraint-description small{display:block;margin-top:4px;font-size:10px;color:#748064}
+.constraint-list li.has-issue .constraint-description small{color:#986027}
+.constraint-list li.is-disabled .constraint-description{color:#7b8172}
+.constraint-row-actions{display:flex;align-items:center;gap:3px;padding:2px 7px 6px}
+.constraint-row-actions label{display:flex;align-items:center;gap:6px;margin-right:auto;color:#6b775e;font-size:11px}
+.constraint-row-actions input{accent-color:var(--accent)}
+.constraint-row-actions .ui-button{width:28px;height:28px}
+.constraint-form{padding-top:3px;min-width:0}
+.constraint-form .field{margin-bottom:12px}
+.constraint-form .field select{max-width:100%;text-overflow:ellipsis;padding-right:28px}
+.constraint-panel-choice{margin-bottom:12px}
+.constraint-panel-choice .field{margin-bottom:3px}
+.constraint-panel-choice>.ui-button{padding:3px 0;height:auto;min-height:25px;font-size:11px}
+.constraint-reference{padding:10px;border-radius:5px;background:#edf1e6;margin-bottom:12px}
+.constraint-reference .field{margin-bottom:4px}
+.constraint-reference>.ui-button{padding-left:0;margin-bottom:5px}
+.constraint-reference .field-note{font-size:11px;margin-bottom:0}
+.constraint-sentence{font-size:12px;line-height:1.5;padding:10px;border-left:2px solid #9aaa85;background:#f1f4eb;overflow-wrap:anywhere;margin-bottom:9px}
+.constraint-form-footer{position:sticky;bottom:-22px;background:var(--paper);border-top:1px solid var(--line);padding:10px 0 3px;z-index:1}
+.inspector-footer .constraint-form-footer{position:static;border-top:0;padding:0}
+.constraint-status{display:flex;align-items:flex-start;gap:7px;color:#54713e;font-size:11px;line-height:1.5;margin:0 0 9px;overflow-wrap:anywhere}
+.constraint-status svg{flex-shrink:0;margin-top:2px}
+.constraint-status.is-blocked{color:#995c2d}
+.constraint-form-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.constraint-form-actions>.ui-button:first-child{flex:1}
+.design-constraints button:focus-visible,.constraint-row-actions input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.constraint-overlay-label{display:block;white-space:nowrap;background:#fafcf4ed;color:#435731;border:1px solid #a4b58d;border-radius:5px;padding:4px 7px;font-size:12px;font-variant-numeric:tabular-nums;box-shadow:0 2px 8px #0001}
+@media(max-width:680px){.constraint-form-actions>.ui-button{font-size:12px}.constraint-description{font-size:12px}.constraint-scope button{min-height:32px}}

@@ -3,6 +3,7 @@ import { disassembleAssembly } from './assemblies'
 import { autoConnect } from './auto-connect'
 import { connectorId, getPhysicalConnectors } from './connector-selection'
 import { getConnectorPlacements, resolvePanels, validateProject } from './model'
+import { designConstraintPanelIds } from './design-constraints'
 import type { Connection, Panel, Project, Vec3 } from './types'
 
 const vector = (value: Vec3) => new Vector3(...value)
@@ -42,6 +43,9 @@ export function reconcileAssemblyPlacement(project: Project, movingIds: readonly
     else kept.push(panel)
   }
   const remap = (id: string) => replacements.get(id) ?? id
+  if (project.constraints?.some(constraint => designConstraintPanelIds(constraint).some(id => replacements.has(id)))) {
+    throw new Error('This placement would merge panels referenced by a design rule. Remove their rules before merging these panels.')
+  }
   const selected = new Set(movingIds.map(remap))
   const groups = new Map<string, Connection[]>()
   for (const connection of project.connections) groups.set(jointId(connection), [...groups.get(jointId(connection)) ?? [], connection])

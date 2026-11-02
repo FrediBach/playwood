@@ -9,6 +9,8 @@ import { parseAssemblyData, releaseAssemblyLinksForPanels } from './assemblies'
 import { parseCustomColors } from './custom-colors'
 import { assertNoNewTrofastIssues, getTrofastInsertLocalBounds, MAX_TROFAST_INSERTS, validateTrofastInserts } from './trofast'
 import { getTrofastColor, getTrofastItem } from './trofast-catalog'
+import { copyDesignConstraints, describeDesignConstraint, designConstraintPanelIds, evaluateDesignConstraints, parseDesignConstraints } from './design-constraints'
+import { assertDesignConstraintEdit } from './design-constraint-edits'
 
 const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', painted: '#e8e7df' }
 const uid = () => globalThis.crypto?.randomUUID?.() ?? `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
@@ -191,6 +193,7 @@ export function removePanel(project: Project, id: string): Project {
   return { ...project,
     panels: worldPanels.filter(p => p.id !== id),
     connections: project.connections.filter(c => !affectedJointIds.has(jointId(c)) && !affectedSupports.has(jointId(c))),
+    ...(project.constraints ? { constraints: project.constraints.filter(constraint => !designConstraintPanelIds(constraint).includes(id)) } : {}),
   }
 }
 
@@ -201,7 +204,8 @@ export function duplicatePanel(project: Project, id: string): Project {
   const duplicate = createPanel({ ...panel, id: uid(), name: `${panel.name} copy`, position: insertOffset === null
     ? [panel.position[0] + 100, panel.position[1] + 100, panel.position[2] + 100]
     : [panel.position[0] + insertOffset, panel.position[1], panel.position[2]] })
-  return { ...project, panels: [...project.panels, duplicate] }
+  const constraints = copyDesignConstraints(project.constraints, new Map([[id, duplicate.id]]))
+  return { ...project, panels: [...project.panels, duplicate], ...(constraints.length ? { constraints: [...project.constraints ?? [], ...constraints] } : {}) }
 }
 
 export function getProjectBounds(panels: Panel[]) {
@@ -231,12 +235,12 @@ export function moveProject(project: Project, delta: Vec3): Project {
   if (!delta.every(Number.isFinite)) throw new Error('Movement must be a finite distance.')
   if (!project.panels.length || delta.every(value => value === 0)) return project
   const move = (position: Vec3): Vec3 => tuple(vec(position).add(vec(delta)))
-  return assertNoNewTrofastIssues(project, { ...project,
+  return assertDesignConstraintEdit(project, assertNoNewTrofastIssues(project, { ...project,
     panels: resolvePanels(project).map(panel => ({ ...panel, position: move(panel.position) })),
     ...(project.assemblies ? { assemblies: { ...project.assemblies,
       instances: project.assemblies.instances.map(instance => ({ ...instance, position: move(instance.position) })),
     } } : {}),
-  })
+  }))
 }
 
 /** Rotate the entire resolved assembly in world space, retaining its lowest panel height. */
@@ -262,7 +266,7 @@ export function rotateProject(project: Project, axis: RotationAxis, degrees: num
   })) }
   // Connections remain in panel-local coordinates. Resolve once more so stored
   // child poses agree with the roots, including multi-branch and support joints.
-  return assertNoNewTrofastIssues(project, { ...next, panels: resolvePanels(next) })
+  return assertDesignConstraintEdit(project, assertNoNewTrofastIssues(project, { ...next, panels: resolvePanels(next) }))
 }
 
 function panelObb(p: Panel) {
@@ -360,6 +364,10 @@ export function validateProject(project: Project, options: { trofastWorld?: bool
   for (let i = 0; i < panels.length; i++) for (let j = i + 1; j < panels.length; j++) {
     if (boxes[i].intersectsOBB(boxes[j])) issues.push({ id: `collision-${panels[i].id}-${panels[j].id}`, severity: 'warning', message: `${panels[i].name} overlaps ${panels[j].name}.`, panelIds: [panels[i].id, panels[j].id] })
   }
+  for (const result of evaluateDesignConstraints(project.constraints, panels)) if (result.constraint.enabled && result.violation > 0) issues.push({
+    id: `constraint-${result.constraint.id}`, severity: 'error', panelIds: designConstraintPanelIds(result.constraint),
+    message: result.issue ?? `${describeDesignConstraint(result.constraint, panels)}. Current measurement: ${Number(result.actual.toFixed(2))} mm.`,
+  })
   return [...issues, ...validateTrofastInserts(project, panels, options.trofastWorld !== false)]
 }
 
@@ -501,6 +509,7 @@ export function parseProject(input: unknown): Project {
     while (current) { if (visited.has(current)) throw new Error('Circular attachments are not supported.'); visited.add(current); current = parents.get(current) }
   }
   const project: Project = { version: 1, name: stringIn(input.name, 'project name'), panels, connections }
+  if (input.constraints !== undefined) project.constraints = parseDesignConstraints(input.constraints, panels)
   if (input.customColors !== undefined) project.customColors = parseCustomColors(input.customColors)
   if (input.assemblies !== undefined) project.assemblies = parseAssemblyData(input.assemblies, project)
   if (input.connectorOverrides !== undefined) {

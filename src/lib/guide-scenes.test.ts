@@ -5,6 +5,7 @@ import { getProjectBounds, resolvePanels, validateProject } from './model'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { GuidePreview } from '@/components/GuidePreview'
+import { evaluateDesignConstraints } from './design-constraints'
 
 const guideIds = BUILD_GUIDES.map(guide => guide.id)
 
@@ -62,5 +63,16 @@ describe('beginner guide project studies', () => {
     const palette = getGuideScene('palette', 3).project
     expect(palette.customColors).toHaveLength(0)
     expect(palette.panels.every(panel => panel.color === '#d9bd8c')).toBe(true)
+  })
+
+  it('illustrates surface height and minimum clear gap using the real rule commands', () => {
+    const raised = getGuideScene('constraints', 1).project
+    const finished = getGuideScene('constraints', 3).project
+    expect(raised.constraints).toHaveLength(1)
+    expect(finished.constraints).toHaveLength(4)
+    const measurements = evaluateDesignConstraints(finished.constraints, resolvePanels(finished))
+    expect(measurements.every(result => result.violation === 0)).toBe(true)
+    expect(measurements.find(result => result.constraint.kind === 'floor')!.actual).toBeCloseTo(800)
+    expect(measurements.find(result => result.constraint.kind === 'gap')!.actual).toBeCloseTo(200)
   })
 })

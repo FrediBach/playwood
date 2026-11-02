@@ -2,6 +2,7 @@ import { getProjectBounds, moveProject, parseProject, resolvePanels, validatePro
 import { resizePanelDimensions } from './structure-edit'
 import { rescaleAssemblies } from './assembly-rescale'
 import { getAssemblyParameterRange } from './assembly-parameters'
+import { assertDesignConstraintEdit } from './design-constraint-edits'
 import type { AssemblyParameter, Panel, Project, Vec3 } from './types'
 
 export type RescaleValueKind = 'dimension' | 'thickness' | 'cornerRadius' | 'holeSize' | 'holeSpacing'
@@ -157,11 +158,14 @@ export function rescaleProject(project: Project, changes: Record<string, number>
   const before = getProjectBounds(resolvePanels(project)), after = getProjectBounds(resolvePanels(next))
   const shift: Vec3 = [(before.min[0] + before.max[0] - after.min[0] - after.max[0]) / 2,
     before.min[1] - after.min[1], (before.min[2] + before.max[2] - after.min[2] - after.max[2]) / 2]
+  // Default grounding is only an editing preference. An explicit elevation
+  // already solved above owns vertical placement, including its chosen surface.
+  if (project.constraints?.some(rule => rule.enabled && rule.kind === 'floor')) shift[1] = 0
   if (shift.some(value => Math.abs(value) > EPSILON)) next = moveProject(next, shift)
   const previousIssues = new Set(validateProject(project).map(issue => issue.id))
   const issue = validateProject(next).find(item => !previousIssues.has(item.id)
     && (item.severity === 'error' || item.id.startsWith('collision-')))
   if (issue) throw new Error(`These values cannot keep the creation connected: ${issue.message}`)
   parseProject(next)
-  return next
+  return assertDesignConstraintEdit(project, next)
 }

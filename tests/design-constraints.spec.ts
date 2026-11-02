@@ -1,0 +1,197 @@
+import { expect, test, type Page } from '@playwright/test'
+import { createPanel, getProjectBounds, resolvePanels } from '../src/lib/model'
+import type { Project } from '../src/lib/types'
+import { openInspectorSection } from './inspector-helpers'
+
+async function importProject(page: Page, project: Project) {
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'constraints.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+}
+
+async function exportedProject(page: Page): Promise<Project> {
+  await page.getByRole('button', { name: 'Export project', exact: true }).click()
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: /Project file All panels/ }).click()
+  const stream = await (await downloading).createReadStream()
+  const chunks: Buffer[] = []
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk))
+  await page.getByRole('button', { name: 'Close dialog' }).click()
+  return JSON.parse(Buffer.concat(chunks).toString())
+}
+
+async function setValue(page: Page, label: string, value: number) {
+  const field = page.getByLabel(label, { exact: true })
+  await field.fill(String(value))
+  await field.press('Enter')
+}
+
+const shelfProject = (): Project => ({ version: 1, name: 'Shelf constraints', connections: [], panels: [
+  createPanel({ id: 'lower', name: 'Lower shelf', width: 600, height: 400, thickness: 18, position: [0, 209, 0], rotation: [-Math.PI / 2, 0, 0] }),
+  createPanel({ id: 'upper', name: 'Upper shelf', width: 600, height: 400, thickness: 18, position: [0, 609, 0], rotation: [-Math.PI / 2, 0, 0] }),
+] })
+
+test('floor rules preview, reject conflicts, and persist as one undoable edit', async ({ page }) => {
+  await importProject(page, shelfProject())
+  await page.locator('.panel-list-select').first().click()
+  await openInspectorSection(page, 'Constraints')
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  await expect(page.getByLabel('Constraint type', { exact: true })).toBeFocused()
+  await setValue(page, 'Height above floor', 800)
+  await expect(page.locator('.constraint-status')).toContainText('Lower shelf')
+  await page.screenshot({ path: test.info().outputPath('floor-preview.png') })
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect((await exportedProject(page)).constraints ?? []).toHaveLength(0)
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  await setValue(page, 'Height above floor', 800)
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  const saved = await exportedProject(page)
+  expect(saved.constraints).toHaveLength(1)
+  expect(saved.constraints?.[0]).toMatchObject({ kind: 'floor', reference: 'max', value: 800, enabled: true })
+  expect(getProjectBounds(resolvePanels(saved).filter(panel => panel.id === 'lower')).max[1]).toBeCloseTo(800)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  const undone = await exportedProject(page)
+  expect(undone.constraints ?? []).toHaveLength(0)
+  expect(resolvePanels(undone).find(panel => panel.id === 'lower')?.position[1]).toBe(209)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(saved)
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  await setValue(page, 'Height above floor', 900)
+  await expect(page.getByRole('button', { name: 'Add constraint', exact: true })).toBeDisabled()
+  await expect(page.locator('.constraint-status.is-blocked')).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(saved)
+  await page.reload()
+  expect(await exportedProject(page)).toEqual(saved)
+})
+
+test('thickness edits maintain floor heights for one or multiple panels', async ({ page }) => {
+  const project = shelfProject()
+  project.constraints = [
+    { id: 'lower-height', kind: 'floor', enabled: true, panelId: 'lower', reference: 'max', value: 218 },
+    { id: 'upper-height', kind: 'floor', enabled: true, panelId: 'upper', reference: 'max', value: 618 },
+  ]
+  await importProject(page, project)
+  await page.locator('.panel-list-select').first().click()
+  const original = await exportedProject(page)
+  await setValue(page, 'Thickness', 20)
+  const single = await exportedProject(page)
+  expect(single.panels.map(panel => panel.thickness)).toEqual([20, 18])
+  expect(single.panels.map(panel => panel.position[1])).toEqual([208, 609])
+  expect(single.constraints).toEqual(original.constraints)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(original)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await setValue(page, 'Thickness', 20)
+  const multiple = await exportedProject(page)
+  expect(multiple.panels.map(panel => panel.thickness)).toEqual([20, 20])
+  expect(multiple.panels.map(panel => panel.position[1])).toEqual([208, 608])
+  expect(multiple.constraints).toEqual(original.constraints)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(original)
+})
+
+test('equal cut dimensions update both panels and preserve the shared rule', async ({ page }) => {
+  const project: Project = { version: 1, name: 'Equal sides', connections: [], panels: [
+    createPanel({ id: 'left', name: 'Left side', width: 300, height: 600, position: [-400, 300, 0] }),
+    createPanel({ id: 'right', name: 'Right side', width: 300, height: 400, position: [400, 200, 0] }),
+  ] }
+  await importProject(page, project)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Constraints')
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  await expect(page.getByLabel('Constraint type', { exact: true })).toHaveValue('equal-dimension')
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  const matched = await exportedProject(page)
+  expect(matched.panels.map(panel => panel.height)).toEqual([600, 600])
+  await page.locator('.panel-list-select').first().click()
+  await setValue(page, 'Height', 700)
+  const resized = await exportedProject(page)
+  expect(resized.panels.map(panel => panel.height)).toEqual([700, 700])
+  expect(resized.constraints).toEqual(matched.constraints)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(matched)
+  await page.getByRole('button', { name: 'All constraints', exact: true }).click()
+  await expect(page.getByRole('group', { name: 'New constraint', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await expect(page.getByRole('group', { name: 'New constraint', exact: true })).toHaveCount(0)
+  await page.locator('.panel-list-select').first().click()
+  await expect(page.getByRole('group', { name: 'New constraint', exact: true })).toHaveCount(0)
+})
+
+test('minimum gaps remain slack and disabled rules require a preview to reactivate', async ({ page }) => {
+  const project = shelfProject()
+  project.constraints = [{ id: 'shelf-gap', kind: 'gap', enabled: true, panelIds: ['lower', 'upper'], axis: 'y', relation: 'minimum', value: 200 }]
+  await importProject(page, project)
+  await page.locator('.panel-list-select').first().click()
+  await openInspectorSection(page, 'Constraints')
+  const unchanged = await exportedProject(page)
+  expect(unchanged.panels.find(panel => panel.id === 'upper')?.position[1]).toBe(609)
+  const enabled = page.getByRole('checkbox', { name: /^Enable constraint:/ })
+  await enabled.uncheck()
+  expect((await exportedProject(page)).constraints?.[0].enabled).toBe(false)
+  await enabled.click()
+  await expect(page.getByRole('group', { name: 'Edit constraint', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect((await exportedProject(page)).constraints?.[0].enabled).toBe(false)
+  await enabled.click()
+  await page.getByRole('button', { name: 'Save constraint', exact: true }).click()
+  expect((await exportedProject(page)).constraints?.[0].enabled).toBe(true)
+})
+
+test('a panel picked in the scene updates the draft without changing selection', async ({ page }) => {
+  const project: Project = { version: 1, name: 'Pick panels', connections: [], panels: [
+    createPanel({ id: 'left', name: 'Left side', width: 300, height: 600, position: [-400, 300, 0] }),
+    createPanel({ id: 'right', name: 'Right side', width: 300, height: 600, position: [400, 300, 0] }),
+  ] }
+  await importProject(page, project)
+  await page.locator('.panel-list-select').first().click()
+  await page.getByLabel('Camera view', { exact: true }).selectOption('front')
+  await openInspectorSection(page, 'Constraints')
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  await page.getByRole('button', { name: 'Pick constrained panel in preview', exact: true }).click()
+  const canvas = page.locator('canvas')
+  const box = (await canvas.boundingBox())!
+  const zoom = Math.min(box.width / 1.26, box.height / 0.76) * 0.74
+  await canvas.click({ position: { x: box.width / 2 + 0.4 * zoom, y: box.height / 2 } })
+  await expect(page.getByLabel('Constrained panel', { exact: true })).toHaveValue('right')
+  await expect(page.getByRole('checkbox', { name: 'Select Left side', exact: true })).toBeChecked()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect((await exportedProject(page)).constraints ?? []).toHaveLength(0)
+})
+
+test('constraint editing fits a narrow inspector and Escape restores focus', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const project = shelfProject()
+  project.constraints = [
+    { id: 'lower-height', kind: 'floor', enabled: true, panelId: 'lower', reference: 'max', value: 218 },
+    { id: 'upper-height', kind: 'floor', enabled: true, panelId: 'upper', reference: 'max', value: 618 },
+  ]
+  await importProject(page, project)
+  await page.getByRole('button', { name: 'Open inspector', exact: true }).click()
+  await openInspectorSection(page, 'Constraints')
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  await page.getByLabel('Constraint type', { exact: true }).selectOption('gap')
+  await expect(page.getByLabel('Lower panel', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Upper panel', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Pick upper panel in preview', exact: true }).click()
+  await expect(page.getByLabel('Upper panel', { exact: true })).toBeHidden()
+  await page.locator('canvas').focus()
+  await page.keyboard.press('Escape')
+  await expect(page.getByLabel('Upper panel', { exact: true })).toBeVisible()
+  await page.getByLabel('Required gap', { exact: true }).scrollIntoViewIfNeeded()
+  await setValue(page, 'Required gap', 500)
+  await expect(page.locator('.constraint-status.is-blocked')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add constraint', exact: true })).toBeDisabled()
+  await expect(page.locator('.toast')).toHaveCount(0)
+  await page.screenshot({ path: test.info().outputPath('narrow-conflict.png') })
+  await setValue(page, 'Required gap', 200)
+  const apply = page.getByRole('button', { name: 'Add constraint', exact: true })
+  await apply.scrollIntoViewIfNeeded()
+  await expect(apply).toBeInViewport()
+  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeInViewport()
+  expect(await page.locator('.inspector-scroll').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await page.getByLabel('Gap requirement', { exact: true }).focus()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('group', { name: 'New constraint', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Add constraint', exact: true })).toBeFocused()
+})

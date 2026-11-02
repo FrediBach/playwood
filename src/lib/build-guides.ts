@@ -1,5 +1,5 @@
 import type { BuildGuide } from './build-guide-types'
-import { PROJECTS_GUIDE, BOX_SELECT_GUIDE, GRID_SPLIT_GUIDE, SNAP_SETTINGS_GUIDE, PALETTE_GUIDE, MOVE_CREATION_GUIDE, RESCALE_GUIDE, ROOM_PREVIEW_GUIDE } from './build-guides-workflows'
+import { PROJECTS_GUIDE, BOX_SELECT_GUIDE, GRID_SPLIT_GUIDE, SNAP_SETTINGS_GUIDE, CONSTRAINTS_GUIDE, PALETTE_GUIDE, MOVE_CREATION_GUIDE, RESCALE_GUIDE, ROOM_PREVIEW_GUIDE } from './build-guides-workflows'
 
 export const BUILD_GUIDES: BuildGuide[] = [
   {
@@ -113,6 +113,7 @@ export const BUILD_GUIDES: BuildGuide[] = [
     ],
   },
   SNAP_SETTINGS_GUIDE,
+  CONSTRAINTS_GUIDE,
   {
     id: 'resize', category: 'Shape & arrange', title: 'Resize connected furniture', duration: '4 min',
     summary: 'Pull or push a panel or connector handle to make furniture wider, taller, or deeper.',

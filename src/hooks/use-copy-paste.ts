@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { copySelection, getPasteTargets, getInsertionTargets, type CopiedItem } from '@/lib/clipboard'
+import { designConstraintPanelIds } from '@/lib/design-constraints'
 import type { AssemblyAttachmentTarget } from '@/lib/assemblies'
 import type { Project } from '@/lib/types'
 
@@ -56,7 +57,9 @@ export function useCopyPaste({ project, selectedIds, commit, select, prepare, no
       try {
         const item = copySelection(project, selectedIds)
         setClipboard(item); cancel()
-        notify(`${item.kind === 'panel' ? 'Panel' : 'Assembly'} copied. Select a target and press Ctrl/Cmd+V.`)
+        const ids=new Set(selectedIds)
+        const omitted=project.constraints?.filter(rule=>designConstraintPanelIds(rule).some(id=>ids.has(id))&&(rule.kind==='floor'||designConstraintPanelIds(rule).some(id=>!ids.has(id)))).length??0
+        notify(`${item.kind === 'panel' ? 'Panel' : 'Assembly'} copied.${omitted?` ${omitted} floor or external ${omitted===1?'constraint stays':'constraints stay'} with the original.`:''} Select a target and press Ctrl/Cmd+V.`)
       } catch (error) { notify((error as Error).message) }
     },
     paste: () => {
@@ -74,9 +77,11 @@ export function useCopyPaste({ project, selectedIds, commit, select, prepare, no
       const next = candidate?.project
       if (!next) return
       const ids = candidate.panelIds ?? addedPanels(next).map(panel => panel.id)
-      commit(next); cancel(); select(ids)
-      const message = placement?.insertion ? `${placement.insertion === 'panel' ? 'Panel' : 'Assembly'} attached.` : 'Copy attached.'
-      notify(`${message}${candidate.warning ? ` ${candidate.warning.replace(/^Requires disassembly:/, 'Disassembled:')}` : ''} Undo is available.`)
+      try {
+        commit(next); cancel(); select(ids)
+        const message = placement?.insertion ? `${placement.insertion === 'panel' ? 'Panel' : 'Assembly'} attached.` : 'Copy attached.'
+        notify(`${message}${candidate.warning ? ` ${candidate.warning.replace(/^Requires disassembly:/, 'Disassembled:')}` : ''} Undo is available.`)
+      } catch(error) { notify(error instanceof Error?error.message:'This attachment conflicts with a constraint.') }
     },
   }
 }

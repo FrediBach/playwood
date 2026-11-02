@@ -4,6 +4,8 @@ import { reconcileAssemblyPlacement, samePanelPlacement } from './assembly-place
 import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { getConnectorPlacements, resolvePanels, validateProject } from './model'
+import { assertDesignConstraintEdit } from './design-constraint-edits'
+import { movePanels } from './structure-edit'
 import type { Connection, ConnectorType, Project, Side, Vec3 } from './types'
 
 const vector = (value: Vec3) => new Vector3(...value)
@@ -36,7 +38,7 @@ export interface PreviewDragSession {
   previousErrors: Set<string>
 }
 
-/** Prepare a rigid move without editing the persisted project or moving neighbors. */
+/** Release external joints in a preview; explicit rules can still move related peers. */
 export function preparePreviewDrag(original: Project, selectedIds: readonly string[]): PreviewDragSession | null {
   const wanted = new Set(selectedIds)
   const moving = original.panels.filter(panel => wanted.has(panel.id))
@@ -152,15 +154,18 @@ export function preparePreviewDrag(original: Project, selectedIds: readonly stri
 
 function translate(session: PreviewDragSession, delta: Vec3): Project {
   if (!delta.every(Number.isFinite)) throw new Error('Movement must be finite.')
+  if (!session.instanceIds.length && session.project.constraints?.some(rule => rule.enabled)) {
+    return assertDesignConstraintEdit(session.original, movePanels(session.project, session.movingIds, delta, { releaseContacts: true }))
+  }
   const wanted = new Set(session.movingIds)
   const panels = session.project.panels.map(panel => wanted.has(panel.id) ? { ...panel, position: vector(panel.position).add(vector(delta)).toArray() } : panel)
   if (panels.some(panel => panel.position.some(value => Math.abs(value) > 100000))) throw new Error('This move exceeds the project placement limits.')
   const selectedInstances = new Set(session.instanceIds)
-  return { ...session.project, panels,
+  return assertDesignConstraintEdit(session.original, { ...session.project, panels,
     ...(session.project.assemblies ? { assemblies: { ...session.project.assemblies,
       instances: session.project.assemblies.instances.map(instance => selectedInstances.has(instance.id) ? { ...instance, position: vector(instance.position).add(vector(delta)).toArray() } : instance),
     } } : {}),
-  }
+  })
 }
 
 /** Total translation from pointer-down, with a true world-space attachment radius. */
@@ -191,9 +196,14 @@ export function movePreviewDrag(session: PreviewDragSession, delta: Vec3, snapDi
   options.sort((a, b) => Math.abs(a.distance - b.distance) > 1e-5 ? a.distance - b.distance
     : Number(!!b.assembly) - Number(!!a.assembly) || Number(!!a.assembly?.snap.warning) - Number(!!b.assembly?.snap.warning))
   for (const option of options) {
-    if (option.assembly) return { project: option.assembly.project, snap: option.assembly.snap }
+    if (option.assembly) {
+      try { return { project: assertDesignConstraintEdit(session.original, option.assembly.project), snap: option.assembly.snap } }
+      catch { continue }
+    }
     const target = option.target!
-    const next = translate(session, vector(delta).add(vector(option.correction!)).toArray())
+    let next: Project
+    try { next = translate(session, vector(delta).add(vector(option.correction!)).toArray()) }
+    catch { continue }
     const nextPanels = resolvePanels(next)
     const nextById = new Map(nextPanels.map(panel => [panel.id, panel]))
     const parent = nextById.get(target.connection.parentId)!, child = nextById.get(target.connection.childId)!
@@ -221,6 +231,7 @@ export function movePreviewDrag(session: PreviewDragSession, delta: Vec3, snapDi
     }
     if (validateProject(snapped).some(issue => (issue.severity === 'error' && !session.previousErrors.has(issue.id))
       || (issue.id.startsWith('collision-') && issue.panelIds.some(id => wanted.has(id)) && issue.panelIds.some(id => !wanted.has(id))))) continue
+    try { assertDesignConstraintEdit(session.original, snapped) } catch { continue }
     return { project: snapped, snap: { label: wanted.has(parent.id) ? child.name : parent.name,
       position: getConnectorPlacements({ ...connection, count: 1 }, parent, child)[0].position, panelIds, warning } }
   }

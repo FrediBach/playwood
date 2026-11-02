@@ -63,6 +63,17 @@ export type ListKind = 'panels' | 'connectors'
 /** Flat organizational folders; independent of physical assemblies and joints. */
 export interface ListGroup { id: string; name: string; kind: ListKind; itemIds: string[] }
 export interface PaletteColor { id: string; name: string; color: string }
+export type ConstraintReference = 'min' | 'center' | 'max'
+interface DesignConstraintBase { id: string; enabled: boolean }
+/** User-authored design requirements, distinct from physical connector joints. */
+export type DesignConstraint = DesignConstraintBase & (
+  | { kind: 'floor'; panelId: string; reference: ConstraintReference; value: number }
+  | { kind: 'dimension'; panelId: string; dimension: 'width' | 'height'; value: number }
+  | { kind: 'equal-dimension'; panelIds: [string, string]; dimension: 'width' | 'height' }
+  | { kind: 'level'; panelIds: [string, string]; references: [ConstraintReference, ConstraintReference] }
+  /** Ordered from the first panel's maximum to the second panel's minimum. */
+  | { kind: 'gap'; panelIds: [string, string]; axis: 'x' | 'y' | 'z'; relation: 'exact' | 'minimum'; value: number }
+)
 export interface Project {
   version: 1; name: string; panels: Panel[]; connections: Connection[]; assemblies?: AssemblyData;
   /** Additional panel finish swatches, saved with this project. */
@@ -72,6 +83,8 @@ export interface Project {
   connectorOverrides?: Record<string, ConnectorOverride>;
   listGroups?: ListGroup[];
   connectorOrder?: string[];
+  /** Optional in legacy saves; measurements and status are derived from resolved geometry. */
+  constraints?: DesignConstraint[];
 }
 export interface AttachmentOptions { side: Side; type: ConnectorType; offset: number; inset: number; flip: boolean; color: string; count: number; material?: ConnectorMaterial }
 export interface ValidationIssue { id: string; severity: 'warning' | 'error'; message: string; panelIds: string[] }
