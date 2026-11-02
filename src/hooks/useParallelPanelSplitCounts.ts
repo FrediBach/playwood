@@ -6,7 +6,8 @@ import type { Project } from '@/lib/types'
 export function useParallelPanelSplitCounts(project: Project, ids: string[]) {
   const [result, setResult] = useState<{ project: Project; ids: string[]; counts: number[]; checking: boolean }>()
   useEffect(() => {
-    if (!parallelPanelCut(resolvePanels(project).filter(panel => ids.includes(panel.id)))) return
+    const selectedIds = new Set(ids)
+    if (!parallelPanelCut(resolvePanels(project).filter(panel => selectedIds.has(panel.id)))) return
     const worker = new Worker(new URL('../lib/parallel-panel-split.worker.ts', import.meta.url), { type: 'module' })
     setResult({ project, ids, counts: [], checking: true })
     worker.onmessage = (event: MessageEvent<{ counts: number[]; checking: boolean }>) => {

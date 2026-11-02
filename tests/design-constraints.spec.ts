@@ -30,6 +30,30 @@ const shelfProject = (): Project => ({ version: 1, name: 'Shelf constraints', co
   createPanel({ id: 'upper', name: 'Upper shelf', width: 600, height: 400, thickness: 18, position: [0, 609, 0], rotation: [-Math.PI / 2, 0, 0] }),
 ] })
 
+test('duplicating constrained panels copies their shared rule and leaves the floor rule on the originals', async ({ page }) => {
+  const project = shelfProject()
+  project.constraints = [
+    { id: 'equal', enabled: true, kind: 'equal-dimension', panelIds: ['lower', 'upper'], dimension: 'height' },
+    { id: 'floor', enabled: true, kind: 'floor', panelId: 'lower', reference: 'max', value: 218 },
+  ]
+  await importProject(page, project)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await page.locator('canvas').focus()
+  await page.keyboard.press('ControlOrMeta+d')
+  await expect(page.locator('.panel-list-row')).toHaveCount(4)
+  const duplicated = await exportedProject(page)
+  const copies = duplicated.panels.filter(panel => !project.panels.some(original => original.id === panel.id))
+  expect(copies).toHaveLength(2)
+  expect(duplicated.constraints).toHaveLength(3)
+  expect(duplicated.constraints).toEqual(expect.arrayContaining(project.constraints))
+  const copiedRule = duplicated.constraints!.find(rule => rule.id !== 'equal' && rule.id !== 'floor')!
+  expect(copiedRule).toMatchObject({ kind: 'equal-dimension', dimension: 'height', enabled: true, panelIds: copies.map(panel => panel.id) })
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  const undone = await exportedProject(page)
+  expect(undone.panels).toHaveLength(2)
+  expect(undone.constraints).toEqual(project.constraints)
+})
+
 for (const width of [1440, 390]) test(`constraints stay hidden without selection unless explicitly opened at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 })
   const project = shelfProject()

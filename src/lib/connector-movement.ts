@@ -8,14 +8,15 @@ import { getPanelMovementDelta } from './panel-movement-direction'
 
 /** The rail shared by every panel clamped by this piece of hardware. */
 export function getConnectorRail(connection: Connection, panels: Panel[], connections: Connection[]) {
-  const parent = panels.find(panel => panel.id === connection.parentId)
-  const child = panels.find(panel => panel.id === connection.childId)
+  const panelsById = new Map(panels.map(panel => [panel.id, panel]))
+  const parent = panelsById.get(connection.parentId)
+  const child = panelsById.get(connection.childId)
   const joint = (item: Connection) => item.id.replace(/:\d+$/, '')
   const branches = connections.filter(item => joint(item) === joint(connection))
   if (!parent?.visible || !child?.visible) return null
   let lower = -Infinity, upper = Infinity
   for (const branch of branches) {
-    const member = panels.find(panel => panel.id === branch.childId)
+    const member = panelsById.get(branch.childId)
     if (!member?.visible) return null
     const seam = getConnectorSeam(branch, parent, member)
     lower = Math.max(lower, seam.lower)

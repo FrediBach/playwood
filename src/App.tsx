@@ -283,7 +283,8 @@ export default function App() {
         if(instance){if(copied.has(instance.id))continue;copied.add(instance.id);next=duplicateAssembly(next,instance.id);const newInstance=next.assemblies!.instances.at(-1)!;copies.push(...Object.values(newInstance.panelIds));for(const [local,original] of Object.entries(instance.panelIds))copiedPanels.set(original,newInstance.panelIds[local])}
         else{const duplicate=duplicatePanel(next,id);if(duplicate!==next){const newId=duplicate.panels.at(-1)!.id;copies.push(newId);copiedPanels.set(id,newId)}next=duplicate}
       }
-      const pairRules=project.constraints?.filter(rule=>'panelIds' in rule&&!project.assemblies?.instances.some(instance=>rule.panelIds.every(id=>Object.values(instance.panelIds).includes(id))))
+      const assemblyPanelIds=project.assemblies?.instances.map(instance=>new Set(Object.values(instance.panelIds)))
+      const pairRules=project.constraints?.filter(rule=>'panelIds' in rule&&!assemblyPanelIds?.some(ids=>rule.panelIds.every(id=>ids.has(id))))
       const copiedRules=copyDesignConstraints(pairRules,copiedPanels)
       if(copiedRules.length)next={...next,constraints:[...next.constraints??[],...copiedRules]}
       const omittedRules=project.constraints?.filter(rule=>designConstraintPanelIds(rule).some(id=>copiedPanels.has(id))&&(rule.kind==='floor'||designConstraintPanelIds(rule).some(id=>!copiedPanels.has(id)))).length??0
