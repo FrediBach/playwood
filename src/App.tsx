@@ -369,7 +369,7 @@ export default function App() {
   useEffect(()=>{
     const onKey=(e:KeyboardEvent)=>{
       const target=e.target as HTMLElement
-      if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||target.closest('[role="dialog"]')||modalOpen)return
+      if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||target.closest('dialog,[role="dialog"]')||modalOpen)return
       if(constraints.editing){if(e.key==='Escape'){e.preventDefault();if(pickingConstraint){constraintPicker.current=null;setPickingConstraint(false);setRightOpen(true)}else constraints.cancel()}return}
       if(managingProjectConstraints&&e.key==='Escape'){e.preventDefault();closeProjectConstraints();return}
       if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='b'){

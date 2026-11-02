@@ -14,7 +14,13 @@ export function AssemblyParametersEditor({ panels, parameters, onChange }: {
   panels: Panel[]; parameters: AssemblyParameter[]; onChange: (parameters: AssemblyParameter[]) => void
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const editedDefaults = useRef(new Set(parameters.map(parameter => parameter.id)))
+  const initialParameters = useRef(parameters)
+  const editedDefaults = useRef<Set<string> | null>(null)
+  // Only event handlers need this bookkeeping; initialize it on first use.
+  const getEditedDefaults = () => {
+    if (editedDefaults.current === null) editedDefaults.current = new Set(initialParameters.current.map(parameter => parameter.id))
+    return editedDefaults.current
+  }
   const update = (id: string, patch: Partial<AssemblyParameter>) => onChange(parameters.map(parameter => parameter.id === id ? { ...parameter, ...patch } : parameter))
   const add = () => {
     let name = 'Side length', number = 1
@@ -24,7 +30,7 @@ export function AssemblyParametersEditor({ panels, parameters, onChange }: {
   }
   const toggle = (parameter: AssemblyParameter, panel: Panel, dimension: typeof DIMENSIONS[number]) => {
     const exists = parameter.bindings.some(binding => binding.panelId === panel.id && binding.dimension === dimension)
-    const defaultValue = parameter.bindings.length || editedDefaults.current.has(parameter.id) ? parameter.defaultValue : panel[dimension]
+    const defaultValue = parameter.bindings.length || getEditedDefaults().has(parameter.id) ? parameter.defaultValue : panel[dimension]
     const first = parameter.bindings[0], firstPanel = first && panels.find(item => item.id === first.panelId)
     // Keep the original size difference even if the user has already changed
     // the default. Equally sized panels should still share the same value.
@@ -48,7 +54,7 @@ export function AssemblyParametersEditor({ panels, parameters, onChange }: {
         </div>
         {expanded && <div className="assembly-parameter-body">
           <label className="field"><span>Value name</span><input aria-label="Value name" value={parameter.name} maxLength={60} placeholder="e.g. Width" onChange={event => update(parameter.id, { name: event.target.value })}/></label>
-          <NumberField label="Default value" nice={!parameter.bindings.some(binding => binding.dimension === 'thickness')} value={parameter.defaultValue} precision={3} min={0.01} max={10000} onChange={defaultValue => { editedDefaults.current.add(parameter.id); update(parameter.id, { defaultValue }) }}/>
+          <NumberField label="Default value" nice={!parameter.bindings.some(binding => binding.dimension === 'thickness')} value={parameter.defaultValue} precision={3} min={0.01} max={10000} onChange={defaultValue => { getEditedDefaults().add(parameter.id); update(parameter.id, { defaultValue }) }}/>
           <div className="assembly-binding-label"><Link2 size={13}/><span>Dimensions controlled by this value</span></div>
           <p className="assembly-binding-note">Choose several to change them together. Panel dimensions are measured before assembly.</p>
           <div className="assembly-binding-list">

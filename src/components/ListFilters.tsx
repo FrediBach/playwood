@@ -13,7 +13,7 @@ export function FilterChoices({ label, values, selected, onChange, colors = fals
 
 export function ListFilters({ kind, filters, onChange, count, total, children }: { kind: string; filters: ListFiltersState; onChange: (filters: ListFiltersState) => void; count: number; total: number; children?: ReactNode }) {
   const id = useId()
-  const ref = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLDialogElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState({ left: 0, top: 0 })
@@ -23,14 +23,14 @@ export function ListFilters({ kind, filters, onChange, count, total, children }:
       const bounds = trigger.current!.getBoundingClientRect()
       setPosition({ left: Math.max(8, Math.min(bounds.left, window.innerWidth - 328)), top: Math.min(bounds.bottom + 8, window.innerHeight - 180) })
     }}><SlidersHorizontal size={15}/>{!!active && <span>{active}</span>}</button>
-    <div ref={ref} id={id} popover="auto" role="dialog" aria-label={`Filter ${kind}`} className="list-filter-popover" style={{ left: position.left, top: position.top, maxHeight: `calc(100dvh - ${position.top + 12}px)` }} onToggle={event => setOpen(event.newState === 'open')} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); ref.current?.hidePopover(); trigger.current?.focus() } }}>
+    <dialog ref={ref} id={id} popover="auto" aria-label={`Filter ${kind}`} className="list-filter-popover" style={{ left: position.left, top: position.top, maxHeight: `calc(100dvh - ${position.top + 12}px)` }} onToggle={event => { const shown = event.newState === 'open'; setOpen(shown); if (shown) event.currentTarget.querySelector<HTMLInputElement>('input[type=search]')?.focus({ preventScroll: true }) }} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); ref.current?.hidePopover(); trigger.current?.focus() } }}>
       <div className="filter-heading"><strong>Filter {kind}</strong><button aria-label="Close filters" onClick={() => { ref.current?.hidePopover(); trigger.current?.focus() }}><X size={16}/></button></div>
-      <label className="filter-field">Search<input autoFocus type="search" placeholder={kind === 'panels' ? 'Panel name…' : 'Panel name or connector type…'} value={filters.search} onChange={event => onChange({ ...filters, search: event.target.value })}/></label>
+      <label className="filter-field">Search<input type="search" placeholder={kind === 'panels' ? 'Panel name…' : 'Panel name or connector type…'} value={filters.search} onChange={event => onChange({ ...filters, search: event.target.value })}/></label>
       {children}
       <div className="filter-columns"><label className="filter-field">Visibility<select value={filters.visibility} onChange={event => onChange({ ...filters, visibility: event.target.value })}><option value="">All</option><option value="visible">Visible</option><option value="hidden">Hidden</option></select></label>
       <label className="filter-field">Selection<select value={filters.selection} onChange={event => onChange({ ...filters, selection: event.target.value })}><option value="">All</option><option value="selected">Selected</option><option value="unselected">Unselected</option></select></label></div>
       <div className="filter-footer"><span role="status">{count} of {total} {kind}</span><button disabled={!active} onClick={() => onChange(emptyFilters())}>Reset filters</button></div>
-    </div>
+    </dialog>
   </>
 }
 

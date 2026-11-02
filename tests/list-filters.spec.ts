@@ -1,5 +1,27 @@
 import { test, expect } from '@playwright/test'
 
+for (const width of [1440, 390]) test(`filters restore focus and dismiss without blocking the workspace at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  await page.goto('/')
+  if (width === 390) await page.getByRole('button', { name: 'Open panel list', exact: true }).click()
+  const trigger = page.getByRole('button', { name: 'Filter panels', exact: true })
+  const dialog = page.getByRole('dialog', { name: 'Filter panels', exact: true })
+  await trigger.click()
+  await expect(dialog).toBeInViewport()
+  await expect(dialog.getByRole('searchbox')).toBeFocused()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  await dialog.getByRole('searchbox').press('Escape')
+  await expect(dialog).not.toBeVisible()
+  await expect(trigger).toBeFocused()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  await trigger.click()
+  await expect(dialog.getByRole('searchbox')).toBeFocused()
+  // An outside action stays usable and light-dismisses the non-modal dialog.
+  await page.getByRole('tab', { name: 'Connectors', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Connectors', exact: true })).toHaveAttribute('aria-selected', 'true')
+})
+
 test('panel filters combine search and area, reset, and select only matches', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Filter panels', exact: true }).click()

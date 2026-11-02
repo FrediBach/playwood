@@ -97,7 +97,7 @@ Resize and control-drag hooks call their finish helpers only on release, retaini
 Several forms intentionally have a narrower transaction boundary than the project:
 
 - [PanelOutlineEditor.tsx](../src/components/PanelOutlineEditor.tsx) owns its own draft history, points, radius, zoom, pan, and snapping. Apply sends one panel patch; Cancel discards the draft. Its local Undo does not undo project history.
-- [AssemblyParametersEditor.tsx](../src/components/AssemblyParametersEditor.tsx) edits a parameter draft until Save values invokes the shared-design update. Cancel discards that draft.
+- [AssemblyParametersEditor.tsx](../src/components/AssemblyParametersEditor.tsx) edits a parameter draft until Save values invokes the shared-design update. Cancel discards that draft. Local bookkeeping tracks existing and explicitly edited defaults so adding the first dimension binding only infers a default for a new, untouched value. Its ID set initializes on the first relevant interaction using the parameters present when the editor mounted.
 - [PaletteManager.tsx](../src/components/PaletteManager.tsx) edits a color locally and calls the project palette callbacks only on Save. Those callbacks can replace uses of that color across panels, definition panels, and instance finish overrides.
 - [fields.tsx](../src/components/fields.tsx) supports fields whose numeric drafts commit on blur/Enter, avoiding partially typed dimensions becoming geometry operations.
 

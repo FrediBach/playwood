@@ -133,6 +133,27 @@ test('authors one value driving multiple dimensions during creation and edits it
   expect(validateProject(scaled)).toEqual([])
 })
 
+test('an explicitly entered default survives adding its first and subsequent bindings', async ({ page }) => {
+  const original = createExampleProject('cube')
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'cube.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(original)) })
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Create assembly')
+  await page.locator('.assembly-create-values summary').click()
+  await page.getByRole('button', { name: 'Add editable value', exact: true }).click()
+  await setValue(page, 'Default value', 420)
+  for (const panel of original.panels) {
+    await page.getByRole('checkbox', { name: `${panel.name} width`, exact: true }).check()
+    await page.getByRole('checkbox', { name: `${panel.name} height`, exact: true }).check()
+    await expect(page.getByLabel('Default value', { exact: true })).toHaveValue('420')
+  }
+  await page.getByRole('button', { name: 'Create assembly', exact: true }).click()
+  const created = await exportedProject(page)
+  expect(created.assemblies!.definitions[0].parameters![0].defaultValue).toBe(420)
+  expect(created.panels.every(panel => panel.width === 420 && panel.height === 420)).toBe(true)
+  expect(validateProject(created)).toEqual([])
+})
+
 test('shelf width, height and depth are independent and controls fit a mobile inspector', async ({ page }) => {
   const original = await importModule(page, 'assembly-wide-box')
   await setValue(page, 'Width', 850)
