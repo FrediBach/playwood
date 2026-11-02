@@ -1,8 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
-import { Euler, Quaternion, Vector3 } from 'three'
+import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
+import { OBB } from 'three/examples/jsm/math/OBB.js'
 import { gridProject } from '../src/lib/example-geometry'
 import { createPanel, getProjectBounds, moveProject, parseProject, resolvePanels, validateProject } from '../src/lib/model'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
+import { CONNECTOR_LOCAL_BOUNDS } from '../src/lib/connector-bounds'
+import { connectorSlide, getConnectorRail } from '../src/lib/connector-movement'
 import { samePanelPlacement } from '../src/lib/assembly-placement'
 import { preparePreviewResize } from '../src/lib/preview-resize'
 import type { Project, Vec3 } from '../src/lib/types'
@@ -220,6 +223,32 @@ function expectSourcePanelsUnchanged(original: Project, result: Project) {
   }
 }
 
+function installedHardware(project: Project) {
+  const panels = resolvePanels(project).map(panel => ({ ...panel, visible: true }))
+  return getPhysicalConnectors(project).map(piece => {
+    const rail = getConnectorRail(piece.connection, panels, project.connections)!
+    const placement = rail.placements[piece.index]
+    const position = new Vector3(...placement.position).addScaledVector(new Vector3(...rail.tangent),
+      connectorSlide(rail, piece.index, project.connectorOverrides?.[piece.id]?.slide))
+    const rotation = new Quaternion().setFromEuler(new Euler(...placement.rotation))
+    const matrix = new Matrix3().setFromMatrix4(new Matrix4().makeRotationFromQuaternion(rotation))
+    return { id: piece.id, type: piece.type, position: position.toArray(), parts: CONNECTOR_LOCAL_BOUNDS[piece.type].map(bounds => {
+      const min = new Vector3(...bounds.min), max = new Vector3(...bounds.max)
+      // CAD part envelopes independently check the installed positions, including saved slides.
+      // Ignore only 0.1 mm of face contact and exported-coordinate rounding.
+      return new OBB(min.clone().add(max).multiplyScalar(.5).applyQuaternion(rotation).add(position),
+        max.sub(min).multiplyScalar(.5).addScalar(-.05), matrix.clone())
+    }) }
+  })
+}
+
+function hardwareOverlaps(project: Project) {
+  const pieces = installedHardware(project)
+  return pieces.flatMap((piece, index) => pieces.slice(index + 1).flatMap(other =>
+    piece.parts.some(part => other.parts.some(otherPart => part.intersectsOBB(otherPart, 1e-8)))
+      ? [`${piece.type} ${piece.id} overlaps ${other.type} ${other.id}`] : []))
+}
+
 for (const { sign, view, label } of [
   { sign: 1, view: 'right', label: 'forward' },
   { sign: -1, view: 'perspective', label: 'backward' },
@@ -248,6 +277,7 @@ for (const { sign, view, label } of [
   const repeated = await savedProject(page)
   expectSourcePanelsUnchanged(project, repeated)
   expect(getPhysicalConnectors(repeated)).toHaveLength(40)
+  expect(hardwareOverlaps(repeated)).toEqual([])
   expect(validateProject(repeated)).toEqual([])
   const edge = sign > 0 ? 'max' : 'min'
   expect(getProjectBounds(resolvePanels(repeated))[edge][2] - getProjectBounds(resolvePanels(project))[edge][2]).toBeCloseTo(sign * PITCH * 2, 5)
@@ -255,7 +285,9 @@ for (const { sign, view, label } of [
   await expect(page.locator(`[data-resize-handle="${handle.id}"]`)).toBeFocused()
   await page.keyboard.press('Control+ArrowRight')
   await expect.poll(async () => (await savedProject(page)).panels.length).toBe(19)
-  expect(validateProject(await savedProject(page))).toEqual([])
+  const continued = await savedProject(page)
+  expect(validateProject(continued)).toEqual([])
+  expect(hardwareOverlaps(continued)).toEqual([])
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(repeated)
   await page.keyboard.press('ControlOrMeta+z')
@@ -265,6 +297,9 @@ for (const { sign, view, label } of [
   await page.reload()
   await expect.poll(() => savedProject(page)).toEqual(repeated)
   expect(parseProject(await savedProject(page))).toEqual(repeated)
+  const exported = await exportedProject(page)
+  expect(exported).toEqual(repeated)
+  expect(hardwareOverlaps(exported)).toEqual([])
   expect(errors).toEqual([])
 })
 
@@ -466,4 +501,39 @@ test('keyboard repetition keeps its world direction when the selected reused flo
   await expect.poll(() => savedProject(page)).toEqual(first)
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(project)
+})
+
+test('depth seam hardware clears frame corners in the exported and reloaded construction', async ({ page }) => {
+  const cube = gridProject('Depth seam clearance', [350], [350], { connectorColor: '#222222' })
+  const { project, handle } = await openCube(page, cube, 'perspective', 'Shelf 1.2', [0, 0, -1])
+  const originalHardware = installedHardware(project)
+  expect(hardwareOverlaps(project)).toEqual([])
+  const move = await beginRepeat(page, handle)
+  await move(PITCH)
+  await expect(page.locator('.preview-resize-caption').filter({ hasText: 'Repeat · 1 bay' })).toBeVisible()
+  await releaseRepeat(page)
+  await expect.poll(async () => (await savedProject(page)).panels.length).toBe(9)
+  await page.getByRole('button', { name: 'Fit assembly (F)', exact: true }).click()
+  for (let index = 0; index < 2; index++) await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
+  await settleScene(page)
+  await page.mouse.move(300, 200)
+  await page.screenshot({ path: 'test-results/preview-repeat-depth-seam-closeup.png' })
+
+  const repeated = await exportedProject(page)
+  expect(getPhysicalConnectors(repeated)).toHaveLength(24)
+  expect(validateProject(repeated)).toEqual([])
+  expect(hardwareOverlaps(repeated)).toEqual([])
+  const currentHardware = new Map(installedHardware(repeated).map(piece => [piece.id, piece]))
+  for (const piece of originalHardware) {
+    const current = currentHardware.get(piece.id)!
+    expect(current.type).toBe(piece.type)
+    current.position.forEach((value, axis) => expect(value).toBeCloseTo(piece.position[axis], 5))
+  }
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect.poll(() => savedProject(page)).toEqual(repeated)
+  await page.reload()
+  await expect.poll(() => savedProject(page)).toEqual(repeated)
+  expect(hardwareOverlaps(await exportedProject(page))).toEqual([])
 })

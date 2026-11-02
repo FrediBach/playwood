@@ -6,6 +6,7 @@ import { autoConnect } from './auto-connect'
 import { findPanelHoles } from './close-holes'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { connectorId } from './connector-selection'
+import { fitAddedConnectorClearance } from './connector-clearance'
 import { copyDesignConstraints, designConstraintPanelIds, MAX_DESIGN_CONSTRAINTS } from './design-constraints'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { gridPanelCut } from './grid-split'
@@ -256,6 +257,9 @@ function addCompartment(session: StructureRepeatSession, count: number) {
   }
   if ((next.constraints?.length ?? 0) + rules.length > MAX_DESIGN_CONSTRAINTS) throw new Error('This repeat would exceed the project limit for design constraints.')
   if (rules.length) next = { ...next, constraints: [...next.constraints ?? [], ...rules] }
+  // Source hardware preferences are copied above; only then fit the new pieces
+  // around existing CAD bodies so copied slides cannot undo required clearance.
+  next = fitAddedConnectorClearance(project, next)
   const resolved = new Map(resolvePanels(next).map(panel => [panel.id, panel]))
   if (resolvePanels(project).some(panel => !resolved.has(panel.id) || !samePanelPlacement(panel, resolved.get(panel.id)!))) {
     throw new Error('This repeat cannot keep the existing panels in place.')

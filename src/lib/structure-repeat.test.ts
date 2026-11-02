@@ -1,9 +1,12 @@
-import { Euler, Quaternion, Vector3 } from 'three'
+import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
+import { OBB } from 'three/examples/jsm/math/OBB.js'
 import { describe, expect, it } from 'vitest'
 import { createAssembly } from './assemblies'
 import { autoConnect } from './auto-connect'
 import { closePanelHole, findPanelHoles } from './close-holes'
 import { connectorId, getPhysicalConnectors } from './connector-selection'
+import { CONNECTOR_LOCAL_BOUNDS } from './connector-bounds'
+import { connectorSlide, getConnectorRail } from './connector-movement'
 import { gridProject } from './example-geometry'
 import { createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
 import { moveStructureRepeat, prepareStructureRepeat } from './structure-repeat'
@@ -12,7 +15,91 @@ import type { Project, Vec3 } from './types'
 const box = () => gridProject('Repeat box', [350], [350], { connectorColor: '#222222' })
 const top = (project: Project) => project.panels.find(panel => panel.name === 'Shelf 1.2')!
 
+/** Actual installed positions, including slides and removals; general project
+ * validation does not detect intersections between connector CAD bodies. */
+function overlappingHardware(project: Project) {
+  const panels = resolvePanels(project).map(panel => ({ ...panel, visible: true }))
+  const pieces = getPhysicalConnectors(project).map(piece => {
+    const rail = getConnectorRail(piece.connection, panels, project.connections)!
+    const placement = rail.placements[piece.index]
+    const origin = new Vector3(...placement.position).addScaledVector(new Vector3(...rail.tangent),
+      connectorSlide(rail, piece.index, project.connectorOverrides?.[piece.id]?.slide))
+    const orientation = new Quaternion().setFromEuler(new Euler(...placement.rotation))
+    const boxes = CONNECTOR_LOCAL_BOUNDS[piece.type].map(part => {
+      const min = new Vector3(...part.min), max = new Vector3(...part.max)
+      return new OBB(min.clone().add(max).multiplyScalar(.5).applyQuaternion(orientation).add(origin),
+        max.sub(min).multiplyScalar(.5).subScalar(.05), new Matrix3().setFromMatrix4(new Matrix4().makeRotationFromQuaternion(orientation)))
+    })
+    return { id: piece.id, type: piece.type, boxes }
+  })
+  return pieces.flatMap((a, index) => pieces.slice(index + 1).filter(b => a.boxes.some(first => b.boxes.some(second => first.intersectsOBB(second, 1e-8))))
+    .map(b => `${a.type} ${a.id} overlaps ${b.type} ${b.id}`))
+}
+
 describe('structure repeat', () => {
+  it.each([1, -1])('keeps CAD connector bodies clear during repeated depth pulls (%i)', sign => {
+    const original = box()
+    expect(overlappingHardware(original)).toEqual([])
+    const session = prepareStructureRepeat(original, top(original).id, [0, 0, sign])
+    const repeated = moveStructureRepeat(session, session.pitch * 2)
+    expect(repeated.count, repeated.reason).toBe(2)
+    expect(overlappingHardware(repeated.project)).toEqual([])
+  })
+
+  it('rejects a narrow bay when its new hardware bodies cannot fit, without retaining partial additions', () => {
+    const original = gridProject('Narrow bay', [150], [350], { depth: 350 })
+    const snapshot = structuredClone(original)
+    expect(validateProject(original)).toEqual([])
+    expect(overlappingHardware(original)).toEqual([])
+    const session = prepareStructureRepeat(original, top(original).id, [0, 0, 1])
+    const untouched = moveStructureRepeat(session, 0)
+    const rejected = moveStructureRepeat(session, session.pitch * 2)
+    expect(rejected).toMatchObject({ count: 0, limited: true, reason: expect.stringContaining('without overlapping hardware') })
+    expect(rejected.project).toBe(untouched.project)
+    expect(rejected.project.panels).toHaveLength(4)
+    expect(moveStructureRepeat(session, 0).project).toBe(original)
+    expect(moveStructureRepeat(session, session.pitch).project).toBe(original)
+    expect(original).toEqual(snapshot)
+  })
+
+  it.each([1, -1])('fits rotated depth hardware after copying customized quantities and slides (%i)', sign => {
+    const source = box()
+    source.connections = source.connections.map((connection, index) => ({ ...connection, count: 3, color: `#${index + 1}11111` }))
+    source.connectorOverrides = Object.fromEntries(source.connections.flatMap(connection => [
+      [connectorId(connection.id, 0), { color: '#123456', material: 'metal' as const, slide: 18 }],
+      [connectorId(connection.id, 1), { removed: true }],
+      [connectorId(connection.id, 2), { color: '#654321', type: '105' as const, slide: -18 }],
+    ]))
+    const original = rotateProject(rotateProject(source, 'y', 37), 'z', 23)
+    const snapshot = structuredClone(original)
+    const direction = new Vector3(0, 0, sign).applyAxisAngle(new Vector3(0, 1, 0), 37 * Math.PI / 180)
+      .applyAxisAngle(new Vector3(0, 0, 1), 23 * Math.PI / 180).toArray()
+    expect(overlappingHardware(original)).toEqual([])
+    const session = prepareStructureRepeat(original, top(original).id, direction)
+    const result = moveStructureRepeat(session, session.pitch * 2)
+    expect(result.count, result.reason).toBe(2)
+    expect(overlappingHardware(result.project)).toEqual([])
+    expect(resolvePanels(result.project).filter(panel => original.panels.some(old => old.id === panel.id))).toEqual(resolvePanels(original))
+    for (const [id, override] of Object.entries(original.connectorOverrides!)) expect(result.project.connectorOverrides?.[id]).toEqual(override)
+    const copied = result.project.connections.filter(connection => connection.type === '90' && !original.connections.some(old => old.id === connection.id))
+    expect(copied).toHaveLength(8)
+    for (const connection of copied) {
+      expect(connection.count).toBe(3)
+      expect(result.project.connectorOverrides?.[connectorId(connection.id, 0)]).toMatchObject({ color: '#123456', material: 'metal' })
+      expect(result.project.connectorOverrides?.[connectorId(connection.id, 1)]).toEqual({ removed: true })
+      expect(result.project.connectorOverrides?.[connectorId(connection.id, 2)]).toMatchObject({ color: '#654321', type: '105' })
+    }
+    const reloaded = parseProject(JSON.parse(JSON.stringify(result.project)))
+    expect(overlappingHardware(reloaded)).toEqual([])
+    const continued = prepareStructureRepeat(reloaded, result.selectedPanelId, direction)
+    const third = moveStructureRepeat(continued, continued.pitch)
+    expect(third.count, third.reason).toBe(1)
+    expect(overlappingHardware(third.project)).toEqual([])
+    expect(moveStructureRepeat(session, 0).project).toBe(original)
+    expect(moveStructureRepeat(session, session.pitch * 2).project).toBe(result.project)
+    expect(original).toEqual(snapshot)
+  })
+
   it('fills the lower row of a staircase by reusing the upper row ceilings and promoting cross joints', () => {
     const initial = box(), bottomId = initial.panels.find(panel => panel.name === 'Shelf 1.1')!.id
     const vertical = prepareStructureRepeat(initial, top(initial).id, [0, 1, 0])
@@ -88,7 +175,7 @@ describe('structure repeat', () => {
 
   it.each([0, 37])('reuses matching depth frames and preserves their hardware (%i degree rotation)', angle => {
     const source = box(), destination = box()
-    const targetPanels = resolvePanels(destination).map(panel => ({ ...panel, position: [panel.position[0], panel.position[1], panel.position[2] + 385] as Vec3, finishCoverage: .7 }))
+    const targetPanels = resolvePanels(destination).map(panel => ({ ...panel, position: [panel.position[0], panel.position[1], panel.position[2] + 385] as Vec3, finishCoverage: .7, visible: angle !== 0 }))
     const targetConnection = destination.connections[0]
     const combined: Project = { ...source, panels: [...source.panels, ...targetPanels], connections: [...source.connections, ...destination.connections],
       connectorOverrides: { [connectorId(targetConnection.id, 0)]: { color: '#123456', material: 'metal' } } }
@@ -102,6 +189,7 @@ describe('structure repeat', () => {
     expect(result.project.connections.filter(connection => destination.connections.some(old => old.id === connection.id)))
       .toEqual(original.connections.filter(connection => destination.connections.some(old => old.id === connection.id)))
     expect(result.project.connectorOverrides?.[connectorId(targetConnection.id, 0)]).toEqual(combined.connectorOverrides![connectorId(targetConnection.id, 0)])
+    expect(overlappingHardware(result.project)).toEqual([])
     expect(validateProject(result.project)).toEqual([])
     const traverse = prepareStructureRepeat(result.project, top(source).id, direction)
     const traversed = moveStructureRepeat(traverse, traverse.pitch)
