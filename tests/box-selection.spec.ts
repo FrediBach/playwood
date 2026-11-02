@@ -351,7 +351,7 @@ test('Shift unions panels and connectors and Escape restores the complete mixed 
 test('attachment previews and dialogs disable the box-selection shortcut', async ({ page }) => {
   const project = boards()
   await openProject(page, project)
-  await page.getByRole('button', { name: 'Attach', exact: true }).click()
+  await page.getByRole('button', { name: 'Attach a panel', exact: true }).click()
   await expect(boxTool(page)).toBeDisabled()
   await page.locator('canvas').press('b')
   await expect(boxTool(page)).toHaveAttribute('aria-pressed', 'false')

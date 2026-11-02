@@ -1,5 +1,5 @@
 import { getPhysicalConnectors } from '@/lib/connector-selection'
-import { isGeometryGuideActive, snapTargets, panelSnapPoints, snapPanelDelta, type SnapSettings } from '@/lib/preview-snap'
+import { snapPanelDelta, type SnapSettings } from '@/lib/preview-snap'
 import { Component, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
@@ -12,10 +12,10 @@ import { TrofastMeshes } from './TrofastMeshes'
 import { getTrofastInsertLocalBounds } from '@/lib/trofast'
 import { createWoodTextures } from './wood-texture'
 import { createPanelMaterials } from './panel-materials'
-import { RoomEnvironment } from './RoomEnvironment'
+import { SceneEnvironment } from './SceneEnvironment'
+import { useSceneSnapFeedback } from '@/hooks/use-scene-snap-feedback'
 import { PreviewFurnishings } from './PreviewFurnishings'
 import type { FurnishingPlacement } from '@/lib/preview-furnishings'
-import { GroundGrid } from './GroundGrid'
 import { DesignConstraintOverlay } from './DesignConstraintOverlay'
 import { getRoomLayout } from './room-layout'
 import { getConnectorKeyboardSlides, getConnectorRail } from '@/lib/connector-movement'
@@ -417,8 +417,61 @@ function PreviewContextGesture({ onOpen, realisticPreview }: Pick<SceneProps, 'r
   return null
 }
 
-function World(props: SceneProps & { attachmentElements: AttachmentElements; boxPreview: BoxSelectionPreview | null; onBoxPreview: (preview: BoxSelectionPreview | null) => void }) {
-  const { panels, connections, selectedIds, onSelect, previewPanels = EMPTY_PANELS, previewConnections = EMPTY_CONNECTIONS, attachmentBoundsPanels = EMPTY_PANELS, showGrid, showDimensions, exploded, realisticPreview } = props
+function SceneResizeHandles(props: SceneProps & { feedback: ReturnType<typeof useSceneSnapFeedback> }) {
+  if (props.boxSelectActive || !props.resizeHandles?.length || !props.onResizeStart || !props.onResizeMove || !props.onResizeEnd) return null
+  return <PreviewResizeHandles
+    handles={props.resizeHandles} keyboardStep={props.niceValueStep ?? (props.snapSettings?.grid ? props.snapSettings.spacing : 10)} enabled={props.movementEnabled && !props.dragging && !props.exploded}
+    onResizeStart={props.feedback.onResizeStart} onResizeMove={props.feedback.onResizeMove} onResizeEnd={props.onResizeEnd}
+    distance={props.resizeDistance} limited={props.resizeLimited}/>
+}
+
+type WorldProps = SceneProps & { attachmentElements: AttachmentElements; boxPreview: BoxSelectionPreview | null; onBoxPreview: (preview: BoxSelectionPreview | null) => void }
+
+/** Highlight both selection categories without changing which one receives movement. */
+function sceneHighlights(props: WorldProps) {
+  const boxPreview = props.boxSelectActive ? props.boxPreview : null
+  const highlightedPanels = boxPreview ? [...(boxPreview.additive ? props.selectedIds : []), ...boxPreview.panelIds] : props.selectedIds
+  const highlightedConnectors = boxPreview ? [...(boxPreview.additive ? props.selectedConnectorIds ?? [] : []), ...boxPreview.connectorIds] : props.selectedConnectorIds
+  const selectedIdSet = new Set([...highlightedPanels, ...props.constraintPanelIds ?? [], ...props.repeatPreview?.sourcePanelIds ?? [], ...props.repeatPreview?.reusedPanelIds ?? []])
+  return {selectedIdSet, highlightedConnectors}
+}
+
+function SceneParts(props: WorldProps & { shownPanels: Panel[] }) {
+  const {panels, connections, onSelect, shownPanels, previewPanels = EMPTY_PANELS, previewConnections = EMPTY_CONNECTIONS, exploded, realisticPreview} = props
+  const {selectedIdSet, highlightedConnectors} = sceneHighlights(props)
+  const repeatPanelIds = new Set(props.repeatPreview?.addedPanelIds)
+  const repeatConnectionIds = new Set(props.repeatPreview?.connectionIds)
+  return <>
+    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} ghost={repeatPanelIds.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
+    {realisticPreview && !!props.furnishings?.length && <PreviewFurnishings placements={props.furnishings} />}
+    {!exploded && <ConnectorMeshes panels={panels} connections={connections.filter(connection => !repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
+    {!exploded && !!repeatConnectionIds.size && <ConnectorMeshes panels={panels} connections={connections.filter(connection => repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} ghost />}
+    {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
+    {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
+  </>
+}
+
+function SceneOverlays(props: SceneProps & { shownPanels: Panel[] }) {
+  const {panels, shownPanels, exploded, realisticPreview} = props
+  const sideGuidePanel = props.attachmentSideGuide && !realisticPreview && !exploded && !props.boxSelectActive
+    ? shownPanels.find(panel => panel.id === props.attachmentSideGuide!.panelId) : undefined
+  return <>
+    {!exploded && !realisticPreview && props.designConstraint && <DesignConstraintOverlay constraint={props.designConstraint} panels={panels}/>}
+    {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
+    {sideGuidePanel && props.attachmentSideGuide && <AttachmentSideGuide panel={sideGuidePanel} guide={props.attachmentSideGuide}/>}
+  </>
+}
+
+function SceneMovement(props: SceneProps & { feedback: ReturnType<typeof useSceneSnapFeedback> }) {
+  const {connectorSelection, activePanelIds, activeConnectorIds, recordMovement} = props.feedback
+  return <>
+    <PanelKeyboardMovement {...props} selectedIds={activePanelIds} selectedConnectorIds={activeConnectorIds} onMovement={recordMovement} movementEnabled={props.movementEnabled && !props.dragging && !props.resizing && !props.boxSelectActive}/>
+    <PreviewDragMovement {...props} selectedIds={activePanelIds} movementEnabled={props.movementEnabled && !connectorSelection && !props.resizing && !props.boxSelectActive}/>
+  </>
+}
+
+function World(props: WorldProps) {
+  const { panels, previewPanels = EMPTY_PANELS, attachmentBoundsPanels = EMPTY_PANELS, showGrid, showDimensions, exploded, realisticPreview } = props
   const displayPanels = useMemo(() => {
     if (!exploded) return panels
     const center = boundsOf(panels).getCenter(new THREE.Vector3())
@@ -433,93 +486,22 @@ function World(props: SceneProps & { attachmentElements: AttachmentElements; box
     }
     return bounds
   }, [displayPanels, previewPanels, attachmentBoundsPanels, props.designConstraint])
-  const center = useMemo(() => bounds.getCenter(new THREE.Vector3()), [bounds])
   const shownPanels = displayPanels.filter(panel => panel.visible)
-  const sideGuidePanel = props.attachmentSideGuide && !realisticPreview && !exploded && !props.boxSelectActive
-    ? shownPanels.find(panel => panel.id === props.attachmentSideGuide!.panelId) : undefined
   const floorY = props.hasFloorConstraint || props.designConstraint?.kind === 'floor' ? -0.012 : bounds.min.y - 0.012
-  const extent = useMemo(() => Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 2.5), [bounds])
-  const boxPreview = props.boxSelectActive ? props.boxPreview : null
-  const highlightedPanels = boxPreview ? [...(boxPreview.additive ? selectedIds : []), ...boxPreview.panelIds] : selectedIds
-  const highlightedConnectors = boxPreview ? [...(boxPreview.additive ? props.selectedConnectorIds ?? [] : []), ...boxPreview.connectorIds] : props.selectedConnectorIds
-  const selectedIdSet = new Set([...highlightedPanels, ...props.constraintPanelIds ?? [], ...props.repeatPreview?.sourcePanelIds ?? [], ...props.repeatPreview?.reusedPanelIds ?? []])
-  const repeatPanelIds = new Set(props.repeatPreview?.addedPanelIds)
-  const repeatConnectionIds = new Set(props.repeatPreview?.connectionIds)
-  const connectorSelection = (props.selectionKind ?? (props.selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'connectors'
-  const activePanelIds = connectorSelection ? [] : selectedIds
-  const activeConnectorIds = connectorSelection ? props.selectedConnectorIds ?? [] : []
-  const activePanelIdSet = new Set(activePanelIds)
-  const activeConnectorIdSet = new Set(activeConnectorIds)
-  const [keyboardSnap, setKeyboardSnap] = useState<{ direction: Vec3; selection: string; handleId?: string } | null>(null)
-  const resizeHandleId = useRef<string | undefined>(undefined)
-  const resizeMode = useRef<PreviewResizeMode>('connected')
-  const selection = JSON.stringify([connectorSelection, activePanelIds, activeConnectorIds])
-  useEffect(() => {
-    if (!keyboardSnap) return
-    const timer = window.setTimeout(() => setKeyboardSnap(null), 900)
-    return () => window.clearTimeout(timer)
-  }, [keyboardSnap])
-  const recordMovement = (direction: Vec3) => setKeyboardSnap({ direction, selection })
-  const guideProject: Project = { version: 1, name: '', panels, connections, connectorOverrides: props.connectorOverrides }
-  const guideTargets = snapTargets(guideProject, activePanelIds, activeConnectorIds, connectorSelection)
-  const keyboardProbe = keyboardSnap?.selection === selection && keyboardSnap.handleId
-    ? props.resizeHandles?.find(handle => handle.id === keyboardSnap.handleId) : undefined
-  const probe = props.snapProbe ?? keyboardProbe
-  const guideSources = probe ? [probe.position] : connectorSelection
-    ? snapTargets(guideProject, [], getPhysicalConnectors(guideProject).filter(piece => !activeConnectorIdSet.has(piece.id)).map(piece => piece.id), true)
-    : panels.filter(panel => panel.visible && activePanelIdSet.has(panel.id)).flatMap(panelSnapPoints)
-  const guideDirection = props.snapProbe?.direction ?? props.snapDirection ?? (keyboardSnap?.selection === selection ? keyboardSnap.direction : [0, 0, 0]) as Vec3
+  const feedback = useSceneSnapFeedback(props)
   return <>
     <PreviewBoxSelection {...props} onPreview={props.onBoxPreview}/>
     <PreviewContextGesture onOpen={props.boxSelectActive ? undefined : props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
-    <PanelKeyboardMovement {...props} selectedIds={activePanelIds} selectedConnectorIds={activeConnectorIds} onMovement={recordMovement} movementEnabled={props.movementEnabled && !props.dragging && !props.resizing && !props.boxSelectActive}/>
-    <PreviewDragMovement {...props} selectedIds={activePanelIds} movementEnabled={props.movementEnabled && !connectorSelection && !props.resizing && !props.boxSelectActive}/>
+    <SceneMovement {...props} feedback={feedback}/>
     {props.view === 'perspective'
       ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
       : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
-    <color attach="background" args={[realisticPreview ? '#e9e7df' : '#eeede8']} />
-    {realisticPreview ? <RoomEnvironment bounds={bounds} /> : <>
-    <ambientLight intensity={0.9} />
-    <hemisphereLight args={['#ffffff', '#b6b0a0', 1.0]} />
-    <directionalLight position={[2.5, 5, 3.5]} intensity={2.3} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.001}
-      shadow-normalBias={0.006} shadow-camera-left={-3} shadow-camera-right={3} shadow-camera-top={3} shadow-camera-bottom={-3} shadow-camera-far={20} />
-    <directionalLight position={[-3, 2, -3]} intensity={0.5} />
-    <mesh position={[center.x, floorY - 0.002, center.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow raycast={() => null}>
-      <planeGeometry args={[200, 200]} /><shadowMaterial color="#706b60" transparent opacity={0.2} />
-    </mesh>
-    {showGrid && props.snapSettings?.geometry && !exploded && guideTargets.flatMap((point, index) => [0, 1, 2].map(axis => {
-      const start = point.map(value => value * MM) as Vec3, end = [...start] as Vec3
-      start[axis] -= extent / 2; end[axis] += extent / 2
-      const active = isGeometryGuideActive(point, axis, guideSources, guideDirection)
-      return <Line key={`${index}-${axis}`} name="geometry-snap-guide" userData={{ snapActive: active }} points={[start, end]}
-        color={active ? '#345b5c' : '#719899'} transparent opacity={active ? 0.9 : 0.25} lineWidth={active ? 1.6 : 1}
-        dashed dashSize={0.025} gapSize={0.025} />
-    }))}
-    {showGrid && <GroundGrid floorY={floorY} extent={extent} cellSize={props.snapSettings?.grid ? props.snapSettings.spacing * MM : 0.1} />}
-    </>}
-    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} ghost={repeatPanelIds.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
-    {realisticPreview && !!props.furnishings?.length && <PreviewFurnishings placements={props.furnishings} />}
-    {!exploded && <ConnectorMeshes panels={panels} connections={connections.filter(connection => !repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
-    {!exploded && !!repeatConnectionIds.size && <ConnectorMeshes panels={panels} connections={connections.filter(connection => repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} ghost />}
-    {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
-    {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
+    <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} snapSettings={props.snapSettings} guides={feedback.guides}/>
+    <SceneParts {...props} shownPanels={shownPanels}/>
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
-    {!exploded && !realisticPreview && props.designConstraint && <DesignConstraintOverlay constraint={props.designConstraint} panels={panels}/>}
-    {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
-    {!props.boxSelectActive && props.resizeHandles?.length && props.onResizeStart && props.onResizeMove && props.onResizeEnd ? <PreviewResizeHandles
-      handles={props.resizeHandles} keyboardStep={props.niceValueStep ?? (props.snapSettings?.grid ? props.snapSettings.spacing : 10)} enabled={props.movementEnabled && !props.dragging && !exploded}
-      onResizeStart={(id, mode) => {
-        const started = props.onResizeStart!(id, mode)
-        if (started) { resizeHandleId.current = id; resizeMode.current = mode ?? 'connected'; setKeyboardSnap(null) }
-        return started
-      }} onResizeMove={(distance, keyboard) => {
-        props.onResizeMove!(distance, keyboard)
-        const handle = props.resizeHandles?.find(item => item.id === resizeHandleId.current)
-        if (keyboard && handle && resizeMode.current !== 'repeat') setKeyboardSnap({ direction: handle.direction, selection, handleId: handle.id })
-      }} onResizeEnd={props.onResizeEnd}
-      distance={props.resizeDistance} limited={props.resizeLimited}/> : null}
+    <SceneOverlays {...props} shownPanels={shownPanels}/>
+    <SceneResizeHandles {...props} feedback={feedback}/>
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
-    {sideGuidePanel && props.attachmentSideGuide && <AttachmentSideGuide panel={sideGuidePanel} guide={props.attachmentSideGuide}/>}
     <CameraController panMode={props.panMode} bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
 }
