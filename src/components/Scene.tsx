@@ -1,3 +1,5 @@
+import { spaceBounds } from '@/lib/space-constraint'
+import { SpaceConstraintOverlay } from './SpaceConstraintOverlay'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
 import { snapPanelDelta, type SnapSettings } from '@/lib/preview-snap'
 import { Component, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
@@ -50,6 +52,7 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   connectorOverrides?: Project['connectorOverrides']
   designConstraint?: NonNullable<Project['constraints']>[number] | null
   constraintPanelIds?: readonly string[]
+  spaceConstraint?: Project['spaceConstraint']
   hasFloorConstraint?: boolean
   selectedConnectorIds?: readonly string[]
   /** Inspector category used for movement; both categories remain highlighted. */
@@ -456,6 +459,7 @@ function SceneOverlays(props: SceneProps & { shownPanels: Panel[] }) {
   const sideGuidePanel = props.attachmentSideGuide && !realisticPreview && !exploded && !props.boxSelectActive
     ? shownPanels.find(panel => panel.id === props.attachmentSideGuide!.panelId) : undefined
   return <>
+    {!exploded && !realisticPreview && props.spaceConstraint && <SpaceConstraintOverlay space={props.spaceConstraint} panels={panels}/> }
     {!exploded && !realisticPreview && props.designConstraint && <DesignConstraintOverlay constraint={props.designConstraint} panels={panels}/>}
     {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
     {sideGuidePanel && props.attachmentSideGuide && <AttachmentSideGuide panel={sideGuidePanel} guide={props.attachmentSideGuide}/>}
@@ -480,14 +484,19 @@ function World(props: WorldProps) {
   const bounds = useMemo(() => boundsOf(displayPanels), [displayPanels])
   const cameraBounds = useMemo(() => {
     const bounds = boundsOf([...displayPanels, ...previewPanels, ...attachmentBoundsPanels])
+    if (props.spaceConstraint?.enabled && !exploded && !realisticPreview) {
+      const space = spaceBounds(props.spaceConstraint)
+      bounds.expandByPoint(vector(space.min))
+      bounds.expandByPoint(vector(space.max))
+    }
     if (props.designConstraint) {
       bounds.expandByScalar(0.1)
       if (props.designConstraint.kind === 'floor') bounds.min.y = Math.min(bounds.min.y, 0)
     }
     return bounds
-  }, [displayPanels, previewPanels, attachmentBoundsPanels, props.designConstraint])
+  }, [displayPanels, previewPanels, attachmentBoundsPanels, props.designConstraint, props.spaceConstraint, exploded, realisticPreview])
   const shownPanels = displayPanels.filter(panel => panel.visible)
-  const floorY = props.hasFloorConstraint || props.designConstraint?.kind === 'floor' ? -0.012 : bounds.min.y - 0.012
+  const floorY = props.spaceConstraint?.enabled || props.hasFloorConstraint || props.designConstraint?.kind === 'floor' ? -0.012 : bounds.min.y - 0.012
   const feedback = useSceneSnapFeedback(props)
   return <>
     <PreviewBoxSelection {...props} onPreview={props.onBoxPreview}/>

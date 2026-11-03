@@ -41,3 +41,6 @@
 .constraint-overlay-label{display:block;white-space:nowrap;background:#fafcf4ed;color:#435731;border:1px solid #a4b58d;border-radius:5px;padding:4px 7px;font-size:12px;font-variant-numeric:tabular-nums;box-shadow:0 2px 8px #0001}
 .constraint-overlay-label small{display:block;margin-top:2px;font-size:10px;color:#647653}
 @media(max-width:680px){.constraint-form-actions>.ui-button{font-size:12px}.constraint-description{font-size:12px}.constraint-scope button{min-height:32px}}
+
+.space-constraint-toggle{display:flex;align-items:center;gap:8px;margin:16px 0;color:var(--ink);font-size:13px;line-height:1.5}
+.space-constraint-toggle input{margin:0;flex-shrink:0;accent-color:var(--accent)}

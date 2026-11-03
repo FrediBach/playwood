@@ -16,8 +16,8 @@ export function useProject() {
   // initial autosave share one version. Retain the saved original for Undo.
   const [history, setHistory] = useState<ProjectHistory>(() => {
     const original = ensureProjectPalette(initialProject())
-    const shelf = original.constraints?.length ? original : repairLegacyShelf(original)
-    const repaired = original.constraints?.length ? shelf : repairLegacyExampleInserts(shelf)
+    const shelf = (original.constraints?.length || original.spaceConstraint?.enabled) ? original : repairLegacyShelf(original)
+    const repaired = (original.constraints?.length || original.spaceConstraint?.enabled) ? shelf : repairLegacyExampleInserts(shelf)
     const present = ensureProjectPalette(repaired)
     const repairNotice = repaired === original ? '' : repaired !== shelf
       ? 'Library inserts fitted to their compartments. Undo is available.'

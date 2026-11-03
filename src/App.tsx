@@ -1,3 +1,4 @@
+import { SpaceConstraintInspector } from '@/components/SpaceConstraintInspector'
 import { buildPreviewMenuActions } from '@/components/preview-menu-actions'
 import { panelSvgFilename, panelToSvg } from '@/lib/panel-svg'
 import { readSnapSettings } from '@/lib/preview-snap'
@@ -372,7 +373,7 @@ export default function App() {
       const target=e.target as HTMLElement
       if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||target.closest('dialog,[role="dialog"]')||modalOpen)return
       if(constraints.editing){if(e.key==='Escape'){e.preventDefault();if(pickingConstraint){constraintPicker.current=null;setPickingConstraint(false);setRightOpen(true)}else constraints.cancel()}return}
-      if(managingProjectConstraints&&e.key==='Escape'){e.preventDefault();closeProjectConstraints();return}
+      if(projectConstraintsOpen&&e.key==='Escape'){e.preventDefault();closeProjectConstraints();return}
       if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='b'){
         if(boxSelectAvailable){e.preventDefault();if(!e.repeat)toggleBoxSelect()}
         return
@@ -516,7 +517,7 @@ export default function App() {
   const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
   const startNewProject=()=>{closeContextMenu();applyTemplate('blank',createExampleProject('blank'));setRealisticPreview(false);setView('perspective');setAttachTarget('new');setAttachment(INITIAL_ATTACHMENT);setImportError('');notify('New project started. Undo to restore your previous project.')}
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
-  const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=imported.constraints?.length?imported:repairLegacyShelf(imported);const repaired=imported.constraints?.length?shelf:repairLegacyExampleInserts(shelf);setProjectConstraintsOpen(false);constraints.cancel();commit(repaired,{replace:true});assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
+  const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=(imported.constraints?.length||imported.spaceConstraint?.enabled)?imported:repairLegacyShelf(imported);const repaired=(imported.constraints?.length||imported.spaceConstraint?.enabled)?shelf:repairLegacyExampleInserts(shelf);setProjectConstraintsOpen(false);constraints.cancel();commit(repaired,{replace:true});assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
   const instance=assembly.selectedInstance
   const holes=useMemo(()=>findPanelHoles(panels.filter(panel=>selectedIdSet.has(panel.id)),panels),[panels,selectedIdSet])
   const closeHole=(id:string)=>{
@@ -567,8 +568,8 @@ export default function App() {
 
   const openConstraints=(add=false)=>{
     if(assembly.editingInstance){notify('Finish editing the shared assembly before managing project constraints.');return}
-    clipboard.cancel();assembly.clearPlacement();closeContextMenu();setSelectedConnectorIds([])
-    setProjectConstraintsOpen(!selectedPanels.length)
+    clipboard.cancel();assembly.clearPlacement();closeContextMenu();if(selectedConnectorIds.length)setSelectedConnectorIds([])
+    setProjectConstraintsOpen(!add)
     setInspectorTab('panel');setRightOpen(true);setRealisticPreview(false);setExploded(false)
     if(window.innerWidth<=900)setLeftOpen(false)
     if(add)constraints.open();else constraints.manage()
@@ -645,7 +646,7 @@ export default function App() {
       onImportAssembly={()=>{setAssemblyImportError('');assemblyImportRef.current?.click()}} assemblyImportError={assemblyImportError}/>
 
     {contextMenu&&<PreviewContextMenu {...contextMenu} title={inspectingConnectors?`${selectedConnectors.length} connectors`:instance?.name??(selectedPanels.length===1?selectedPanels[0].name:selectedPanels.length?`${selectedPanels.length} panels`:'Preview')} actions={menuActions} onClose={closeContextMenu}/>}
-    <AssemblyWorkspace niceValueStep={getNiceValueStep(project.niceValues)} boxSelectActive={boxSelectActive&&boxSelectAvailable} boxSelectDisabled={!boxSelectAvailable} selectionKind={selectionKind} onToggleBoxSelect={toggleBoxSelect} onBoxSelect={selectBox} onBoxSelectCancel={cancelBoxSelect} resolveBoxPanelIds={resolveBoxPanelIds} resolveBoxConnectorIds={resolveBoxConnectorIds}
+    <AssemblyWorkspace spaceConstraint={project.spaceConstraint} niceValueStep={getNiceValueStep(project.niceValues)} boxSelectActive={boxSelectActive&&boxSelectAvailable} boxSelectDisabled={!boxSelectAvailable} selectionKind={selectionKind} onToggleBoxSelect={toggleBoxSelect} onBoxSelect={selectBox} onBoxSelectCancel={cancelBoxSelect} resolveBoxPanelIds={resolveBoxPanelIds} resolveBoxConnectorIds={resolveBoxConnectorIds}
       snapProbe={resize.snapProbe} snapDirection={drag.snapDirection} snapSettings={snapSettings} setSnapSettings={setSnapSettings} onPreviewContextMenu={constraints.editing||modalOpen||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
       if(target.connectorId&&!realisticPreview){if(!selectedConnectorIds.includes(target.connectorId))chooseConnector(target.connectorId)}
       else if(target.panelId!==undefined){if(!target.panelId||!selectedIds.includes(target.panelId))choosePanel(target.panelId||null)}
@@ -682,6 +683,7 @@ export default function App() {
       contextDetail={assembly.editingDefinition?`${assembly.editingDefinition.name} · affects ${assemblyCount(assembly.editingDefinition.id)} linked ${assemblyCount(assembly.editingDefinition.id)===1?'instance':'instances'}`:undefined}
       attachmentStatus={previewResult.error||attachmentErrors[0]?.message||(previewProject?'Panel thickness is compatible · Ready to attach':undefined)}
       footer={constraints.editing?<div ref={setConstraintFooter}/>:clipboard.active?<><p className="inspector-task-status" role="status">{attachmentSummary||'Choose a + in the workspace to attach.'}</p><Button variant="outline" className="full-button" onClick={clipboard.cancel}>Cancel placement</Button></>:assembly.placementActive?<><p className={`inspector-task-status ${attachmentWarning?'is-blocked':''}`} role="status">{attachmentSummary||assemblyHint}</p><Button variant="outline" className="full-button" onClick={assembly.clearPlacement}>Cancel attachment</Button></>:managingProjectConstraints?<Button variant="outline" className="full-button" aria-label="Done managing constraints" onClick={closeProjectConstraints}>Done</Button>:undefined}>
+        {projectConstraintsOpen&&!clipboard.active&&!assembly.editingInstance&&inspectorTab==='panel'&&!constraints.editing&&<SpaceConstraintInspector key={JSON.stringify(project.spaceConstraint && {...project.spaceConstraint,enabled:undefined})} value={project.spaceConstraint} panels={panels} onToggle={spaceConstraint=>{commit(current=>({...current,spaceConstraint}));if(spaceConstraint.enabled)setFitSignal(v=>v+1)}} onSave={spaceConstraint=>{commit(current=>({...current,spaceConstraint}));setFitSignal(v=>v+1);notify('Build space saved')}}/>}
         {inspectingConnectors?<ConnectorInspector panels={panels} fitSummary={fittedConnectorPanel?`${Math.round(fittedConnectorPanel.width)} × ${Math.round(fittedConnectorPanel.height)} × ${fittedConnectorPanel.thickness} mm`:undefined} connectors={selectedConnectors} onChange={patch=>commitWithInsertChecks(current=>editConnectors(current,selectedConnectorIds,patch))} onRemove={removeSelectedConnectors} onConnectPanel={connectWithPanel} panelFitReason={assembly.editingInstance?'Finish editing the assembly before connecting a panel.':modalOpen?'Close the dialog before connecting a panel.':connectorPanelFit.reason}/>:<>
         {clipboard.active?<div className="multi-selection-heading"><h2>Place {clipboard.inserting||'copy'}</h2><p>Hover a + in the workspace to preview. Click to attach, or cancel to return.</p></div>:assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
           panels={assembly.editingDefinition.panels.filter(panel=>selectedIdSet.has(assembly.editingInstance!.panelIds[panel.id]))}

@@ -80,7 +80,10 @@ export type DesignConstraint = DesignConstraintBase & (
   /** Ordered from the first panel's maximum to the second panel's minimum. */
   | ({ kind: 'gap'; panelIds: [string, string]; axis: 'x' | 'y' | 'z'; relation: 'exact' | 'minimum' | 'maximum' | 'range' } & ConstraintRequirement)
 )
+export interface SpaceConstraint { enabled: boolean; width: number; height: number; depth: number; centerX: number; centerZ: number }
+
 export interface Project {
+  spaceConstraint?: SpaceConstraint;
   version: 1; name: string; panels: Panel[]; connections: Connection[]; assemblies?: AssemblyData;
   /** Additional panel finish swatches, saved with this project. */
   customColors?: PaletteColor[];

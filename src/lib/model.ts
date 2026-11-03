@@ -1,3 +1,4 @@
+import { parseSpaceConstraint, spaceClearances } from './space-constraint'
 import { getOutlineError, panelCornerRadius } from './panel-shape'
 import { getPhysicalConnectors } from './connector-selection'
 import { connectorDisplayColor, getConnectorMaterial } from './connector-options'
@@ -300,6 +301,9 @@ function jointStructureIssues(connections: Connection[]): ValidationIssue[] {
 
 export function validateProject(project: Project, options: { trofastWorld?: boolean } = {}): ValidationIssue[] {
   const issues: ValidationIssue[] = jointStructureIssues(project.connections)
+  if (project.spaceConstraint?.enabled) for (const row of spaceClearances(project.spaceConstraint, resolvePanels(project))) {
+    if (row.clearance < -0.1) issues.push({ id: `${row.panel.id}-space`, severity: 'error', message: `${row.panel.name} exceeds the build space.`, panelIds: [row.panel.id] })
+  }
   const panels = resolvePanels(project)
   const byId = new Map(panels.map(p => [p.id, p]))
   const jointQuantities = new Map(project.connections.filter(c => c.count > 0).map(c => [jointId(c), c.count]))
@@ -510,6 +514,7 @@ export function parseProject(input: unknown): Project {
     while (current) { if (visited.has(current)) throw new Error('Circular attachments are not supported.'); visited.add(current); current = parents.get(current) }
   }
   const project: Project = { version: 1, name: stringIn(input.name, 'project name'), panels, connections }
+  if (input.spaceConstraint !== undefined) project.spaceConstraint = parseSpaceConstraint(input.spaceConstraint)
   if (input.niceValues !== undefined) project.niceValues = parseNiceValues(input.niceValues)
   if (input.constraints !== undefined) project.constraints = parseDesignConstraints(input.constraints, panels)
   if (input.customColors !== undefined) project.customColors = parseCustomColors(input.customColors)

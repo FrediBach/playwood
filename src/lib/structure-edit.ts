@@ -1,3 +1,4 @@
+import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { resolvePanels, validateProject } from './model'
 import { connectorSlide, getConnectorRail } from './connector-movement'
@@ -509,7 +510,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
       }
     }
     if ([...affected].some(id => managed.has(id) || boundary.has(id))) throw new Error('This design rule reaches a linked assembly. Edit its shared values or disassemble it before adjusting these panels.')
-    const loose: Project = { version: 1, name: project.name, connectorOverrides: project.connectorOverrides, panels: project.panels.filter(panel => !managed.has(panel.id) && !boundary.has(panel.id)),
+    const loose: Project = { version: 1, name: project.name, spaceConstraint: project.spaceConstraint, connectorOverrides: project.connectorOverrides, panels: project.panels.filter(panel => !managed.has(panel.id) && !boundary.has(panel.id)),
       connections: looseConnections.filter(connection => !boundary.has(connection.parentId) && !boundary.has(connection.childId)),
       constraints: project.constraints?.filter(rule => designConstraintPanelIds(rule).every(id => !managed.has(id) && !boundary.has(id))) }
     const edited = editStructure(loose, ids, edit, validation)
@@ -579,7 +580,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
       throw new Error('This move would leave an insert unsupported. Try a smaller step or move its supporting panels together.')
     }
   }
-  return next
+  return assertDesignConstraintEdit(project, next)
 }
 
 /** Apply new or re-enabled rules as one immutable structural edit. The anchor
@@ -596,7 +597,7 @@ export function reconcileDesignConstraints(project: Project, anchorPanelId?: str
   const remaining = evaluateDesignConstraints(next.constraints, resolvePanels(next)).find(result => result.constraint.enabled && result.violation > 0
     && (!ruleId || result.constraint.id === ruleId))
   if (remaining) throw new Error(`Cannot satisfy this design rule: ${describeDesignConstraint(remaining.constraint, next.panels)}.`)
-  return next
+  return assertDesignConstraintEdit(project, next)
 }
 
 /** Move selected panels by an exact world-space displacement, adapting connected spans. */
