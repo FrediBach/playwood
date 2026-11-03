@@ -22,6 +22,7 @@ export function RotateCreation({ onRotate, onCancel }: {
     <SelectField label="Rotation angle" value={String(angle)} onChange={value => setAngle(Number(value))}>
       <option value="90">90° · quarter turn</option>
       <option value="45">45° · diagonal</option>
+      <option value="180">180° · half turn</option>
     </SelectField>
     <p className="dialog-note">Rotates around the center and keeps the base at the same height. Undo is available.</p>
     <div className="dialog-footer rotation-actions">

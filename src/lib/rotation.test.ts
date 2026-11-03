@@ -38,7 +38,7 @@ describe('whole-creation rotation', () => {
     const project = create()
     const before = resolvePanels(project)
     const snapshot = JSON.stringify(project)
-    for (const axis of axes) for (const angle of [-90, 45, 90]) {
+    for (const axis of axes) for (const angle of [-180, -90, 45, 90, 180]) {
       const turned = rotateProject(project, axis, angle)
       const after = resolvePanels(turned)
       const turn = new Quaternion().setFromAxisAngle(new Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0), angle * Math.PI / 180)

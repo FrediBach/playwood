@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { Euler, Quaternion } from 'three'
 import { createStarterProject, getProjectBounds, resolvePanels } from '../src/lib/model'
 import { EXAMPLE_LIBRARY } from '../src/lib/example-library'
 import type { Project } from '../src/lib/types'
@@ -57,15 +58,15 @@ test('whole-creation quarter turn updates geometry, supports undo/redo, and pers
   expect(errors).toEqual([])
 })
 
-test('phone rotation dialog supports 45-degree tilt, cancel, room rotation, and empty creations', async ({ page }) => {
+test('phone rotation dialog supports 45-degree tilt, 180-degree turn, cancel, and empty creations', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 })
   await page.goto('/')
   const cube = EXAMPLE_LIBRARY.find(example => example.name === 'Cube')!.create()
   await importProject(page, cube)
   await page.getByRole('button', { name: 'Rotate creation', exact: true }).click()
-  await page.getByLabel('Rotation angle').selectOption('45')
-  await expect(page.getByRole('button', { name: 'Rotate creation by −45°', exact: true })).toBeInViewport()
-  await expect(page.getByRole('button', { name: 'Rotate creation by +45°', exact: true })).toBeInViewport()
+  await page.getByLabel('Rotation angle').selectOption('180')
+  await expect(page.getByRole('button', { name: 'Rotate creation by −180°', exact: true })).toBeInViewport()
+  await expect(page.getByRole('button', { name: 'Rotate creation by +180°', exact: true })).toBeInViewport()
   await page.screenshot({ path: 'test-results/rotation-dialog-mobile.png' })
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   expect(await exportedProject(page)).toEqual(cube)
@@ -85,11 +86,15 @@ test('phone rotation dialog supports 45-degree tilt, cancel, room rotation, and 
   expect(await exportedProject(page)).toEqual(tilted)
   await page.getByRole('button', { name: 'Rotate creation', exact: true }).click()
   await page.getByLabel('Rotation axis').selectOption('y')
-  await page.getByRole('button', { name: 'Rotate creation by +90°', exact: true }).click()
+  await page.getByLabel('Rotation angle').selectOption('180')
+  await page.getByRole('button', { name: 'Rotate creation by +180°', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Realistic preview', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  const turned = getProjectBounds(resolvePanels(await exportedProject(page)))
-  expect(turned.depth).toBeCloseTo(tiltedBounds.width, 3)
-  expect(turned.width).toBeCloseTo(tiltedBounds.depth, 3)
+  const halfTurn = await exportedProject(page), turned = getProjectBounds(resolvePanels(halfTurn))
+  expect(turned.depth).toBeCloseTo(tiltedBounds.depth, 3)
+  expect(turned.width).toBeCloseTo(tiltedBounds.width, 3)
+  const beforeRotation = new Quaternion().setFromEuler(new Euler(...resolvePanels(tilted)[0].rotation))
+  const afterRotation = new Quaternion().setFromEuler(new Euler(...resolvePanels(halfTurn)[0].rotation))
+  expect(beforeRotation.angleTo(afterRotation)).toBeCloseTo(Math.PI, 8)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.getByRole('button', { name: 'Studio', exact: true }).click()
   await importProject(page, createStarterProject('blank'))

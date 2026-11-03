@@ -128,7 +128,7 @@ export const BUILD_GUIDES: BuildGuide[] = [
   },
   {
     id: 'rotate', category: 'Shape & arrange', title: 'Turn a selection or creation', duration: '4 min',
-    summary: 'Use quarter turns for selected objects and 45° or 90° turns for the whole build.',
+    summary: 'Use quarter turns for selected objects and 45°, 90°, or 180° turns for the whole build.',
     startingPoint: 'Open Library → Full builds → Cube. Keep it in Studio with Exploded view off.',
     related: ['move-creation', 'multi-select', 'assembly-attach'],
     steps: [
