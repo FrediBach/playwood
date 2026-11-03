@@ -88,7 +88,7 @@ export function AttachmentSideGuide({ panel, guide }: { panel: Panel; guide: Att
           <span className="attachment-side-leader" aria-hidden="true" />
           <button type="button" className={`attachment-side-label${guide.side === anchor.side ? ' is-selected' : ''}${guide.highlightedSide === anchor.side ? ' is-highlighted' : ''}`}
             data-attachment-side={anchor.side} aria-label={`Choose ${anchor.label} side`} aria-pressed={guide.side === anchor.side}
-            title={`${anchor.label} side of ${panel.name}`}
+            title={`${anchor.label} side of ${panel.name}${guide.side === anchor.side ? ' · Click again to flip joint direction' : ''}`}
             onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
             onPointerEnter={() => guide.onHighlight(anchor.side)} onPointerLeave={event => { if (document.activeElement !== event.currentTarget) guide.onHighlight(null) }}
             onFocus={() => guide.onHighlight(anchor.side)} onBlur={() => guide.onHighlight(null)}

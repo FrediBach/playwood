@@ -18,6 +18,7 @@ interface MenuContext {
   assembly: Pick<ReturnType<typeof useAssemblyEditor>, 'editingInstance' | 'selectedInstance' | 'memberInstance' | 'hasMembers' | 'done' | 'edit' | 'select' | 'disconnect' | 'independent' | 'disassemble'>
   canAddConnectorsBetween?: boolean
   canConnectWithPanel: boolean
+  canAttachPanel?: boolean
   canExtendToGround: boolean
   canAttachCopy: boolean
   splitCounts: number[]
@@ -73,7 +74,7 @@ function addLoosePanelActions(context: MenuContext, menuAction: AddAction) {
   const {groupSelected, openConstraints, startAttach, extendToGround, detachSelection, splitSelection}=actions
   menuAction('Add constraint',SlidersHorizontal,()=>openConstraints(true))
   menuAction('Group selected',FolderPlus,()=>groupSelected('panels',selectedIds),false,selectedPanels.length<2)
-  if (selectedPanels.length===1) menuAction('Attach panel',Link2,startAttach)
+  if (selectedPanels.length===1) menuAction('Attach a panel (A)',Link2,startAttach,false,context.canAttachPanel===false)
   menuAction('Extend to ground',ArrowDownToLine,extendToGround,false,!canExtendToGround)
   if (selectedPanels.length>1) menuAction('Create assembly',Box,()=>actions.openTool('assembly'),false,!!assemblySelectionError(project,selectedIds))
   if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Disconnect panels',Unlink,detachSelection)

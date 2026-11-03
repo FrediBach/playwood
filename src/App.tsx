@@ -148,7 +148,7 @@ export default function App() {
     side:attachment.side,
     highlightedSide:attachmentSideHighlight?.panelId===selected.id?attachmentSideHighlight.side:null,
     onHighlight:side=>setAttachmentSideHighlight(side?{panelId:selected.id,side}:null),
-    onSelect:side=>setAttachment(current=>({...current,side})),
+    onSelect:side=>setAttachment(current=>({...current,side,flip:current.side===side?!current.flip:current.flip})),
   }:undefined
   const connection=project.connections.find(c=>c.childId===selectedId&&c.role!=='support')
   const bounds=useMemo(()=>getProjectBounds(panels),[panels])
@@ -384,6 +384,7 @@ export default function App() {
     setAssemblyTab(tab);setInspectorTab('panel');assembly.clearPlacement();closeContextMenu()
     if(selectedPanels.length||selectedConnectors.length)setRightOpen(true)
   }
+  const canAttachPanel=selectedPanels.length===1&&!inspectingConnectors&&!assembly.hasMembers&&!assembly.editingInstance&&!assembly.placementActive&&!clipboard.active&&!constraints.editing&&!modalOpen&&!drag.active&&!resize.active&&!boxSelectActive&&inspectorTab!=='attach'
   useEffect(()=>{
     const onKey=(e:KeyboardEvent)=>{
       const target=e.target as HTMLElement
@@ -395,6 +396,10 @@ export default function App() {
         return
       }
       if(boxSelectActive)return
+      if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='a'){
+        if(canAttachPanel){e.preventDefault();if(!e.repeat)startAttach()}
+        return
+      }
       if((e.metaKey||e.ctrlKey)&&['c','v'].includes(e.key.toLowerCase())){
         e.preventDefault();if(!e.repeat){if(e.key.toLowerCase()==='c')clipboard.copy();else clipboard.paste()}return
       }
@@ -594,7 +599,7 @@ export default function App() {
     project, panels, selectedPanels, selectedIds, selectedConnectorIds, selectedIdSet,
     inspectingConnectors, modalOpen, assembly, splitCounts, checkingSplits, canDivideGrid: !!gridCut, holes,
     canMenuAutoConnect, hasVisiblePanels, canAddConnectorsBetween: !infillReason, canConnectWithPanel: !!connectorPanelFit.result,
-    canExtendToGround: !!groundPanelFit.result, canAttachCopy: validTargets.length > 0,
+    canAttachPanel, canExtendToGround: !!groundPanelFit.result, canAttachCopy: validTargets.length > 0,
     actions: {
       addConnectorsBetween: openConnectorInfill, connectWithPanel, groupSelected, removeSelectedConnectors, openConstraints, startAttach,
       extendToGround, detachSelection, splitSelection, closeHole, duplicateSelected, deleteSelected,

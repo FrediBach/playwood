@@ -32,6 +32,9 @@ describe.each(materials)('%s texture', material => {
     }
   })
 
+})
+
+describe.each([...materials, 'osb', 'nazena'] as const)('%s raster texture', material => {
   it('keeps raster tile boundaries within the surrounding grain variation', () => {
     const textures = createWoodTextures(material)
     for (const [map, channel] of [[textures.color, 0], [textures.surface, 0], [textures.surface, 1]] as const) {
@@ -56,9 +59,9 @@ describe.each(materials)('%s texture', material => {
 })
 
 describe('wood texture rendering', () => {
-  it('shares upload sources across matching panels with independently disposable textures', () => {
-    const first = createWoodTextures('oak')
-    const second = createWoodTextures('oak')
+  it.each(['oak', 'osb', 'nazena'] as const)('shares %s upload sources across matching panels with independently disposable textures', material => {
+    const first = createWoodTextures(material)
+    const second = createWoodTextures(material)
     const different = createWoodTextures('birch')
     for (const channel of ['color', 'surface'] as const) {
       expect(first[channel]).not.toBe(second[channel])
@@ -74,7 +77,7 @@ describe('wood texture rendering', () => {
     }
   })
 
-  it.each(['birch', 'oak', 'walnut'] as const)('keeps %s grain visible after preview-sized filtering', material => {
+  it.each(['birch', 'oak', 'walnut', 'osb', 'nazena'] as const)('keeps %s grain visible after preview-sized filtering', material => {
     const textures = createWoodTextures(material)
     const { data, width, height } = textures.color.image
     const averages: number[] = []
@@ -87,19 +90,19 @@ describe('wood texture rendering', () => {
     averages.sort((a, b) => a - b)
     // Broad grain must survive minification, rather than disappearing with
     // fine noise when the whole assembly is fitted into the viewport.
-    expect(averages[Math.floor(averages.length * 0.95)] - averages[Math.floor(averages.length * 0.05)]).toBeGreaterThan(18)
+    expect(averages[Math.floor(averages.length * 0.95)] - averages[Math.floor(averages.length * 0.05)]).toBeGreaterThan(material === 'nazena' ? 8 : 18)
     textures.color.dispose(); textures.surface.dispose()
   })
 
-  it('uses matching physical scale and filters without gamma-correcting surface data', () => {
-    const textures = createWoodTextures('oak')
+  it.each([['oak', 0.6, 1.2], ['osb', 0.6, 0.6], ['nazena', 0.45, 0.45]] as const)('uses %s physical scale and filters without gamma-correcting surface data', (material, width, height) => {
+    const textures = createWoodTextures(material)
     expect(textures.color.colorSpace).toBe(SRGBColorSpace)
     expect(textures.surface.colorSpace).toBe(NoColorSpace)
     for (const map of [textures.color, textures.surface]) {
       expect(map.wrapS).toBe(RepeatWrapping)
       expect(map.wrapT).toBe(RepeatWrapping)
-      expect(map.repeat.x * 0.6).toBeCloseTo(1)
-      expect(map.repeat.y * 1.2).toBeCloseTo(1)
+      expect(map.repeat.x * width).toBeCloseTo(1)
+      expect(map.repeat.y * height).toBeCloseTo(1)
       expect(map.magFilter).toBe(LinearFilter)
       expect(map.minFilter).toBe(LinearMipmapLinearFilter)
       expect(map.generateMipmaps).toBe(true)

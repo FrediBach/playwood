@@ -23,6 +23,8 @@ The main entry points are [App.tsx](../src/App.tsx), [use-project.ts](../src/hoo
 
 The `Project` includes user-visible organization as well as geometry: names, panel visibility/order, connector order, list groups, custom palette colors, and per-piece connector overrides. Those edits go through history just like resizing a panel. Flat list groups are independent of physical assembly membership.
 
+Panel `material` accepts `birch`, `oak`, `walnut`, `mdf`, `osb`, `nazena`, and `painted`. OSB and Nazena use the existing version 1 material field in project panels, assembly definitions, and instance finish overrides. They add no saved texture data or required fields; existing files retain their material/color defaults. Copies, standalone assemblies, and cutting lists preserve the material IDs.
+
 `App` derives resolved panel transforms with `resolvePanels(project)`, physical hardware with `orderedConnectors(project)`, and warnings/errors with `validateProject(project)`. These are derived views of the project rather than additional persisted stores. There is no Redux/Zustand store or server synchronization layer.
 
 ## A committed edit

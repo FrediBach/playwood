@@ -506,7 +506,7 @@ export function renameAssembly(project: Project, instanceId: string, name: strin
 export function updateAssemblyFinish(project: Project, instanceId: string, finish: AssemblyFinish): Project {
   instanceFor(project, instanceId)
   if (finish.color !== undefined && !/^#[\da-f]{6}$/i.test(finish.color)) throw new Error('Choose a valid finish color.')
-  if (finish.material !== undefined && !['birch', 'oak', 'walnut', 'mdf', 'painted'].includes(finish.material)) throw new Error('Choose a valid panel material.')
+  if (finish.material !== undefined && !['birch', 'oak', 'walnut', 'mdf', 'osb', 'nazena', 'painted'].includes(finish.material)) throw new Error('Choose a valid panel material.')
   if (finish.finishCoverage !== undefined && (!Number.isFinite(finish.finishCoverage) || finish.finishCoverage < 0 || finish.finishCoverage > 1)) throw new Error('Choose finish coverage between 0 and 1.')
   const data = project.assemblies!
   return rebuild(project, { ...data, instances: data.instances.map(instance => instance.id === instanceId ? { ...instance, finish: { ...instance.finish, ...finish } } : instance) })
@@ -678,7 +678,7 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
       if (!record(raw.finish) || Object.keys(raw.finish).some(key => key !== 'color' && key !== 'material' && key !== 'finishCoverage')) throw new Error('Invalid assembly finish override.')
       const finish: AssemblyFinish = {}
       if (raw.finish.color !== undefined) { if (typeof raw.finish.color !== 'string' || !/^#[\da-f]{6}$/i.test(raw.finish.color)) throw new Error('Invalid assembly finish color.'); finish.color = raw.finish.color }
-      if (raw.finish.material !== undefined) { if (typeof raw.finish.material !== 'string' || !['birch', 'oak', 'walnut', 'mdf', 'painted'].includes(raw.finish.material)) throw new Error('Invalid assembly material.'); finish.material = raw.finish.material as AssemblyFinish['material'] }
+      if (raw.finish.material !== undefined) { if (typeof raw.finish.material !== 'string' || !['birch', 'oak', 'walnut', 'mdf', 'osb', 'nazena', 'painted'].includes(raw.finish.material)) throw new Error('Invalid assembly material.'); finish.material = raw.finish.material as AssemblyFinish['material'] }
       if (raw.finish.finishCoverage !== undefined) {
         if (typeof raw.finish.finishCoverage !== 'number' || !Number.isFinite(raw.finish.finishCoverage) || raw.finish.finishCoverage < 0 || raw.finish.finishCoverage > 1) throw new Error('Invalid assembly finish coverage.')
         finish.finishCoverage = raw.finish.finishCoverage

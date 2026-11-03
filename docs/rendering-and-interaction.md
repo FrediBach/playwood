@@ -70,6 +70,8 @@ The geometry builder has a performance guard: if the candidate perforation grid 
 
 [`wood-texture.ts`](../src/components/wood-texture.ts) generates deterministic wood texture data locally. Pixel sources are cached by material; each panel owns disposable texture wrappers referencing those sources. [`panel-materials.ts`](../src/components/panel-materials.ts) supplies separate face and edge materials. Finish coverage reduces grain color variation, bump, roughness variation, and birch plywood edge bands together. Painted material and full finish coverage avoid the wood maps. Ghost panels use translucent accent materials without grain or depth writes.
 
+[`composite-texture.ts`](../src/components/composite-texture.ts) adds OSB wood flakes with individual grain and Nazena recycled-textile fibers over a mottled base. Deterministic fragments wrap across raster boundaries for seamless color, bump, and roughness maps. The same source cache and per-panel wrappers apply; 600 mm OSB tiles and 450 mm Nazena tiles keep fragment sizes fixed as panels resize. These materials texture the cut edges too, and finish coverage fades their detail with the faces. Maps are generated once on first use, without image requests or animation. They are visual approximations of the reference finishes.
+
 Panel geometry, outline geometry, texture wrappers, and materials have explicit effect cleanup. Preserve this ownership when adding a panel visual: rebuilding a geometry on every selection change is unnecessary, while disposing a shared cache entry can break other meshes.
 
 ## TROFAST geometry
@@ -182,3 +184,7 @@ The practical constraints for rendering changes are to preserve the millimeter/m
 ### Nice values and live feedback
 
 `RescaleCreation` configures saved millimeter steps. Length fields keep uncommitted text while typing and apply rounding on Enter/blur. Preview resize and free-drag hooks round only during their end handlers; pointer movement continues through the existing continuous preview and optional snap paths. Release re-solves against the gesture source and preserves stale-source/cancel guards. Exact attachment candidates bypass coordinate rounding. Keyboard movement and resize handles use the nice-value step before the grid/default increment; Shift still multiplies it by ten. Connector keyboard movement uses that increment while retaining exact rail limits. The workspace grid settings remain independent of this input policy.
+
+The **A** shortcut opens the existing new-panel attachment preview for exactly one ordinary selected panel, as does **Attach a panel (A)** in the preview context menu. It respects text/dialog focus and is disabled during box selection, gestures, clipboard placement, constraint editing, assembly editing/placement, and an active attachment preview. Opening it leaves realistic/exploded view for Studio and does not commit a panel until the attachment is accepted.
+
+Attachment side buttons in the inspector and the A–F preview labels share `AttachmentSideGuideState.onSelect`. Activating the already selected side toggles the draft’s `flip`; selecting another side preserves it. Native button Enter/Space activation follows the same rule. Hover and focus only highlight sides. These changes remain in the attachment draft until Apply; Cancel leaves the project untouched.

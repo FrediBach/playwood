@@ -100,6 +100,7 @@ function ViewportShortcuts({ panMode, realisticPreview }: { panMode: boolean; re
         <div><dt>Move &amp; snap</dt><dd><kbd>Ctrl + drag</kbd></dd></div>
         <div><dt>Move 1 cm</dt><dd><kbd>↑ ↓ ← →</kbd></dd></div>
         <div><dt>Move 10 cm</dt><dd><kbd>Shift + arrows</kbd></dd></div>
+        <div><dt>Attach a panel</dt><dd><kbd>A</kbd></dd></div>
         <div><dt>Rotate 90°</dt><dd><kbd>X</kbd><kbd>Y</kbd><kbd>Z</kbd></dd></div>
       </dl>
     </div>

@@ -9,9 +9,11 @@ const SOLID_ROUGHNESS = 0.76
 export function createPanelMaterials(panel: PanelFinish, textures: ReturnType<typeof createWoodTextures> | null, ghostColor?: string) {
   const grain = ghostColor || panel.material === 'painted' ? 0 : 1 - (panel.finishCoverage ?? 0)
   const maps = grain > 0 ? textures : null
+  const composite = panel.material === 'osb' || panel.material === 'nazena'
+  const bumpScale = panel.material === 'mdf' ? 0.00008 : panel.material === 'osb' ? 0.00065 : panel.material === 'nazena' ? 0.00045 : 0.0003
   const face = new THREE.MeshStandardMaterial({
     color: ghostColor ?? panel.color, map: maps?.color ?? null,
-    bumpMap: maps?.surface ?? null, bumpScale: (panel.material === 'mdf' ? 0.00008 : 0.0003) * grain,
+    bumpMap: maps?.surface ?? null, bumpScale: bumpScale * grain,
     roughnessMap: maps?.surface ?? null, roughness: maps ? 1 : SOLID_ROUGHNESS,
     metalness: 0, transparent: !!ghostColor, opacity: ghostColor ? 0.38 : 1, depthWrite: !ghostColor,
   })
@@ -29,6 +31,15 @@ export function createPanelMaterials(panel: PanelFinish, textures: ReturnType<ty
     color: ghostColor ?? panel.color, roughness: THREE.MathUtils.lerp(SOLID_ROUGHNESS, 0.9, grain),
     transparent: !!ghostColor, opacity: ghostColor ? 0.32 : 1, depthWrite: !ghostColor,
   })
+  if (composite && maps) {
+    edge.map = maps.color
+    edge.bumpMap = maps.surface
+    edge.bumpScale = bumpScale * grain * 0.65
+    edge.roughnessMap = maps.surface
+    edge.roughness = 1
+    edge.onBeforeCompile = face.onBeforeCompile
+    edge.customProgramCacheKey = face.customProgramCacheKey
+  }
   if (panel.material === 'birch' && grain > 0) {
     edge.onBeforeCompile = shader => {
       shader.uniforms.woodGrainStrength = { value: grain }

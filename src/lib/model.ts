@@ -14,7 +14,7 @@ import { getTrofastColor, getTrofastItem } from './trofast-catalog'
 import { copyDesignConstraints, describeDesignConstraint, designConstraintPanelIds, evaluateDesignConstraints, parseDesignConstraints } from './design-constraints'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 
-const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', painted: '#e8e7df' }
+const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', osb: '#dfc391', nazena: '#607d97', painted: '#e8e7df' }
 const uid = () => globalThis.crypto?.randomUUID?.() ?? `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 const vec = (v: Vec3) => new Vector3(...v)
 const tuple = (v: Vector3): Vec3 => [v.x, v.y, v.z]
@@ -446,7 +446,7 @@ export function parseProject(input: unknown): Project {
     const p: Panel = {
       id: stringIn(raw.id, 'panel ID'), name: stringIn(raw.name, 'panel name'),
       width: numberIn(raw.width, 40, 4000, 'panel width'), height: numberIn(raw.height, 40, 4000, 'panel height'), thickness: numberIn(raw.thickness, 3, 100, 'panel thickness'),
-      material: enumIn(raw.material, ['birch', 'oak', 'walnut', 'mdf', 'painted'], 'material'),
+      material: enumIn(raw.material, ['birch', 'oak', 'walnut', 'mdf', 'osb', 'nazena', 'painted'], 'material'),
       color: colorIn(raw.color), pattern: enumIn(raw.pattern, ['solid', 'pegboard', 'slots'], 'panel pattern'),
       position: vectorIn(raw.position, 'position', 100000), rotation: vectorIn(raw.rotation, 'rotation', Math.PI * 100),
       cornerRadius: raw.cornerRadius === undefined ? 0 : numberIn(raw.cornerRadius, 0, 2000, 'corner radius'),

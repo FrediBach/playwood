@@ -45,7 +45,7 @@ export function AttachmentInspector({selected,panels,draft,setDraft,attachment,s
           {side[0].toUpperCase()+side.slice(1)}
         </button>)}
       </div>
-      <p className="field-note" id="attachment-side-help">Match the letters in the preview, or click a label there. Side names stay with the panel as you orbit.</p>
+      <p className="field-note" id="attachment-side-help">Match the letters in the preview, or click a label there. Click the selected side again to flip joint direction. Side names stay with the panel as you orbit.</p>
     </div>
     <ConnectorTypeField value={attachment.type} onChange={type=>setAttachment(a=>({...a,type,...(a.material ? {material:getConnectorMaterial(type,a.material)} : {})}))}/>
     <section className="inspector-section"><div className="section-title"><h2>{count>1?`${count} new panels`:attachTarget==='new'?'New panel dimensions':'Panel dimensions'}</h2><span>mm</span></div><PanelFields group="dimensions" panel={draft} onChange={patch=>setDraft(p=>({...p,...patch}))} compact/></section>

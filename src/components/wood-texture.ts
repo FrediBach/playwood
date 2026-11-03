@@ -1,7 +1,9 @@
 import * as THREE from 'three'
 import type { Material } from '@/lib/types'
+import { createCompositeSources } from './composite-texture'
 
-type WoodMaterial = Exclude<Material, 'painted'>
+type NaturalMaterial = Exclude<Material, 'painted'>
+type WoodMaterial = Exclude<NaturalMaterial, 'osb' | 'nazena'>
 const TAU = Math.PI * 2
 const WIDTH = 512
 const HEIGHT = 1024
@@ -68,11 +70,16 @@ export function sampleWood(material: WoodMaterial, u: number, v: number) {
   }
 }
 
-const sourcesByMaterial = new Map<WoodMaterial, { color: THREE.Source; surface: THREE.Source }>()
+const sourcesByMaterial = new Map<NaturalMaterial, { color: THREE.Source; surface: THREE.Source; tileWidth: number; tileHeight: number }>()
 
-function textureSources(material: WoodMaterial) {
+function textureSources(material: NaturalMaterial) {
   const cached = sourcesByMaterial.get(material)
   if (cached) return cached
+  if (material === 'osb' || material === 'nazena') {
+    const sources = createCompositeSources(material)
+    sourcesByMaterial.set(material, sources)
+    return sources
+  }
   const color = new Uint8Array(WIDTH * HEIGHT * 4)
   const surface = new Uint8Array(color.length)
   for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < WIDTH; x++) {
@@ -89,20 +96,22 @@ function textureSources(material: WoodMaterial) {
   const sources = {
     color: new THREE.Source({ data: color, width: WIDTH, height: HEIGHT }),
     surface: new THREE.Source({ data: surface, width: WIDTH, height: HEIGHT }),
+    tileWidth: TILE_WIDTH,
+    tileHeight: TILE_HEIGHT,
   }
   sourcesByMaterial.set(material, sources)
   return sources
 }
 
 /** Shared sources reuse GPU uploads; Three refcounts each panel's disposable wrappers. */
-export function createWoodTextures(material: WoodMaterial) {
+export function createWoodTextures(material: NaturalMaterial) {
   const sources = textureSources(material)
   const texture = (source: THREE.Source, colorSpace: THREE.ColorSpace) => {
     const map = new THREE.DataTexture()
     map.source = source
     map.colorSpace = colorSpace
     map.wrapS = map.wrapT = THREE.RepeatWrapping
-    map.repeat.set(1 / TILE_WIDTH, 1 / TILE_HEIGHT)
+    map.repeat.set(1 / sources.tileWidth, 1 / sources.tileHeight)
     map.magFilter = THREE.LinearFilter
     map.minFilter = THREE.LinearMipmapLinearFilter
     map.generateMipmaps = true

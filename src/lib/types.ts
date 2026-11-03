@@ -1,6 +1,6 @@
 export type Vec3 = [number, number, number]
 export type RotationAxis = 'x' | 'y' | 'z'
-export type Material = 'birch' | 'oak' | 'walnut' | 'mdf' | 'painted'
+export type Material = 'birch' | 'oak' | 'walnut' | 'mdf' | 'osb' | 'nazena' | 'painted'
 export type Pattern = 'solid' | 'pegboard' | 'slots'
 export type Side = 'left' | 'right' | 'top' | 'bottom' | 'front' | 'back'
 export type ConnectorType = '90' | '105' | '150' | 't' | 'cross'
