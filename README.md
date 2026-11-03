@@ -138,6 +138,8 @@ React Doctor is installed as a development dependency. Run `npm run doctor -- --
 
 The browser suite starts/reuses port 5174. An existing Chromium binary can be selected through `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Tests cover attachment transforms, all six sides, offsets and angles, shared joints, existing-panel reattachment, import validation, actual hole/slot geometry, browser persistence, exports, undo/redo, and fixed-viewport layouts.
 
+Select two connectors joining the same panels with matching type, material, and color, then choose **Add connectors between** in the inspector or preview context menu. Enter a quantity and click **Add connectors** to space new matching pieces evenly between them. Existing pieces and panels stay fixed. Quantities that overlap hardware are rejected; each connection supports up to 20 stored pieces. Disassemble managed assemblies first. Cancel/Escape makes no changes; additions support Undo/Redo, autosave, and project export.
+
 ## Geometry and source references
 
 Manufacturer references:

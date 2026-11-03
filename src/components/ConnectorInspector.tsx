@@ -9,7 +9,9 @@ import { InspectorDisclosure } from './InspectorPrimitives'
 import { Button } from './ui/button'
 import './connector-inspector.css'
 
-export function ConnectorInspector({ connectors, panels = [], onChange, onTypeChange, typeError, onRemove, onConnectPanel, panelFitReason, fitSummary }: {
+export function ConnectorInspector({ onAddBetween, infillReason, connectors, panels = [], onChange, onTypeChange, typeError, onRemove, onConnectPanel, panelFitReason, fitSummary }: {
+  onAddBetween: () => void
+  infillReason: string
   connectors: ReturnType<typeof getPhysicalConnectors>
   panels?: Panel[]
   onChange: (patch: ConnectorOverride) => void
@@ -51,6 +53,10 @@ export function ConnectorInspector({ connectors, panels = [], onChange, onTypeCh
         <p className="field-note" id="connector-fit-status" role="status">{panelFitReason || (fitSummary ? `Fits one ${fitSummary} panel to the selected openings.` : 'Fits one panel to the selected free openings.')}</p>
       </>}
     </section>
+    {connectors.length === 2 && <section className="inspector-section" aria-label="Add connectors between">
+      <Button data-connector-infill variant="outline" className="full-button" onClick={onAddBetween} disabled={!!infillReason}><Plus size={15}/>Add connectors between</Button>
+      <p className="field-note">{infillReason || 'Choose how many matching connectors to space evenly between this pair.'}</p>
+    </section>}
     <InspectorDisclosure title="Selection & movement" preferenceKey="connector-help">
       <p className="field-note">Shift, ⌘ or Ctrl-click to select several connectors. Angle changes apply to their whole joints. Material and color changes apply to each selected piece.</p>
       <p className="field-note">Use arrow keys in the workspace to slide hardware along its joint; hold Shift for larger steps. Snapping follows the workspace settings. Movement stops at panel ends and other connectors.</p>

@@ -16,6 +16,7 @@ interface MenuContext {
   inspectingConnectors: boolean
   modalOpen: boolean
   assembly: Pick<ReturnType<typeof useAssemblyEditor>, 'editingInstance' | 'selectedInstance' | 'memberInstance' | 'hasMembers' | 'done' | 'edit' | 'select' | 'disconnect' | 'independent' | 'disassemble'>
+  canAddConnectorsBetween?: boolean
   canConnectWithPanel: boolean
   canExtendToGround: boolean
   canAttachCopy: boolean
@@ -32,6 +33,7 @@ interface MenuContext {
     fitView: () => void
     openTool: (tool: 'assembly' | 'grid' | 'parallel') => void
     copy: () => void
+    addConnectorsBetween?: () => void
     connectWithPanel: () => void
     groupSelected: (kind: ListKind, ids: string[]) => void
     removeSelectedConnectors: () => void
@@ -54,6 +56,7 @@ function addConnectorActions(context: MenuContext, menuAction: AddAction) {
   const {selectedConnectorIds, modalOpen, assembly, canConnectWithPanel, actions}=context
   const {connectWithPanel, groupSelected, removeSelectedConnectors}=actions
   if(!assembly.editingInstance&&!modalOpen)menuAction('Connect with a panel',Link2,connectWithPanel,false,!canConnectWithPanel)
+  if(context.canAddConnectorsBetween && actions.addConnectorsBetween && !modalOpen)menuAction('Add connectors between',Plus,actions.addConnectorsBetween)
   menuAction('Group selected',FolderPlus,()=>groupSelected('connectors',selectedConnectorIds),false,selectedConnectorIds.length<2)
   menuAction('Inspect connectors',SlidersHorizontal,actions.inspectConnectors)
   menuAction('Remove connectors',Trash2,removeSelectedConnectors,true)
