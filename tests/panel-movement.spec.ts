@@ -207,7 +207,7 @@ test('text fields, sidebar controls, attachment previews and exploded views do n
   expect(await savedProject(page)).toEqual(project)
 })
 
-test('the room preview can move the selected panel and undo without leaving the room', async ({ page }) => {
+test('room arrows leave panels unchanged and Studio retains panel movement and undo', async ({ page }) => {
   const panel = createPanel({ name: 'Room panel', width: 1600, height: 1600, position: [0, 900, 0] })
   const project: Project = { version: 1, name: 'Room movement', panels: [panel], connections: [] }
   await openProject(page, project)
@@ -216,9 +216,15 @@ test('the room preview can move the selected panel and undo without leaving the 
   await expect(page.getByLabel(/^Realistic furniture preview/)).toBeVisible()
   await page.getByLabel('3D preview canvas', { exact: true }).click()
   await page.keyboard.press('ArrowRight')
+  expect(await savedProject(page)).toEqual(project)
+  await expect(page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Studio', exact: true }).click()
+  await page.locator('.panel-list-select').click()
+  await cameraView(page, 'front')
+  await page.getByLabel('3D preview canvas', { exact: true }).focus()
+  await page.keyboard.press('ArrowRight')
   await expectPosition(page, panel.id, [10, 900, 0])
-  await page.screenshot({ path: 'test-results/panel-room-movement.png' })
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(project)
-  await expect(page.getByRole('button', { name: 'Realistic preview', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'Studio', exact: true })).toHaveAttribute('aria-pressed', 'true')
 })

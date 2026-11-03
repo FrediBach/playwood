@@ -476,7 +476,7 @@ function SceneOverlays(props: SceneProps & { shownPanels: Panel[] }) {
 function SceneMovement(props: SceneProps & { feedback: ReturnType<typeof useSceneSnapFeedback> }) {
   const {connectorSelection, activePanelIds, activeConnectorIds, recordMovement} = props.feedback
   return <>
-    <PanelKeyboardMovement {...props} selectedIds={activePanelIds} selectedConnectorIds={activeConnectorIds} onMovement={recordMovement} movementEnabled={props.movementEnabled && !props.dragging && !props.resizing && !props.boxSelectActive}/>
+    <PanelKeyboardMovement {...props} selectedIds={activePanelIds} selectedConnectorIds={activeConnectorIds} onMovement={recordMovement} movementEnabled={props.movementEnabled && !props.realisticPreview && !props.dragging && !props.resizing && !props.boxSelectActive}/>
     <PreviewDragMovement {...props} selectedIds={activePanelIds} movementEnabled={props.movementEnabled && !connectorSelection && !props.resizing && !props.boxSelectActive}/>
   </>
 }
@@ -514,7 +514,7 @@ function World(props: WorldProps) {
       ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
       : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
     <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} snapSettings={props.snapSettings} guides={feedback.guides}/>
-    {vacuumPlan && <RobotVacuum plan={vacuumPlan} projectPanels={displayPanels} />}
+    {vacuumPlan && <RobotVacuum plan={vacuumPlan} projectPanels={displayPanels} controlsEnabled={!props.dragging && !props.resizing && !props.boxSelectActive && !props.designConstraint} />}
     <SceneParts {...props} shownPanels={shownPanels}/>
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     <SceneOverlays {...props} shownPanels={shownPanels}/>

@@ -116,7 +116,7 @@ function WorkspaceToolbar({onConstraints,constraintEditing,snapSettings,setSnapS
               <label>Spacing (mm)<input aria-label="Grid spacing (mm)" type="number" min="1" max="1000" value={snapSettings.spacing} onChange={e=>{const n=e.target.valueAsNumber;if(Number.isFinite(n)&&n>=1&&n<=1000)setSnapSettings(v=>({...v,spacing:n}))}}/></label>
               <label><input type="checkbox" checked={snapSettings.geometry} onChange={e=>setSnapSettings(v=>({...v,geometry:e.target.checked}))}/>Align to geometry <kbd>S</kbd></label>
               <label>Snap tolerance (mm)<input aria-label="Snap tolerance (mm)" type="number" min="1" max="100" value={snapSettings.tolerance} onChange={e=>{const n=e.target.valueAsNumber;if(Number.isFinite(n)&&n>=1&&n<=100)setSnapSettings(v=>({...v,tolerance:n}))}}/></label>
-              <p>World-axis grid from the origin. Align panel boundaries, or connector centers when moving connectors. Both modes can be combined. Arrows move one grid spacing (Shift: ×10). Show grid displays guides. Joint limits take priority.</p>
+              <p>World-axis grid from the origin. Align panel boundaries, or connector centers when moving connectors. Both modes can be combined. In Studio, arrows move one grid spacing (Shift: ×10). Show grid displays guides. Joint limits take priority.</p>
             </div>
           </details>
           <IconButton label="All constraints" disabled={constraintEditing} onClick={onConstraints}><SlidersHorizontal size={18}/></IconButton>

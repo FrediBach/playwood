@@ -5,6 +5,7 @@ import type { VacuumPlan } from '../src/components/robot-vacuum-navigation'
 interface VacuumState {
   x: number
   z: number
+  heading: number
   phase: string
   elapsed: number
   plan: VacuumPlan
@@ -23,7 +24,7 @@ async function vacuumState(page: Page): Promise<VacuumState | null> {
     if (!vacuum) return null
     let dockCount = 0
     scene.traverse((object: { name: string }) => { if (object.name === 'Dreame X50 Ultra Complete dock') dockCount++ })
-    return { x: vacuum.position.x, z: vacuum.position.z, phase: vacuum.userData.phase,
+    return { x: vacuum.position.x, z: vacuum.position.z, heading: vacuum.rotation.y, phase: vacuum.userData.phase,
       elapsed: vacuum.userData.elapsed, plan: vacuum.userData.plan, dockCount }
   })
 }
@@ -183,4 +184,122 @@ test('room edits rebuild vacuum clearance from visible resolved geometry', async
   expectClearOfFurniture(moved)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
   await expect.poll(async () => (await vacuumState(page))?.plan.obstacles.find(item => item.id === 'panel:vacuum-leg')?.minX).toBeCloseTo(side.minX)
+})
+
+test('arrow keys drive and turn the vacuum, then resume cleaning after ten idle seconds without moving panels', async ({ page }) => {
+  test.setTimeout(60000)
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await page.goto('/')
+  const original = await exportedProject(page)
+  await expect(page.getByLabel('Panel name')).toBeVisible()
+  await page.clock.pauseAt(new Date('2026-01-01T01:00:00Z'))
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await page.clock.runFor(100)
+  const docked = (await vacuumState(page))!
+  expect(docked.phase).toBe('docked')
+  await page.locator('canvas').focus()
+
+  // Manual control can leave the dock before the automatic departure delay.
+  await page.keyboard.down('ArrowUp')
+  await page.clock.runFor(2000)
+  const forward = (await vacuumState(page))!
+  expect(forward.phase).toBe('manual')
+  expect(forward.z - docked.z).toBeGreaterThan(0.03)
+  expectClearOfFurniture(forward)
+  // Holding or repeating a key cannot allow the idle timer to resume cleaning.
+  await page.keyboard.down('ArrowUp')
+  await page.clock.fastForward(11000)
+  expect((await vacuumState(page))?.phase).toBe('manual')
+  await page.keyboard.up('ArrowUp')
+
+  const beforeTurn = (await vacuumState(page))!
+  await page.keyboard.down('ArrowLeft')
+  await page.clock.runFor(400)
+  await page.keyboard.up('ArrowLeft')
+  const turned = (await vacuumState(page))!
+  expect(Math.abs(turned.heading - beforeTurn.heading)).toBeGreaterThan(0.1)
+  expect(distance(turned, beforeTurn)).toBeLessThan(0.001)
+  await page.keyboard.down('ArrowDown')
+  await page.clock.runFor(300)
+  await page.keyboard.up('ArrowDown')
+  const reversed = (await vacuumState(page))!
+  expect((reversed.x - turned.x) * Math.sin(turned.heading) + (reversed.z - turned.z) * Math.cos(turned.heading)).toBeLessThan(-0.005)
+  expectClearOfFurniture(reversed)
+
+  const furnish = page.getByRole('checkbox', { name: 'Auto furnish', exact: true })
+  await furnish.check()
+  const furnished = (await vacuumState(page))!
+  expect(furnished.phase).toBe('manual')
+  expect(distance(furnished, reversed)).toBeLessThan(0.001)
+  expect(furnished.heading).toBeCloseTo(reversed.heading)
+  await furnish.uncheck()
+  await page.clock.fastForward(9000)
+  const idle = (await vacuumState(page))!
+  expect(idle.phase).toBe('manual')
+  expect(distance(idle, reversed)).toBeLessThan(0.001)
+  await page.clock.fastForward(1000)
+  const resumed = (await vacuumState(page))!
+  expect(resumed.phase).toBe('cleaning')
+  expect(distance(resumed, reversed)).toBeLessThan(0.02)
+
+  // A new press near the end of the idle period starts a fresh ten seconds.
+  await page.locator('canvas').focus()
+  await page.keyboard.press('ArrowRight')
+  await page.clock.fastForward(9000)
+  await page.keyboard.press('ArrowRight')
+  await page.clock.fastForward(1000)
+  expect((await vacuumState(page))?.phase).toBe('manual')
+  await page.clock.fastForward(9000)
+  expect((await vacuumState(page))?.phase).toBe('cleaning')
+  expect(await exportedProject(page)).toEqual(original)
+  expect(errors).toEqual([])
+})
+
+test('vacuum driving respects fields and modifiers and releases held keys on blur', async ({ page }) => {
+  test.setTimeout(60000)
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await page.goto('/')
+  const original = await exportedProject(page)
+  await page.clock.pauseAt(new Date('2026-01-01T01:00:00Z'))
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await page.clock.runFor(100)
+  const docked = (await vacuumState(page))!
+  const canvas = page.locator('canvas')
+  await canvas.focus()
+  await page.keyboard.press('Shift+ArrowUp')
+  await page.keyboard.press('Alt+ArrowRight')
+  expect((await vacuumState(page))?.phase).toBe('docked')
+  expect(distance((await vacuumState(page))!, docked)).toBeLessThan(0.001)
+
+  await page.getByRole('button', { name: 'Export project', exact: true }).focus()
+  await page.keyboard.press('ArrowUp')
+  expect((await vacuumState(page))?.phase).toBe('docked')
+
+  await page.getByRole('button', { name: 'Move creation', exact: true }).click()
+  await page.getByLabel('Left / right · X').focus()
+  await page.keyboard.press('ArrowUp')
+  expect((await vacuumState(page))?.phase).toBe('docked')
+  // A modal also owns input when an event is dispatched directly to the canvas.
+  await canvas.dispatchEvent('keydown', { key: 'ArrowUp', bubbles: true })
+  await canvas.dispatchEvent('keyup', { key: 'ArrowUp', bubbles: true })
+  expect((await vacuumState(page))?.phase).toBe('docked')
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+  await canvas.focus()
+  await page.keyboard.down('ArrowUp')
+  await page.clock.runFor(700)
+  expect((await vacuumState(page))?.phase).toBe('manual')
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+  await page.keyboard.up('ArrowUp')
+  const blurred = (await vacuumState(page))!
+  await page.clock.fastForward(9000)
+  const paused = (await vacuumState(page))!
+  expect(paused.phase).toBe('manual')
+  expect(distance(paused, blurred)).toBeLessThan(0.001)
+  expect(paused.heading).toBeCloseTo(blurred.heading)
+  await page.clock.fastForward(1000)
+  expect((await vacuumState(page))?.phase).toBe('cleaning')
+  expect(await exportedProject(page)).toEqual(original)
 })
