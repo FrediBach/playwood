@@ -105,6 +105,8 @@ Several forms intentionally have a narrower transaction boundary than the projec
 
 Panel selection uses panel IDs. Physical connector selection uses the serialized ID for a connection and placement index, as defined by [connector-selection.ts](../src/lib/connector-selection.ts). A connection can produce several independently selectable pieces of hardware.
 
+Connector angle choices use [connector-type-edit.ts](../src/lib/connector-type-edit.ts) in one functional history commit, including all affected seams and resolved descendant poses. They preserve selection IDs and the version 1 format, using existing connection types and per-piece overrides. Rejected angles produce a transient inspector error scoped to the current project and selection, with no history or autosave change. Color/material/removal edits and T/cross hardware choices keep their per-piece scope.
+
 Ordinary panel selection clears connector selection, and ordinary connector selection clears panel selection. Additive canvas selection and box selection can keep both. When both exist, the active Panels/Connectors tab determines which inspector is shown. The two selections remain separate arrays; do not infer the full selection from one array or from the active inspector.
 
 Outside shared-design editing, selecting an assembly member normally selects every panel belonging to that instance. Box selection expands hits to whole linked instances. During shared-design editing, box selection is restricted to that instance's panels and internal connectors. A drilled-in member selection is distinct from a whole-instance selection, and actions such as duplicate/remove require the whole instance.

@@ -9,6 +9,7 @@ import { ConnectorInspector } from '@/components/ConnectorInspector'
 import { CloseHoles } from '@/components/CloseHoles'
 import { closePanelHole, findPanelHoles } from '@/lib/close-holes'
 import { editConnectors } from '@/lib/connector-selection'
+import { changeConnectorType } from '@/lib/connector-type-edit'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import { Box, Check, CheckCheck, Copy, Link2, MousePointer2, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -64,7 +65,7 @@ import { assemblySelectionError, duplicateAssembly, getAssemblyInstance, getAsse
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, moveProject, rotateProject, validateProject } from '@/lib/model'
-import type { AssemblyDefinition, AttachmentOptions, CameraView, Panel, Project, Side, Vec3, ListKind, TrofastInsert } from '@/lib/types'
+import type { AssemblyDefinition, AttachmentOptions, CameraView, ConnectorType, Panel, Project, Side, Vec3, ListKind, TrofastInsert } from '@/lib/types'
 
 const INITIAL_ATTACHMENT: AttachmentOptions = {side:'right',type:'90',offset:0,inset:0,flip:false,color:DEFAULT_CONNECTOR_COLOR,count:2}
 function download(content:string,name:string,type:string) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
@@ -72,6 +73,7 @@ function download(content:string,name:string,type:string) {const url=URL.createO
 export default function App() {
   const {project,commit,undo,redo,canUndo,canRedo,saveStatus,repairNotice}=useProject()
   const [selectedConnectorIds,setSelectedConnectorIds]=useState<string[]>([])
+  const [connectorTypeError,setConnectorTypeError]=useState<{source:Project;selection:string;message:string}|null>(null)
   const [selectedIds,setPanelSelection]=useState<string[]>(()=>{const first=project.panels[0];const instance=first&&getAssemblyInstance(project,first.id);return instance?Object.values(instance.panelIds):first?[first.id]:[]})
   const setSelectedIds=useCallback((next:SetStateAction<string[]>)=>{setSelectedConnectorIds([]);setPanelSelection(next)},[])
   const setSelectedId=useCallback((id:string|null)=>setSelectedIds(id?[id]:[]),[])
@@ -190,6 +192,15 @@ export default function App() {
   const removeSelectedConnectors=()=>{
     commit(current=>editConnectors(current,selectedConnectorIds,{removed:true}))
     setSelectedConnectorIds([]);notify('Connectors removed. Undo to bring them back.')
+  }
+  const updateConnectorType=(type:ConnectorType)=>{
+    try {
+      commit(current=>changeConnectorType(current,selectedConnectorIds,type))
+      setConnectorTypeError(null)
+    } catch(error) {
+      const message=error instanceof Error?error.message:'This connector angle cannot keep the joints aligned.'
+      setConnectorTypeError({source:project,selection:selectedConnectorIds.join('/'),message});notify(message)
+    }
   }
   const selectConnectors=(next:SetStateAction<string[]>,revealInspector=true,additive=false)=>{
     if(constraints.editing)return
@@ -684,7 +695,7 @@ export default function App() {
       attachmentStatus={previewResult.error||attachmentErrors[0]?.message||(previewProject?'Panel thickness is compatible · Ready to attach':undefined)}
       footer={constraints.editing?<div ref={setConstraintFooter}/>:clipboard.active?<><p className="inspector-task-status" role="status">{attachmentSummary||'Choose a + in the workspace to attach.'}</p><Button variant="outline" className="full-button" onClick={clipboard.cancel}>Cancel placement</Button></>:assembly.placementActive?<><p className={`inspector-task-status ${attachmentWarning?'is-blocked':''}`} role="status">{attachmentSummary||assemblyHint}</p><Button variant="outline" className="full-button" onClick={assembly.clearPlacement}>Cancel attachment</Button></>:managingProjectConstraints?<Button variant="outline" className="full-button" aria-label="Done managing constraints" onClick={closeProjectConstraints}>Done</Button>:undefined}>
         {projectConstraintsOpen&&!clipboard.active&&!assembly.editingInstance&&inspectorTab==='panel'&&!constraints.editing&&<SpaceConstraintInspector key={JSON.stringify(project.spaceConstraint && {...project.spaceConstraint,enabled:undefined})} value={project.spaceConstraint} panels={panels} onToggle={spaceConstraint=>{commit(current=>({...current,spaceConstraint}));if(spaceConstraint.enabled)setFitSignal(v=>v+1)}} onSave={spaceConstraint=>{commit(current=>({...current,spaceConstraint}));setFitSignal(v=>v+1);notify('Build space saved')}}/>}
-        {inspectingConnectors?<ConnectorInspector panels={panels} fitSummary={fittedConnectorPanel?`${Math.round(fittedConnectorPanel.width)} × ${Math.round(fittedConnectorPanel.height)} × ${fittedConnectorPanel.thickness} mm`:undefined} connectors={selectedConnectors} onChange={patch=>commitWithInsertChecks(current=>editConnectors(current,selectedConnectorIds,patch))} onRemove={removeSelectedConnectors} onConnectPanel={connectWithPanel} panelFitReason={assembly.editingInstance?'Finish editing the assembly before connecting a panel.':modalOpen?'Close the dialog before connecting a panel.':connectorPanelFit.reason}/>:<>
+        {inspectingConnectors?<ConnectorInspector panels={panels} fitSummary={fittedConnectorPanel?`${Math.round(fittedConnectorPanel.width)} × ${Math.round(fittedConnectorPanel.height)} × ${fittedConnectorPanel.thickness} mm`:undefined} connectors={selectedConnectors} onChange={patch=>commitWithInsertChecks(current=>editConnectors(current,selectedConnectorIds,patch))} onTypeChange={updateConnectorType} typeError={connectorTypeError?.source===project&&connectorTypeError.selection===selectedConnectorIds.join('/')?connectorTypeError.message:undefined} onRemove={removeSelectedConnectors} onConnectPanel={connectWithPanel} panelFitReason={assembly.editingInstance?'Finish editing the assembly before connecting a panel.':modalOpen?'Close the dialog before connecting a panel.':connectorPanelFit.reason}/>:<>
         {clipboard.active?<div className="multi-selection-heading"><h2>Place {clipboard.inserting||'copy'}</h2><p>Hover a + in the workspace to preview. Click to attach, or cancel to return.</p></div>:assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
           panels={assembly.editingDefinition.panels.filter(panel=>selectedIdSet.has(assembly.editingInstance!.panelIds[panel.id]))}
           definitionPanels={assembly.editingDefinition.panels} parameters={assembly.editingDefinition.parameters} onParametersChange={assembly.parameters}
