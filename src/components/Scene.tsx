@@ -20,6 +20,8 @@ import { PreviewFurnishings } from './PreviewFurnishings'
 import type { FurnishingPlacement } from '@/lib/preview-furnishings'
 import { DesignConstraintOverlay } from './DesignConstraintOverlay'
 import { getRoomLayout } from './room-layout'
+import { RobotVacuum } from './RobotVacuum'
+import { createVacuumPlan, type VacuumPoint } from './robot-vacuum-navigation'
 import { getConnectorKeyboardSlides, getConnectorRail } from '@/lib/connector-movement'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
 import { PreviewDragMovement, type PreviewDragProps } from './PreviewDragMovement'
@@ -178,15 +180,16 @@ function Dimensions({ bounds }: { bounds: THREE.Box3 }) {
   </group>
 }
 
-function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, realisticPreview, panMode }: Pick<SceneProps, 'view' | 'fitSignal' | 'frameSignal' | 'zoomSignal' | 'realisticPreview' | 'panMode'> & { bounds: THREE.Box3 }) {
+function CameraController({ bounds, vacuumDock, view, fitSignal, frameSignal, zoomSignal, realisticPreview, panMode }: Pick<SceneProps, 'view' | 'fitSignal' | 'frameSignal' | 'zoomSignal' | 'realisticPreview' | 'panMode'> & { bounds: THREE.Box3; vacuumDock?: VacuumPoint }) {
   const controls = useRef<OrbitControlsImpl>(null)
   const [roomMaxDistance, setRoomMaxDistance] = useState(100)
   const { camera, size, invalidate } = useThree()
   const boundsRef = useRef(bounds)
+  const dockRef = useRef(vacuumDock)
   const lastZoomKey = useRef(0)
   const lastFrameSignal = useRef(frameSignal)
   const lastFitSignal = useRef(fitSignal)
-  useLayoutEffect(() => { boundsRef.current = bounds }, [bounds])
+  useLayoutEffect(() => { boundsRef.current = bounds; dockRef.current = vacuumDock }, [bounds, vacuumDock])
   useEffect(() => {
     // Clear pending inertia before fitting, so the view stays centered after a pan.
     if (controls.current) {
@@ -204,6 +207,10 @@ function CameraController({ bounds, view, fitSignal, frameSignal, zoomSignal, re
       // Include life-size reference objects without scaling the design to the room.
       cameraBounds.expandByPoint(new THREE.Vector3(boundsRef.current.min.x - 0.75, room.floorY, room.backZ + 0.2))
       cameraBounds.expandByPoint(new THREE.Vector3(room.chairX + 0.55, Math.max(room.floorY + 1.9, boundsRef.current.max.y + 0.25), room.chairZ + 0.5))
+      if (dockRef.current) {
+        cameraBounds.expandByPoint(new THREE.Vector3(dockRef.current.x - 0.2, room.floorY, dockRef.current.z - 0.24))
+        cameraBounds.expandByPoint(new THREE.Vector3(dockRef.current.x + 0.2, room.floorY + 0.59, dockRef.current.z + 0.75))
+      }
     }
     const center = cameraBounds.getCenter(new THREE.Vector3())
     const direction = previousDirection ?? (realisticPreview ? new THREE.Vector3(0.33, size.width < size.height ? 0.1 : 0.22, 1).normalize() : view === 'front' ? new THREE.Vector3(0, 0, 1) : view === 'top' ? new THREE.Vector3(0, 1, 0.0001) : view === 'right' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(1.35, 0.9, 1.6).normalize())
@@ -482,6 +489,7 @@ function World(props: WorldProps) {
     return panels.map(panel => ({ ...panel, position: vector(panel.position).sub(center).multiplyScalar(1.45).add(center).multiplyScalar(1 / MM).toArray() as Vec3 }))
   }, [panels, exploded])
   const bounds = useMemo(() => boundsOf(displayPanels), [displayPanels])
+  const vacuumPlan = useMemo(() => realisticPreview ? createVacuumPlan(bounds, displayPanels, props.furnishings) : null, [realisticPreview, bounds, displayPanels, props.furnishings])
   const cameraBounds = useMemo(() => {
     const bounds = boundsOf([...displayPanels, ...previewPanels, ...attachmentBoundsPanels])
     if (props.spaceConstraint?.enabled && !exploded && !realisticPreview) {
@@ -506,12 +514,13 @@ function World(props: WorldProps) {
       ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
       : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
     <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} snapSettings={props.snapSettings} guides={feedback.guides}/>
+    {vacuumPlan && <RobotVacuum plan={vacuumPlan} projectPanels={displayPanels} />}
     <SceneParts {...props} shownPanels={shownPanels}/>
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     <SceneOverlays {...props} shownPanels={shownPanels}/>
     <SceneResizeHandles {...props} feedback={feedback}/>
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
-    <CameraController panMode={props.panMode} bounds={cameraBounds} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
+    <CameraController panMode={props.panMode} bounds={cameraBounds} vacuumDock={vacuumPlan?.dock} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
 }
 
