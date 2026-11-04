@@ -132,7 +132,7 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDri
   const geometry = useMemo(() => makePanelGeometry({ width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline, trofastInserts }), [width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline, trofastInserts])
   const textured = !ghost && (panel.finishCoverage ?? 0) < 1
   const textures = useMemo(() => textured && panel.material !== 'painted' ? createWoodTextures(panel.material) : null, [panel.material, textured])
-  const materials = useMemo(() => createPanelMaterials({ color: panel.color, material: panel.material, finishCoverage: panel.finishCoverage }, textures, ghost ? ACCENT : undefined), [panel.color, panel.material, panel.finishCoverage, textures, ghost])
+  const materials = useMemo(() => createPanelMaterials({ color: panel.color, material: panel.material, finishCoverage: panel.finishCoverage }, textures, ghost ? ACCENT : undefined, selected), [panel.color, panel.material, panel.finishCoverage, textures, ghost, selected])
   const outline = useMemo(() => {
     const box = new THREE.BoxGeometry(panel.width * MM + 0.001, panel.height * MM + 0.001, panel.thickness * MM + 0.001)
     const edges = new THREE.EdgesGeometry(box)

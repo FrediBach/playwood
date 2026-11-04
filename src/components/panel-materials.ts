@@ -6,7 +6,7 @@ type PanelFinish = Pick<Panel, 'color' | 'material' | 'finishCoverage'>
 const SOLID_ROUGHNESS = 0.76
 
 /** Finish covers colour variation, pores, and exposed plywood layers together. */
-export function createPanelMaterials(panel: PanelFinish, textures: ReturnType<typeof createWoodTextures> | null, ghostColor?: string) {
+export function createPanelMaterials(panel: PanelFinish, textures: ReturnType<typeof createWoodTextures> | null, ghostColor?: string, selected = false) {
   const grain = ghostColor || panel.material === 'painted' ? 0 : 1 - (panel.finishCoverage ?? 0)
   const maps = grain > 0 ? textures : null
   const composite = panel.material === 'osb' || panel.material === 'nazena'
@@ -15,7 +15,7 @@ export function createPanelMaterials(panel: PanelFinish, textures: ReturnType<ty
     color: ghostColor ?? panel.color, map: maps?.color ?? null,
     bumpMap: maps?.surface ?? null, bumpScale: bumpScale * grain,
     roughnessMap: maps?.surface ?? null, roughness: maps ? 1 : SOLID_ROUGHNESS,
-    metalness: 0, transparent: !!ghostColor, opacity: ghostColor ? 0.38 : 1, depthWrite: !ghostColor,
+    metalness: 0, transparent: !!ghostColor || selected, opacity: ghostColor ? 0.38 : selected ? 0.8 : 1, depthWrite: !ghostColor && !selected,
   })
   if (maps) {
     face.onBeforeCompile = shader => {
@@ -29,7 +29,7 @@ export function createPanelMaterials(panel: PanelFinish, textures: ReturnType<ty
   }
   const edge = new THREE.MeshStandardMaterial({
     color: ghostColor ?? panel.color, roughness: THREE.MathUtils.lerp(SOLID_ROUGHNESS, 0.9, grain),
-    transparent: !!ghostColor, opacity: ghostColor ? 0.32 : 1, depthWrite: !ghostColor,
+    transparent: !!ghostColor || selected, opacity: ghostColor ? 0.32 : selected ? 0.8 : 1, depthWrite: !ghostColor && !selected,
   })
   if (composite && maps) {
     edge.map = maps.color

@@ -35,8 +35,8 @@ async function sceneSnapshot(page: Page) {
     state.scene.updateMatrixWorld(true)
     state.camera.updateMatrixWorld()
     const rect = canvas.getBoundingClientRect()
-    const panels: Record<string, { left: number; right: number; top: number; bottom: number; highlighted: boolean }> = {}
-    const connectors: Record<string, { left: number; right: number; top: number; bottom: number; highlighted: boolean }> = {}
+    const panels: Record<string, { left: number; right: number; top: number; bottom: number; highlighted: boolean; opacity?: number[] }> = {}
+    const connectors: Record<string, { left: number; right: number; top: number; bottom: number; highlighted: boolean; opacity?: number[] }> = {}
     state.scene.traverse((object: any) => {
       const kind = object.userData.panelId ? panels : object.userData.connectorId ? connectors : null
       if (!kind) return
@@ -54,6 +54,7 @@ async function sceneSnapshot(page: Page) {
         }
       })
       kind[object.userData.panelId || object.userData.connectorId] = { left, right, top, bottom,
+        opacity: kind === panels ? object.material.map((material: any) => material.opacity) : undefined,
         highlighted: kind === panels ? object.parent.children.some((child: any) => child.isLineSegments) : !!object.userData.selected }
     })
     return { panels, connectors, camera: [...state.camera.position.toArray(), ...state.camera.quaternion.toArray()], viewport: { width: state.size.width, height: state.size.height }, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } }
@@ -125,6 +126,10 @@ test('B previews and replaces selection without moving the camera, then restores
   await startBox(page, [middle.id, right.id])
   await expect.poll(() => highlightedPanels(page)).toEqual([middle.id, right.id].sort())
   expect(await selectedPanels(page)).toEqual([project.panels[0].id])
+  const preview = (await sceneSnapshot(page)).panels
+  expect(preview[middle.id].opacity).toEqual([0.8, 0.8])
+  expect(preview[right.id].opacity).toEqual([0.8, 0.8])
+  expect(preview[project.panels[0].id].opacity).toEqual([1, 1])
   expect((await sceneSnapshot(page)).camera).toEqual(initialCamera)
   await page.screenshot({ path: 'test-results/box-selection-preview.png' })
   await page.mouse.up()

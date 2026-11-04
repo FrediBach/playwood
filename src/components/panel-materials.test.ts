@@ -28,3 +28,26 @@ describe.each(['osb', 'nazena'] as const)('%s panel appearance', material => {
     textures.color.dispose(); textures.surface.dispose()
   })
 })
+
+it('keeps selected finishes while making faces and edges translucent, with ghost precedence', () => {
+  const textures = createWoodTextures('birch')
+  const panel = { material: 'birch' as const, color: '#abcdef', finishCoverage: 0.4 }
+  const normal = createPanelMaterials(panel, textures)
+  const selected = createPanelMaterials(panel, textures, undefined, true)
+  const ghost = createPanelMaterials(panel, textures, '#ff8800', true)
+  for (const index of [0, 1]) {
+    expect(selected[index].transparent).toBe(true)
+    expect(selected[index].opacity).toBe(0.8)
+    expect(selected[index].depthWrite).toBe(false)
+    expect(selected[index].color.equals(normal[index].color)).toBe(true)
+    expect(selected[index].map).toBe(normal[index].map)
+    expect(selected[index].bumpScale).toBe(normal[index].bumpScale)
+    expect(normal[index].opacity).toBe(1)
+    expect(normal[index].transparent).toBe(false)
+    expect(normal[index].depthWrite).toBe(true)
+    expect(ghost[index].opacity).toBeLessThan(selected[index].opacity)
+    expect(ghost[index].map).toBeNull()
+  }
+  for (const entry of [...normal, ...selected, ...ghost]) entry.dispose()
+  textures.color.dispose(); textures.surface.dispose()
+})
