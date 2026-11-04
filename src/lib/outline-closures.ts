@@ -18,8 +18,9 @@ export function outlineJointFrame(parent: Panel, connection: Connection) {
   const tangent = new Vector3(horizontal ? 1 : 0, horizontal ? 0 : 1, 0).applyQuaternion(turn)
   const normal = new Vector3(connection.side === 'left' ? -1 : connection.side === 'right' ? 1 : 0,
     connection.side === 'bottom' ? -1 : connection.side === 'top' ? 1 : 0, 0).applyQuaternion(turn)
-  const inward = new Vector3(0, 0, connection.flip ? -1 : 1).applyQuaternion(turn)
-  const seat = CONNECTOR_PROFILES['90'].seat
+  const opposite = connection.type === 't' && Number(connection.id.match(/:(\d+)$/)?.[1] ?? 0) === 1
+  const inward = new Vector3(0, 0, (connection.flip ? -1 : 1) * (opposite ? -1 : 1)).applyQuaternion(turn)
+  const seat = CONNECTOR_PROFILES[connection.type].seat
   const point = new Vector3(...parent.position).addScaledVector(normal, (horizontal ? parent.height : parent.width) / 2 + seat).addScaledVector(inward, seat)
   return { point, tangent, normal, inward, length: horizontal ? parent.width : parent.height }
 }
@@ -27,8 +28,8 @@ export function outlineJointFrame(parent: Panel, connection: Connection) {
 export function outlineConnectionAligned(parent: Panel, child: Panel, connection: Connection): boolean {
   const index = connection.outlineEdge, points = outlineWorldPoints(child)
   if (index === undefined || !Number.isInteger(index) || index < 0 || index >= points.length
-    || connection.role !== 'support' || connection.type !== '90' || parent.customOutline
-    || connection.side === 'front' || connection.side === 'back' || connection.inset !== 0 || connection.quarterTurn) return false
+    || connection.role !== 'support' || (connection.type !== '90' && connection.type !== 't') || parent.customOutline
+    || connection.side === 'front' || connection.side === 'back' || connection.inset !== 0 || connection.quarterTurn || connection.partial) return false
   const { point, tangent, normal, inward } = outlineJointFrame(parent, connection)
   const first = points[index], last = points[(index + 1) % points.length]
   const edge = last.clone().sub(first)

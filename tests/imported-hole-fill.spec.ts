@@ -2,6 +2,8 @@ import { test, expect, type Page } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import { writeFile } from 'node:fs/promises'
 import { resolvePanels, validateProject } from '../src/lib/model'
+import { installedHardware, overlappingHardware } from '../src/lib/connector-hardware-test-helpers'
+import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { outlineConnectionAligned } from '../src/lib/outline-closures'
 import type { Project } from '../src/lib/types'
 import { openInspectorSection } from './inspector-helpers'
@@ -10,6 +12,21 @@ const fixturePath = fileURLToPath(new URL('./fixtures/everyday-shelf-angled-open
 const upperRimNames = ['Top shelf', 'Middle shelf', 'Left upper side', 'Right upper side', 'Right upper side (section)']
 const angledRimNames = ['Right side', 'Right upper side', 'Panel 8', 'Panel 10', 'Panel 11', 'Panel 12']
 const saved = (page: Page): Promise<Project> => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+
+function expectClearAddedHardware(original: Project, closed: Project) {
+  // This imported shelf already has two overlapping pairs of CAD envelopes.
+  // Filling a hole must neither add overlaps nor move that existing hardware.
+  const pairKey = (ids: string[]) => JSON.stringify([...ids].sort())
+  const existing = new Set(overlappingHardware(original).map(pairKey))
+  expect(overlappingHardware(closed).filter(pair => !existing.has(pairKey(pair)))).toEqual([])
+  const installed = new Map(installedHardware(closed).map(piece => [piece.id, piece]))
+  for (const piece of installedHardware(original)) {
+    expect(installed.get(piece.id)!.origin.distanceTo(piece.origin)).toBeLessThan(1e-7)
+  }
+  const existingIds = new Set(getPhysicalConnectors(original).map(piece => piece.id))
+  expect(getPhysicalConnectors(closed).some(piece => !existingIds.has(piece.id)
+    && Math.abs(closed.connectorOverrides?.[piece.id]?.slide ?? 0) > 1)).toBe(true)
+}
 
 async function selectPanels(page: Page, names: string[]) {
   for (const [index, name] of names.entries()) {
@@ -63,6 +80,7 @@ test('the imported upper opening closes across its split T-joint side and surviv
     for (let axis = 0; axis < 3; axis++) expect(panel.position[axis]).toBeCloseTo(originalPanel.position[axis], 5)
   }
   expect(validateProject(closed)).toEqual([])
+  expectClearAddedHardware(original, closed)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
   await expect.poll(() => saved(page)).toEqual(original)
   await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
@@ -133,6 +151,7 @@ test('the imported angled opening reviews edge alignment and closes beside the u
     expect(panel.position[2] - panel.height / 2).toBeCloseTo(originalPanel.position[2] - originalPanel.height / 2, 5)
   }
   expect(validateProject(closed)).toEqual([])
+  expectClearAddedHardware(original, closed)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
   await expect.poll(() => saved(page)).toEqual(original)
   await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
@@ -146,6 +165,7 @@ test('the imported angled opening reviews edge alignment and closes beside the u
   const both = await saved(page)
   expect(both.panels.filter(panel => panel.customOutline).map(panel => panel.customOutline!.length).sort()).toEqual([4, 5])
   expect(validateProject(both)).toEqual([])
+  expectClearAddedHardware(original, both)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
   await expect.poll(() => saved(page)).toEqual(closed)
   await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()

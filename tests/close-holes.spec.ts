@@ -2,6 +2,7 @@ import { openInspectorSection } from './inspector-helpers'
 import { test, expect } from '@playwright/test'
 import { ASSEMBLY_LIBRARY } from '../src/lib/assembly-library'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
+import { installedHardware, overlappingHardware } from '../src/lib/connector-hardware-test-helpers'
 import { validateProject } from '../src/lib/model'
 import { gridProject } from '../src/lib/example-geometry'
 import { pentagonalFrame } from '../src/lib/outline-closure-test-fixtures'
@@ -24,9 +25,15 @@ test('choose one assembly opening, close the last directly, undo, and reload', a
   await expect(choice).toHaveCount(0)
   await expect(close).toBeEnabled()
   await expect.poll(savedCount).toBe(5)
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+  const saved: Project = await page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
   expect(getPhysicalConnectors(saved)).toHaveLength(16)
   expect(validateProject(saved)).toEqual([])
+  expect(overlappingHardware(saved)).toEqual([])
+  const installed = installedHardware(saved)
+  for (const piece of installedHardware(project)) {
+    expect(installed.find(candidate => candidate.id === piece.id)!.origin.distanceTo(piece.origin)).toBeLessThan(1e-7)
+  }
+  expect(Object.values(saved.connectorOverrides ?? {}).some(override => Math.abs(override.slide ?? 0) > 1)).toBe(true)
   await page.screenshot({ path: 'test-results/close-holes.png' })
   await close.click()
   await expect(close).toHaveCount(0)
@@ -38,8 +45,14 @@ test('choose one assembly opening, close the last directly, undo, and reload', a
   await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
   await expect.poll(savedCount).toBe(6)
   await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
+  const closed = await page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+  expect(overlappingHardware(closed)).toEqual([])
+  await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
+  await page.locator('canvas').click({ position: { x: 25, y: 300 } })
+  await page.screenshot({ path: 'test-results/close-holes-connectors.png' })
   await page.reload()
   await expect.poll(savedCount).toBe(6)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))).toEqual(closed)
 })
 
 test('selected loose panels expose the same hole choices', async ({ page }) => {
@@ -72,6 +85,7 @@ test('neighboring closure replaces 90 degree joints with T connectors', async ({
   await expect.poll(async () => (await saved()).panels.length).toBe(project.panels.length + 2)
   const result = await saved()
   expect(validateProject(result)).toEqual([])
+  expect(overlappingHardware(result)).toEqual([])
   expect(getPhysicalConnectors(result).filter(connector => connector.type === 't')).toHaveLength(getPhysicalConnectors(project).filter(connector => connector.type === 't').length + 2)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
   await expect.poll(async () => getPhysicalConnectors(await saved()).filter(connector => connector.type === 't').length).toBe(getPhysicalConnectors(project).filter(connector => connector.type === 't').length)
@@ -110,6 +124,7 @@ test('a shaped opening closes with an outline that follows frame resizing and su
   expect(filler.customOutline).toHaveLength(5)
   expect(closed.connections.filter(connection => connection.childId === filler.id && connection.outlineEdge !== undefined)).toHaveLength(5)
   expect(validateProject(closed)).toEqual([])
+  expect(overlappingHardware(closed)).toEqual([])
 
   await page.locator('.panel-list-select').filter({ hasText: /^Top$/ }).click()
   const width = page.getByRole('spinbutton', { name: 'Width', exact: true })

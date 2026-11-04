@@ -14,6 +14,13 @@ interface Body {
 const EPSILON = 1e-7
 const CLEARANCE = 0.1
 
+export class ConnectorClearanceError extends Error {
+  constructor(readonly connectionId: string) {
+    super('There is not enough room to place the added connectors without overlapping hardware.')
+    this.name = 'ConnectorClearanceError'
+  }
+}
+
 function bodies(type: ConnectorType, position: Vector3, rotation: Vec3): Body[] {
   const orientation = new Quaternion().setFromEuler(new Euler(...rotation))
   const axes = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)]
@@ -49,7 +56,7 @@ function blockedInterval(moving: Body, fixed: Body, tangent: Vector3): [number, 
   return [lower, upper]
 }
 
-/** Fit only newly installed hardware after repeat has copied its custom pieces.
+/** Fit only newly installed hardware after a construction operation.
  * Retained pieces are fixed obstacles; no geometry or existing overrides move.
  * Conservative CAD-part envelopes avoid the interleaving that center distances
  * miss at perpendicular rails, without loading rendering meshes in the domain. */
@@ -60,7 +67,7 @@ export function fitAddedConnectorClearance(original: Project, candidate: Project
   const panels = resolvePanels(candidate).map(panel => panel.visible ? panel : { ...panel, visible: true })
   const installed = pieces.map(piece => {
     const rail = getConnectorRail(piece.connection, panels, candidate.connections)
-    if (!rail?.placements[piece.index]) throw new Error('A repeated connector has no usable shared edge.')
+    if (!rail?.placements[piece.index]) throw new Error('An added connector has no usable shared edge.')
     const placement = rail.placements[piece.index]
     return { piece, rail, tangent: new Vector3(...rail.tangent),
       preferred: connectorSlide(rail, piece.index, candidate.connectorOverrides?.[piece.id]?.slide),
@@ -88,7 +95,7 @@ export function fitAddedConnectorClearance(original: Project, candidate: Project
     }
     const slide = intervals.map(([lower, upper]) => Math.max(lower, Math.min(upper, preferred)))
       .sort((a, b) => Math.abs(a - preferred) - Math.abs(b - preferred))[0]
-    if (slide === undefined) throw new Error('There is not enough room to place the repeated connectors without overlapping hardware.')
+    if (slide === undefined) throw new ConnectorClearanceError(piece.connection.id)
     if (Math.abs(slide - preferred) > EPSILON) overrides = { ...overrides,
       [piece.id]: { ...overrides?.[piece.id], slide } }
     occupied.push(...item.bodies.map(body => ({ ...body, center: body.center.clone().addScaledVector(tangent, slide) })))

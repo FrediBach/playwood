@@ -32,7 +32,7 @@ export interface Connection {
   partial?: boolean;
   /** Child's width/height axes are turned 90 degrees within its clamp plane. */
   quarterTurn?: boolean;
-  /** Child custom-outline edge, for a supplemental 90° rim joint. */
+  /** Child custom-outline edge for a 90° rim joint or either branch of a complete T with the rim as its stem. */
   outlineEdge?: number;
   side: Side; offset: number; inset: number; flip: boolean;
   color: string; count: number;

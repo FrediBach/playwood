@@ -188,8 +188,11 @@ export function getConnectionAnchors(connection: Connection, parent: Panel, chil
 export function getConnectorPlacements(connection: Connection, parent: Panel, child: Panel): Pick<Panel, 'position' | 'rotation'>[] {
   const seam = seamInfo(parent, connection)
   const direction = (connection.flip ? -1 : 1) * seam.front
-  const x = seam.radial.clone().negate()
-  const z = new Vector3(0, 0, direction)
+  // An outline T uses the rectangular rim as its stem; its two custom
+  // children occupy the opposing straight slots instead of a flat branch.
+  const outlineT = connection.type === 't' && connection.outlineEdge !== undefined
+  const x = outlineT ? new Vector3(0, 0, direction) : seam.radial.clone().negate()
+  const z = outlineT ? seam.radial.clone().negate() : new Vector3(0, 0, direction)
   const y = new Vector3().crossVectors(z, x)
   const local = new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(x, y, z))
   const rotation = rotationTuple(quaternion(parent).multiply(local))
@@ -305,7 +308,9 @@ function jointStructureIssues(connections: Connection[]): ValidationIssue[] {
       ? index < 0 || index >= expected || (i === 0 ? index !== 0 : index === branchIndices[i - 1])
       : index !== i)
     const invalidShared = expected > 1 && (invalidIndices || group.some(c => branchIndex(c) === 0 ? c.count < 1 : c.count !== 0))
-    if ((first.partial && !partial) || (partial ? group.length > expected : group.length !== expected) || inconsistent || invalidShared || (expected === 1 && first.count < 1)) issues.push({
+    const invalidOutline = group.some(c => c.outlineEdge !== undefined) && (group.some(c => c.outlineEdge === undefined || c.partial)
+      || (first.type !== '90' && first.type !== 't') || new Set(group.map(c => c.childId)).size !== group.length)
+    if ((first.partial && !partial) || (partial ? group.length > expected : group.length !== expected) || inconsistent || invalidShared || invalidOutline || (expected === 1 && first.count < 1)) issues.push({
       id: `${id}-joint`, severity: 'error', message: `${first.type === 't' ? 'T' : first.type === 'cross' ? 'Cross' : `${first.type}°`} joint is incomplete or inconsistent. Detach it and reconnect the panels.`, panelIds: [...new Set(group.flatMap(c => [c.parentId, c.childId]))],
     })
   }
@@ -515,8 +520,8 @@ export function parseProject(input: unknown): Project {
     if (raw.outlineEdge !== undefined) {
       c.outlineEdge = numberIn(raw.outlineEdge, 0, 127, 'outline edge')
       const parent = panels.find(panel => panel.id === c.parentId), child = panels.find(panel => panel.id === c.childId)
-      if (!Number.isInteger(c.outlineEdge) || !child?.customOutline?.[c.outlineEdge] || parent?.customOutline || c.role !== 'support' || c.type !== '90'
-        || c.side === 'front' || c.side === 'back' || c.inset !== 0 || c.quarterTurn || c.partial) throw new Error('Invalid outline edge joint: use a supplemental 90° connector from a rectangular rim to an existing outline edge.')
+      if (!Number.isInteger(c.outlineEdge) || !child?.customOutline?.[c.outlineEdge] || parent?.customOutline || c.role !== 'support' || (c.type !== '90' && c.type !== 't')
+        || c.side === 'front' || c.side === 'back' || c.inset !== 0 || c.quarterTurn || c.partial) throw new Error('Invalid outline edge joint: use a supplemental 90° connector or complete T joint from a rectangular rim to existing outline edges.')
     }
     if (typeof c.flip !== 'boolean' || !Number.isInteger(c.count)) throw new Error('Invalid connector options.')
     if (!panelIds.has(c.parentId) || !panelIds.has(c.childId) || c.parentId === c.childId) throw new Error('Connections must link two different, existing panels.')

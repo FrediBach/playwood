@@ -1,7 +1,7 @@
 import { Euler, Quaternion, Vector3 } from 'three'
 import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyLoosePort, AssemblyParameter, AssemblyPort, AttachmentOptions, Connection, DesignConstraint, Panel, Project, Vec3 } from './types'
 import { attachPanel, getConnectorPlacements, getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
-import { connectClosingPanel } from './closure-connectors'
+import { connectClosingPanel, fitClosingConnectorClearance } from './closure-connectors'
 import { resizePanels } from './structure-edit'
 import { evaluateAssemblyDefinition, parseAssemblyParameters, parseAssemblyParameterValues } from './assembly-parameters'
 import { reconcileAssemblyPlacement, samePanelPlacement } from './assembly-placement'
@@ -488,13 +488,23 @@ export function addFittedPanelToAssembly(project: Project, instanceId: string, p
   const inverse = q(instance.rotation).invert()
   const local = { ...panel, position: tuple(v(panel.position).sub(v(instance.position)).applyQuaternion(inverse)), rotation: angles(inverse.clone().multiply(q(panel.rotation))) }
   const localId = new Map(Object.entries(instance.panelIds).map(([local, world]) => [world, local]))
-  const fitted = connectClosingPanel(flat(source), local, boundaryIds.map(id => localId.get(id)!))
+  const fitted = connectClosingPanel(flat(source), local, boundaryIds.map(id => localId.get(id)!), { fitClearance: false })
   const connectionIds = Object.fromEntries(fitted.connections.map(connection => [connection.id, instance.connectionIds?.[connection.id] ?? internalId(instance, connection.id)]))
   const definition: AssemblyDefinition = { ...structuredClone(source), id: uid(), name: `${source.name.slice(0, 108)} closed`,
     panels: fitted.panels, connections: fitted.connections,
     parameters: source.parameters?.map(parameter => ({ ...parameter, defaultValue: instance.parameterValues?.[parameter.id] ?? parameter.defaultValue })) }
   const nextInstance = { ...instance, definitionId: definition.id, parameterValues: undefined, connectionIds, panelIds: { ...instance.panelIds, [local.id]: panel.id } }
-  return ensureValid(rebuild(project, { ...data, definitions: [...data.definitions, definition], instances: data.instances.map(item => item.id === instanceId ? nextInstance : item) }), project, new Set([panel.id]))
+  const rebuilt = rebuild(project, { ...data, definitions: [...data.definitions, definition], instances: data.instances.map(item => item.id === instanceId ? nextInstance : item) })
+  // Hardware overrides belong to the materialized project, where linked corners,
+  // neighboring construction, and retained per-piece slides are available.
+  const cleared = fitClosingConnectorClearance(project, rebuilt)
+  const counts = new Map(cleared.connections.map(connection => [connection.id, connection.count]))
+  const fittedDefinition = { ...definition, connections: definition.connections.map(connection => {
+    const count = counts.get(connectionIds[connection.id])
+    return count !== undefined && count !== connection.count ? { ...connection, count } : connection
+  }) }
+  const candidate = { ...cleared, assemblies: { ...cleared.assemblies!, definitions: cleared.assemblies!.definitions.map(item => item.id === definition.id ? fittedDefinition : item) } }
+  return ensureValid(candidate, project, new Set([panel.id]))
 }
 
 export function renameAssembly(project: Project, instanceId: string, name: string): Project {
