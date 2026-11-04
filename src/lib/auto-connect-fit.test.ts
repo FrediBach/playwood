@@ -1,3 +1,4 @@
+import extendedCorner from './fixtures/everyday-shelf-extended-corner.json'
 import { describe, expect, it } from 'vitest'
 import { Vector3 } from 'three'
 import { autoConnect } from './auto-connect'
@@ -81,5 +82,46 @@ describe('automatic connector fit proposals', () => {
     expect(getAutoConnectFit(blocked, ['small'])).toBeNull()
     const thick = { ...original, panels: original.panels.map(panel => panel.id === 'small' ? { ...panel, thickness: 25 } : panel) }
     expect(getAutoConnectFit(thick, ['small'])).toBeNull()
+  })
+})
+
+
+describe('extended corner shelf fitting', () => {
+  const corner = ['Left upper side', 'Right side copy']
+  const top = ['Top shelf', 'Right side copy']
+  const lower = ['Left side', 'Right upper side copy']
+  it.each([[corner, top, lower], [top, corner, lower]])('fits adjoining corner and top seams in either order: %j', (...pairs) => {
+    let project = parseProject(extendedCorner)
+    for (const names of pairs) {
+      const before = structuredClone(project)
+      const ids = names.map(name => project.panels.find(panel => panel.name === name)!.id)
+      const fit = getAutoConnectFit(project, ids)
+      expect(fit).not.toBeNull()
+      const next = fit!.result.project
+      expect(fit!.result.joints).toBe(1)
+      expect(next.connections).toHaveLength(project.connections.length + 1)
+      expect(validateProject(next)).toEqual([])
+      const after = positions(next)
+      for (const piece of positions(project)) expect(after.find(item => item.id === piece.id)!.position.distanceTo(piece.position)).toBeLessThan(1e-5)
+      for (const panel of resolvePanels(project).filter(panel => !ids.includes(panel.id))) {
+        const current = resolvePanels(next).find(item => item.id === panel.id)!
+        expect(current.width).toBeCloseTo(panel.width, 5)
+        expect(current.height).toBeCloseTo(panel.height, 5)
+        current.position.forEach((value, axis) => expect(value).toBeCloseTo(panel.position[axis], 5))
+      }
+      expect(project).toEqual(before)
+      expect(getAutoConnectFit(next, ids)).toBeNull()
+      project = parseProject(JSON.parse(JSON.stringify(next)))
+    }
+  })
+
+  it('offers a fit with one enlarged side selected and respects fixed cut rules', () => {
+    const project = parseProject(extendedCorner)
+    const ids = corner.map(name => project.panels.find(panel => panel.name === name)!.id)
+    expect(getAutoConnectFit(project, [ids[1]])).not.toBeNull()
+    const fixed: Project = { ...project, constraints: ids.map(panelId => ({
+      id: panelId, kind: 'dimension', enabled: true, panelId, dimension: 'height', value: 1010,
+    })) }
+    expect(getAutoConnectFit(fixed, ids)).toBeNull()
   })
 })

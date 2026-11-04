@@ -3,7 +3,7 @@ import { autoConnect } from './auto-connect'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { resolvePanels, validateProject } from './model'
-import { fitPanelPair, resizePanelEdge } from './structure-edit'
+import { fitPanelPair, resizePanelEdge, resizePanelEdges, type PanelEdgeResize } from './structure-edit'
 import type { Connection, Panel, Project, Side, Vec3 } from './types'
 
 const rotation = (panel: Panel) => new Quaternion().setFromEuler(new Euler(...panel.rotation))
@@ -44,7 +44,7 @@ export function getAutoConnectFit(project: Project, selectedIds: readonly string
   const joined = (a: string, b: string) => [...groups.values()].some(members => members.has(a) && members.has(b))
   type Candidate = { parent: Panel; child: Panel; dimension: 'width' | 'height'; side: -1 | 1; distance: number }
   const candidates: Candidate[] = []
-  const pairCandidates: { parent: Panel; child: Panel; connection: Connection; distance: number }[] = []
+  const pairCandidates: { parent: Panel; child: Panel; connection: Connection; distance: number; edges?: PanelEdgeResize[] }[] = []
   const seen = new Set<string>()
   for (const child of panels) {
     if (child.customOutline || child.thickness < 16 || child.thickness > 19 || (selected.size && !selected.has(child.id))) continue
@@ -64,9 +64,40 @@ export function getAutoConnectFit(project: Project, selectedIds: readonly string
         if (!axes.every(axis => Math.abs(axis.clone().applyQuaternion(rotation(baseline)).dot(axis.clone().applyQuaternion(rotation(child)))) > 0.99999)) continue
         const error = new Vector3(...baseline.position).sub(new Vector3(...child.position))
         if (error.length() <= 0.5 || error.length() > 100 + 0.05) continue
-        if ([parent, child].every(panel => project.connections.some(joint => joint.parentId === panel.id || joint.childId === panel.id))) {
+        if (!parent.customOutline && [parent, child].every(panel => project.connections.some(joint => joint.parentId === panel.id || joint.childId === panel.id))) {
           const delta = new Vector3(...child.position).sub(new Vector3(...parent.position)).applyQuaternion(rotation(parent).invert())
-          pairCandidates.push({ parent, child, connection: { ...connection, offset: seam === 'left' || seam === 'right' ? delta.y : delta.x }, distance: error.length() })
+          const fittedConnection = { ...connection, offset: seam === 'left' || seam === 'right' ? delta.y : delta.x }
+          // Try anchored edge corrections before the free pair solve. Its
+          // least-change solution can move hardware even when fixed-edge trims fit.
+          const parentDimension = seam === 'left' || seam === 'right' ? 'width' : 'height'
+          const childDimension = quarterTurn ? (parentDimension === 'width' ? 'height' : 'width') : parentDimension
+          const trial = (panel: Panel, dimension: 'width' | 'height', side: -1 | 1) => ({ ...panel,
+            [dimension]: panel[dimension] + 1,
+            position: new Vector3(...panel.position).addScaledVector(axes[dimension === 'width' ? 0 : 1].clone().applyQuaternion(rotation(panel)), side / 2).toArray() as Vec3,
+          })
+          const residual = (p: Panel, c: Panel) => {
+            const local = new Vector3(...c.position).sub(new Vector3(...p.position)).applyQuaternion(rotation(p).invert())
+            const expected = resolvePanels({ version: 1, name: '', panels: [p, c], connections: [{ ...connection,
+              offset: seam === 'left' || seam === 'right' ? local.y : local.x }] })[1]
+            return new Vector3(...expected.position).sub(new Vector3(...c.position))
+          }
+          for (const parentSide of [-1, 1] as const) for (const childSide of [-1, 1] as const) {
+            const a = residual(trial(parent, parentDimension, parentSide), child).sub(error)
+            const b = residual(parent, trial(child, childDimension, childSide)).sub(error)
+            const aa = a.dot(a), ab = a.dot(b), bb = b.dot(b), determinant = aa * bb - ab * ab
+            if (determinant < 1e-8) continue
+            const ae = -a.dot(error), be = -b.dot(error)
+            const first = (ae * bb - be * ab) / determinant, second = (be * aa - ae * ab) / determinant
+            if (Math.max(Math.abs(first), Math.abs(second)) > MAX_ADJUSTMENT
+              || error.clone().addScaledVector(a, first).addScaledVector(b, second).length() > 0.05) continue
+            const edges: PanelEdgeResize[] = [
+              { panelId: parent.id, dimension: parentDimension, side: parentSide, distance: first },
+              { panelId: child.id, dimension: childDimension, side: childSide, distance: second },
+            ]
+            const corrections = edges.filter(edge => Math.abs(edge.distance) > 0.001)
+            if (corrections.length) pairCandidates.push({ parent, child, connection: fittedConnection, distance: error.length(), edges: corrections })
+          }
+          pairCandidates.push({ parent, child, connection: fittedConnection, distance: error.length() })
         }
         for (const dimension of ['width', 'height'] as const) for (const side of [-1, 1] as const) {
           const displacement = axes[dimension === 'width' ? 0 : 1].clone().applyQuaternion(rotation(child)).multiplyScalar(side / 2)
@@ -106,9 +137,9 @@ export function getAutoConnectFit(project: Project, selectedIds: readonly string
     }
   }
   pairCandidates.sort((a, b) => a.distance - b.distance)
-  for (const { parent, child, connection } of pairCandidates) {
+  for (const { parent, child, connection, edges } of pairCandidates) {
     try {
-      const resized = fitPanelPair(project, connection)
+      const resized = edges ? resizePanelEdges(project, edges) : fitPanelPair(project, connection)
       const adjustments = resolvePanels(resized).flatMap(panel => {
         const before = panels.find(item => item.id === panel.id)
         if (!before) return []
@@ -118,9 +149,11 @@ export function getAutoConnectFit(project: Project, selectedIds: readonly string
           dimension, before: before[dimension], after: panel[dimension], distance: panel[dimension] - before[dimension],
         }])
       })
-      if (new Set(adjustments.map(item => item.panelId)).size < 2) continue
+      if (!adjustments.length || (!edges && new Set(adjustments.map(item => item.panelId)).size < 2)) continue
       const result = autoConnect(resized, [parent.id, child.id])
       if (!result.joints || result.splits || result.upgrades) continue
+      if (!result.project.connections.some(joint => !project.connections.some(old => old.id === joint.id)
+        && ((joint.parentId === parent.id && joint.childId === child.id) || (joint.parentId === child.id && joint.childId === parent.id)))) continue
       if (validateProject(result.project).some(issue => !beforeIssues.has(issue.id) && (issue.severity === 'error' || issue.id.startsWith('collision-')))) continue
       const afterHardware = hardwarePositions(result.project)
       if ([...hardware].some(([id, position]) => !afterHardware.has(id) || afterHardware.get(id)!.distanceTo(position) > 1e-5)) continue

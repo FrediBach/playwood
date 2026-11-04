@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
-import { attachPanel, createPanel, createStarterProject, getProjectBounds, resolvePanels, validateProject } from '../src/lib/model'
+import { attachPanel, createPanel, createStarterProject, parseProject, getProjectBounds, resolvePanels, validateProject } from '../src/lib/model'
 import { connectorSlide, getConnectorRail } from '../src/lib/connector-movement'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { resizePanelEdge } from '../src/lib/structure-edit'
@@ -207,4 +208,37 @@ test('auto-connect proposes both angled panel lengths, cancels safely, and commi
   await expect.poll(() => savedProject(page)).toEqual(fitted)
   await page.reload()
   expect(await savedProject(page)).toEqual(fitted)
+})
+
+
+test('extended corner panels and long top fit through reviewed trims with undo and reload', async ({ page }) => {
+  const project = parseProject(JSON.parse(readFileSync(new URL('../src/lib/fixtures/everyday-shelf-extended-corner.json', import.meta.url), 'utf8')))
+  await openProject(page, project)
+  let before = project
+  for (const names of [['Left upper side', 'Right side copy'], ['Top shelf', 'Right side copy'], ['Left side', 'Right upper side copy']]) {
+    await page.locator('.panel-list-select').filter({ hasText: new RegExp(`^${names[0]}$`) }).click()
+    await page.getByRole('checkbox', { name: `Select ${names[1]}`, exact: true }).check()
+    await openInspectorSection(page, 'Auto-add connectors')
+    await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).last().click()
+    const confirmation = page.getByRole('dialog', { name: /Resize panels? to connect/ })
+    await expect(confirmation).toBeVisible()
+    await expect(confirmation).toContainText('1,010 → 1,005 mm')
+    expect(await savedProject(page)).toEqual(before)
+    await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
+    expect(await savedProject(page)).toEqual(before)
+    await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).last().click()
+    await confirmation.getByRole('button', { name: 'Resize and connect', exact: true }).click()
+    await expect.poll(async () => (await savedProject(page)).connections.length).toBe(before.connections.length + 1)
+    const fitted = await savedProject(page)
+    expect(validateProject(fitted)).toEqual([])
+    const hardware = hardwarePositions(before)
+    hardwarePositions(fitted).slice(0, hardware.length).forEach((position, index) => position.forEach((value, axis) => expect(value).toBeCloseTo(hardware[index][axis], 5)))
+    await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+    await expect.poll(() => savedProject(page)).toEqual(before)
+    await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+    await expect.poll(() => savedProject(page)).toEqual(fitted)
+    before = fitted
+  }
+  await page.reload()
+  expect(await savedProject(page)).toEqual(before)
 })
