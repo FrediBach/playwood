@@ -1,7 +1,7 @@
 import { Euler, Quaternion, Vector3 } from 'three'
 import { getAssemblyAttachmentTargets, materializeAssemblies } from './assemblies'
 import { reconcileAssemblyPlacement, samePanelPlacement } from './assembly-placement'
-import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
+import { getDefaultConnectorColor } from './connector-selection'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { getConnectorPlacements, resolvePanels, validateProject } from './model'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
@@ -41,6 +41,7 @@ export interface PreviewDragSession {
 
 /** Release external joints in a preview; explicit rules can still move related peers. */
 export function preparePreviewDrag(original: Project, selectedIds: readonly string[]): PreviewDragSession | null {
+  const defaultColor = getDefaultConnectorColor(original)
   const wanted = new Set(selectedIds)
   const moving = original.panels.filter(panel => wanted.has(panel.id))
   if (!moving.some(panel => panel.visible)) return null
@@ -88,7 +89,7 @@ export function preparePreviewDrag(original: Project, selectedIds: readonly stri
     const compatibleTypes = types.filter(type => Math.abs(normalDot - Math.abs(Math.cos(CONNECTOR_PROFILES[type].bend))) < 0.005)
     for (const type of compatibleTypes) for (const side of sides) for (const flip of [false, true]) {
       const connection: Connection = { id: `drag/${sessionId}/${panelTargets.length}:0`, parentId: parent.id, childId: child.id, type, side, flip,
-        offset: 0, inset: 0, count: 2, color: DEFAULT_CONNECTOR_COLOR, role: 'support' }
+        offset: 0, inset: 0, count: 2, color: defaultColor, role: 'support' }
       const expected = resolvePanels({ version: 1, name: '', panels: [parent, child], connections: [{ ...connection, role: undefined }] })[1]
       const expectedRotation = rotation(expected.rotation)
       if (!axes.every(axis => Math.abs(axis.clone().applyQuaternion(expectedRotation).dot(axis.clone().applyQuaternion(actualRotation))) > 0.99999)) continue

@@ -1,5 +1,5 @@
 import { Euler, Quaternion, Vector3 } from 'three'
-import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
+import { getDefaultConnectorColor } from './connector-selection'
 import { ConnectorClearanceError, fitAddedConnectorClearance } from './connector-clearance'
 import { getConnectorRail } from './connector-movement'
 import { resolvePanels, validateProject } from './model'
@@ -83,12 +83,13 @@ function fitJoint(members: Panel[], count: number, color: string): Connection[] 
  * where the closing panels can occupy its slots, then fit hardware clearance.
  * The whole operation is prepared before the caller commits it to history.
  */
-export function connectClosingPanel(project: Project, panel: Panel, boundaryIds: readonly string[], options: { fitClearance?: boolean } = {}): Project {
+export function connectClosingPanel(project: Project, panel: Panel, boundaryIds: readonly string[], options: { fitClearance?: boolean; color?: string } = {}): Project {
   const panels = [...resolvePanels(project), panel]
   const byId = new Map(panels.map(item => [item.id, item]))
   const visiblePanels = panels.map(item => item.visible ? item : { ...item, visible: true })
   let connections = [...project.connections]
   const removedIds = new Set<string>()
+  const color = options.color ?? getDefaultConnectorColor(project)
   // Joint promotion is a topology decision: only coincident, overlapping rails
   // share a clamp. Perpendicular corner hardware is handled by sliding below.
   const sharesRail = (first: Connection, group: Connection[], second: Connection) => {
@@ -104,7 +105,6 @@ export function connectClosingPanel(project: Project, panel: Panel, boundaryIds:
   }
   for (const boundaryId of boundaryIds) {
     const boundary = byId.get(boundaryId)!
-    const color = connections.find(connection => connection.parentId === boundaryId || connection.childId === boundaryId)?.color ?? DEFAULT_CONNECTOR_COLOR
     let accepted = false
     for (const count of [2, 1]) {
       let group = fitJoint([boundary, panel], count, color)

@@ -4,7 +4,7 @@ import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, v
 import { createExampleProject } from './example-library'
 import { Vector3 } from 'three'
 import { connectorSlide, getConnectorRail } from './connector-movement'
-import { getPhysicalConnectors } from './connector-selection'
+import { connectorId, getPhysicalConnectors } from './connector-selection'
 import type { ConnectorType, Project } from './types'
 
 function joint(type: ConnectorType = '90', width = 300): Project {
@@ -43,6 +43,20 @@ describe('auto-add connectors', () => {
     const result = autoConnect(partial)
     expect(result.joints).toBe(2)
     expect(result.project.connections.slice(0, 2)).toEqual(partial.connections)
+  })
+
+  it('colors every newly found joint from the installed physical majority, including overrides', () => {
+    const box = createExampleProject('cube')
+    const partial: Project = { ...box, connections: box.connections.slice(0, 2).map(connection => ({ ...connection, color: '#ff0000' })) }
+    partial.connectorOverrides = Object.fromEntries(partial.connections.flatMap((connection, index) =>
+      Array.from({ length: index ? 1 : 2 }, (_, piece) => [connectorId(connection.id, piece), { color: '#123456' }])))
+    const snapshot = structuredClone(partial), originalIds = new Set(partial.connections.map(connection => connection.id))
+    const result = autoConnect(partial)
+    expect(result.joints).toBe(2)
+    expect(result.project.connections.filter(connection => !originalIds.has(connection.id)).map(connection => connection.color)).toEqual(['#123456', '#123456'])
+    expect(result.project.connections.slice(0, 2)).toEqual(partial.connections)
+    expect(result.project.connectorOverrides).toEqual(partial.connectorOverrides)
+    expect(partial).toEqual(snapshot)
   })
 
   it('uses a single connector on short shared edges', () => {
@@ -135,6 +149,21 @@ describe('interior T joints', () => {
     expect(result.project.connections[0].id).toBe(connected.connections[0].id)
     expect(result.project.connections[0].parentId).toBe(result.addedPanelIds[0])
     expect(validateProject(result.project).filter(issue => issue.severity === 'error')).toEqual([])
+  })
+
+  it('uses the installed project color for new interior T hardware without recoloring the outer joint', () => {
+    const original = continuousT(), shelf = original.panels[0]
+    const connected = attachPanel(original, shelf.id, createPanel(), { side: 'top', type: '90', flip: true, offset: 0, inset: 0, color: '#ff0000', count: 2 })
+    const outer = connected.connections[0]
+    connected.connectorOverrides = {
+      [connectorId(outer.id, 0)]: { color: '#123456' },
+      [connectorId(outer.id, 1)]: { color: '#123456' },
+    }
+    const result = autoConnect(connected)
+    expect(result.splits).toBe(1)
+    expect(result.project.connections.filter(connection => connection.id !== outer.id).map(connection => connection.color)).toEqual(['#123456', '#123456'])
+    expect(result.project.connections.find(connection => connection.id === outer.id)?.color).toBe('#ff0000')
+    expect(result.project.connectorOverrides).toEqual(connected.connectorOverrides)
   })
 
   it('does not cut panels for incompatible thickness, gaps, or selection', () => {

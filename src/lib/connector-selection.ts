@@ -1,5 +1,5 @@
 import type { Connection, ConnectorOverride, Project } from './types'
-import { getConnectorMaterial } from './connector-options'
+import { DEFAULT_CONNECTOR_COLOR, getConnectorMaterial } from './connector-options'
 
 /** Stable identity for each physical piece of hardware along a joint. */
 export const connectorId = (connectionId: string, index: number) => JSON.stringify([connectionId, index])
@@ -12,6 +12,22 @@ export function getPhysicalConnectors(project: Pick<Project, 'connections' | 'co
     return { id, connection, index, type, color: override?.color ?? connection.color,
       material: getConnectorMaterial(type, override?.material ?? connection.material), removed: override?.removed ?? false }
   })).filter(connector => !connector.removed)
+}
+
+/** Match installed hardware, including per-piece colors but excluding removals.
+ * Equal totals keep the first encountered color; an empty project uses red. */
+export function getDefaultConnectorColor(project: Pick<Project, 'connections' | 'connectorOverrides'>): string {
+  const counts = new Map<string, number>()
+  for (const piece of getPhysicalConnectors(project)) {
+    const color = piece.color.toLowerCase()
+    counts.set(color, (counts.get(color) ?? 0) + 1)
+  }
+  let color: string = DEFAULT_CONNECTOR_COLOR
+  let maximum = 0
+  for (const [candidate, count] of counts) {
+    if (count > maximum) { color = candidate; maximum = count }
+  }
+  return color
 }
 
 export function editConnectors(project: Project, ids: readonly string[], patch: ConnectorOverride): Project {

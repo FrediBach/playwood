@@ -3,7 +3,7 @@ import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAtta
 import { gridProject } from './example-geometry'
 import { attachPanel, createPanel, parseProject, resolvePanels, validateProject } from './model'
 import { movePreviewDrag, preparePreviewDrag } from './preview-drag'
-import { getPhysicalConnectors } from './connector-selection'
+import { connectorId, getPhysicalConnectors } from './connector-selection'
 import type { AttachmentOptions, Project, Vec3 } from './types'
 
 const options: AttachmentOptions = { type: '90', side: 'right', flip: false, offset: 0, inset: 0, color: '#e75a35', count: 2 }
@@ -50,6 +50,20 @@ describe('preview dragging', () => {
     const released = movePreviewDrag(session, [60, 0, 60], 20)
     expect(released.snap).toBeNull()
     expect(released.project.connections).toEqual([])
+  })
+
+  it('chooses snap hardware color before the preview releases the existing joints', () => {
+    const original = corner()
+    original.connectorOverrides = Object.fromEntries(Array.from({ length: 2 }, (_, index) =>
+      [connectorId(original.connections[0].id, index), { color: '#123456' }]))
+    const snapshot = structuredClone(original)
+    const session = preparePreviewDrag(original, ['moving'])!
+    expect(session.project.connections).toEqual([])
+    const snapped = movePreviewDrag(session, [8, 0, 4], 20)
+    expect(snapped.snap).not.toBeNull()
+    expect(snapped.project.connections).toHaveLength(1)
+    expect(snapped.project.connections[0].color).toBe('#123456')
+    expect(original).toEqual(snapshot)
   })
 
   it('can snap when the selected panel supplies the parent edge', () => {

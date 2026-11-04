@@ -2,13 +2,35 @@ import { describe, expect, it } from 'vitest'
 import { copySelection, getPasteTargets, getInsertionTargets } from './clipboard'
 import { createAssembly, materializeAssemblies, removeAssembly, updateAssemblyFinish, updateAssemblyParameters, updateAssemblyParameterValues } from './assemblies'
 import { createExampleProject } from './example-library'
-import { createPanel, parseProject, validateProject } from './model'
+import { attachPanel, createPanel, parseProject, validateProject } from './model'
+import { connectorId } from './connector-selection'
 import type { Project } from './types'
 
 const looseProject = (): Project => ({ version: 1, name: 'Paste', panels: [createPanel({ name: 'Source', width: 250, height: 250, position: [-1000, 500, 0], color: '#123456', pattern: 'pegboard' }), createPanel({ name: 'Target', position: [0, 500, 0] })], connections: [] })
 const boxProject = () => { const project = createExampleProject('cube'); return createAssembly(project, project.panels.map(panel => panel.id), 'Box') }
 
 describe('copy and paste attachments', () => {
+  it.each(['paste', 'insert'] as const)('matches new %s attachment hardware to the destination project colors', operation => {
+    const loose = looseProject()
+    const project = attachPanel(loose, loose.panels[0].id, createPanel({ width: 250, height: 250 }),
+      { side: 'left', type: '90', flip: false, offset: 0, inset: 0, count: 2, color: '#ff0000' })
+    const existing = project.connections[0]
+    project.connectorOverrides = {
+      [connectorId(existing.id, 0)]: { color: '#123456' },
+      [connectorId(existing.id, 1)]: { color: '#123456' },
+    }
+    const snapshot = structuredClone(project), copied = copySelection(project, [project.panels[0].id])
+    const targets = (operation === 'paste' ? getPasteTargets : getInsertionTargets)(project, [project.panels[1].id], copied)
+      .filter(target => target.project)
+    expect(targets.length).toBeGreaterThan(0)
+    for (const target of targets) {
+      expect(target.project!.connections.filter(connection => connection.id !== existing.id).map(connection => connection.color)).toEqual(['#123456'])
+      expect(target.project!.connections[0]).toEqual(existing)
+      expect(target.project!.connectorOverrides).toEqual(project.connectorOverrides)
+    }
+    expect(project).toEqual(snapshot)
+  })
+
   it('snapshots a panel and pastes fresh IDs without moving the originals', () => {
     const project = looseProject()
     const copied = copySelection(project, [project.panels[0].id])

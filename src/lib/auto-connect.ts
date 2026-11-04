@@ -1,10 +1,9 @@
-import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { createPanel, getConnectorPlacements, resolvePanels, validateProject } from './model'
 import { isPanelConnectedToAssembly } from './assemblies'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { connectorSlide, getConnectorRail } from './connector-movement'
-import { connectorId, getPhysicalConnectors } from './connector-selection'
+import { connectorId, getDefaultConnectorColor, getPhysicalConnectors } from './connector-selection'
 import { prepareJointUpgrade } from './prepare-joint-upgrade'
 import type { Connection, ConnectorType, Panel, Project, Side } from './types'
 
@@ -71,6 +70,7 @@ function clearPlacements(rail: NonNullable<ReturnType<typeof getConnectorRail>>,
 
 /** Fill compatible joints, including complete upgrades of occupied T/cross corners. */
 export function autoConnect(project: Project, selectedIds: readonly string[] = []) {
+  const defaultColor = getDefaultConnectorColor(project)
   const prepared = splitInteriorTJoints(project, selectedIds)
   project = prepared.project
   selectedIds = selectedIds.length > 1 ? [...selectedIds, ...prepared.addedPanelIds] : selectedIds
@@ -98,7 +98,7 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
     for (const side of sides) for (const flip of [false, true]) for (const quarterTurn of [false, true]) {
       const offset = side === 'left' || side === 'right' ? relative.y : relative.x
       const id = crypto.randomUUID()
-      const first: Connection = { id: `${id}:0`, parentId: parent.id, childId: child.id, type, side, flip, offset, inset: 0, color: DEFAULT_CONNECTOR_COLOR, count: 2, role: 'support', ...(quarterTurn ? { quarterTurn } : {}) }
+      const first: Connection = { id: `${id}:0`, parentId: parent.id, childId: child.id, type, side, flip, offset, inset: 0, color: defaultColor, count: 2, role: 'support', ...(quarterTurn ? { quarterTurn } : {}) }
       if (!fits(parent, child, first)) continue
       const group = [first]
       const count = type === 'cross' ? 3 : type === 't' ? 2 : 1
@@ -155,7 +155,7 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
       }
       if (!placements) continue
       const replacementHardware = occupied.filter(piece => removedIds.has(piece.connection.id))
-      const color = replaced[0]?.connections[0].color ?? DEFAULT_CONNECTOR_COLOR
+      const color = replaced[0]?.connections[0].color ?? defaultColor
       for (const connection of group) connection.color = color
       const baked = prepareJointUpgrade(project, replaced.flatMap(old => old.connections))
       // Removing a driving attachment must leave its child at its world pose;
@@ -199,6 +199,7 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
  * A rejected candidate never alters the project.
  */
 export function splitInteriorTJoints(original: Project, selectedIds: readonly string[]) {
+  const defaultColor = getDefaultConnectorColor(original)
   let project = original, splits = 0, connectors = 0
   const addedPanelIds: string[] = [], selected = new Set(selectedIds)
   const seat = CONNECTOR_PROFILES.t.seat
@@ -224,7 +225,7 @@ export function splitInteriorTJoints(original: Project, selectedIds: readonly st
         const right = createPanel({ ...shelf, id: crypto.randomUUID(), name: `${shelf.name.slice(0, 108)} (section)`, [dimension]: rightLength, position: new Vector3(...shelf.position).addScaledVector(worldAxis, (length - rightLength) / 2).toArray() })
         for (const flip of [false, true]) for (const quarterTurn of [false, true]) {
           const id = crypto.randomUUID()
-          const first: Connection = { id: `${id}:0`, parentId: left.id, childId: divider.id, type: 't', side: dimension === 'width' ? 'right' : 'top', flip, ...(quarterTurn ? { quarterTurn } : {}), offset: dimension === 'width' ? local.y : local.x, inset: 0, color: DEFAULT_CONNECTOR_COLOR, count: 2, role: 'support' }
+          const first: Connection = { id: `${id}:0`, parentId: left.id, childId: divider.id, type: 't', side: dimension === 'width' ? 'right' : 'top', flip, ...(quarterTurn ? { quarterTurn } : {}), offset: dimension === 'width' ? local.y : local.x, inset: 0, color: defaultColor, count: 2, role: 'support' }
           if (!fits(left, divider, first)) continue
           const second: Connection = { ...first, id: `${id}:1`, childId: right.id, count: 0, offset: 0, ...(quarterTurn ? { quarterTurn: false } : {}) }
           if (!fits(left, right, second)) continue

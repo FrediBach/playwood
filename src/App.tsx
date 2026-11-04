@@ -10,7 +10,7 @@ import { PreviewContextMenu } from '@/components/PreviewContextMenu'
 import { ConnectorInspector } from '@/components/ConnectorInspector'
 import { CloseHoles } from '@/components/CloseHoles'
 import { closePanelHole, findClosingPanelHoles } from '@/lib/close-holes'
-import { editConnectors } from '@/lib/connector-selection'
+import { editConnectors, getDefaultConnectorColor } from '@/lib/connector-selection'
 import { changeConnectorType } from '@/lib/connector-type-edit'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import { Box, Check, CheckCheck, Copy, Link2, MousePointer2, Plus, Trash2 } from 'lucide-react'
@@ -486,7 +486,7 @@ export default function App() {
     setSelectedId(panel.id); setInspectorTab('panel'); setRightOpen(true)
     setFitSignal(v => v + 1); notify('Your panel is ready')
   }
-  const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachTarget('new');setAttachmentSideHighlight(null);setRealisticPreview(false);setExploded(false);setDraft(roundPanelDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87',...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}),project.niceValues));setInspectorTab('attach');setRightOpen(true)}
+  const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachment(current=>({...current,color:getDefaultConnectorColor(project)}));setAttachTarget('new');setAttachmentSideHighlight(null);setRealisticPreview(false);setExploded(false);setDraft(roundPanelDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87',...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}),project.niceValues));setInspectorTab('attach');setRightOpen(true)}
   const applyAttachment=()=>{if(!previewProject||attachmentErrors.length)return;commit(previewProject);setSelectedId(attachTarget==='new'?draft.id:attachTarget);setInspectorTab('panel');setDraft(createPanel());notify(`${previewPanels.length===1?'Panel':`${previewPanels.length} panels`} attached`)}
   const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return false;const group=connection.id.replace(/:\d+$/,'');return commitWithInsertChecks(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
   const insertModuleDefinition = (definition: AssemblyDefinition) => {
