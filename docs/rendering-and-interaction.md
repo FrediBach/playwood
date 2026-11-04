@@ -42,6 +42,8 @@ flowchart TD
 
 [`SceneEnvironment.tsx`](../src/components/SceneEnvironment.tsx) owns Studio lighting, the ground grid and geometry guides, or the room environment. [`use-scene-snap-feedback.ts`](../src/hooks/use-scene-snap-feedback.ts) owns the 900 ms keyboard feedback timer and tracks accepted resize starts. It remains mounted across mode and handle visibility changes, ignores feedback from a different selection, and suppresses resize feedback for repetition. [`scene-snap-guides.ts`](../src/lib/scene-snap-guides.ts) resolves guide targets, sources, and direction in millimeters, giving the live pointer probe priority over keyboard feedback. The environment layer converts guide positions to meters when drawing.
 
+Ground-grid meter marks are textured planes parallel to the floor, with depth testing enabled. They remain below ground panels instead of billboarding upward through them; their size follows camera zoom and they hide in edge-on views.
+
 ### Coordinate boundary
 
 Project lengths and positions use millimeters, and rotations use Euler radians. A panel's geometry is centered on its local XY plane, with thickness centered along local Z. World Y is vertical.

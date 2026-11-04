@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Grid } from '@react-three/drei'
-import { CanvasTexture, Sprite, SRGBColorSpace, Vector3 } from 'three'
+import { CanvasTexture, Mesh, SRGBColorSpace, Vector3 } from 'three'
 import type { Vec3 } from '@/lib/types'
 
 function MeterMark({ position, label }: { position: Vec3; label: string }) {
-  const sprite = useRef<Sprite>(null)
+  const mark = useRef<Mesh>(null)
   const direction = useMemo(() => new Vector3(), [])
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas')
@@ -29,16 +29,17 @@ function MeterMark({ position, label }: { position: Vec3; label: string }) {
   }, [label])
   useEffect(() => () => texture.dispose(), [texture])
   useFrame(({ camera, viewport, size }) => {
-    if (!sprite.current) return
+    if (!mark.current) return
     // Ground labels overlap when the floor is viewed edge-on.
-    sprite.current.visible = camera.getWorldDirection(direction).y < -0.08
-    // Keep the lettering at 11 screen pixels as the camera zooms or changes view.
-    const factor = size.width / viewport.getCurrentViewport(camera, sprite.current.position, size).width * 3
-    sprite.current.scale.set(texture.image.width / factor, texture.image.height / factor, 1)
+    mark.current.visible = camera.getWorldDirection(direction).y < -0.08
+    // Keep a consistent label size while letting the floor perspective foreshorten it.
+    const factor = size.width / viewport.getCurrentViewport(camera, mark.current.position, size).width * 3
+    mark.current.scale.set(texture.image.width / factor, texture.image.height / factor, 1)
   })
-  return <sprite ref={sprite} name={`ground-grid-label-${label}`} position={position} center={[0.5, 0]} raycast={() => null}>
-    <spriteMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
-  </sprite>
+  return <mesh ref={mark} name={`ground-grid-label-${label}`} position={position} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+    <planeGeometry />
+    <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
+  </mesh>
 }
 
 export function GroundGrid({ floorY, extent, cellSize }: { floorY: number; extent: number; cellSize: number }) {
