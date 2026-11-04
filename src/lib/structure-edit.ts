@@ -18,7 +18,7 @@ type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
 type Row = { entries: Map<number, number>; value: number }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3; releaseContacts?: boolean } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
+type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 interface ValidationContext { trofastWorld?: boolean }
 
@@ -164,7 +164,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   const selected = frames.filter(item => ids.has(item.panel.id))
   if (!selected.length) return project
   const constraints = (project.constraints ?? []).filter(rule => rule.enabled && designConstraintPanelIds(rule).every(id => indices.has(id)))
-  if (edit.kind === 'move' && selected.length === frames.length && !constraints.length) {
+  if (edit.kind === 'move' && !edit.deltas && selected.length === frames.length && !constraints.length) {
     return { ...project, panels: project.panels.map(panel => indices.has(panel.id) ? {
       ...panel, position: panel.position.map((value, axis) => value + edit.delta[axis]) as Vec3,
     } : panel) }
@@ -400,7 +400,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       const target = row(patch?.[field] !== undefined ? patch[field]! - item.panel[field] : 0)
       add(target, index * 5 + 3 + dimension, 1)
     }
-    if (edit.kind === 'move') worldAxes.forEach((axis, dimension) => center(row(edit.delta[dimension]), index, axis))
+    if (edit.kind === 'move') worldAxes.forEach((axis, dimension) => center(row((edit.deltas?.[item.panel.id] ?? edit.delta)[dimension]), index, axis))
   }
   if (edit.kind === 'resize') {
     // An edge pull shifts the center by half the growth to anchor its opposite
@@ -412,7 +412,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         selected.forEach(item => center(constraint, indices.get(item.panel.id)!, axis, 1 / selected.length))
       }
   } else if (edit.kind === 'move') {
-    const axis = new Vector3(...edit.delta).normalize()
+    const direction = edit.deltas ? selected.map(item => edit.deltas![item.panel.id]).find(delta => delta?.some(value => Math.abs(value) > EPSILON)) ?? edit.delta : edit.delta
+    const axis = new Vector3(...direction).normalize()
     const physicalRoots = frames.map((_, index) => index)
     const physicalRoot = (index: number): number => { while (physicalRoots[index] !== index) { physicalRoots[index] = physicalRoots[physicalRoots[index]]; index = physicalRoots[index] } return index }
     for (const connection of connections) physicalRoots[physicalRoot(indices.get(connection.parentId)!)] = physicalRoot(indices.get(connection.childId)!)
@@ -579,7 +580,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     if (!wanted.has(panel.id)) continue
     const patch: PanelDimensions | undefined = edit.kind === 'resize' ? edit.patches?.[panel.id] ?? edit.patch : undefined
     const missesMove = edit.kind === 'move' && (sizeChanged || outlineChanged
-      || position(panel).distanceTo(position(original).add(new Vector3(...edit.delta))) > EPSILON)
+      || position(panel).distanceTo(position(original).add(new Vector3(...(edit.deltas?.[panel.id] ?? edit.delta)))) > EPSILON)
     const missesResize = patch && (['width', 'height', 'thickness'] as const).some(dimension => patch[dimension] !== undefined
       && Math.abs(panel[dimension] - patch[dimension]!) > EPSILON)
     if (missesMove || missesResize) throw new Error('This fitted outline follows its surrounding panels. Edit those panels together, or detach the outline panel first.')
@@ -649,6 +650,34 @@ export function movePanels(project: Project, ids: readonly string[], delta: Vec3
   if (delta.some(value => !Number.isFinite(value))) throw new Error('Panel movement must be a finite distance.')
   if (delta.every(value => Math.abs(value) < EPSILON)) return project
   return editStructure(project, ids, { kind: 'move', delta, releaseContacts: options.releaseContacts })
+}
+
+/** Solve independent center targets together, preserving selected cut dimensions. */
+export function movePanelsToPositions(project: Project, targets: Record<string, Vec3>): Project {
+  const panels = resolvePanels(project)
+  const byId = new Map(panels.map(panel => [panel.id, panel]))
+  const centerDeltas: Record<string, Vec3> = Object.create(null)
+  for (const [id, target] of Object.entries(targets)) {
+    const panel = byId.get(id)
+    if (!panel) throw new Error('A placement target refers to a missing panel.')
+    if (target.some(value => !Number.isFinite(value) || Math.abs(value) > 100000)) throw new Error('This move would exceed the project placement limits.')
+    centerDeltas[id] = target.map((value, axis) => value - panel.position[axis]) as Vec3
+  }
+  if (!Object.values(centerDeltas).some(delta => delta.some(value => Math.abs(value) > EPSILON))) return project
+  // Unchanged boundary targets are checked below, rather than adding redundant
+  // zero-motion equations to imperfectly aligned imported joint loops.
+  const movingIds = Object.keys(targets).filter(id => centerDeltas[id].some(value => Math.abs(value) > EPSILON))
+  const next = editStructure(project, movingIds, { kind: 'move', delta: [0, 0, 0], deltas: centerDeltas })
+  // Fitted outlines are refitted after the solve; they must still meet all targets.
+  for (const panel of resolvePanels(next)) {
+    if (!Object.hasOwn(targets, panel.id)) continue
+    const original = byId.get(panel.id)!
+    if (position(panel).distanceTo(new Vector3(...targets[panel.id])) > 0.001
+      || Math.abs(panel.width - original.width) > EPSILON || Math.abs(panel.height - original.height) > EPSILON) {
+      throw new Error('These panels cannot reach the requested spacing while keeping their shapes and joints. Detach them first.')
+    }
+  }
+  return next
 }
 
 /** Resize a selection while keeping structural joints and existing inserts fitted. */

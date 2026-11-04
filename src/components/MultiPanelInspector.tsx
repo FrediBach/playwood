@@ -5,6 +5,7 @@ import { NumberField, PanelFields, SelectField } from '@/components/fields'
 import { InspectorDisclosure } from './InspectorPrimitives'
 import { JointPositionDiagram } from './InspectorDiagrams'
 import { PanelSecondaryFields } from './PanelInspectorFields'
+import { panelDistribution } from '@/lib/panel-distribution'
 import { getSharedPanelFields, panelValuesEqual } from '@/lib/selection'
 import type { Connection, Panel, Side, ValidationIssue, Vec3 } from '@/lib/types'
 
@@ -18,6 +19,7 @@ interface Props {
   onDuplicate: () => void
   onDelete: () => void
   onDetach?: () => void
+  onDistribute: () => void
   buildTools?: ReactNode
   constraints?: ReactNode
   editError?: string
@@ -39,7 +41,7 @@ function SharedConnectionFields({connections,onChange}: {connections:(Connection
   </section>
 }
 
-export function MultiPanelInspector({ panels, connections, issues, onChange, onConnectionChange, onDuplicate, onDelete, onDetach, buildTools, constraints, editError, onManageConstraints }: Props) {
+export function MultiPanelInspector({ panels, connections, issues, onChange, onConnectionChange, onDuplicate, onDelete, onDetach, onDistribute, buildTools, constraints, editError, onManageConstraints }: Props) {
   const first = panels[0]
   const shared = getSharedPanelFields(panels)
   const selectedConnections = panels.map(panel => connections.find(c => c.childId === panel.id && c.role !== 'support'))
@@ -70,6 +72,7 @@ export function MultiPanelInspector({ panels, connections, issues, onChange, onC
     {editError&&<div className="validation-note error" role="status"><span>{editError}{onManageConstraints&&<button className="text-button" onClick={onManageConstraints}>Review constraints</button>}</span></div>}
     {hasDriving&&<SharedConnectionFields connections={selectedConnections} onChange={onConnectionChange}/>}
     <section className="inspector-section"><div className="section-title"><h2>Placement</h2><Move3D size={16}/></div>
+      {panelDistribution(panels)&&<><Button variant="outline" size="sm" onClick={onDistribute}>Distribute evenly</Button><p className="field-note">Equal gaps along the panels’ facing direction. The two outer panels stay fixed.</p></>}
       {anyAttached?<>
         <p className="field-note">Connected panels move together in the workspace. Detach to edit their placement freely.</p>
         {onDetach&&<Button variant="ghost" size="sm" className="detach-button" onClick={onDetach}>Detach selected panels</Button>}

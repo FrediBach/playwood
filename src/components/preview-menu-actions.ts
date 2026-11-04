@@ -2,6 +2,7 @@ import { ArrowDownToLine, Box, Check, Clipboard, Copy, FolderPlus, Grid2X2, Link
 import type { PreviewMenuAction } from './PreviewContextMenu'
 import type { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { assemblySelectionError } from '@/lib/assemblies'
+import { panelDistribution } from '@/lib/panel-distribution'
 import { parallelPanelCut } from '@/lib/parallel-panels'
 import type { findPanelHoles } from '@/lib/close-holes'
 import type { Panel, Project, ListKind } from '@/lib/types'
@@ -43,6 +44,7 @@ interface MenuContext {
     extendToGround: () => void
     detachSelection: () => void
     splitSelection: () => void
+    distributeSelection: () => void
     closeHole: (id: string) => void
     duplicateSelected: () => void
     deleteSelected: () => void
@@ -78,6 +80,7 @@ function addLoosePanelActions(context: MenuContext, menuAction: AddAction) {
   menuAction('Extend to ground',ArrowDownToLine,extendToGround,false,!canExtendToGround)
   if (selectedPanels.length>1) menuAction('Create assembly',Box,()=>actions.openTool('assembly'),false,!!assemblySelectionError(project,selectedIds))
   if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Disconnect panels',Unlink,detachSelection)
+  if (panelDistribution(selectedPanels)) menuAction('Distribute evenly',Rows3,actions.distributeSelection)
   if (splitCounts.includes(1)) menuAction('Split in the middle',Scissors,()=>splitSelection())
   if (canDivideGrid) menuAction('Divide into a grid',Grid2X2,()=>actions.openTool('grid'))
   if (parallelPanelCut(selectedPanels)) menuAction('Split x times',Rows3,()=>actions.openTool('parallel'),false,checkingSplits||!splitCounts.length)

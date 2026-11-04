@@ -46,6 +46,7 @@ import { useParallelPanelSplitCounts } from '@/hooks/useParallelPanelSplitCounts
 import { GridPanelSplit } from '@/components/GridPanelSplit'
 import { gridPanelCut } from '@/lib/grid-split'
 import { ParallelPanelSplit } from '@/components/ParallelPanelSplit'
+import { distributePanels } from '@/lib/panel-distribution'
 import { parallelPanelCut, splitParallelPanels } from '@/lib/parallel-panels'
 import { autoConnectNearby } from '@/lib/auto-connect-nearby'
 import { getAutoConnectFit } from '@/lib/auto-connect-fit'
@@ -269,6 +270,10 @@ export default function App() {
         return looseIds.length?movePanels(next,looseIds,delta):next
       },{group:'panel-move',repeat})
     } catch(error) {notify(error instanceof Error?error.message:'This move cannot keep the joints aligned.')}
+  }
+  const distributeSelection=()=>{
+    try {commit(current=>distributePanels(current,selectedIds))}
+    catch(error){notify(error instanceof Error?error.message:'These panels cannot be distributed while keeping their joints aligned.')}
   }
   const splitSelection=(count=1)=>{
     try {
@@ -605,7 +610,7 @@ export default function App() {
     canAttachPanel, canExtendToGround: !!groundPanelFit.result, canAttachCopy: validTargets.length > 0,
     actions: {
       addConnectorsBetween: openConnectorInfill, connectWithPanel, groupSelected, removeSelectedConnectors, openConstraints, startAttach,
-      extendToGround, detachSelection, splitSelection, closeHole, duplicateSelected, deleteSelected,
+      extendToGround, detachSelection, splitSelection, distributeSelection, closeHole, duplicateSelected, deleteSelected,
       addPanel, addAutoConnectors, selectAll, copy: clipboard.copy,
       inspectConnectors: ()=>setRightOpen(true),
       inspectPanels: ()=>{setInspectorTab('panel');setRightOpen(true)},
@@ -731,7 +736,7 @@ export default function App() {
         :assembly.memberInstance&&selected&&assembly.definition?<><AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={()=>assembly.select(assembly.memberInstance!.id)} onEdit={()=>assembly.edit(assembly.memberInstance!.id)}/>{buildTools}</>
         :assembly.hasMembers?<><div className="selected-heading"><Box size={15}/><span>MULTIPLE OBJECTS</span></div><p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p>{buildTools}<div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15}/>Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15}/>Remove</Button></div></>
         :<>
-          {selectedPanels.length>1&&<MultiPanelInspector editError={panelEditError?.selection===selectionKey?panelEditError.message:undefined} onManageConstraints={()=>openConstraints()} constraints={constraintsInspector} buildTools={buildTools} panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commitWithInsertChecks(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
+          {selectedPanels.length>1&&<MultiPanelInspector onDistribute={distributeSelection} editError={panelEditError?.selection===selectionKey?panelEditError.message:undefined} onManageConstraints={()=>openConstraints()} constraints={constraintsInspector} buildTools={buildTools} panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commitWithInsertChecks(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
           {selected&&(inspectorTab==='panel'?<SinglePanelInspector editError={panelEditError?.selection===selectionKey?panelEditError.message:undefined} onManageConstraints={()=>openConstraints()} constraints={constraintsInspector} accessories={trofastInspector} onExtendToGround={extendToGround} groundFitReason={groundPanelFit.reason} buildTools={buildTools} selected={selected} connected={project.connections.some(c=>c.parentId===selected.id||c.childId===selected.id)} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewIssues={previewIssues} sideGuide={attachmentSideGuide!}/>)}
           {!selectedPanels.length&&!managingProjectConstraints&&<div className="no-selection"><MousePointer2 size={28}/><h2>A little more detail.</h2><p>Select a panel or connector in the workspace<br/>to make it your own.</p><Button variant="outline" onClick={addPanel}><Plus size={16}/>Add a panel</Button></div>}
         </>}
