@@ -1,0 +1,667 @@
+{
+  "version": 1,
+  "name": "The everyday shelf",
+  "panels": [
+    {
+      "id": "2e75a13d-d853-4600-aa34-eac5aa4879c4",
+      "name": "Bottom shelf",
+      "width": 430,
+      "height": 1005.00000305,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        -335.00000003,
+        28,
+        322.50000153
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "46b5e450-ac4a-4970-a766-bb8ad86c378b",
+      "name": "Left side",
+      "width": 375.00001441,
+      "height": 1005,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        -567.5000000300001,
+        233.00000720499997,
+        322.5000000000001
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "e728585c-9135-4f49-9f1e-91dd6bb17f30",
+      "name": "Right side",
+      "width": 375.00001442,
+      "height": 540,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        -102.50000002999997,
+        233.00000721000004,
+        90.00000000000006
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "36090c1f-08d7-4ed6-844b-8e2a59d874fe",
+      "name": "Top shelf",
+      "width": 430,
+      "height": 1005,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        -335.0000000300003,
+        848.00001526,
+        322.5000000000002
+      ],
+      "rotation": [
+        1.5707963267948968,
+        3.14018491736755e-16,
+        3.141592653589793
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "9f1d224b-6d59-47c4-9c76-909033069c02",
+      "name": "Middle shelf",
+      "width": 430,
+      "height": 540,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        -335.0000000300002,
+        438.0000144100001,
+        90.00000000000017
+      ],
+      "rotation": [
+        1.5707963267948968,
+        3.14018491736755e-16,
+        3.141592653589793
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "36089a40-960a-46dd-9e7c-7ad48159e45f",
+      "name": "Left upper side",
+      "width": 375.00000085,
+      "height": 1005,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        -567.5000000300003,
+        643.000014835,
+        322.5000000000002
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "36a4ea50-dc3d-4f24-b77e-189b41cb462a",
+      "name": "Right upper side",
+      "width": 375.00000086,
+      "height": 540,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        -102.50000003000022,
+        643.0000148300002,
+        90.00000000000009
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -1.5707963118937354,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "0be7ec21-3a93-4787-ae9e-ad8d4092f493",
+      "name": "Bottom shelf copy",
+      "width": 430,
+      "height": 540,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        184.9999999700001,
+        848.0000220449997,
+        610.0000000000002
+      ],
+      "rotation": [
+        1.5707963267948963,
+        0,
+        1.5707963267948963
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "48300bc9-49ed-4711-b542-afd773412da4",
+      "name": "Left side copy",
+      "width": 375.00001441,
+      "height": 540,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        184.99999997000006,
+        643.0000148399997,
+        377.5000000000002
+      ],
+      "rotation": [
+        1.570092458683775e-16,
+        0,
+        1.5707963267948963
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "8d756dad-0913-4ea3-882b-6707553c9e19",
+      "name": "Right side copy",
+      "width": 375.00001442,
+      "height": 1005,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        -47.50000003,
+        643.0000148349998,
+        842.5000000000002
+      ],
+      "rotation": [
+        3.141592653589793,
+        0,
+        1.5707963267948963
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "4aa8781f-8c68-49fe-90c3-e39586e0beea",
+      "name": "Top shelf copy",
+      "width": 430,
+      "height": 540,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        184.99999997000006,
+        28.00000678499984,
+        610
+      ],
+      "rotation": [
+        -1.5707963267948961,
+        1.1102230246251565e-16,
+        1.5707963267948961
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "f2bbff66-8737-4675-a266-afe45976748c",
+      "name": "Middle shelf copy",
+      "width": 430,
+      "height": 540,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        184.9999999700001,
+        438.00000763499975,
+        610.0000000000001
+      ],
+      "rotation": [
+        -1.5707963267948961,
+        1.1102230246251565e-16,
+        1.5707963267948961
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "f030e5c5-faef-4b62-8b49-de97ea2e2b13",
+      "name": "Left upper side copy",
+      "width": 375.00000085,
+      "height": 540,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        184.99999997000003,
+        233.0000072099999,
+        377.5000000000001
+      ],
+      "rotation": [
+        1.570092458683775e-16,
+        -1.5700924586837752e-16,
+        1.5707963267948963
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "f8458d63-393d-43ba-8968-2f30e210ef1c",
+      "name": "Right upper side copy",
+      "width": 375.00000086,
+      "height": 1005,
+      "thickness": 18,
+      "material": "birch",
+      "color": "#d9bd8c",
+      "pattern": "solid",
+      "position": [
+        -47.50000003,
+        233.0000072149997,
+        842.5
+      ],
+      "rotation": [
+        3.141592638688632,
+        7.850462159063936e-17,
+        1.5707963267948966
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    }
+  ],
+  "connections": [
+    {
+      "id": "11d7ce5c-072a-4dd3-8d3a-d521d532485d:0",
+      "parentId": "2e75a13d-d853-4600-aa34-eac5aa4879c4",
+      "childId": "46b5e450-ac4a-4970-a766-bb8ad86c378b",
+      "type": "90",
+      "side": "left",
+      "offset": 0.00000153,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2
+    },
+    {
+      "id": "7ea199f7-d2ac-4e22-a1eb-047820de8812:0",
+      "parentId": "2e75a13d-d853-4600-aa34-eac5aa4879c4",
+      "childId": "e728585c-9135-4f49-9f1e-91dd6bb17f30",
+      "type": "90",
+      "side": "right",
+      "offset": 232.50000153,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2
+    },
+    {
+      "id": "1f5fe9b2-9c77-48a2-8124-afa41a9b74ea:0",
+      "parentId": "46b5e450-ac4a-4970-a766-bb8ad86c378b",
+      "childId": "9f1d224b-6d59-47c4-9c76-909033069c02",
+      "type": "t",
+      "side": "left",
+      "offset": 232.5,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2
+    },
+    {
+      "id": "1f5fe9b2-9c77-48a2-8124-afa41a9b74ea:1",
+      "parentId": "46b5e450-ac4a-4970-a766-bb8ad86c378b",
+      "childId": "36089a40-960a-46dd-9e7c-7ad48159e45f",
+      "type": "t",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0
+    },
+    {
+      "id": "61b3b52b-28dd-4e74-afc8-9ae21b23d1c6:0",
+      "parentId": "36089a40-960a-46dd-9e7c-7ad48159e45f",
+      "childId": "36090c1f-08d7-4ed6-844b-8e2a59d874fe",
+      "type": "90",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2
+    },
+    {
+      "id": "26c98855-bad8-4009-87c7-de81df174eca:0",
+      "parentId": "36090c1f-08d7-4ed6-844b-8e2a59d874fe",
+      "childId": "36a4ea50-dc3d-4f24-b77e-189b41cb462a",
+      "type": "90",
+      "side": "left",
+      "offset": 232.5,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2
+    },
+    {
+      "id": "e3af451e-b6b9-4a62-9f60-c559aea7bb80:0",
+      "parentId": "e728585c-9135-4f49-9f1e-91dd6bb17f30",
+      "childId": "9f1d224b-6d59-47c4-9c76-909033069c02",
+      "type": "t",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "e3af451e-b6b9-4a62-9f60-c559aea7bb80:1",
+      "parentId": "e728585c-9135-4f49-9f1e-91dd6bb17f30",
+      "childId": "36a4ea50-dc3d-4f24-b77e-189b41cb462a",
+      "type": "t",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "cd6ab4e4-a182-42ce-9648-cd8c1edfa17e:0",
+      "parentId": "e728585c-9135-4f49-9f1e-91dd6bb17f30",
+      "childId": "f030e5c5-faef-4b62-8b49-de97ea2e2b13",
+      "type": "90",
+      "side": "bottom",
+      "offset": 0,
+      "inset": 0,
+      "flip": true,
+      "color": "#e75a35",
+      "count": 2
+    },
+    {
+      "id": "8e1bdf57-e03c-43d5-9020-577b1dca8048:0",
+      "parentId": "0be7ec21-3a93-4787-ae9e-ad8d4092f493",
+      "childId": "48300bc9-49ed-4711-b542-afd773412da4",
+      "type": "90",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "8a98f0c6-ed20-4e5d-9e34-a07065396402:0",
+      "parentId": "0be7ec21-3a93-4787-ae9e-ad8d4092f493",
+      "childId": "8d756dad-0913-4ea3-882b-6707553c9e19",
+      "type": "90",
+      "side": "right",
+      "offset": 232.5,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "1b524453-ae3f-4350-bbfa-c0319e7ba56b:0",
+      "parentId": "48300bc9-49ed-4711-b542-afd773412da4",
+      "childId": "f2bbff66-8737-4675-a266-afe45976748c",
+      "type": "t",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "1b524453-ae3f-4350-bbfa-c0319e7ba56b:1",
+      "parentId": "48300bc9-49ed-4711-b542-afd773412da4",
+      "childId": "f030e5c5-faef-4b62-8b49-de97ea2e2b13",
+      "type": "t",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "682f016a-0427-4c7b-94ac-be20d0133f97:0",
+      "parentId": "f030e5c5-faef-4b62-8b49-de97ea2e2b13",
+      "childId": "4aa8781f-8c68-49fe-90c3-e39586e0beea",
+      "type": "90",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "926614cf-36ee-4e89-ae6f-4a57702986a2:0",
+      "parentId": "4aa8781f-8c68-49fe-90c3-e39586e0beea",
+      "childId": "f8458d63-393d-43ba-8968-2f30e210ef1c",
+      "type": "90",
+      "side": "left",
+      "offset": 232.5,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "69b1101a-2f06-42ee-9d0c-84e525d6d586:0",
+      "parentId": "8d756dad-0913-4ea3-882b-6707553c9e19",
+      "childId": "f2bbff66-8737-4675-a266-afe45976748c",
+      "type": "t",
+      "side": "right",
+      "offset": -232.5,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "69b1101a-2f06-42ee-9d0c-84e525d6d586:1",
+      "parentId": "8d756dad-0913-4ea3-882b-6707553c9e19",
+      "childId": "f8458d63-393d-43ba-8968-2f30e210ef1c",
+      "type": "t",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "5c000743-c9c2-4756-8dad-2ff33c0bee8a:0",
+      "parentId": "36a4ea50-dc3d-4f24-b77e-189b41cb462a",
+      "childId": "48300bc9-49ed-4711-b542-afd773412da4",
+      "type": "90",
+      "side": "bottom",
+      "offset": 0.000004294083510103519,
+      "inset": 0,
+      "flip": true,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "cb84ae67-1eee-42b4-af1d-f1552d781cd5:0",
+      "parentId": "36089a40-960a-46dd-9e7c-7ad48159e45f",
+      "childId": "8d756dad-0913-4ea3-882b-6707553c9e19",
+      "type": "90",
+      "side": "bottom",
+      "flip": false,
+      "offset": 2.2737367544323206e-13,
+      "inset": 0,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "903e8051-0855-4e54-8958-8797991edde5:0",
+      "parentId": "46b5e450-ac4a-4970-a766-bb8ad86c378b",
+      "childId": "f8458d63-393d-43ba-8968-2f30e210ef1c",
+      "type": "90",
+      "side": "bottom",
+      "flip": false,
+      "offset": -9.999780559155624e-9,
+      "inset": 0,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "03d43153-817f-41f6-8b3d-60dc76b4c593:0",
+      "parentId": "36090c1f-08d7-4ed6-844b-8e2a59d874fe",
+      "childId": "8d756dad-0913-4ea3-882b-6707553c9e19",
+      "type": "90",
+      "side": "bottom",
+      "flip": false,
+      "offset": -287.50000000000017,
+      "inset": 0,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "185857be-56ea-4736-b30e-9587c19ef2b4:0",
+      "parentId": "2e75a13d-d853-4600-aa34-eac5aa4879c4",
+      "childId": "f8458d63-393d-43ba-8968-2f30e210ef1c",
+      "type": "90",
+      "side": "bottom",
+      "flip": false,
+      "offset": 287.5,
+      "inset": 0,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    }
+  ],
+  "niceValues": {
+    "enabled": true,
+    "step": 10
+  },
+  "connectorOverrides": {
+    "[\"cd6ab4e4-a182-42ce-9648-cd8c1edfa17e:0\",1]": {
+      "slide": -50
+    },
+    "[\"cd6ab4e4-a182-42ce-9648-cd8c1edfa17e:0\",0]": {
+      "slide": 50
+    },
+    "[\"5c000743-c9c2-4756-8dad-2ff33c0bee8a:0\",0]": {
+      "slide": 50
+    },
+    "[\"5c000743-c9c2-4756-8dad-2ff33c0bee8a:0\",1]": {
+      "slide": -50
+    },
+    "[\"61b3b52b-28dd-4e74-afc8-9ae21b23d1c6:0\",0]": {
+      "slide": 465
+    },
+    "[\"03d43153-817f-41f6-8b3d-60dc76b4c593:0\",1]": {
+      "slide": -50
+    },
+    "[\"03d43153-817f-41f6-8b3d-60dc76b4c593:0\",0]": {
+      "slide": 50
+    },
+    "[\"cb84ae67-1eee-42b4-af1d-f1552d781cd5:0\",0]": {
+      "slide": 49.99999999999977
+    },
+    "[\"cb84ae67-1eee-42b4-af1d-f1552d781cd5:0\",1]": {
+      "slide": -49.999999990000106
+    },
+    "[\"903e8051-0855-4e54-8958-8797991edde5:0\",0]": {
+      "slide": 50.00000000999967
+    },
+    "[\"903e8051-0855-4e54-8958-8797991edde5:0\",1]": {
+      "slide": -50.000000000000284
+    },
+    "[\"11d7ce5c-072a-4dd3-8d3a-d521d532485d:0\",0]": {
+      "slide": 465
+    }
+  }
+}

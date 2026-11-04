@@ -8,6 +8,7 @@ import { movePreviewResize, preparePreviewResize, type PreviewResizeSession } fr
 import { gridProject } from './example-geometry'
 import { moveStructureRepeat, prepareStructureRepeat } from './structure-repeat'
 import type { Project, Vec3 } from './types'
+import connectedCorner from './fixtures/everyday-shelf-connected-corner.json'
 import cornerShelf from './fixtures/everyday-shelf-corner.json'
 import everydayShelf from './fixtures/everyday-shelf.json'
 
@@ -25,6 +26,10 @@ const piecePosition = (project: Project, index = 0) => {
 describe('preview structural resize handles', () => {
   it('extends the corner shelf independently with every installed connector fixed', () => {
     const project = parseProject(cornerShelf)
+    // Keep connected growth genuinely blocked now that imported-loop roundoff
+    // no longer blocks this fixture by itself.
+    const neighbor = named(project, 'Left side copy')
+    project.constraints = [{ id: 'fixed-neighbor', kind: 'dimension', enabled: true, panelId: neighbor.id, dimension: 'height', value: neighbor.height }]
     const panel = named(project, 'Right side copy')
     const session = preparePreviewResize(project, { panelId: panel.id })!
     const handle = along(session, [-1, 0, 0])
@@ -264,5 +269,35 @@ describe('preview structural resize handles', () => {
     const assembly = createAssembly(project, project.panels.map(panel => panel.id), 'Shelf')
     expect(preparePreviewResize(assembly, { panelId: panel.id })).toBeNull()
     expect(preparePreviewResize(assembly, { connectorId: id })).toBeNull()
+  })
+})
+
+
+describe('connected corner shelf resize precision', () => {
+  it.each([0, 31])('resizes either wing without losing closed joints after rotation by %s degrees', angle => {
+    const source = parseProject(connectedCorner)
+    const project = angle ? rotateProject(source, 'y', angle) : source
+    const before = structuredClone(project)
+    for (const name of ['Bottom shelf copy', 'Top shelf']) for (const distance of [1, 100, 1000]) {
+      const panel = named(project, name)
+      const session = preparePreviewResize(project, { panelId: panel.id })!
+      const handle = session.handles.find(handle => handle.id === 'panel-height-negative')!
+      expect(handle).toBeDefined()
+      expect(handle.repeatOnly).not.toBe(true)
+      const result = movePreviewResize(session, handle.id, distance)
+      expect(result.limited).toBe(false)
+      const next = named(result.project, name)
+      expect(next.height).toBeCloseTo(panel.height + distance, 5)
+      near(new Vector3(...next.position).addScaledVector(new Vector3(...handle.direction), -next.height / 2).toArray(),
+        new Vector3(...panel.position).addScaledVector(new Vector3(...handle.direction), -panel.height / 2).toArray(), 5)
+      for (const original of resolvePanels(project)) {
+        const current = named(result.project, original.name)
+        near(current.rotation, original.rotation, 5)
+        expect(current.thickness).toBe(original.thickness)
+      }
+      expect(result.project.connections.map(c => c.id)).toEqual(project.connections.map(c => c.id))
+      valid(result.project)
+    }
+    expect(project).toEqual(before)
   })
 })

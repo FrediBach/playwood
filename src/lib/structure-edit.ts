@@ -82,6 +82,10 @@ function solve(rows: Row[], weights: number[], dual?: number[]): number[] {
   let residual = Float64Array.from(equations, row => row.value)
   let direction = residual.slice()
   let error = dot(residual, residual)
+  // Keep the best iterate: tiny imported rotation/offset drift can make a
+  // redundant closed loop diverge after it already reached a usable solution.
+  let bestError = error
+  let bestSolution = solution.slice()
   const threshold = Math.max(1e-18, error * 1e-22)
   for (let iteration = 0; error > threshold && iteration < Math.max(200, count * 6); iteration++) {
     const product = multiply(direction)
@@ -90,14 +94,24 @@ function solve(rows: Row[], weights: number[], dual?: number[]): number[] {
     const alpha = error / denominator
     for (let i = 0; i < count; i++) { solution[i] += alpha * direction[i]; residual[i] -= alpha * product[i] }
     const nextError = dot(residual, residual)
+    if (nextError < bestError) { bestError = nextError; bestSolution = solution.slice() }
     const beta = nextError / error
     for (let i = 0; i < count; i++) direction[i] = residual[i] + beta * direction[i]
     error = nextError
   }
-  const output = Array<number>(size).fill(0)
-  equations.forEach((row, i) => { for (const [index, coefficient] of row.entries) output[index] += coefficient * solution[i] * inverseScale[index] })
-  if (output.some(value => !Number.isFinite(value)) || rows.some(row => Math.abs([...row.entries].reduce((sum, [index, value]) => sum + value * output[index], 0) - row.value) > 1e-5)) {
-    throw new Error(CONSTRAINT_MESSAGE)
+  const result = () => {
+    const output = Array<number>(size).fill(0)
+    equations.forEach((row, i) => { for (const [index, coefficient] of row.entries) output[index] += coefficient * solution[i] * inverseScale[index] })
+    return output
+  }
+  const valid = (output: number[]) => output.every(Number.isFinite) && rows.every(row =>
+    Math.abs([...row.entries].reduce((sum, [index, value]) => sum + value * output[index], 0) - row.value) <= 1e-5)
+  let output = result()
+  if (!valid(output)) {
+    solution.set(bestSolution)
+    output = result()
+    // The fallback must satisfy the same original equations and tolerance.
+    if (!valid(output)) throw new Error(CONSTRAINT_MESSAGE)
   }
   if (dual) {
     dual.length = rows.length

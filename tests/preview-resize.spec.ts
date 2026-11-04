@@ -239,6 +239,8 @@ test('Shift-drag resizes only a shelf edge and can be undone', async ({ page }) 
 
 test('Shift-drag extends a corner shelf edge when connected resizing is blocked', async ({ page }) => {
   const project = parseProject(cornerShelf)
+  const neighbor = project.panels.find(panel => panel.name === 'Left side copy')!
+  project.constraints = [{ id: 'fixed-neighbor', kind: 'dimension', enabled: true, panelId: neighbor.id, dimension: 'height', value: neighbor.height }]
   const selected = project.panels.find(panel => panel.name === 'Right side copy')!
   const handle = directionHandle(project, { panelId: selected.id }, [-1, 0, 0])
   expect(handle.repeatOnly).toBe(true)
@@ -264,6 +266,33 @@ test('Shift-drag extends a corner shelf edge when connected resizing is blocked'
     next.position.forEach((value, axis) => expect(value).toBeCloseTo(old.position[axis], 5))
   }
   expectAnglesAndJoints(project, resized)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect.poll(() => savedProject(page)).toEqual(resized)
+  await page.reload()
+  expect(await savedProject(page)).toEqual(resized)
+})
+
+
+test('the smaller top of a connected corner shelf grows with its wing', async ({ page }) => {
+  const project = parseProject(JSON.parse(readFileSync(new URL('../src/lib/fixtures/everyday-shelf-connected-corner.json', import.meta.url), 'utf8')))
+  const panel = project.panels.find(panel => panel.name === 'Bottom shelf copy')!
+  const handle = directionHandle(project, { panelId: panel.id }, [1, 0, 0])
+  await openProject(page, project, 'perspective')
+  await page.locator('.panel-list-select').filter({ hasText: /^Bottom shelf copy$/ }).click()
+  await beginResize(page, handle, 100)
+  await page.keyboard.press('Escape')
+  await page.mouse.up()
+  expect(await savedProject(page)).toEqual(project)
+  await beginResize(page, handle, 100)
+  await page.mouse.up()
+  await expect.poll(async () => (await savedProject(page)).panels.find(p => p.id === panel.id)!.height).toBeGreaterThan(panel.height + 50)
+  const resized = await savedProject(page)
+  expectAnglesAndJoints(project, resized)
+  for (const name of ['Right side copy', 'Left side copy', 'Middle shelf copy']) {
+    expect(resized.panels.find(p => p.name === name)!.height).toBeGreaterThan(project.panels.find(p => p.name === name)!.height + 50)
+  }
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(project)
   await page.keyboard.press('ControlOrMeta+Shift+z')

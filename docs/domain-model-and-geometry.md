@@ -145,6 +145,8 @@ Collision boxes shrink each half-extent by 0.5 mm, with a small minimum, to avoi
 
 Mutation modules often compare issue IDs before and after an edit and reject newly introduced problems. Some operations additionally treat collisions as blockers, while general project validation labels them warnings. Preserve the operation's existing policy instead of assuming every warning should reject every edit.
 
+The structural linear solver retains its best iterate when floating-point rotation and offset drift in imported closed loops causes later iterations to diverge. It uses that fallback only if the final iterate fails, and checks it against the same original equations and residual tolerance. This avoids rejecting feasible connected resizes without relaxing joint constraints.
+
 ## User-defined design constraints
 
 `Project.constraints` is an optional array of `DesignConstraint` values. These rules express design intent without adding physical joints or changing the driving attachment graph. Each has a stable ID and an `enabled` flag. [`design-constraints.ts`](../src/lib/design-constraints.ts) parses and evaluates the rules without importing the model resolver; callers supply resolved panels. Derived measurements, numerical residuals, and unsupported-geometry messages are not persisted. Evaluation uses a 0.1 mm tolerance.
