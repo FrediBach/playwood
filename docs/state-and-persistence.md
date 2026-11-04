@@ -13,7 +13,7 @@ The main entry points are [App.tsx](../src/App.tsx), [use-project.ts](../src/hoo
 | `useProject` | Current project, past/future snapshots, repeat-group token, save status, startup repair notice | Current project only |
 | `App` | Panel and connector selections, inspector/list tabs, dialogs, new-panel draft, attachment options, camera-view choice, sidebar visibility, exploded/realistic preview switches, context menu, notifications | No |
 | `useAssemblyEditor` | Which instance is being edited, assembly placement mode, hovered placement target | No |
-| `useCopyPaste` | In-memory copied panel/assembly, insertion candidates, hovered candidate | No |
+| `useCopyPaste` | In-memory copied panels/connectors/assembly, insertion candidates, hovered candidate | No |
 | `usePreviewDrag` / `usePreviewResize` | Gesture source, latest candidate project, transient displayed geometry | No |
 | `useDesignConstraints` / `DesignConstraintsInspector` | Rule form draft, reference-panel preference, source-bound candidate, measurement highlight, and feedback | Only the accepted rule and geometry |
 | `useAttachmentPreview` | Derived candidate project, preview panels/hardware, validation issues | No |
@@ -227,7 +227,7 @@ The assembly import UI uses the same 2,000,000-byte limit. With an eligible pane
 
 ## Clipboard and CSV export
 
-Copy/paste is internal to the current app session; [use-copy-paste.ts](../src/hooks/use-copy-paste.ts) does not use the operating-system clipboard API. [clipboard.ts](../src/lib/clipboard.ts) clones one resolved panel or one whole assembly. Assembly copies retain their definition ID and use the existing source when it remains available; if that source was removed, the captured definition can be restored. Paste requires a target and offers validated attachment candidates. Reloading loses this clipboard.
+Copy/paste is internal to the current app session; [use-copy-paste.ts](../src/hooks/use-copy-paste.ts) does not use the operating-system clipboard API. [clipboard.ts](../src/lib/clipboard.ts) clones resolved panel selections, including internal joints and per-piece hardware overrides, or one whole assembly. Selected physical connectors include all panels of their joint (including every T/cross branch). Mixed selections union those panels with the explicitly selected panels. External joints are omitted as complete joint groups. Multi-panel copies preserve relative poses under a rigid transform, receive fresh panel/joint/constraint IDs, and paste as ordinary panels with internal support connections. Any copied panel can anchor the group to a selected destination. Assembly copies retain their definition ID and use the existing source when it remains available; if that source was removed, the captured definition can be restored. Paste requires a target and offers validated attachment candidates. Reloading loses this clipboard.
 
 ### Design-rule lifecycle
 

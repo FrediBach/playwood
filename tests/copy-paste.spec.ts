@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { createPanel } from '../src/lib/model'
+import { attachPanel, createPanel, parseProject } from '../src/lib/model'
 import { createAssembly } from '../src/lib/assemblies'
 import { createExampleProject } from '../src/lib/example-library'
 import type { Project } from '../src/lib/types'
@@ -139,5 +139,49 @@ for (const selection of ['panel', 'multiple panels', 'assembly', 'none'] as cons
     expect(await saved(page, project.panels.length)).toEqual(project)
     await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
     expect(await saved(page, next.panels.length)).toEqual(next)
+  })
+}
+
+
+for (const kind of ['panels', 'connectors', 'mixed'] as const) {
+  test(`copies multiple ${kind}, previews the whole group, cancels, pastes, undoes and reloads`, async ({ page }) => {
+    const parent = createPanel({ name: 'Source base', width: 250, height: 250, position: [-1000, 800, 0] })
+    const target = createPanel({ name: 'Destination', width: 500, height: 500, position: [1000, 800, 0] })
+    const project = attachPanel({ version: 1, name: 'Selection copy', panels: [parent, target], connections: [] }, parent.id,
+      createPanel({ name: 'Source side', width: 250, height: 250 }), { side: 'left', type: '90', flip: false, count: 2, color: '#123456', offset: 0, inset: 0 })
+    await load(page, project)
+    if (kind === 'panels') {
+      await page.locator('.panel-list-select').nth(0).click()
+      await page.locator('.panel-list-select').nth(2).click({ modifiers: ['Shift'] })
+    } else {
+      if (kind === 'mixed') await page.locator('.panel-list-select').nth(2).click()
+      await page.getByRole('tab', { name: 'Connectors', exact: true }).click()
+      await page.locator('.connector-list-select').nth(0).click({ modifiers: kind === 'mixed' ? ['Shift'] : [] })
+      await page.locator('.connector-list-select').nth(1).click({ modifiers: ['Shift'] })
+    }
+    await page.keyboard.press('Control+c')
+    await expect(page.getByText('Selection copied. Select a target and press Ctrl/Cmd+V.')).toBeVisible()
+    await page.getByRole('tab', { name: 'Panels', exact: true }).click()
+    await page.locator('.panel-list-select').filter({ hasText: /^Destination$/ }).click()
+    await page.keyboard.press('Control+v')
+    const handles = page.getByRole('button', { name: /^Paste at / })
+    await expect(handles.first()).toBeVisible()
+    await handles.first().hover()
+    expect(await saved(page, 3)).toEqual(project)
+    await page.keyboard.press('Escape')
+    await expect(handles).toHaveCount(0)
+    await page.keyboard.press('Meta+v')
+    await handles.first().click()
+    const next = await saved(page, 5)
+    expect(next.connections).toHaveLength(3)
+    expect(next.panels.slice(0, 3)).toEqual(project.panels)
+    expect(parseProject(next)).toEqual(next)
+    await expect(page.locator('.panel-list-row.selected')).toHaveCount(2)
+    await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+    expect(await saved(page, 3)).toEqual(project)
+    await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+    expect(await saved(page, 5)).toEqual(next)
+    await page.reload()
+    expect(await saved(page, 5)).toEqual(next)
   })
 }

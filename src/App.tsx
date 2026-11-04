@@ -185,7 +185,7 @@ export default function App() {
     prepareSelection:()=>{setInspectorTab('panel');setRightOpen(true);setExploded(false);if(window.innerWidth<=900)setLeftOpen(false)},fit:()=>setFrameSignal(v=>v+1)})
   // Connector edits affect instance hardware, so leave shared-source editing without changing selection.
   useEffect(()=>{if(inspectingConnectors&&assembly.editingInstance)assembly.close()})
-  const clipboard=useCopyPaste({project,selectedIds:inspectingConnectors?[]:selectedIds,commit,notify,
+  const clipboard=useCopyPaste({project,selectedIds,selectedConnectorIds,commit,notify,
     prepare:()=>{assembly.clearPlacement();setInspectorTab('panel');setExploded(false);setRealisticPreview(false);setFrameSignal(v=>v+1)},
     select:ids=>{assembly.close();setSelectedIds(ids);setInspectorTab('panel');setRightOpen(true);setFrameSignal(v=>v+1)}})
   const assemblyCount=(definitionId:string)=>assembly.instances.filter(instance=>instance.definitionId===definitionId).length

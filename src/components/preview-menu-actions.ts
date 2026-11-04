@@ -62,6 +62,7 @@ function addConnectorActions(context: MenuContext, menuAction: AddAction) {
   if(context.canAddConnectorsBetween && actions.addConnectorsBetween && !modalOpen)menuAction('Add connectors between',Plus,actions.addConnectorsBetween)
   menuAction('Group selected',FolderPlus,()=>groupSelected('connectors',selectedConnectorIds),false,selectedConnectorIds.length<2)
   menuAction('Inspect connectors',SlidersHorizontal,actions.inspectConnectors)
+  menuAction('Copy',Clipboard,context.actions.copy)
   menuAction('Remove connectors',Trash2,removeSelectedConnectors,true)
 }
 
@@ -106,8 +107,8 @@ function addPanelActions(context: MenuContext, menuAction: AddAction) {
       addLoosePanelActions(context, menuAction)
     }
     if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`${hole.alignment ? 'Review hole fit' : 'Fill hole'} · ${hole.label}`,Square,()=>closeHole(hole.id))
+    menuAction('Copy',Clipboard,actions.copy)
     if (!assembly.memberInstance || instance) {
-      menuAction('Copy',Clipboard,actions.copy)
       menuAction('Duplicate',Copy,duplicateSelected)
       menuAction('Delete selection',Trash2,deleteSelected,true)
     }

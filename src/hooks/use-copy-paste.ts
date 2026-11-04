@@ -7,17 +7,18 @@ import type { Project } from '@/lib/types'
 interface Options {
   project: Project
   selectedIds: string[]
+  selectedConnectorIds: string[]
   commit: (project: Project) => void
   select: (ids: string[]) => void
   prepare: () => void
   notify: (message: string) => void
 }
 
-export function useCopyPaste({ project, selectedIds, commit, select, prepare, notify }: Options) {
+export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commit, select, prepare, notify }: Options) {
   const [clipboard, setClipboard] = useState<CopiedItem | null>(null)
   const [placement, setPlacement] = useState<{ project: Project; selection: string; insertion?: 'panel' | 'assembly'; targets: AssemblyAttachmentTarget[] } | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
-  const selection = selectedIds.join('/')
+  const selection = JSON.stringify([selectedIds, selectedConnectorIds])
   useEffect(() => {
     if (placement && (placement.project !== project || placement.selection !== selection)) { setPlacement(null); setHoverId(null) }
   }, [project, selection, placement])
@@ -40,7 +41,7 @@ export function useCopyPaste({ project, selectedIds, commit, select, prepare, no
     suppressedPanelIds: preview ? project.panels.filter(panel => !previewPanelIds.has(panel.id)).map(panel => panel.id) : [],
     boundsPanels: targets.flatMap(target => target.project ? addedPanels(target.project) : []),
     cancel, hover: setHoverId,
-    insert: (item: CopiedItem) => {
+    insert: (item: Exclude<CopiedItem, { kind: 'selection' }>) => {
       cancel()
       try {
         const candidates = getInsertionTargets(project, selectedIds, item)
@@ -55,15 +56,15 @@ export function useCopyPaste({ project, selectedIds, commit, select, prepare, no
     },
     copy: () => {
       try {
-        const item = copySelection(project, selectedIds)
+        const item = copySelection(project, selectedIds, selectedConnectorIds)
         setClipboard(item); cancel()
-        const ids=new Set(selectedIds)
+        const ids=new Set(item.kind === 'selection' ? item.panels.map(panel => panel.id) : item.kind === 'assembly' ? Object.values(item.instance.panelIds) : [item.panel.id])
         const omitted=project.constraints?.filter(rule=>designConstraintPanelIds(rule).some(id=>ids.has(id))&&(rule.kind==='floor'||designConstraintPanelIds(rule).some(id=>!ids.has(id)))).length??0
-        notify(`${item.kind === 'panel' ? 'Panel' : 'Assembly'} copied.${omitted?` ${omitted} floor or external ${omitted===1?'constraint stays':'constraints stay'} with the original.`:''} Select a target and press Ctrl/Cmd+V.`)
+        notify(`${item.kind === 'panel' ? 'Panel' : item.kind === 'assembly' ? 'Assembly' : 'Selection'} copied.${omitted?` ${omitted} floor or external ${omitted===1?'constraint stays':'constraints stay'} with the original.`:''} Select a target and press Ctrl/Cmd+V.`)
       } catch (error) { notify((error as Error).message) }
     },
     paste: () => {
-      if (!clipboard) { notify('Copy a panel or assembly first with Ctrl/Cmd+C.'); return }
+      if (!clipboard) { notify('Copy panels, connectors, or an assembly first with Ctrl/Cmd+C.'); return }
       try {
         const candidates = getPasteTargets(project, selectedIds, clipboard)
         const valid = candidates.filter(target => target.project)
