@@ -56,8 +56,9 @@ describe('split parallel panels', () => {
   })
   it('offers only counts that fit and rejects invalid counts atomically', () => {
     const original = shelves(200, 100), before = structuredClone(original)
-    expect(parallelPanelSplitCounts(original, ['a', 'b'])).toEqual([1, 2])
-    for (const count of [0, -1, 1.5, NaN, Infinity, 3]) expect(() => splitParallelPanels(original, ['a', 'b'], count)).toThrow()
+    // Two dividers leave overlapping CAD bodies despite adequate center distances.
+    expect(parallelPanelSplitCounts(original, ['a', 'b'])).toEqual([1])
+    for (const count of [0, -1, 1.5, NaN, Infinity, 2, 3]) expect(() => splitParallelPanels(original, ['a', 'b'], count)).toThrow()
     expect(original).toEqual(before)
     original.panels[0].thickness = 16
     expect(parallelPanelSplitCounts(original, ['a', 'b'])).toEqual([])

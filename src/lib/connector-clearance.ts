@@ -3,6 +3,7 @@ import { CONNECTOR_LOCAL_BOUNDS } from './connector-bounds'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { resolvePanels } from './model'
+import { assertNoNewTrofastIssues } from './trofast'
 import type { ConnectorType, Project, Vec3 } from './types'
 
 interface Body {
@@ -62,27 +63,65 @@ function blockedInterval(moving: Body, fixed: Body, tangent: Vector3): [number, 
  * miss at perpendicular rails, without loading rendering meshes in the domain. */
 export function fitAddedConnectorClearance(original: Project, candidate: Project): Project {
   const retained = new Set(getPhysicalConnectors(original).map(piece => piece.id))
-  const pieces = getPhysicalConnectors(candidate)
-  if (pieces.every(piece => retained.has(piece.id))) return candidate
-  const panels = resolvePanels(candidate).map(panel => panel.visible ? panel : { ...panel, visible: true })
-  const installed = pieces.map(piece => {
+  return fitConnectorClearance(candidate, new Set(getPhysicalConnectors(candidate).filter(piece => !retained.has(piece.id)).map(piece => piece.id)))
+}
+
+function installedBodies(candidate: Project) {
+  const panels = resolvePanels(candidate).map(panel => ({ ...panel, visible: true }))
+  return getPhysicalConnectors(candidate).map(piece => {
     const rail = getConnectorRail(piece.connection, panels, candidate.connections)
-    if (!rail?.placements[piece.index]) throw new Error('An added connector has no usable shared edge.')
+    if (!rail?.placements[piece.index]) throw new Error('A connector has no usable shared edge.')
     const placement = rail.placements[piece.index]
     return { piece, rail, tangent: new Vector3(...rail.tangent),
       preferred: connectorSlide(rail, piece.index, candidate.connectorOverrides?.[piece.id]?.slide),
       bodies: bodies(piece.type, new Vector3(...placement.position), placement.rotation) }
   })
-  const occupied = installed.filter(item => retained.has(item.piece.id)).flatMap(item => item.bodies.map(body => ({
+}
+
+export function overlappingConnectorIds(project: Project): Set<string> {
+  const installed = installedBodies(project).map(item => ({ ...item,
+    bodies: item.bodies.map(body => ({ ...body, center: body.center.clone().addScaledVector(item.tangent, item.preferred) })) }))
+  const result = new Set<string>()
+  installed.forEach((item, index) => {
+    for (const other of installed.slice(index + 1)) {
+      if (item.bodies.some(a => other.bodies.some(b => {
+        const interval = blockedInterval(a, b, item.tangent)
+        return interval && interval[0] < -EPSILON && interval[1] > EPSILON
+      }))) { result.add(item.piece.id); result.add(other.piece.id) }
+    }
+  })
+  return result
+}
+
+/** Only selected overlapping pieces may move. Retry alternate packing orders;
+ * failure is atomic, and existing unselected overlaps do not block the repair. */
+export function separateOverlappingConnectors(project: Project, ids: readonly string[]): Project {
+  const overlaps = overlappingConnectorIds(project)
+  const movable = new Set(ids.filter(id => overlaps.has(id)))
+  if (!movable.size) return project
+  for (const order of [0, 1, 2, 3, 4]) {
+    try { return assertNoNewTrofastIssues(project, fitConnectorClearance(project, movable, order)) }
+    catch { /* Try narrow rails first, then reverse, before leaving the source intact. */ }
+  }
+  throw new Error('Could not find room to separate all selected overlapping connectors. Select more neighboring connectors or make more space along the joints.')
+}
+
+function fitConnectorClearance(candidate: Project, movable: Set<string>, order = 0): Project {
+  if (!movable.size) return candidate
+  const installed = installedBodies(candidate)
+  const occupied = installed.filter(item => !movable.has(item.piece.id)).flatMap(item => item.bodies.map(body => ({
     ...body, center: body.center.clone().addScaledVector(item.tangent, item.preferred),
   })))
   // Reserve the copied frame corners before fitting its perpendicular divider
   // seams. Stable ordering also keeps repeated previews deterministic.
-  const added = installed.filter(item => !retained.has(item.piece.id))
+  const added = installed.filter(item => movable.has(item.piece.id))
     .sort((a, b) => Number(a.piece.connection.type !== '90') - Number(b.piece.connection.type !== '90'))
+  if (order === 1) added.sort((a, b) => (a.rail.upper - a.rail.lower) - (b.rail.upper - b.rail.lower))
+  if (order === 2) added.reverse()
   let overrides = candidate.connectorOverrides
   for (const item of added) {
     const { piece, rail, tangent, preferred } = item
+    if (rail.upper < rail.lower - EPSILON) throw new ConnectorClearanceError(piece.connection.id)
     let intervals: [number, number][] = [[rail.lower - rail.along[piece.index], rail.upper - rail.along[piece.index]]]
     for (const body of item.bodies) for (const other of occupied) {
       const blocked = blockedInterval(body, other, tangent)
@@ -93,8 +132,8 @@ export function fitAddedConnectorClearance(original: Project, candidate: Project
           ...(blocked[1] <= upper ? [[blocked[1], upper] as [number, number]] : [])]
       })
     }
-    const slide = intervals.map(([lower, upper]) => Math.max(lower, Math.min(upper, preferred)))
-      .sort((a, b) => Math.abs(a - preferred) - Math.abs(b - preferred))[0]
+    const slide = intervals.map(([lower, upper]) => order === 3 ? lower : order === 4 ? upper : Math.max(lower, Math.min(upper, preferred)))
+      .sort((a, b) => order === 3 ? a - b : order === 4 ? b - a : Math.abs(a - preferred) - Math.abs(b - preferred))[0]
     if (slide === undefined) throw new ConnectorClearanceError(piece.connection.id)
     if (Math.abs(slide - preferred) > EPSILON) overrides = { ...overrides,
       [piece.id]: { ...overrides?.[piece.id], slide } }

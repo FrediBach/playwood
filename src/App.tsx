@@ -1,3 +1,4 @@
+import { separateOverlappingConnectors } from '@/lib/connector-clearance'
 import { addConnectorsBetween, connectorInfillReason } from '@/lib/connector-infill'
 import { ConnectorInfillDialog } from '@/components/ConnectorInfillDialog'
 import { SpaceConstraintInspector } from '@/components/SpaceConstraintInspector'
@@ -196,6 +197,15 @@ export default function App() {
     const remaining=ids.filter(id=>physicalConnectors.some(connector=>connector.id===id))
     return remaining.length===ids.length?ids:remaining
   })},[physicalConnectors])
+  const separateSelectedConnectors=()=>{
+    if(modalOpen||assembly.editingInstance)return
+    let changed=false
+    if(commitWithInsertChecks(current=>{
+      const next=separateOverlappingConnectors(current,selectedConnectorIds)
+      changed=next!==current
+      return next
+    }))notify(changed?'Selected overlapping connectors separated. Undo is available.':'No selected connectors overlap.')
+  }
   const removeSelectedConnectors=()=>{
     commit(current=>editConnectors(current,selectedConnectorIds,{removed:true}))
     setSelectedConnectorIds([]);notify('Connectors removed. Undo to bring them back.')
@@ -609,7 +619,7 @@ export default function App() {
     canMenuAutoConnect, hasVisiblePanels, canAddConnectorsBetween: !infillReason, canConnectWithPanel: !!connectorPanelFit.result,
     canAttachPanel, canExtendToGround: !!groundPanelFit.result, canAttachCopy: validTargets.length > 0,
     actions: {
-      addConnectorsBetween: openConnectorInfill, connectWithPanel, groupSelected, removeSelectedConnectors, openConstraints, startAttach,
+      separateSelectedConnectors, addConnectorsBetween: openConnectorInfill, connectWithPanel, groupSelected, removeSelectedConnectors, openConstraints, startAttach,
       extendToGround, detachSelection, splitSelection, distributeSelection, closeHole, duplicateSelected, deleteSelected,
       addPanel, addAutoConnectors, selectAll, copy: clipboard.copy,
       inspectConnectors: ()=>setRightOpen(true),

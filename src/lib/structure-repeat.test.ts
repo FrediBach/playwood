@@ -46,19 +46,16 @@ describe('structure repeat', () => {
     expect(overlappingHardware(repeated.project)).toEqual([])
   })
 
-  it('rejects a narrow bay when its new hardware bodies cannot fit, without retaining partial additions', () => {
+  it('fits a narrow bay by sliding new hardware without retaining partial additions on cancellation', () => {
     const original = gridProject('Narrow bay', [150], [350], { depth: 350 })
     const snapshot = structuredClone(original)
-    expect(validateProject(original)).toEqual([])
     expect(overlappingHardware(original)).toEqual([])
     const session = prepareStructureRepeat(original, top(original).id, [0, 0, 1])
-    const untouched = moveStructureRepeat(session, 0)
-    const rejected = moveStructureRepeat(session, session.pitch * 2)
-    expect(rejected).toMatchObject({ count: 0, limited: true, reason: expect.stringContaining('without overlapping hardware') })
-    expect(rejected.project).toBe(untouched.project)
-    expect(rejected.project.panels).toHaveLength(4)
+    const repeated = moveStructureRepeat(session, session.pitch * 2)
+    expect(repeated).toMatchObject({ count: 2, limited: false })
+    expect(overlappingHardware(repeated.project)).toEqual([])
+    expect(validateProject(repeated.project)).toEqual([])
     expect(moveStructureRepeat(session, 0).project).toBe(original)
-    expect(moveStructureRepeat(session, session.pitch).project).toBe(original)
     expect(original).toEqual(snapshot)
   })
 

@@ -148,6 +148,8 @@ The browser suite starts/reuses port 5174. An existing Chromium binary can be se
 
 Select two connectors joining the same panels with matching type, material, and color, then choose **Add connectors between** in the inspector or preview context menu. Enter a quantity and click **Add connectors** to space new matching pieces evenly between them. Existing pieces and panels stay fixed. Quantities that overlap hardware are rejected; each connection supports up to 20 stored pieces. Disassemble managed assemblies first. Cancel/Escape makes no changes; additions support Undo/Redo, autosave, and project export.
 
+Select overlapping connectors and choose **Separate overlapping connectors** in the preview context menu (right-click, or focus the canvas and press Shift+F10). The command slides selected overlapping pieces along their existing joints, keeping panels and unselected hardware fixed. If no fit is found for the full selection, nothing changes; select neighboring hardware too or make more space. Repairs support Undo/Redo, autosave, and project export. Auto-add connectors now checks CAD-part envelopes and slides new pieces to avoid surrounding hardware, using one connector when two cannot fit. These conservative bounds do not guarantee fabrication clearance.
+
 ## Geometry and source references
 
 Manufacturer references:

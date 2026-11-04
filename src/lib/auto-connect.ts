@@ -1,5 +1,6 @@
 import { Euler, Quaternion, Vector3 } from 'three'
-import { createPanel, getConnectorPlacements, resolvePanels, validateProject } from './model'
+import { fitAddedConnectorClearance } from './connector-clearance'
+import { createPanel, resolvePanels, validateProject } from './model'
 import { isPanelConnectedToAssembly } from './assemblies'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { connectorSlide, getConnectorRail } from './connector-movement'
@@ -36,36 +37,6 @@ function fits(parent: Panel, child: Panel, connection: Connection): boolean {
   if (new Vector3(...expected.position).distanceTo(new Vector3(...child.position)) > 0.5) return false
   const a = rotation(expected), b = rotation(child)
   return axes.every(axis => Math.abs(axis.clone().applyQuaternion(a).dot(axis.clone().applyQuaternion(b))) > 0.99999)
-}
-
-/** Leave room for nearby corner hardware instead of discarding a clear seam
- * because its default end placements happen to be occupied. */
-function clearPlacements(rail: NonNullable<ReturnType<typeof getConnectorRail>>, blockers: Vector3[], canSlide: boolean) {
-  const defaults = rail.placements.map(placement => new Vector3(...placement.position))
-  if (defaults.every(position => blockers.every(blocker => position.distanceTo(blocker) >= 40 - 1e-7))) return defaults
-  // Angled bodies need their complete corner clearance; moving their centers
-  // apart alone does not establish clearance for interleaved angled slots.
-  if (!canSlide) return null
-  const tangent = new Vector3(...rail.tangent)
-  const origin = new Vector3(...rail.placements[0].position).addScaledVector(tangent, -rail.along[0])
-  let intervals = [[rail.lower, rail.upper]]
-  for (const blocker of blockers) {
-    const delta = blocker.clone().sub(origin)
-    const along = delta.dot(tangent)
-    const across = delta.addScaledVector(tangent, -along).lengthSq()
-    if (across >= 40 * 40) continue
-    const reach = Math.sqrt(40 * 40 - across)
-    intervals = intervals.flatMap(([low, high]) => {
-      if (along + reach <= low || along - reach >= high) return [[low, high]]
-      return [...(along - reach >= low ? [[low, along - reach]] : []), ...(along + reach <= high ? [[along + reach, high]] : [])]
-    })
-  }
-  if (!intervals.length) return null
-  const low = intervals[0][0], high = intervals[intervals.length - 1][1]
-  if (rail.placements.length === 2 && high - low < 40 - 1e-7) return null
-  const along = rail.placements.length === 2 ? [low, high] : [intervals.map(([a, b]) => Math.max(a, Math.min(b, rail.along[0])))
-    .sort((a, b) => Math.abs(a - rail.along[0]) - Math.abs(b - rail.along[0]))[0]]
-  return along.map(value => origin.clone().addScaledVector(tangent, value))
 }
 
 /** Fill compatible joints, including complete upgrades of occupied T/cross corners. */
@@ -145,15 +116,11 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
         return delta.addScaledVector(tangent, -delta.dot(tangent)).length() > 0.5
       })) continue
       const removedIds = new Set(replaced.flatMap(old => old.connections.map(c => c.id)))
-      const blockers = occupied.filter(other => !removedIds.has(other.connection.id)).map(other => other.position)
-      const canSlide = type === '90' || shared
-      let placements = clearPlacements(rail, blockers, canSlide)
-      if (!placements && first.count === 2 && canSlide) {
-        first.count = 1
-        rail = getConnectorRail(first, members, group)!
-        placements = clearPlacements(rail, blockers, canSlide)
-      }
-      if (!placements) continue
+      const placements = rail.placements.map(placement => new Vector3(...placement.position))
+      // Preserve the stricter angled-seat exclusion used by shared-panel
+      // assembly reconciliation; sliding alone cannot validate those seats.
+      if ((type === '105' || type === '150') && placements.some(position => occupied.some(other =>
+        !removedIds.has(other.connection.id) && position.distanceTo(other.position) < 40 - 1e-7))) continue
       const replacementHardware = occupied.filter(piece => removedIds.has(piece.connection.id))
       const color = replaced[0]?.connections[0].color ?? defaultColor
       for (const connection of group) connection.color = color
@@ -176,14 +143,14 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
         if (project.connectorOverrides || Object.keys(overrides).length) next.connectorOverrides = overrides
         if (validateProject(next).some(issue => issue.severity === 'error' && !previousErrors.has(issue.id))) continue
       }
-      placements.forEach((position, index) => {
-        const slide = position.clone().sub(new Vector3(...rail.placements[index].position)).dot(tangent)
-        if (Math.abs(slide) > 1e-7) {
-          const key = connectorId(first.id, index)
-          next.connectorOverrides = { ...next.connectorOverrides, [key]: { ...next.connectorOverrides?.[key], slide } }
-        }
-      })
-      project = next
+      try { project = fitAddedConnectorClearance(project, next) }
+      catch {
+        if (first.count !== 2) continue
+        first.count = 1
+        if (next.connectorOverrides) next.connectorOverrides = Object.fromEntries(Object.entries(next.connectorOverrides)
+          .filter(([id]) => id !== connectorId(first.id, 1)))
+        try { project = fitAddedConnectorClearance(project, next) } catch { continue }
+      }
       groups = jointGroups(project.connections); existingPairs = connectedPairs(); occupied = occupiedHardware(project, worldPanels)
       upgrades += replaced.length
       baked.disassembledNames.forEach(name => disassembledNames.add(name))
@@ -253,16 +220,16 @@ export function splitInteriorTJoints(original: Project, selectedIds: readonly st
             remapped.push(match)
           }
           if (!compatible) continue
-          const placements = getConnectorPlacements(first, left, divider)
-          const blocked = remapped.filter(c => c.count > 0).some(c => {
-            const parent = byId.get(c.parentId)!, child = byId.get(c.childId)!
-            return getConnectorPlacements(c, parent, child).some(existing => placements.some(placed => new Vector3(...existing.position).distanceTo(new Vector3(...placed.position)) < 40))
-          })
-          if (blocked) continue
           const next = { ...project, panels: nextPanels, connections: [...remapped, first, second] }
           if (next.panels.length > 200 || next.connections.length > 400) throw new Error('This T joint would exceed the project limit of 200 panels or 400 connections.')
           if (validateProject(next).some(issue => issue.severity === 'error' && !previousErrors.has(issue.id))) continue
-          project = next; splits++; connectors += first.count; addedPanelIds.push(right.id)
+          try { project = fitAddedConnectorClearance(project, next) }
+          catch {
+            if (first.count !== 2) continue
+            first.count = 1
+            try { project = fitAddedConnectorClearance(project, next) } catch { continue }
+          }
+          splits++; connectors += first.count; addedPanelIds.push(right.id)
           if (selected.has(shelf.id)) selected.add(right.id)
           changed = true
           break outer

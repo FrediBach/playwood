@@ -35,6 +35,7 @@ interface MenuContext {
     fitView: () => void
     openTool: (tool: 'assembly' | 'grid' | 'parallel') => void
     copy: () => void
+    separateSelectedConnectors?: () => void
     addConnectorsBetween?: () => void
     connectWithPanel: () => void
     groupSelected: (kind: ListKind, ids: string[]) => void
@@ -124,6 +125,7 @@ export function buildPreviewMenuActions(context: MenuContext): PreviewMenuAction
   if (inspectingConnectors) addConnectorActions(context, menuAction)
   else if (assembly.editingInstance) addEditingActions(context, menuAction)
   else addPanelActions(context, menuAction)
+  if(context.selectedConnectorIds.length&&actions.separateSelectedConnectors&&!assembly.editingInstance&&!context.modalOpen)menuAction('Separate overlapping connectors',Rows3,actions.separateSelectedConnectors)
   if (panels.length) menuAction('Select all panels',Scan,()=>selectAll(),false,!inspectingConnectors&&(assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):panels.map(panel=>panel.id)).every(id=>selectedIdSet.has(id)))
   if(!assembly.editingInstance)menuAction('All constraints',SlidersHorizontal,()=>openConstraints())
   menuAction('Fit view',Maximize,actions.fitView,false,!hasVisiblePanels)
