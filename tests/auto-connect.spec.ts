@@ -96,3 +96,31 @@ test('auto-connect upgrades a corner using an unselected upright and preserves t
   await expect(page.locator('.status-bar')).toContainText('2 connectors')
   expect(await savedProject()).toEqual(upgraded)
 })
+
+test('auto-connect moves a nearby loose shelf to an upright, preserving the frame through undo and reload', async ({ page }) => {
+  const upright = createPanel({ id: 'upright', name: 'Upright', width: 300, height: 900, position: [0, 700, 0] })
+  const frame = attachPanel({ version: 1, name: 'Nearby shelf', panels: [upright], connections: [] }, upright.id,
+    createPanel({ id: 'top', name: 'Frame top', width: 300, height: 500 }),
+    { type: '90', side: 'top', flip: false, offset: 0, inset: 0, count: 2, color: '#222222' })
+  const project: Project = { ...frame, panels: [...frame.panels,
+    createPanel({ id: 'loose', name: 'Loose shelf', width: 300, height: 200, position: [20, 700, 225], rotation: [Math.PI / 2, 0, Math.PI / 2] }),
+  ] }
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'nearby.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  await page.getByRole('button', { name: 'Loose shelf', exact: true }).click()
+  const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+  await expect.poll(async () => (await saved()).panels.length).toBe(3)
+  const before = await saved()
+  await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).first().click()
+  await expect(page.getByText(/1 loose panel moved to fit/)).toBeVisible()
+  await expect.poll(async () => (await saved()).connections.length).toBe(3)
+  const after = await saved()
+  expect(after.panels.find((panel: { id: string }) => panel.id === 'loose').position).toEqual([20, 700, 167.5])
+  expect(resolvePanels(after).find(panel => panel.id === 'top')).toEqual(resolvePanels(before).find(panel => panel.id === 'top'))
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect.poll(saved).toEqual(before)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect.poll(saved).toEqual(after)
+  await page.reload()
+  expect(await saved()).toEqual(after)
+})

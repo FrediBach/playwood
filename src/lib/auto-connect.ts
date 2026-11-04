@@ -222,11 +222,11 @@ export function splitInteriorTJoints(original: Project, selectedIds: readonly st
         const worldAxis = axis.applyQuaternion(rotation(shelf))
         const left: Panel = { ...shelf, [dimension]: leftLength, position: new Vector3(...shelf.position).addScaledVector(worldAxis, (leftLength - length) / 2).toArray() }
         const right = createPanel({ ...shelf, id: crypto.randomUUID(), name: `${shelf.name.slice(0, 108)} (section)`, [dimension]: rightLength, position: new Vector3(...shelf.position).addScaledVector(worldAxis, (length - rightLength) / 2).toArray() })
-        for (const flip of [false, true]) {
+        for (const flip of [false, true]) for (const quarterTurn of [false, true]) {
           const id = crypto.randomUUID()
-          const first: Connection = { id: `${id}:0`, parentId: left.id, childId: divider.id, type: 't', side: dimension === 'width' ? 'right' : 'top', flip, offset: 0, inset: 0, color: DEFAULT_CONNECTOR_COLOR, count: 2, role: 'support' }
+          const first: Connection = { id: `${id}:0`, parentId: left.id, childId: divider.id, type: 't', side: dimension === 'width' ? 'right' : 'top', flip, ...(quarterTurn ? { quarterTurn } : {}), offset: dimension === 'width' ? local.y : local.x, inset: 0, color: DEFAULT_CONNECTOR_COLOR, count: 2, role: 'support' }
           if (!fits(left, divider, first)) continue
-          const second: Connection = { ...first, id: `${id}:1`, childId: right.id, count: 0 }
+          const second: Connection = { ...first, id: `${id}:1`, childId: right.id, count: 0, offset: 0, ...(quarterTurn ? { quarterTurn: false } : {}) }
           if (!fits(left, right, second)) continue
           const localProject: Project = { version: 1, name: '', panels: [left, divider, right], connections: [first, second] }
           if (validateProject(localProject).some(issue => issue.id.endsWith('-overlap'))) first.count = 1

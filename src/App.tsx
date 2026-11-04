@@ -47,7 +47,7 @@ import { GridPanelSplit } from '@/components/GridPanelSplit'
 import { gridPanelCut } from '@/lib/grid-split'
 import { ParallelPanelSplit } from '@/components/ParallelPanelSplit'
 import { parallelPanelCut, splitParallelPanels } from '@/lib/parallel-panels'
-import { autoConnect } from '@/lib/auto-connect'
+import { autoConnectNearby } from '@/lib/auto-connect-nearby'
 import { getAutoConnectFit } from '@/lib/auto-connect-fit'
 import { getPanelGroundExtension } from '@/lib/extend-to-ground'
 import { getConnectorPanelFit } from '@/lib/connect-panel'
@@ -309,20 +309,21 @@ export default function App() {
       commit(next);assembly.close();setSelectedIds(copies);if(copied.size)setFrameSignal(v=>v+1);notify(`${copied.size?'Linked instances duplicated':'Panels duplicated'}${omittedRules?`. ${omittedRules} floor or external ${omittedRules===1?'constraint stays':'constraints stay'} with the originals.`:''}`)
     }catch(error){notify(error instanceof Error?error.message:'This selection could not be duplicated.')}
   }
-  const finishAutoConnect=(result:ReturnType<typeof autoConnect>,resized=false)=>{
+  const finishAutoConnect=(result:ReturnType<typeof autoConnectNearby>,resized=false)=>{
     commit(result.project);clipboard.cancel();assembly.clearPlacement();setInspectorTab('panel');setExploded(false)
     if(result.splits&&selectedIds.length>1)setSelectedIds(ids=>[...ids,...result.addedPanelIds])
-    notify(`${result.connectors} connectors ${result.upgrades?'fitted':'added'} at ${result.joints} ${result.joints===1?'joint':'joints'}. ${result.upgrades?`${result.upgrades} existing ${result.upgrades===1?'joint':'joints'} upgraded. `:''}${resized?'Panel resized to fit.':result.splits?`${result.splits} panel ${result.splits===1?'split':'splits'} for T joints; outer dimensions kept.`:'Panel positions kept.'}${result.disassembledNames.length?` Made independent: ${result.disassembledNames.join(', ')}.`:''} Undo is available.`)
+    const placementMessage=[resized?'Panel resized to fit.':'',result.splits?`${result.splits} panel ${result.splits===1?'split':'splits'} for T joints; outer dimensions kept.`:'',result.movedPanelIds.length?`${result.movedPanelIds.length} loose ${result.movedPanelIds.length===1?'panel moved':'panels moved'} to fit.`:''].filter(Boolean).join(' ')||'Panel positions kept.'
+    notify(`${result.connectors} connectors ${result.upgrades?'fitted':'added'} at ${result.joints} ${result.joints===1?'joint':'joints'}. ${result.upgrades?`${result.upgrades} existing ${result.upgrades===1?'joint':'joints'} upgraded. `:''}${placementMessage}${result.disassembledNames.length?` Made independent: ${result.disassembledNames.join(', ')}.`:''} Undo is available.`)
   }
   const addAutoConnectors=()=>{
     if(modalOpen||assembly.editingInstance)return
     try {
-      const result=autoConnect(project,selectedIds)
+      const result=autoConnectNearby(project,selectedIds)
       const fitSelection=result.splits&&selectedIds.length>1?[...selectedIds,...result.addedPanelIds]:selectedIds
       const fit=getAutoConnectFit(result.project,fitSelection)
       if(fit){
         setPendingConnectionFit({source:project,fit:{...fit,result:{...fit.result,
-          joints:result.joints+fit.result.joints,connectors:result.connectors+fit.result.connectors,
+          movedPanelIds:result.movedPanelIds,joints:result.joints+fit.result.joints,connectors:result.connectors+fit.result.connectors,
           upgrades:result.upgrades+fit.result.upgrades,splits:result.splits+fit.result.splits,
           addedPanelIds:[...result.addedPanelIds,...fit.result.addedPanelIds],
           disassembledNames:[...new Set([...result.disassembledNames,...fit.result.disassembledNames])],
@@ -582,7 +583,7 @@ export default function App() {
   const canMenuAutoConnect = useMemo(() => {
     if (!contextMenu || inspectingConnectors || assembly.editingInstance || project.panels.length < 2) return false
     try {
-      const result = autoConnect(project, selectedIds)
+      const result = autoConnectNearby(project, selectedIds)
       return result.joints > 0 || !!getAutoConnectFit(result.project, selectedIds)
     } catch { return false }
   }, [contextMenu, inspectingConnectors, assembly.editingInstance, project, selectedIds])

@@ -22,7 +22,7 @@ function hardwarePositions(project: Project) {
 }
 
 export interface AutoConnectFit {
-  result: ReturnType<typeof autoConnect>
+  result: ReturnType<typeof autoConnect> & { movedPanelIds: string[] }
   adjustment: {
     panelId: string; panelName: string; targetPanelId: string; targetPanelName: string
     dimension: 'width' | 'height'; before: number; after: number; distance: number
@@ -93,7 +93,7 @@ export function getAutoConnectFit(project: Project, selectedIds: readonly string
       if (validateProject(result.project).some(issue => !beforeIssues.has(issue.id) && (issue.severity === 'error' || issue.id.startsWith('collision-')))) continue
       const afterHardware = hardwarePositions(result.project)
       if ([...hardware].some(([id, position]) => !afterHardware.has(id) || afterHardware.get(id)!.distanceTo(position) > 1e-5)) continue
-      return { result, adjustment: { panelId: child.id, panelName: child.name, targetPanelId: parent.id, targetPanelName: parent.name,
+      return { result: { ...result, movedPanelIds: [] }, adjustment: { panelId: child.id, panelName: child.name, targetPanelId: parent.id, targetPanelName: parent.name,
         dimension, before: child[dimension], after: result.project.panels.find(panel => panel.id === child.id)![dimension], distance } }
     } catch {
       // A constrained edge, blocked clamp, or managed assembly is not a fit.

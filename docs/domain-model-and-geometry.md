@@ -222,6 +222,7 @@ For projects containing assemblies, [`assembly-rescale.ts`](../src/lib/assembly-
 | Operation | Main module | Architectural role |
 | --- | --- | --- |
 | Add hardware to matching panels | [`auto-connect.ts`](../src/lib/auto-connect.ts) | Finds compatible poses, handles interior T splits and shared-joint upgrades, and emits supplemental connections for positioned geometry |
+| Snap loose panels for explicit auto connect | [`auto-connect-nearby.ts`](../src/lib/auto-connect-nearby.ts) | Runs exact fitting first, then tries nearest compatible translations within 100 mm for visible, unconnected, unmanaged panels in scope. Uses constrained movement and validated exact fitting, including interior T splits; preserves other panels during movement and rejects new errors/collisions. Internal geometry callers retain exact-only fitting. |
 | Propose a small edge correction | [`auto-connect-fit.ts`](../src/lib/auto-connect-fit.ts) | Prepares a valid correction of at most 50 mm while preserving the opposite edge, other panels, and existing hardware; the UI presents the proposed fit before commitment |
 | Fit panels to selected hardware | [`connect-panel.ts`](../src/lib/connect-panel.ts) | Builds connections and fit proposals from selected physical connectors |
 | Prepare shared hardware replacement | [`prepare-joint-upgrade.ts`](../src/lib/prepare-joint-upgrade.ts) | Preserves geometry and handles assembly ownership before replacing joint groups |
@@ -306,7 +307,7 @@ Start with the behavior under change rather than copying a nearby implementation
 - [`model.test.ts`](../src/lib/model.test.ts) covers attachment transforms, joint rules, and project validation.
 - [`structure-edit.test.ts`](../src/lib/structure-edit.test.ts), [`accessory-support.test.ts`](../src/lib/accessory-support.test.ts), and [`preview-resize.test.ts`](../src/lib/preview-resize.test.ts) cover constrained movement, inserts, and interactive resize limits.
 - [`assemblies.test.ts`](../src/lib/assemblies.test.ts), [`assembly-parameters.test.ts`](../src/lib/assembly-parameters.test.ts), and [`assembly-rescale.test.ts`](../src/lib/assembly-rescale.test.ts) cover source/instance consistency and configurable geometry.
-- [`auto-connect.test.ts`](../src/lib/auto-connect.test.ts), [`auto-connect-upgrades.test.ts`](../src/lib/auto-connect-upgrades.test.ts), and [`auto-connect-fit.test.ts`](../src/lib/auto-connect-fit.test.ts) cover hardware fitting and upgrades.
+- [`auto-connect.test.ts`](../src/lib/auto-connect.test.ts), [`auto-connect-upgrades.test.ts`](../src/lib/auto-connect-upgrades.test.ts), [`auto-connect-fit.test.ts`](../src/lib/auto-connect-fit.test.ts), and [`auto-connect-nearby.test.ts`](../src/lib/auto-connect-nearby.test.ts) cover hardware fitting, upgrades, and nearby placement.
 - [`connector-movement.test.ts`](../src/lib/connector-movement.test.ts), [`connector-selection.test.ts`](../src/lib/connector-selection.test.ts), and [`connector-geometry.test.ts`](../src/components/connector-geometry.test.ts) cover physical hardware identity, rails, and measured mesh placement.
 - [`custom-outline.test.ts`](../src/lib/custom-outline.test.ts), [`panel-shape.test.ts`](../src/lib/panel-shape.test.ts), and [`scene-geometry.test.ts`](../src/components/scene-geometry.test.ts) distinguish persisted outline rules from rendered cut geometry.
 
