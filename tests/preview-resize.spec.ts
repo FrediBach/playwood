@@ -1,8 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createPanel, createStarterProject, resolvePanels, validateProject } from '../src/lib/model'
+import { createPanel, createStarterProject, parseProject, resolvePanels, validateProject } from '../src/lib/model'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { preparePreviewResize } from '../src/lib/preview-resize'
 import type { Project, Vec3 } from '../src/lib/types'
+
+import { readFileSync } from 'node:fs'
+const cornerShelf = JSON.parse(readFileSync(new URL('../src/lib/fixtures/everyday-shelf-corner.json', import.meta.url), 'utf8'))
 
 const STORAGE_KEY = 'playwood-studio-project-v1'
 type Handle = NonNullable<ReturnType<typeof preparePreviewResize>>['handles'][number]
@@ -231,4 +234,40 @@ test('Shift-drag resizes only a shelf edge and can be undone', async ({ page }) 
   expectAnglesAndJoints(project, resized)
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(project)
+})
+
+
+test('Shift-drag extends a corner shelf edge when connected resizing is blocked', async ({ page }) => {
+  const project = parseProject(cornerShelf)
+  const selected = project.panels.find(panel => panel.name === 'Right side copy')!
+  const handle = directionHandle(project, { panelId: selected.id }, [-1, 0, 0])
+  expect(handle.repeatOnly).toBe(true)
+  await openProject(page, project)
+  await page.locator('.panel-list-select').filter({ hasText: /^Right side copy$/ }).click()
+  await beginResize(page, handle, 100)
+  await page.mouse.up()
+  expect(await savedProject(page)).toEqual(project)
+  await page.keyboard.down('Shift')
+  await beginResize(page, handle, 100)
+  await page.keyboard.press('Escape')
+  await page.mouse.up()
+  expect(await savedProject(page)).toEqual(project)
+  await beginResize(page, handle, 100)
+  await page.mouse.up()
+  await page.keyboard.up('Shift')
+  await expect.poll(async () => (await savedProject(page)).panels.find(panel => panel.id === selected.id)!.height).toBeGreaterThan(selected.height + 50)
+  const resized = await savedProject(page)
+  for (const old of resolvePanels(project).filter(panel => panel.id !== selected.id)) {
+    const next = resolvePanels(resized).find(panel => panel.id === old.id)!
+    expect(next.width).toBeCloseTo(old.width, 5)
+    expect(next.height).toBeCloseTo(old.height, 5)
+    next.position.forEach((value, axis) => expect(value).toBeCloseTo(old.position[axis], 5))
+  }
+  expectAnglesAndJoints(project, resized)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect.poll(() => savedProject(page)).toEqual(resized)
+  await page.reload()
+  expect(await savedProject(page)).toEqual(resized)
 })

@@ -8,6 +8,7 @@ import { movePreviewResize, preparePreviewResize, type PreviewResizeSession } fr
 import { gridProject } from './example-geometry'
 import { moveStructureRepeat, prepareStructureRepeat } from './structure-repeat'
 import type { Project, Vec3 } from './types'
+import cornerShelf from './fixtures/everyday-shelf-corner.json'
 import everydayShelf from './fixtures/everyday-shelf.json'
 
 const named = (project: Project, name: string) => resolvePanels(project).find(panel => panel.name === name)!
@@ -22,6 +23,30 @@ const piecePosition = (project: Project, index = 0) => {
 }
 
 describe('preview structural resize handles', () => {
+  it('extends the corner shelf independently with every installed connector fixed', () => {
+    const project = parseProject(cornerShelf)
+    const panel = named(project, 'Right side copy')
+    const session = preparePreviewResize(project, { panelId: panel.id })!
+    const handle = along(session, [-1, 0, 0])
+    expect(handle.repeatOnly).toBe(true)
+    const result = movePreviewResize(session, handle.id, 100, true)
+    expect(result.limited).toBe(false)
+    expect(named(result.project, panel.name).height).toBeCloseTo(panel.height + 100)
+    for (const original of resolvePanels(project).filter(item => item.id !== panel.id)) {
+      const next = named(result.project, original.name)
+      near(next.position, original.position)
+      expect(next.width).toBeCloseTo(original.width, 5)
+      expect(next.height).toBeCloseTo(original.height, 5)
+    }
+    const positions = (value: Project) => getPhysicalConnectors(value).map(piece => {
+      const rail = getConnectorRail(piece.connection, resolvePanels(value), value.connections)!
+      return new Vector3(...rail.placements[piece.index].position).addScaledVector(new Vector3(...rail.tangent),
+        connectorSlide(rail, piece.index, value.connectorOverrides?.[piece.id]?.slide)).toArray()
+    })
+    positions(result.project).forEach((position, index) => near(position, positions(project)[index]))
+    valid(result.project)
+  })
+
   it('keeps repeat arrows available when a saved dimension fixes the source panel', () => {
     const original = gridProject('Fixed cube', [350], [350])
     const panel = named(original, 'Shelf 1.2')

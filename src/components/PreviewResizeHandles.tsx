@@ -259,7 +259,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
             {!!handle.repeat?.reused && <span className="preview-resize-size">{handle.repeat.reused} existing {handle.repeat.reused === 1 ? 'panel' : 'panels'} reused</span>}
             {handle.sizes?.map((size, index) => <span className="preview-resize-size" key={index}>{size.label} = {Math.round(size.value * 100) / 100} mm</span>)}
             {handle.repeat && <span className="preview-resize-size">{handle.repeat.reason ?? `${Math.round(handle.repeat.pitch * 100) / 100} mm per bay`}</span>}
-            <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.label}{handle.repeatOnly && <small>Fixed size · Control-pull to repeat</small>}</>}
+            <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.label}{handle.repeatOnly && <small>{handle.panelEdge ? 'Shift-pull: panel edge · Control-pull: repeat' : 'Fixed size · Control-pull to repeat'}</small>}</>}
         </span>
       </div>)}
     </div>
