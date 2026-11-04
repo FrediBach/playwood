@@ -55,6 +55,7 @@ import { movePanels, resizePanelDimensions, resizePanels } from '@/lib/structure
 import { rescaleProject } from '@/lib/project-rescale'
 import { getNiceValueStep, roundPanelDraft } from '@/lib/nice-values'
 import { rotateSelection } from '@/lib/selection-rotation'
+import { mirrorSelection } from '@/lib/selection-mirror'
 import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
 import { useProject } from '@/hooks/use-project'
 import { addCustomColor, getProjectPalette, removeCustomColor, updateCustomColor } from '@/lib/custom-colors'
@@ -414,7 +415,7 @@ export default function App() {
         if(!inspectingConnectors&&movementEnabled&&!drag.active&&!resize.active&&!assembly.target&&selectedPanels.length){
           e.preventDefault()
           if(!e.repeat){
-            try{commit(current=>rotateSelection(current,selectedIds,axis))}
+            try{commit(current=>e.shiftKey?mirrorSelection(current,selectedIds,axis):rotateSelection(current,selectedIds,axis))}
             catch(error){notify(error instanceof Error?error.message:'This selection cannot rotate while keeping its joints aligned.')}
           }
         }

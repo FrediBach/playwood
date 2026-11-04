@@ -58,7 +58,7 @@ test('X, Y and Z turn the selected panel in place, with one undo step per press 
     // The shortcut works with either the canvas or its selected sidebar row focused.
     if (axis === 'y') await page.locator('.panel-list-select').first().focus()
     else await canvas.focus()
-    await page.keyboard.press(axis === 'y' ? 'Shift+Y' : axis)
+    await page.keyboard.press(axis)
     expected = quarterTurn(axis).multiply(expected)
     await expectOrientation(page, panel.id, expected)
     const current = await savedProject(page)
@@ -130,7 +130,7 @@ test('a connected panel cannot turn alone, but selecting its complete structure 
   const project = createStarterProject('shelf')
   await openProject(page, project)
   await page.locator('.panel-list-select').filter({ hasText: /^Middle shelf$/ }).click()
-  await page.keyboard.press('z')
+  await page.keyboard.press('Shift+z')
   await expect(page.locator('.toast')).toContainText(/select|detach/i)
   await expect(page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' })).toBeDisabled()
   expect(await savedProject(page)).toEqual(project)
@@ -154,7 +154,7 @@ test('typing, modified keys, composition, dialogs and placement previews do not 
   const canvas = page.getByLabel('3D preview canvas', { exact: true })
   const name = page.getByLabel('Panel name', { exact: true })
   await name.focus()
-  await name.pressSequentially('xyz')
+  await name.pressSequentially('xyzXYZ')
   await name.fill(panel.name)
   await canvas.focus()
   for (const modifier of ['ctrlKey', 'metaKey', 'altKey'] as const) {
@@ -171,7 +171,7 @@ test('typing, modified keys, composition, dialogs and placement previews do not 
   })
 
   await page.getByRole('button', { name: 'Shortcuts & help', exact: true }).click()
-  await canvas.dispatchEvent('keydown', { key: 'z', bubbles: true })
+  await canvas.dispatchEvent('keydown', { key: 'Z', shiftKey: true, bubbles: true })
   await page.getByRole('button', { name: 'Close dialog' }).click()
   await page.getByRole('button', { name: 'Exploded view', exact: true }).click()
   await canvas.focus()
@@ -196,4 +196,37 @@ test('typing, modified keys, composition, dialogs and placement previews do not 
   await page.keyboard.press('x')
   await expect(page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' })).toBeDisabled()
   expect(await savedProject(page)).toEqual(project)
+})
+
+test('Shift+X/Y/Z mirror a complete selection with undo, redo and reload', async ({ page }) => {
+  const project: Project = { version: 1, name: 'Mirror shortcuts', connections: [], panels: [
+    createPanel({ id: 'a', name: 'Left board', width: 300, height: 200, position: [-500, 500, -200], rotation: [0.2, 0.4, -0.3] }),
+    createPanel({ id: 'b', name: 'Right board', width: 400, height: 300, position: [600, 900, 300], rotation: [-0.1, 0.3, 0.5] }),
+  ] }
+  await openProject(page, project)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  const canvas = page.getByLabel('3D preview canvas', { exact: true })
+  let before = project
+  for (const [index, axis] of ['x', 'y', 'z'].entries()) {
+    const bounds = getProjectBounds(resolvePanels(before))
+    await canvas.focus()
+    await page.keyboard.press(`Shift+${axis}`)
+    await expect.poll(async () => (await savedProject(page)).panels[0].position[index]).toBeCloseTo(bounds.min[index] + bounds.max[index] - before.panels[0].position[index], 5)
+    const mirrored = await savedProject(page)
+    for (const panel of before.panels) {
+      const current = mirrored.panels.find(item => item.id === panel.id)!
+      const expected = new Vector3(37, -59, 0).applyQuaternion(orientation(panel.rotation)).add(new Vector3(...panel.position))
+      expected.setComponent(index, bounds.min[index] + bounds.max[index] - expected.getComponent(index))
+      const actual = new Vector3(37, -59, 0).applyQuaternion(orientation(current.rotation)).add(new Vector3(...current.position))
+      expect(actual.distanceTo(expected)).toBeLessThan(0.001)
+    }
+    await canvas.dispatchEvent('keydown', { key: axis.toUpperCase(), shiftKey: true, repeat: true, bubbles: true })
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect.poll(() => savedProject(page)).toEqual(before)
+    await page.keyboard.press('ControlOrMeta+Shift+z')
+    await expect.poll(() => savedProject(page)).toEqual(mirrored)
+    before = mirrored
+  }
+  await page.reload()
+  expect(await savedProject(page)).toEqual(before)
 })

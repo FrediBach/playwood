@@ -102,6 +102,7 @@ function ViewportShortcuts({ panMode, realisticPreview }: { panMode: boolean; re
         <div><dt>Move 10 cm</dt><dd><kbd>Shift + arrows</kbd></dd></div>
         <div><dt>Attach a panel</dt><dd><kbd>A</kbd></dd></div>
         <div><dt>Rotate 90°</dt><dd><kbd>X</kbd><kbd>Y</kbd><kbd>Z</kbd></dd></div>
+        <div><dt>Mirror selection</dt><dd><kbd>Shift</kbd> + <kbd>X / Y / Z</kbd></dd></div>
       </dl>
     </div>
   </details>
