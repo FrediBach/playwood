@@ -309,10 +309,10 @@ export default function App() {
       commit(next);assembly.close();setSelectedIds(copies);if(copied.size)setFrameSignal(v=>v+1);notify(`${copied.size?'Linked instances duplicated':'Panels duplicated'}${omittedRules?`. ${omittedRules} floor or external ${omittedRules===1?'constraint stays':'constraints stay'} with the originals.`:''}`)
     }catch(error){notify(error instanceof Error?error.message:'This selection could not be duplicated.')}
   }
-  const finishAutoConnect=(result:ReturnType<typeof autoConnectNearby>,resized=false)=>{
+  const finishAutoConnect=(result:ReturnType<typeof autoConnectNearby>,resized=0)=>{
     commit(result.project);clipboard.cancel();assembly.clearPlacement();setInspectorTab('panel');setExploded(false)
     if(result.splits&&selectedIds.length>1)setSelectedIds(ids=>[...ids,...result.addedPanelIds])
-    const placementMessage=[resized?'Panel resized to fit.':'',result.splits?`${result.splits} panel ${result.splits===1?'split':'splits'} for T joints; outer dimensions kept.`:'',result.movedPanelIds.length?`${result.movedPanelIds.length} loose ${result.movedPanelIds.length===1?'panel moved':'panels moved'} to fit.`:''].filter(Boolean).join(' ')||'Panel positions kept.'
+    const placementMessage=[resized?(resized>1?'Panels resized to fit.':'Panel resized to fit.'):'',result.splits?`${result.splits} panel ${result.splits===1?'split':'splits'} for T joints; outer dimensions kept.`:'',result.movedPanelIds.length?`${result.movedPanelIds.length} loose ${result.movedPanelIds.length===1?'panel moved':'panels moved'} to fit.`:''].filter(Boolean).join(' ')||'Panel positions kept.'
     notify(`${result.connectors} connectors ${result.upgrades?'fitted':'added'} at ${result.joints} ${result.joints===1?'joint':'joints'}. ${result.upgrades?`${result.upgrades} existing ${result.upgrades===1?'joint':'joints'} upgraded. `:''}${placementMessage}${result.disassembledNames.length?` Made independent: ${result.disassembledNames.join(', ')}.`:''} Undo is available.`)
   }
   const addAutoConnectors=()=>{
@@ -336,7 +336,7 @@ export default function App() {
   }
   const acceptConnectionFit=()=>{
     if(!pendingConnectionFit||pendingConnectionFit.source!==project)return
-    finishAutoConnect(pendingConnectionFit.fit.result,true);setPendingConnectionFit(null)
+    finishAutoConnect(pendingConnectionFit.fit.result,pendingConnectionFit.fit.adjustments?.length??1);setPendingConnectionFit(null)
   }
   const extendToGround=()=>{
     if(modalOpen||assembly.hasMembers||!groundPanelFit.result)return
@@ -740,7 +740,7 @@ export default function App() {
     <ProjectStatus panelCount={project.panels.length} connectorCount={connectorCount} issueCount={issues.length} bounds={bounds} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')}/>
     {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
 
-    <PanelConnectionFitDialog adjustment={pendingConnectionFit?.fit.adjustment} operations={pendingConnectionFit?.fit.result} onConfirm={acceptConnectionFit} onCancel={()=>setPendingConnectionFit(null)}/>
+    <PanelConnectionFitDialog adjustments={pendingConnectionFit?.fit.adjustments} adjustment={pendingConnectionFit?.fit.adjustment} operations={pendingConnectionFit?.fit.result} onConfirm={acceptConnectionFit} onCancel={()=>setPendingConnectionFit(null)}/>
     <ProjectDialogs onNew={startNewProject} dialog={dialog} onClose={closeProjectDialog} draft={draft} setDraft={setDraft} loadTemplate={loadTemplate}
       replacementName={pendingTemplate?.project.name??''} onReplace={()=>{if(pendingTemplate)applyTemplate(pendingTemplate.id,pendingTemplate.project)}}
       onExportPanelSvg={(panel,index)=>{download(panelToSvg(panel),`${exportName}-${panelSvgFilename(panel,index)}`,'image/svg+xml');notify('Panel SVG exported')}}

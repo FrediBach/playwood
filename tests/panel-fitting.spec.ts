@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createPanel, createStarterProject, getProjectBounds, resolvePanels, validateProject } from '../src/lib/model'
+import { attachPanel, createPanel, createStarterProject, getProjectBounds, resolvePanels, validateProject } from '../src/lib/model'
 import { connectorSlide, getConnectorRail } from '../src/lib/connector-movement'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
+import { resizePanelEdge } from '../src/lib/structure-edit'
 import { autoConnect } from '../src/lib/auto-connect'
 import { Vector3 } from 'three'
 import type { Project } from '../src/lib/types'
@@ -154,4 +155,56 @@ test('auto-connect asks before resizing a short bench side, then resizes and con
   await expect(page.getByLabel('Panel name')).toHaveValue('Bench top')
   expect(await savedProject(page)).toEqual(fitted)
   expect(errors).toEqual([])
+})
+
+
+test('auto-connect proposes both angled panel lengths, cancels safely, and commits one persistent edit', async ({ page }) => {
+  let project: Project = { version: 1, name: 'Angled gap', panels: [createPanel({ id: 'lower', name: 'Lower slope', width: 300, height: 400, position: [0, 700, 0] })], connections: [] }
+  const options = { type: '150' as const, side: 'top' as const, flip: false, offset: 0, inset: 0, count: 2, color: '#222222' }
+  project = attachPanel(project, 'lower', createPanel({ id: 'upper', name: 'Upper slope', width: 300, height: 200 }), options)
+  const missing = project.connections[0].id
+  project = attachPanel(project, 'lower', createPanel({ id: 'base', width: 300, height: 300 }), { ...options, side: 'bottom', type: '90' })
+  project = attachPanel(project, 'upper', createPanel({ id: 'top', width: 300, height: 300 }), { ...options, type: '105' })
+  project = { ...project, panels: resolvePanels(project), connections: project.connections.filter(connection => connection.id !== missing) }
+  project = resizePanelEdge(project, 'lower', 'height', 1, -20, true)
+  project = resizePanelEdge(project, 'upper', 'height', -1, -30, true)
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'angled-gap.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  await page.getByRole('button', { name: 'Lower slope', exact: true }).click()
+  await expect.poll(async () => (await savedProject(page)).panels.length).toBe(4)
+  const before = await savedProject(page)
+  const connect = page.getByRole('button', { name: 'Auto-add connectors', exact: true }).first()
+  await connect.click()
+  const dialog = page.getByRole('dialog', { name: 'Resize panels to connect?' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText('Lower slope · Height')).toBeVisible()
+  await expect(dialog.getByText('Upper slope · Height')).toBeVisible()
+  await expect(dialog.getByText('380 → 400 mm')).toBeVisible()
+  await expect(dialog.getByText('170 → 200 mm')).toBeVisible()
+  expect(await savedProject(page)).toEqual(before)
+  await page.keyboard.press('Escape')
+  await expect(dialog).not.toBeVisible()
+  expect(await savedProject(page)).toEqual(before)
+  await connect.click()
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect(await savedProject(page)).toEqual(before)
+  await connect.click()
+  await page.setViewportSize({ width: 540, height: 800 })
+  const bounds = await dialog.boundingBox()
+  expect(bounds!.x).toBeGreaterThanOrEqual(0)
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(540)
+  await page.screenshot({ path: test.info().outputPath('coordinated-fit-narrow.png') })
+  await dialog.getByRole('button', { name: 'Resize and connect', exact: true }).click()
+  await expect.poll(async () => (await savedProject(page)).connections.length).toBe(3)
+  const fitted = await savedProject(page)
+  expect(fitted.panels.find(panel => panel.id === 'lower')!.height).toBeCloseTo(400, 5)
+  expect(fitted.panels.find(panel => panel.id === 'upper')!.height).toBeCloseTo(200, 5)
+  expect(validateProject(fitted)).toEqual([])
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect.poll(() => savedProject(page)).toEqual(before)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect.poll(() => savedProject(page)).toEqual(fitted)
+  await page.reload()
+  expect(await savedProject(page)).toEqual(fitted)
 })

@@ -17,7 +17,7 @@ type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
 type Row = { entries: Map<number, number>; value: number }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3; releaseContacts?: boolean } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; local?: boolean } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string }
+type Edit = { kind: 'move'; delta: Vec3; releaseContacts?: boolean } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; local?: boolean } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 interface ValidationContext { trofastWorld?: boolean }
 
@@ -171,10 +171,10 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   // Tangential changes are cheaper than moving a whole shelf/side out of its
   // plane. Dimensions are allowed to adapt while thickness remains physical.
   const weights = frames.flatMap(() => [1, 1, 64, 0.25, 0.25])
-  const connections = project.connections.filter(connection => indices.has(connection.parentId) && indices.has(connection.childId))
+  const connections = [...project.connections, ...(edit.kind === 'fit' ? [edit.connection] : [])].filter(connection => indices.has(connection.parentId) && indices.has(connection.childId))
   // Independent edge pulls may shift one branch center along a shared T/cross
   // joint without shifting the other branches or the physical hardware.
-  const offsetKey = (connection: Connection) => edit.kind === 'resize' && edit.local ? connection.id : jointId(connection)
+  const offsetKey = (connection: Connection) => ((edit.kind === 'resize' && edit.local) || edit.kind === 'fit') ? connection.id : jointId(connection)
   const offsetVariables = new Map<string, number>()
   for (const connection of connections) if (!offsetVariables.has(offsetKey(connection))) {
     offsetVariables.set(offsetKey(connection), weights.length)
@@ -265,7 +265,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     const thicknessShift = expected({ ...parent, thickness: parent.thickness + thicknessChange(parentIndex) },
       { ...child, thickness: child.thickness + thicknessChange(childIndex) }, connection.offset).sub(baseline)
     worldAxes.forEach(axis => {
-      const constraint = row(thicknessShift.dot(axis))
+      const constraint = row(thicknessShift.dot(axis) + (edit.kind === 'fit' && connection.id === edit.connection.id ? baseline.clone().sub(position(child)).dot(axis) : 0))
       center(constraint, childIndex, axis)
       center(constraint, parentIndex, axis, -1)
       add(constraint, parentIndex * 5 + 3, -changes[0].dot(axis))
@@ -389,7 +389,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   })
 
   for (const item of selected) {
-    if (edit.kind === 'reconcile') continue
+    if (edit.kind === 'reconcile' || edit.kind === 'fit') continue
     const index = indices.get(item.panel.id)!
     for (const [dimension, field] of (['width', 'height'] as const).entries()) {
       const patch = edit.kind === 'resize' ? edit.patches?.[item.panel.id] ?? edit.patch : undefined
@@ -435,7 +435,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         }
       }
     }
-  } else {
+  } else if (edit.kind === 'reconcile') {
     // A first/reference panel gives a new relationship a predictable direction.
     // A user-selected reference is fixed; only inferred anchors may yield.
     for (const rule of constraints) {
@@ -454,10 +454,18 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     }
   }
 
-  if (edit.kind === 'resize' && edit.local) frames.forEach((item, index) => {
+  if ((edit.kind === 'resize' && edit.local) || edit.kind === 'fit') frames.forEach((item, index) => {
     if (ids.has(item.panel.id)) return
     for (let variable = 0; variable < 5; variable++) add(row(), index * 5 + variable, 1)
   })
+
+  if (edit.kind === 'fit') {
+    const horizontal = ['top', 'bottom'].includes(edit.connection.side)
+    const parentDimension = horizontal ? 0 : 1
+    for (const [id, dimension] of [[edit.connection.parentId, parentDimension], [edit.connection.childId, edit.connection.quarterTurn ? 1 - parentDimension : parentDimension]] as const) {
+      add(row(), indices.get(id)! * 5 + 3 + dimension, 1)
+    }
+  }
 
   let changes: number[]
   try {
@@ -528,6 +536,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   const root = (index: number): number => { while (groups[index] !== index) { groups[index] = groups[groups[index]]; index = groups[index] } return index }
   const join = (a: number, b: number) => { groups[root(a)] = root(b) }
   project.connections.forEach(connection => { const a = indices.get(connection.parentId), b = indices.get(connection.childId); if (a !== undefined && b !== undefined) join(a, b) })
+  if (edit.kind === 'fit') join(indices.get(edit.connection.parentId)!, indices.get(edit.connection.childId)!)
   contacts.forEach(contact => join(contact.a, contact.b))
   for (const rule of project.constraints ?? []) {
     if (!rule.enabled) continue
@@ -546,7 +555,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   next = { ...next, panels: resolvePanels(next) }
   if (next.panels.some(panel => panel.position.some(value => !Number.isFinite(value) || Math.abs(value) > 100000))
     || next.connections.some(connection => !Number.isFinite(connection.offset) || Math.abs(connection.offset) > 10000)) throw new Error('This move would exceed the project placement limits. Try a smaller step.')
-  if (edit.kind === 'resize' && edit.local) {
+  if ((edit.kind === 'resize' && edit.local) || edit.kind === 'fit') {
     const overrides = { ...project.connectorOverrides }
     const connectionsById = new Map(next.connections.map(connection => [connection.id, connection]))
     for (const piece of getPhysicalConnectors(project)) {
@@ -641,4 +650,29 @@ export function resizePanelDimensions(project: Project, patches: Record<string, 
   const ownPatches: Record<string, PanelDimensions> = Object.assign(Object.create(null), patches)
   if (!project.panels.some(panel => (['width', 'height', 'thickness'] as const).some(field => ownPatches[panel.id]?.[field] !== undefined && Math.abs(panel[field] - ownPatches[panel.id][field]!) > EPSILON))) return project
   return editStructure(project, ids, { kind: 'resize', patch: {}, patches: ownPatches }, validation)
+}
+
+/** Close a compatible seam by solving both radial lengths together. Other
+ * panels, rotations, thicknesses and installed hardware remain fixed. The
+ * proposed connection is a solve constraint only; hardware fitting follows. */
+export function fitPanelPair(project: Project, connection: Connection): Project {
+  const ids = [connection.parentId, connection.childId]
+  if (ids[0] === ids[1] || ids.some(id => !project.panels.some(panel => panel.id === id))) throw new Error('Choose two different panels to fit.')
+  if (project.panels.some(panel => ids.includes(panel.id) && (panel.customOutline || !panel.visible))) throw new Error('Fit visible rectangular panels only.')
+  const target = { ...connection, id: `fit/${crypto.randomUUID()}:0` }
+  const next = editStructure(project, ids, { kind: 'fit', connection: target })
+  const fitted = resolvePanels(next)
+  const parent = fitted.find(panel => panel.id === connection.parentId)!
+  const child = fitted.find(panel => panel.id === connection.childId)!
+  const expected = resolvePanels({ version: 1, name: '', panels: [parent, child], connections: [{ ...target, role: undefined }] })[1]
+  if (position(expected).distanceTo(position(child)) > 1e-5 || frame(expected).axes.some((axis, index) => Math.abs(axis.dot(frame(child).axes[index])) < 0.99999)) {
+    throw new Error('These panel edges cannot meet at this connector angle.')
+  }
+  const before = new Map(resolvePanels(project).map(panel => [panel.id, panel]))
+  for (const panel of resolvePanels(next)) {
+    const original = before.get(panel.id)!
+    if (Math.abs(panel.width - original.width) > 100 || Math.abs(panel.height - original.height) > 100
+      || position(panel).distanceTo(position(original)) > 100) throw new Error('This fit needs an adjustment greater than 100 mm.')
+  }
+  return next
 }
