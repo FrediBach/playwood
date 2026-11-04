@@ -4,6 +4,8 @@ import { createPanel, resolvePanels, validateProject } from './model'
 import { addFittedPanelToAssembly, getAssemblyInstance } from './assemblies'
 import { connectClosingPanel } from './closure-connectors'
 import { CONNECTOR_PROFILES } from './connector-profile'
+import { findPolygonPanelHoles } from './polygon-holes'
+import { prepareHoleEdgeAlignment, type HoleEdgeAdjustment } from './close-hole-alignment'
 import type { Panel, Project, Vec3 } from './types'
 
 const axes = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)]
@@ -11,14 +13,18 @@ const tolerance = 0.1
 const clearance = 1
 const quaternion = (panel: Panel) => new Quaternion().setFromEuler(new Euler(...panel.rotation))
 const box = (panel: Panel) => new OBB(new Vector3(...panel.position), new Vector3(panel.width / 2, panel.height / 2, panel.thickness / 2), new Matrix3().setFromMatrix4(new Matrix4().makeRotationFromQuaternion(quaternion(panel))))
-export interface PanelHole { id: string; label: string; panel: Panel; boundaryIds: string[] }
+export interface PanelHole {
+  id: string; label: string; panel: Panel; boundaryIds: string[];
+  /** Reviewed extensions needed before a flat closing panel can seat on this rim. */
+  alignment?: { normal: Vec3; sign: -1 | 1; adjustments: HoleEdgeAdjustment[] };
+}
 
-/** Rectangular openings bounded by four orthogonal panels, in any world orientation.
- * Allow the measured connector seat at corners, but require all four edges.
+/** Closed openings bounded by coplanar rim edges, in any world orientation.
+ * Allow the measured connector seat at corners, but require every edge.
  */
 export function findPanelHoles(selected: readonly Panel[], obstacles: readonly Panel[] = selected): PanelHole[] {
   const visible = selected.filter(panel => panel.visible)
-  if (visible.length < 4) return []
+  if (visible.length < 3) return []
   // Prefer world axes for familiar labels; use the first panel's frame for rotated work.
   const aligned = (rotation: Quaternion) => axes.every(axis => Math.max(...axis.clone().applyQuaternion(rotation).toArray().map(Math.abs)) > 0.99999)
   const frame = visible.every(panel => aligned(quaternion(panel))) ? new Quaternion() : quaternion(visible[0])
@@ -85,7 +91,12 @@ export function findPanelHoles(selected: readonly Panel[], obstacles: readonly P
       }
     }
   }
-  const holes = [...result.values()].sort((a, b) => a.label.localeCompare(b.label) || a.panel.position[1] - b.panel.position[1] || a.panel.position[0] - b.panel.position[0])
+  return labelHoles([...result.values(), ...findPolygonPanelHoles(visible, obstacles)])
+}
+
+function labelHoles(openings: PanelHole[]) {
+  const holes = openings.map(hole => ({ ...hole, label: hole.label.replace(/ \d+$/, '') }))
+    .sort((a, b) => a.label.localeCompare(b.label) || a.panel.position[1] - b.panel.position[1] || a.panel.position[0] - b.panel.position[0])
   const totals = new Map<string, number>()
   for (const hole of holes) totals.set(hole.label, (totals.get(hole.label) ?? 0) + 1)
   const counts = new Map<string, number>()
@@ -95,12 +106,35 @@ export function findPanelHoles(selected: readonly Panel[], obstacles: readonly P
   })
 }
 
+/** The closing UI can offer a reviewed depth correction. Geometry-only callers
+ * (such as compartment repetition) continue to use findPanelHoles directly. */
+export function findClosingPanelHoles(project: Project, selectedIds: readonly string[]): PanelHole[] {
+  const panels = resolvePanels(project), selected = new Set(selectedIds)
+  const selection = panels.filter(panel => selected.has(panel.id))
+  const holes = findPanelHoles(selection, panels)
+  for (const proposal of findPolygonPanelHoles(selection, panels, { alignDepth: true })) {
+    if (holes.some(hole => hole.id === proposal.id)) continue
+    try {
+      const alignment = proposal.alignment!
+      const prepared = prepareHoleEdgeAlignment(project, proposal.boundaryIds, alignment.normal, alignment.sign)
+      const alignedPanels = resolvePanels(prepared.project), boundary = new Set(proposal.boundaryIds)
+      const fitted = findPanelHoles(alignedPanels.filter(panel => boundary.has(panel.id)), alignedPanels)
+        .find(hole => hole.id === proposal.id || JSON.stringify(hole.boundaryIds) === JSON.stringify(proposal.boundaryIds)
+          && hole.label.replace(/ \d+$/, '') === proposal.label)
+      if (!fitted) continue
+      // Check installed hardware as well as empty space before offering a fit.
+      connectClosingPanel(prepared.project, { ...fitted.panel, id: crypto.randomUUID() }, fitted.boundaryIds)
+      holes.push({ ...fitted, id: `align:${proposal.id}`, alignment: { ...alignment, adjustments: prepared.adjustments } })
+    } catch { /* A conflicting rule, assembly, obstacle, or joint prevents this fit. */ }
+  }
+  return labelHoles(holes)
+}
+
 export function closePanelHole(project: Project, selectedIds: readonly string[], holeId: string) {
-  const panels = resolvePanels(project)
-  const selected = new Set(selectedIds)
-  const hole = findPanelHoles(panels.filter(panel => selected.has(panel.id)), panels).find(item => item.id === holeId)
+  const hole = findClosingPanelHoles(project, selectedIds).find(item => item.id === holeId)
   if (!hole) throw new Error('This opening is no longer available. Select its surrounding panels again.')
   if (project.panels.length >= 200) throw new Error('Projects support up to 200 panels.')
+  if (hole.alignment) project = prepareHoleEdgeAlignment(project, hole.boundaryIds, hole.alignment.normal, hole.alignment.sign).project
   const panel = { ...hole.panel, id: crypto.randomUUID(), name: `${hole.label} panel` }
   const owners = selectedIds.map(id => getAssemblyInstance(project, id))
   const instance = owners[0] && owners.every(owner => owner?.id === owners[0]?.id) ? owners[0] : undefined

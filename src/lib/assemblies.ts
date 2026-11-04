@@ -71,7 +71,7 @@ export function getAssemblyMovementPanelIds(project: Project, instanceIds: reado
 
 function inferPorts(panels: Panel[], connections: Connection[]): AssemblyPort[] {
   const byId = new Map(panels.map(panel => [panel.id, panel]))
-  const candidates = connections.filter(connection => connection.type === '90' && connection.count > 0 && connection.side !== 'front' && connection.side !== 'back')
+  const candidates = connections.filter(connection => connection.type === '90' && connection.outlineEdge === undefined && connection.count > 0 && connection.side !== 'front' && connection.side !== 'back')
   const centers = candidates.map(connection => getConnectorPlacements({ ...connection, count: 1 }, byId.get(connection.parentId)!, byId.get(connection.childId)!)[0].position)
   const center = centers.reduce((sum, position) => sum.add(v(position)), new Vector3()).multiplyScalar(1 / Math.max(1, centers.length))
   return candidates.map((connection, i) => {
@@ -86,7 +86,7 @@ interface PortFrame { position: Vec3; rotation: Vec3; connection: Connection; pa
 function localPort(definition: AssemblyDefinition, portId: string): PortFrame {
   const port = definition.ports.find(item => item.id === portId)
   const connection = port && definition.connections.find(item => item.id === port.connectionId)
-  if (!connection || connection.type !== '90') throw new Error('This assembly corner is unavailable.')
+  if (!connection || connection.type !== '90' || connection.outlineEdge !== undefined) throw new Error('This assembly corner is unavailable.')
   const panels = resolvePanels(flat(definition))
   const parent = panels.find(panel => panel.id === connection.parentId)!, child = panels.find(panel => panel.id === connection.childId)!
   if (!parent || !child) throw new Error('This corner refers to a missing panel.')
@@ -644,7 +644,7 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
       if (!record(port)) throw new Error('Invalid assembly corner.')
       const result = { id: text(port.id), connectionId: text(port.connectionId), label: text(port.label) }
       const connection = parsed.connections.find(item => item.id === result.connectionId)
-      if (!connection || connection.type !== '90' || connection.count < 1 || connection.side === 'front' || connection.side === 'back') throw new Error('Assembly corners must refer to an edge corner joint.')
+      if (!connection || connection.type !== '90' || connection.outlineEdge !== undefined || connection.count < 1 || connection.side === 'front' || connection.side === 'back') throw new Error('Assembly corners must refer to an edge corner joint.')
       return result
     })
     if (new Set(ports.map(port => port.id)).size !== ports.length || new Set(ports.map(port => port.connectionId)).size !== ports.length) throw new Error('Assembly corners must be unique.')
@@ -696,7 +696,7 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
       if (!record(raw) || !record(raw.connection)) throw new Error('Invalid loose assembly corner.')
       const parsed = parseProject({ version: 1, name: 'Loose corner', panels: project.panels, connections: [raw.connection] })
       const connection = parsed.connections[0]
-      if (connection.type !== '90' || connection.role !== 'support' || connection.side === 'front' || connection.side === 'back'
+      if (connection.type !== '90' || connection.role !== 'support' || connection.outlineEdge !== undefined || connection.side === 'front' || connection.side === 'back'
         || allPanelIds.has(connection.parentId) || allPanelIds.has(connection.childId) || project.connections.some(item => item.id === connection.id)) throw new Error('A loose corner must reference two ordinary panels and its suppressed corner connector.')
       return { id: text(raw.id), connection }
     })

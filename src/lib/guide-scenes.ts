@@ -204,7 +204,7 @@ function buildScenes(id: GuideId): GuideScene[] {
       return [scene(p, 'Four panels enclose a rectangular opening.', { labels: [{ text: 'Open back', point: [0, 201.5, -175] }] }),
         scene(p, 'Select the complete frame around the opening.', { selected: ids(p) }),
         scene(preview, 'Choose Back to close the rear face of this box.', { ghost: [hole.panel.id], labels: [label(hole.panel, 'Fitted back panel')] }),
-        scene(closed.project, 'The closing panel and compatible hardware are added together.', { selected: [closed.panelId], labels: [label(closed.project.panels.find(panel => panel.id === closed.panelId)!, 'Back closed')] })]
+        scene(closed.project, 'The fitted back and its hardware follow compatible frame resizing.', { selected: [closed.panelId], labels: [label(closed.project.panels.find(panel => panel.id === closed.panelId)!, 'Back closed')] })]
     }
     case 'split-panels': {
       const p = box()

@@ -9,7 +9,7 @@ import type { ListGroupingProps } from '@/components/GroupedList'
 import { PreviewContextMenu } from '@/components/PreviewContextMenu'
 import { ConnectorInspector } from '@/components/ConnectorInspector'
 import { CloseHoles } from '@/components/CloseHoles'
-import { closePanelHole, findPanelHoles } from '@/lib/close-holes'
+import { closePanelHole, findClosingPanelHoles } from '@/lib/close-holes'
 import { editConnectors } from '@/lib/connector-selection'
 import { changeConnectorType } from '@/lib/connector-type-edit'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
@@ -86,7 +86,7 @@ export default function App() {
   const [pickingConstraint,setPickingConstraint]=useState(false)
   const [panelEditError,setPanelEditError]=useState<{selection:string;message:string}|null>(null)
   const closeContextMenu=useCallback(()=>setContextMenu(null),[])
-  const [toolRequest,setToolRequest]=useState<{tool:'grid'|'parallel'|'assembly';selection:string;token:number}>()
+  const [toolRequest,setToolRequest]=useState<{tool:'grid'|'parallel'|'assembly'|'holes';selection:string;token:number;holeId?:string}>()
   const [inspectorTab,setInspectorTab]=useState<'panel'|'attach'>('panel')
   const [trofastPreview,setTrofastPreview]=useState<{source:Project;panelId:string;inserts:TrofastInsert[]}|null>(null)
   const previewTrofast=useCallback((panelId:string,inserts:TrofastInsert[]|null)=>{
@@ -541,8 +541,9 @@ export default function App() {
   const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
   const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=(imported.constraints?.length||imported.spaceConstraint?.enabled)?imported:repairLegacyShelf(imported);const repaired=(imported.constraints?.length||imported.spaceConstraint?.enabled)?shelf:repairLegacyExampleInserts(shelf);setProjectConstraintsOpen(false);constraints.cancel();commit(repaired,{replace:true});assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
   const instance=assembly.selectedInstance
-  const holes=useMemo(()=>findPanelHoles(panels.filter(panel=>selectedIdSet.has(panel.id)),panels),[panels,selectedIdSet])
-  const closeHole=(id:string)=>{
+  const holes=useMemo(()=>findClosingPanelHoles(project,selectedIds),[project,selectedIds])
+  const closeHole=(id:string,reviewed=false)=>{
+    if(!reviewed&&holes.find(hole=>hole.id===id)?.alignment){setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'holes',selection:selectionKey,token:Date.now(),holeId:id});return}
     try {
       const result=closePanelHole(project,selectedIds,id)
       commit(result.project)
@@ -617,7 +618,7 @@ export default function App() {
     <div className="section-title"><h2>Build tools</h2><Plus size={16}/></div>
     {!assembly.hasMembers&&gridCut&&<InspectorDisclosure openRequest={toolRequest?.tool==='grid'&&toolRequest.selection===selectedIds.join('/')?toolRequest.token:0} focusTarget="#grid-split-X" title="Divide into a grid" summary="Rows & columns" lazy><GridPanelSplit project={project} ids={selectedIds} frame={gridCut} onSplit={(result,x,y)=>{commit(result.project);setSelectedIds(result.panelIds);notify(`Created a ${x+1} × ${y+1} grid with ${result.connectors} new connectors. Undo is available.`)}}/></InspectorDisclosure>}
     {!assembly.hasMembers&&parallelPanelCut(selectedPanels)&&<InspectorDisclosure openRequest={toolRequest?.tool==='parallel'&&toolRequest.selection===selectedIds.join('/')?toolRequest.token:0} focusTarget="select" title="Divide evenly" summary="Add equally spaced dividers" lazy><ParallelPanelSplit counts={splitCounts} checking={checkingSplits} onSplit={splitSelection}/></InspectorDisclosure>}
-    {(instance||!assembly.hasMembers)&&holes.length>0&&<InspectorDisclosure title="Close holes" summary={`${holes.length} ${holes.length===1?'opening':'openings'} available`} lazy><CloseHoles holes={holes} assembly={!!instance} onClose={closeHole}/></InspectorDisclosure>}
+    {(instance||!assembly.hasMembers)&&holes.length>0&&<InspectorDisclosure openRequest={toolRequest?.tool==='holes'&&toolRequest.selection===selectionKey?toolRequest.token:0} focusTarget="select" title="Close holes" summary={`${holes.length} ${holes.length===1?'opening':'openings'} available`} lazy><CloseHoles key={toolRequest?.tool==='holes'?toolRequest.token:'holes'} initialHoleId={toolRequest?.tool==='holes'?toolRequest.holeId:undefined} holes={holes} assembly={!!instance} onClose={id=>closeHole(id,true)}/></InspectorDisclosure>}
     <InspectorDisclosure title="Auto-add connectors" summary="Connect matching or nearly fitting edges" lazy><p className="field-note">{selectedPanels.length>1?'Connect matching edges between selected panels.':'Connect this panel to matching nearby edges.'} If a small size change is needed, review it before applying. Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2||modalOpen}><Link2 size={15}/>Auto-add connectors</Button></InspectorDisclosure>
     {!assembly.hasMembers&&selectedPanels.length>1&&<InspectorDisclosure openRequest={toolRequest?.tool==='assembly'&&toolRequest.selection===selectedIds.join('/')?toolRequest.token:0} focusTarget="input" title="Create assembly" summary="Reuse these panels as linked copies" lazy><CreateAssemblyForm panelCount={selectedPanels.length} panels={selectedPanels} onCreate={assembly.create}/></InspectorDisclosure>}
   </section> : undefined

@@ -5,6 +5,7 @@ import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { isPanelConnectedToAssembly } from './assemblies'
 import { designConstraintLimits, designConstraintPanelIds, describeDesignConstraint, evaluateDesignConstraints } from './design-constraints'
+import { refitOutlineClosures } from './outline-closures'
 import type { Connection, ConstraintReference, Panel, Project, Vec3 } from './types'
 
 const EPSILON = 1e-6
@@ -17,7 +18,7 @@ type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
 type Row = { entries: Map<number, number>; value: number }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3; releaseContacts?: boolean } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; local?: boolean } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
+type Edit = { kind: 'move'; delta: Vec3; releaseContacts?: boolean } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 interface ValidationContext { trofastWorld?: boolean }
 
@@ -404,10 +405,12 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   if (edit.kind === 'resize') {
     // An edge pull shifts the center by half the growth to anchor its opposite
     // edge. Numeric dimension edits keep the selected center stationary.
-    for (const [dimension, axis] of worldAxes.entries()) {
-      const constraint = (edit.centerDelta || edit.local ? row : preference)(edit.centerDelta?.[dimension] ?? 0)
-      selected.forEach(item => center(constraint, indices.get(item.panel.id)!, axis, 1 / selected.length))
-    }
+    if (edit.centerDeltas) for (const item of selected) {
+      for (const [dimension, axis] of worldAxes.entries()) center(row(edit.centerDeltas[item.panel.id]?.[dimension] ?? 0), indices.get(item.panel.id)!, axis)
+    } else for (const [dimension, axis] of worldAxes.entries()) {
+        const constraint = (edit.centerDelta || edit.local ? row : preference)(edit.centerDelta?.[dimension] ?? 0)
+        selected.forEach(item => center(constraint, indices.get(item.panel.id)!, axis, 1 / selected.length))
+      }
   } else if (edit.kind === 'move') {
     const axis = new Vector3(...edit.delta).normalize()
     const physicalRoots = frames.map((_, index) => index)
@@ -528,9 +531,13 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   }
   const panels = resolvePanels(project)
   if (!panels.some(panel => wanted.has(panel.id))) return project
+  // A fitted polygon follows its surrounding edge planes. Its rectangular
+  // stock bounds are neither physical contacts nor independent solver spans.
+  const outlineClosures = new Set(project.connections.filter(connection => connection.outlineEdge !== undefined).map(connection => connection.childId))
   const frames = panels.map(frame)
-  const contacts = findContacts(frames).filter(contact => edit.kind !== 'move' || !edit.releaseContacts
-    || wanted.has(frames[contact.a].panel.id) === wanted.has(frames[contact.b].panel.id))
+  const contacts = findContacts(frames).filter(contact => !outlineClosures.has(frames[contact.a].panel.id) && !outlineClosures.has(frames[contact.b].panel.id))
+    .filter(contact => edit.kind !== 'move' || !edit.releaseContacts
+      || wanted.has(frames[contact.a].panel.id) === wanted.has(frames[contact.b].panel.id))
   const indices = new Map(panels.map((panel, index) => [panel.id, index]))
   const groups = panels.map((_, index) => index)
   const root = (index: number): number => { while (groups[index] !== index) { groups[index] = groups[groups[index]]; index = groups[index] } return index }
@@ -545,20 +552,48 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   }
   const components = new Map<number, number[]>()
   panels.forEach((_, index) => { const key = root(index); components.set(key, [...components.get(key) ?? [], index]) })
+  const affectedOutlineClosures = new Set<string>()
   let next: Project = { ...project, panels }
   for (const component of components.values()) {
     if (!component.some(index => wanted.has(panels[index].id))) continue
-    const local = new Map(component.map((index, localIndex) => [index, localIndex]))
-    next = editComponent(next, component.map(index => frames[index]), contacts.filter(contact => local.has(contact.a) && local.has(contact.b))
+    component.forEach(index => { if (outlineClosures.has(panels[index].id)) affectedOutlineClosures.add(panels[index].id) })
+    const independent = component.filter(index => !outlineClosures.has(panels[index].id))
+    const local = new Map(independent.map((index, localIndex) => [index, localIndex]))
+    next = editComponent(next, independent.map(index => frames[index]), contacts.filter(contact => local.has(contact.a) && local.has(contact.b))
       .map(contact => ({ ...contact, a: local.get(contact.a)!, b: local.get(contact.b)! })), wanted, edit)
   }
-  next = { ...next, panels: resolvePanels(next) }
+  if (edit.kind === 'resize' && edit.patches) next = { ...next, panels: next.panels.map(panel => affectedOutlineClosures.has(panel.id)
+    && edit.patches?.[panel.id]?.thickness !== undefined ? { ...panel, thickness: edit.patches[panel.id].thickness! } : panel) }
+  next = { ...next, panels: refitOutlineClosures(resolvePanels(next), next.connections.filter(connection => connection.outlineEdge === undefined
+    || affectedOutlineClosures.has(connection.childId))) }
+  for (const panel of next.panels) {
+    if (!affectedOutlineClosures.has(panel.id)) continue
+    const original = panels[indices.get(panel.id)!]
+    const sizeChanged = Math.abs(panel.width - original.width) > EPSILON || Math.abs(panel.height - original.height) > EPSILON
+    const poseChanged = position(panel).distanceTo(position(original)) > EPSILON
+    const outlineChanged = panel.customOutline?.some((point, index) => Math.abs(point.x - (original.customOutline?.[index]?.x ?? Infinity)) > EPSILON
+      || Math.abs(point.y - (original.customOutline?.[index]?.y ?? Infinity)) > EPSILON) ?? false
+    if (edit.kind === 'resize' && edit.local && !wanted.has(panel.id) && !edit.refitOutlinePanelIds?.includes(panel.id) && (sizeChanged || poseChanged || outlineChanged)) {
+      throw new Error('This resize would reshape a fitted outline panel. Resize the connected structure instead of only this panel edge.')
+    }
+    if (!wanted.has(panel.id)) continue
+    const patch: PanelDimensions | undefined = edit.kind === 'resize' ? edit.patches?.[panel.id] ?? edit.patch : undefined
+    const missesMove = edit.kind === 'move' && (sizeChanged || outlineChanged
+      || position(panel).distanceTo(position(original).add(new Vector3(...edit.delta))) > EPSILON)
+    const missesResize = patch && (['width', 'height', 'thickness'] as const).some(dimension => patch[dimension] !== undefined
+      && Math.abs(panel[dimension] - patch[dimension]!) > EPSILON)
+    if (missesMove || missesResize) throw new Error('This fitted outline follows its surrounding panels. Edit those panels together, or detach the outline panel first.')
+  }
   if (next.panels.some(panel => panel.position.some(value => !Number.isFinite(value) || Math.abs(value) > 100000))
     || next.connections.some(connection => !Number.isFinite(connection.offset) || Math.abs(connection.offset) > 10000)) throw new Error('This move would exceed the project placement limits. Try a smaller step.')
   if ((edit.kind === 'resize' && edit.local) || edit.kind === 'fit') {
     const overrides = { ...project.connectorOverrides }
     const connectionsById = new Map(next.connections.map(connection => [connection.id, connection]))
     for (const piece of getPhysicalConnectors(project)) {
+      // A reviewed rim alignment carries the existing fitted cap and its
+      // hardware to the new face; ordinary structural hardware stays fixed.
+      if (edit.kind === 'resize' && piece.connection.outlineEdge !== undefined
+        && edit.refitOutlinePanelIds?.includes(piece.connection.childId)) continue
       const before = getConnectorRail(piece.connection, panels, project.connections)
       const connection = connectionsById.get(piece.connection.id)!
       const after = getConnectorRail(connection, next.panels, next.connections)
@@ -635,6 +670,29 @@ export function resizePanelEdge(project: Project, id: string, dimension: 'width'
   const axis = frame(panel).axes[dimension === 'width' ? 0 : 1]
   return editStructure(project, [id], { kind: 'resize', patch: { [dimension]: size }, local,
     centerDelta: axis.multiplyScalar(side * distance / 2).toArray() as Vec3 })
+}
+
+export interface PanelEdgeResize { panelId: string; dimension: 'width' | 'height'; side: -1 | 1; distance: number }
+
+/** Extend several reviewed rim edges atomically while anchoring their opposite
+ * edges. Explicit dependent caps may follow; all other panels and hardware stay.
+ */
+export function resizePanelEdges(project: Project, edges: readonly PanelEdgeResize[], refitOutlinePanelIds: readonly string[] = []): Project {
+  const panels = new Map(resolvePanels(project).map(panel => [panel.id, panel]))
+  if (new Set(edges.map(edge => edge.panelId)).size !== edges.length) throw new Error('Adjust each panel edge once.')
+  const patches: Record<string, PanelDimensions> = Object.create(null), centerDeltas: Record<string, Vec3> = Object.create(null)
+  for (const edge of edges) {
+    if (!Number.isFinite(edge.distance) || (edge.side !== -1 && edge.side !== 1)) throw new Error('Panel movement must be a finite distance.')
+    const panel = panels.get(edge.panelId)
+    if (!panel) throw new Error('A rim panel is no longer available.')
+    const size = panel[edge.dimension] + edge.distance
+    if (size < 40 || size > 4000) throw new Error(LIMIT_MESSAGE)
+    if (Math.abs(edge.distance) < EPSILON) continue
+    patches[panel.id] = { width: panel.width, height: panel.height, [edge.dimension]: size }
+    centerDeltas[panel.id] = frame(panel).axes[edge.dimension === 'width' ? 0 : 1].multiplyScalar(edge.side * edge.distance / 2).toArray() as Vec3
+  }
+  if (!Object.keys(patches).length) return project
+  return editStructure(project, Object.keys(patches), { kind: 'resize', patch: {}, patches, centerDeltas, local: true, refitOutlinePanelIds })
 }
 
 /** Simultaneous independent targets, used by assembly instance parameters. */

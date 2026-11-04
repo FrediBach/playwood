@@ -1,6 +1,7 @@
 import { Euler, Quaternion, Vector3 } from 'three'
 import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
 import { getConnectorPlacements, resolvePanels, validateProject } from './model'
+import { outlineConnectionAligned } from './outline-closures'
 import type { Connection, Panel, Project, Side } from './types'
 
 const rotation = (panel: Panel) => new Quaternion().setFromEuler(new Euler(...panel.rotation))
@@ -16,6 +17,17 @@ function fits(parent: Panel, child: Panel, connection: Connection) {
 
 /** Solve every slot of one physical clamp, including a child with exchanged cut axes. */
 function fitJoint(members: Panel[], count: number, color: string): Connection[] | undefined {
+  if (members.some(panel => panel.customOutline)) {
+    if (members.length !== 2) return
+    const child = members.find(panel => panel.customOutline)!, parent = members.find(panel => panel !== child)!
+    for (let outlineEdge = 0; outlineEdge < child.customOutline!.length; outlineEdge++) for (const side of sides) for (const flip of [false, true]) {
+      const candidate: Connection = { id: `${crypto.randomUUID()}:0`, parentId: parent.id, childId: child.id, type: '90', role: 'support', outlineEdge,
+        side, flip, offset: 0, inset: 0, count, color }
+      if (outlineConnectionAligned(parent, child, candidate)
+        && !validateProject({ version: 1, name: '', panels: members, connections: [candidate] }).some(issue => issue.severity === 'error' || issue.id.startsWith('collision-'))) return [candidate]
+    }
+    return
+  }
   const type = members.length === 2 ? '90' : members.length === 3 ? 't' : members.length === 4 ? 'cross' : undefined
   if (!type) return
   for (const parent of members) for (const side of sides) for (const flip of [false, true]) {
@@ -40,7 +52,7 @@ function fitJoint(members: Panel[], count: number, color: string): Connection[] 
   }
 }
 
-/** Attach each of the four rim edges. Replace occupied 90°/T clamps with one
+/** Attach each rim edge. Replace occupied rectangular 90°/T clamps with one
  * complete T/cross joint when another closing panel already shares that edge.
  * The whole operation is prepared before the caller commits it to history.
  */

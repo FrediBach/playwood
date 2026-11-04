@@ -75,6 +75,8 @@ Only branch 0 carries a positive `count` for T/cross joints; the other branch re
 
 `attachmentPose` places panel leading edges at the measured shoulders of the connector. It does not use a generic gap between panels. Front/back attachments use face-oriented placement and produce a warning that an accessible edge is needed.
 
+Polygonal closing panels use the optional `Connection.outlineEdge` index into the child's normalized outline. These are supplemental 90° connections from a rectangular rim panel's ordinary edge; they do not drive a rectangular attachment pose. [`outline-closures.ts`](../src/lib/outline-closures.ts) validates the actual world-space outline edge against both connector seats and derives its usable seam. This support format is specific to fitted outlines, not general attachment to arbitrary custom shapes.
+
 ## Connector dimensions, meshes, and individual hardware
 
 [`connector-profile.ts`](../src/lib/connector-profile.ts) defines the geometric bend and seat depth derived from the bundled CAD model:
@@ -97,7 +99,7 @@ The resulting geometries are cached for the application's lifetime and shared by
 
 ### Seams and rails
 
-`getConnectorSeam` finds the overlapping straight edges of parent and child, subtracts corner-radius regions, and leaves 20 mm at each end for the 40 mm body. `getConnectionAnchors` and `getConnectorPlacements` distribute a connection's hardware evenly across its usable span.
+`getConnectorSeam` finds the overlapping straight edges of parent and child, subtracts corner-radius regions, and leaves 20 mm at each end for the 40 mm body. Ordinary attachments use rectangular edge extents; an `outlineEdge` support uses its actual child outline segment projected onto the parent's seam. `getConnectionAnchors` and `getConnectorPlacements` distribute a connection's hardware evenly across its usable span.
 
 For T/cross joints, [`getConnectorRail`](../src/lib/connector-movement.ts) intersects the usable seams of every branch. All participating panels must be visible for that rail to be available to preview interactions. `connectorSlide` clamps a per-piece slide offset to this shared rail. Keyboard movement additionally prevents pieces on the same connection from passing through or overlapping their neighbors, preserving 40 mm spacing.
 
@@ -185,7 +187,7 @@ The solver follows this flow:
 2. Detect existing surface contacts. These act as implicit supports for loose inserts such as shelves, dividers, and doors.
 3. Partition panels into solve components using connection edges, detected contacts, and enabled design-rule relationships.
 4. For each affected component, form sparse linear constraints for joint alignment, existing contacts, requested movement/dimensions, design rules, and placement preferences. Minimum-gap and stock-size bounds participate in the solve.
-5. Solve for the minimum weighted change, re-resolve the result, and check limits, new errors, and continued insert support.
+5. Solve for the minimum weighted change, re-resolve the result, refit dependent polygonal closing panels, and check limits, new errors, and continued insert support.
 
 Each panel contributes three translation variables and two size variables. Thickness is prescribed when requested, never a free solver variable. Rotations and connector seat dimensions remain fixed, which keeps the problem linear even for angled connectors. Connection offsets can adapt along seams. The internal solver uses conjugate gradients for the weighted constraint system and rejects nonfinite values or residual errors above tolerance.
 
@@ -226,7 +228,7 @@ For projects containing assemblies, [`assembly-rescale.ts`](../src/lib/assembly-
 | Propose edge corrections | [`auto-connect-fit.ts`](../src/lib/auto-connect-fit.ts) | Prefers a single edge correction of at most 50 mm, then tries coordinated fitting of two already connected panels within a 100 mm seam error. `fitPanelPair` solves both radial lengths together (at most 100 mm change each), with other panels and installed hardware fixed; all changed dimensions are presented before commitment |
 | Fit panels to selected hardware | [`connect-panel.ts`](../src/lib/connect-panel.ts) | Builds connections and fit proposals from selected physical connectors |
 | Prepare shared hardware replacement | [`prepare-joint-upgrade.ts`](../src/lib/prepare-joint-upgrade.ts) | Preserves geometry and handles assembly ownership before replacing joint groups |
-| Close an opening | [`close-holes.ts`](../src/lib/close-holes.ts), [`closure-connectors.ts`](../src/lib/closure-connectors.ts) | Finds rectangular openings in a common frame, checks obstacles, sizes an infill for connector seats, and fits boundary hardware |
+| Close an opening | [`close-holes.ts`](../src/lib/close-holes.ts), [`polygon-holes.ts`](../src/lib/polygon-holes.ts), [`closure-connectors.ts`](../src/lib/closure-connectors.ts) | Finds rectangular and polygonal framed openings, checks obstacles, sizes a rectangular or custom-outline infill for connector seats, and fits boundary hardware |
 | Insert equal dividers | [`parallel-panels.ts`](../src/lib/parallel-panels.ts) | Requires two matching aligned parallel panels; inserts dividers, splits boundaries, and fits T joints atomically |
 | Divide a rectangular opening into a grid | [`grid-split.ts`](../src/lib/grid-split.ts) | Requires four matching sides; accounts for fixed connector gaps and fits boundary T/interior cross joints |
 | Repeat a rectangular compartment | [`structure-repeat.ts`](../src/lib/structure-repeat.ts) | Infers one cell and handle axis, adds whole bays with shared boundaries or fitted depth dividers, and retains the last valid preview count |
@@ -235,6 +237,14 @@ For projects containing assemblies, [`assembly-rescale.ts`](../src/lib/assembly-
 Coordinated auto-connect uses a temporary seam equation in the existing structural solver, joining the two solve components without persisting a speculative connection. It preserves seam widths, panel rotations, thicknesses, contacts, user rules, and installed hardware positions. Only the two candidate panels may change; linked assemblies and custom outlines are excluded. Exact auto-connect fits the resulting hardware after geometry validation. A single selection scopes candidate pairs to its neighbors, so the confirmation may include an unselected partner. Unsupported angles and fits requiring changes outside that pair remain unavailable.
 
 Parallel and grid splits reject custom outlines and panels connected to linked assemblies. Feasibility is bounded by minimum panel dimensions and document limits. Parallel count enumeration includes document limits; grid input maxima come from geometry, with document limits checked when evaluating the proposed split. Split feasibility is evaluated by attempting complete valid edits; a visually plausible divider count is insufficient if joints or hardware cannot fit.
+
+Polygonal hole detection walks bounded faces of the surrounding panels' planar line arrangement. Small endpoint gaps may bridge the measured connector seats; incomplete frames are not closed by a convex hull. The rim uses rectangular panels with matching end planes and distinct adjoining edge directions. Inward offsets reserve connector seats, then the resulting simple outline is normalized into the fill panel's bounding dimensions. Opening probes triangulate the polygon against conservative obstacle boxes, including hidden obstacles. This detection-specific check does not make general collision validation shape-aware. Polygonal closing edges use available 90° clamps; shared T/cross promotion remains on the rectangular path.
+
+After collinear segments merge, a rectangular face with more than one board on an edge stays on the outline-support path. A four-vertex outline lets each split board retain its own support on the same edge. Only rectangles with one distinct board per edge defer to the original rectangular finder; external branches subdividing the same board do not create duplicate openings.
+
+The closing UI uses `findClosingPanelHoles(project, selectedIds)`, while geometry-only callers such as repetition retain `findPanelHoles`. The UI finder also considers nearby unequal rim depths. [`close-hole-alignment.ts`](../src/lib/close-hole-alignment.ts) prepares outward-only extensions to the outermost end plane, bounded to 100 mm per edge. Its atomic `resizePanelEdges` command fixes each opposite edge, all other ordinary panel geometry, and existing frame hardware. Fully supported outline fillers already on that face expand the affected rim set and move with their own hardware. Their refit runs after every rim target has been solved, avoiding invalid intermediate planes. Ordinary legacy rectangular supports and linked assemblies retain their existing restrictions. The prepared project must introduce no collision/error and satisfy saved rules; the final cap must pass the normal obstacle and hardware checks. The inspector lists the concrete changes before acceptance, and context-menu requests open that review. Acceptance recalculates the fit from the current project and commits alignment plus filling together; no clamp tolerance or seat dimension is relaxed.
+
+Fully supported outline fillers remain in the structural component but do not contribute their rectangular bounds as joint or contact equations. After the surrounding panels solve, `refitOutlineClosures` intersects the updated edge-seat lines, then updates the filler center, bounds, and normalized vertices while preserving its ID and edge order. Noncoplanar, crossed, reversed, undersized, or unsupported results reject the edit. Editing the surrounding panels therefore reshapes the cut, rather than merely stretching its old normalized outline. Direct edits that cannot preserve the fitted edges require detaching the filler first. The same structural path serves compatible project rescaling and assembly parameters.
 
 ## Reusable assemblies
 

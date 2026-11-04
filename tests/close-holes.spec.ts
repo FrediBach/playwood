@@ -4,6 +4,8 @@ import { ASSEMBLY_LIBRARY } from '../src/lib/assembly-library'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { validateProject } from '../src/lib/model'
 import { gridProject } from '../src/lib/example-geometry'
+import { pentagonalFrame } from '../src/lib/outline-closure-test-fixtures'
+import type { Project } from '../src/lib/types'
 
 test('choose one assembly opening, close the last directly, undo, and reload', async ({ page }) => {
   const project = ASSEMBLY_LIBRARY.find(item => item.id === 'assembly-cube')!.create()
@@ -73,4 +75,71 @@ test('neighboring closure replaces 90 degree joints with T connectors', async ({
   expect(getPhysicalConnectors(result).filter(connector => connector.type === 't')).toHaveLength(getPhysicalConnectors(project).filter(connector => connector.type === 't').length + 2)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
   await expect.poll(async () => getPhysicalConnectors(await saved()).filter(connector => connector.type === 't').length).toBe(getPhysicalConnectors(project).filter(connector => connector.type === 't').length)
+})
+
+test('a shaped opening closes with an outline that follows frame resizing and survives undo and reload', async ({ page }) => {
+  const project = pentagonalFrame()
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  const saved = (): Promise<Project> => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'pentagon.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  for (const panel of project.panels.slice(1)) {
+    await page.locator('.panel-list-select').filter({ hasText: new RegExp(`^${panel.name}$`) }).click({ modifiers: ['Shift'] })
+  }
+  await openInspectorSection(page, 'Close holes')
+  const choice = page.getByLabel('Opening to close')
+  const front = choice.locator('option').filter({ hasText: /^Front ·/ })
+  await expect(front).toContainText('Custom outline')
+  await choice.selectOption((await front.getAttribute('value'))!)
+  await expect(page.getByText('Custom outline with 5 edges. Reshapes with the surrounding panels.')).toBeVisible()
+  await page.getByRole('button', { name: 'Collapse panel list', exact: true }).click()
+  await page.getByRole('button', { name: 'Collapse inspector', exact: true }).click()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: 'Open inspector', exact: true }).click()
+  await page.getByRole('button', { name: 'Close hole', exact: true }).scrollIntoViewIfNeeded()
+  const inspectorBounds = (await page.getByRole('complementary', { name: 'Inspector' }).boundingBox())!
+  expect(inspectorBounds.x).toBeGreaterThanOrEqual(0)
+  expect(inspectorBounds.x + inspectorBounds.width).toBeLessThanOrEqual(391)
+  await page.screenshot({ path: 'test-results/close-shaped-hole-mobile.png' })
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.getByRole('button', { name: 'Open panel list', exact: true }).click()
+  await page.getByRole('button', { name: 'Close hole', exact: true }).click()
+  await expect.poll(async () => (await saved()).panels.length).toBe(6)
+  const closed = await saved(), filler = closed.panels.find(panel => panel.customOutline)!
+  expect(filler.customOutline).toHaveLength(5)
+  expect(closed.connections.filter(connection => connection.childId === filler.id && connection.outlineEdge !== undefined)).toHaveLength(5)
+  expect(validateProject(closed)).toEqual([])
+
+  await page.locator('.panel-list-select').filter({ hasText: /^Top$/ }).click()
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true })
+  await width.fill('565')
+  await width.press('Tab')
+  await expect.poll(async () => (await saved()).panels.find(panel => panel.id === 'rim-3')!.width).toBeCloseTo(565, 5)
+  const resized = await saved(), reshaped = resized.panels.find(panel => panel.id === filler.id)!
+  expect(reshaped.customOutline).not.toEqual(filler.customOutline)
+  expect(validateProject(resized)).toEqual([])
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect.poll(saved).toEqual(closed)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect.poll(saved).toEqual(resized)
+  await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
+  await page.screenshot({ path: 'test-results/close-shaped-hole.png' })
+  await page.reload()
+  await expect.poll(saved).toEqual(resized)
+  await page.locator('.panel-list-select').filter({ hasText: new RegExp(`^${filler.name}$`) }).click()
+  await openInspectorSection(page, 'Shape & surface')
+  await expect(page.getByRole('img', { name: 'Custom outline preview', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Remove custom outline', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Panel dimensions' }).getByText(/This edit would break a fitted outline joint/)).toBeVisible()
+  expect(await saved()).toEqual(resized)
+  await expect(page.getByRole('img', { name: 'Custom outline preview', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Export project', exact: true }).click()
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: /Project file All panels/ }).click()
+  const stream = await (await downloading).createReadStream()
+  const chunks: Buffer[] = []
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk))
+  expect(JSON.parse(Buffer.concat(chunks).toString())).toEqual(resized)
+  expect(errors).toEqual([])
 })

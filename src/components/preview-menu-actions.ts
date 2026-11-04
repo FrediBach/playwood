@@ -102,7 +102,7 @@ function addPanelActions(context: MenuContext, menuAction: AddAction) {
     } else if (!assembly.hasMembers) {
       addLoosePanelActions(context, menuAction)
     }
-    if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`Fill hole · ${hole.label}`,Square,()=>closeHole(hole.id))
+    if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`${hole.alignment ? 'Review hole fit' : 'Fill hole'} · ${hole.label}`,Square,()=>closeHole(hole.id))
     if (!assembly.memberInstance || instance) {
       menuAction('Copy',Clipboard,actions.copy)
       menuAction('Duplicate',Copy,duplicateSelected)

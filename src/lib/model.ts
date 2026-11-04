@@ -1,5 +1,5 @@
 import { parseSpaceConstraint, spaceClearances } from './space-constraint'
-import { getOutlineError, panelCornerRadius } from './panel-shape'
+import { getOutlineError, panelCornerRadius, panelOutlineCorners } from './panel-shape'
 import { getPhysicalConnectors } from './connector-selection'
 import { connectorDisplayColor, getConnectorMaterial } from './connector-options'
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
@@ -13,6 +13,7 @@ import { assertNoNewTrofastIssues, getTrofastInsertLocalBounds, MAX_TROFAST_INSE
 import { getTrofastColor, getTrofastItem } from './trofast-catalog'
 import { copyDesignConstraints, describeDesignConstraint, designConstraintPanelIds, evaluateDesignConstraints, parseDesignConstraints } from './design-constraints'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
+import { outlineConnectionAligned } from './outline-closures'
 
 const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', osb: '#dfc391', nazena: '#607d97', painted: '#e8e7df' }
 const uid = () => globalThis.crypto?.randomUUID?.() ?? `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
@@ -149,6 +150,18 @@ export function attachExistingPanel(project: Project, parentId: string, childId:
 /** Connector centers stay 20 mm inside the straight overlap to fit the 40 mm body. */
 export function getConnectorSeam(connection: Connection, parent: Panel, child: Panel) {
   const seam = seamInfo(parent, connection)
+  if (connection.outlineEdge !== undefined && child.customOutline?.[connection.outlineEdge]) {
+    const corners = panelOutlineCorners(child), index = connection.outlineEdge
+    const tangent = seam.tangent.clone().applyQuaternion(quaternion(parent))
+    // Acute and concave fillets consume different amounts of each edge. Use
+    // the same straight endpoints as the rendered/cut outline, not its radius.
+    const along = [corners[index].exit, corners[(index + 1) % corners.length].entry].map(point =>
+      new Vector3(point.x - child.width / 2, child.height / 2 - point.y, 0).applyQuaternion(quaternion(child))
+        .add(vec(child.position)).sub(vec(parent.position)).dot(tangent))
+    const radius = panelCornerRadius(parent)
+    return { lower: Math.max(-seam.seamLength / 2 + radius, Math.min(...along)) + 20,
+      upper: Math.min(seam.seamLength / 2 - radius, Math.max(...along)) - 20, tangent: tuple(tangent) }
+  }
   const childSeamLength = seam.horizontalSeam !== !!connection.quarterTurn ? child.width : child.height
   const parentRadius = seam.face ? 0 : panelCornerRadius(parent)
   const childRadius = panelCornerRadius(child)
@@ -329,14 +342,14 @@ export function validateProject(project: Project, options: { trofastWorld?: bool
     const insetMax = seam.face ? parent.height / 2 : parentRadialLength
     if ((c.inset < insetMin || c.inset > insetMax) && c.count > 0) issues.push({ id: `${c.id}-inset`, severity: 'error', message: `The attachment is outside ${parent.name}. Keep inset between ${insetMin} and ${insetMax} mm.`, panelIds: [parent.id, child.id] })
     if (!seam.face && c.inset > 0 && c.inset < parentRadialLength && c.count > 0) issues.push({ id: `${c.id}-edge-access`, severity: 'error', message: `${parent.name} needs an exposed edge for this connector. Use a T joint with separate panels instead of an interior inset.`, panelIds: [parent.id, child.id] })
-    const childLength = seam.horizontalSeam !== !!c.quarterTurn ? child.width : child.height
-    const parentRadius = seam.face ? 0 : panelCornerRadius(parent)
-    const childRadius = panelCornerRadius(child)
-    const overlap = Math.min(seam.seamLength / 2 - parentRadius, c.offset + childLength / 2 - childRadius) - Math.max(-seam.seamLength / 2 + parentRadius, c.offset - childLength / 2 + childRadius)
+    const usableSeam = getConnectorSeam(c, parent, child)
+    const overlap = usableSeam.upper - usableSeam.lower + 40
     const quantity = jointQuantities.get(jointId(c)) ?? 1
     if (overlap < quantity * 40) issues.push({ id: `${c.id}-overlap`, severity: 'error', message: `Not enough shared edge for ${quantity} connector${quantity > 1 ? 's' : ''}. Reduce the offset, corner radius, or connector count.`, panelIds: [parent.id, child.id] })
     if (seam.face && c.count > 0) issues.push({ id: `${c.id}-face`, severity: 'warning', message: 'This face attachment needs an accessible panel edge. Check clamp access before making.', panelIds: [parent.id, child.id] })
-    if (c.role === 'support') {
+    if (c.outlineEdge !== undefined) {
+      if (!outlineConnectionAligned(parent, child, c)) issues.push({ id: `${c.id}-alignment`, severity: 'error', message: `The support joint between ${parent.name} and ${child.name} no longer aligns with its outline edge. Restore the outline or detach the joint.`, panelIds: [parent.id, child.id] })
+    } else if (c.role === 'support') {
       const expected = attachmentPose(parent, child, c)
       const positionError = vec(expected.position).distanceTo(vec(child.position))
       const expectedRotation = quaternion({ ...child, rotation: expected.rotation })
@@ -498,6 +511,12 @@ export function parseProject(input: unknown): Project {
     if (raw.partial !== undefined) {
       if (typeof raw.partial !== 'boolean') throw new Error('Invalid partial joint.')
       c.partial = raw.partial
+    }
+    if (raw.outlineEdge !== undefined) {
+      c.outlineEdge = numberIn(raw.outlineEdge, 0, 127, 'outline edge')
+      const parent = panels.find(panel => panel.id === c.parentId), child = panels.find(panel => panel.id === c.childId)
+      if (!Number.isInteger(c.outlineEdge) || !child?.customOutline?.[c.outlineEdge] || parent?.customOutline || c.role !== 'support' || c.type !== '90'
+        || c.side === 'front' || c.side === 'back' || c.inset !== 0 || c.quarterTurn || c.partial) throw new Error('Invalid outline edge joint: use a supplemental 90° connector from a rectangular rim to an existing outline edge.')
     }
     if (typeof c.flip !== 'boolean' || !Number.isInteger(c.count)) throw new Error('Invalid connector options.')
     if (!panelIds.has(c.parentId) || !panelIds.has(c.childId) || c.parentId === c.childId) throw new Error('Connections must link two different, existing panels.')
