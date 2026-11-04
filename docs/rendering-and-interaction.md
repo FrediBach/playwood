@@ -126,7 +126,7 @@ The hook provides the valid result, actual distance, and limit status; the compo
 
 [`box-selection.ts`](../src/lib/box-selection.ts) projects visible mesh bounding-box corners into normalized device coordinates, aggregates them by part ID, and requires the entire projected part to be inside the rectangle. It selects through occluding objects, skips invisible geometry, and rejects clipped or behind-camera bounds. It is a bounds-based selection algorithm, not pixel or silhouette coverage. Application callbacks expand linked assemblies as whole instances, or restrict candidates to the assembly currently being edited.
 
-`PreviewContextGesture` in `Scene.tsx` opens a menu only after a stationary right-click, preserving right-drag pan. It raycasts the same part IDs and supports the Context Menu key and Shift+F10. [`PreviewContextMenu.tsx`](../src/components/PreviewContextMenu.tsx) renders the DOM menu; `App` supplies actions for the current target and selection.
+`PreviewContextGesture` in `Scene.tsx` opens a menu only after a stationary right-click, preserving right-drag pan. It raycasts the same part IDs and supports the Context Menu key and Shift+F10. [`PreviewContextMenu.tsx`](../src/components/PreviewContextMenu.tsx) renders the DOM menu; `App` supplies actions for the current target and selection through `preview-menu-actions.ts`. Preview actions appear in ordered Selection, Build, Assembly, Organize, Remove, and Preview groups, omitting empty groups. Group labels and separators are not keyboard stops; arrow keys and Home/End move through all commands, including disabled items, and Escape restores focus. List menus reuse the component without section labels.
 
 ### Attachment affordances and snapping
 

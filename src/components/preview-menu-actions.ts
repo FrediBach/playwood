@@ -54,38 +54,40 @@ interface MenuContext {
     selectAll: () => void
   }
 }
-type AddAction = (label: string, icon: LucideIcon, run: () => void, danger?: boolean, disabled?: boolean) => void
+const MENU_GROUPS = ['Selection', 'Build', 'Assembly', 'Organize', 'Remove', 'Preview'] as const
+type MenuGroup = typeof MENU_GROUPS[number]
+type AddAction = (group: MenuGroup, label: string, icon: LucideIcon, run: () => void, danger?: boolean, disabled?: boolean) => void
 
 function addConnectorActions(context: MenuContext, menuAction: AddAction) {
   const {selectedConnectorIds, modalOpen, assembly, canConnectWithPanel, actions}=context
   const {connectWithPanel, groupSelected, removeSelectedConnectors}=actions
-  if(!assembly.editingInstance&&!modalOpen)menuAction('Connect with a panel',Link2,connectWithPanel,false,!canConnectWithPanel)
-  if(context.canAddConnectorsBetween && actions.addConnectorsBetween && !modalOpen)menuAction('Add connectors between',Plus,actions.addConnectorsBetween)
-  menuAction('Group selected',FolderPlus,()=>groupSelected('connectors',selectedConnectorIds),false,selectedConnectorIds.length<2)
-  menuAction('Inspect connectors',SlidersHorizontal,actions.inspectConnectors)
-  menuAction('Copy',Clipboard,context.actions.copy)
-  menuAction('Remove connectors',Trash2,removeSelectedConnectors,true)
+  if(!assembly.editingInstance&&!modalOpen)menuAction('Build', 'Connect with a panel',Link2,connectWithPanel,false,!canConnectWithPanel)
+  if(context.canAddConnectorsBetween && actions.addConnectorsBetween && !modalOpen)menuAction('Build', 'Add connectors between',Plus,actions.addConnectorsBetween)
+  menuAction('Organize', 'Group selected',FolderPlus,()=>groupSelected('connectors',selectedConnectorIds),false,selectedConnectorIds.length<2)
+  menuAction('Selection', 'Inspect connectors',SlidersHorizontal,actions.inspectConnectors)
+  menuAction('Selection', 'Copy',Clipboard,context.actions.copy)
+  menuAction('Remove', 'Remove connectors',Trash2,removeSelectedConnectors,true)
 }
 
 function addEditingActions(context: MenuContext, menuAction: AddAction) {
   const {assembly, actions}=context
-  menuAction('Inspect assembly parts',SlidersHorizontal,actions.inspectConnectors)
-  menuAction('Done editing assembly',Check,assembly.done)
+  menuAction('Selection', 'Inspect assembly parts',SlidersHorizontal,actions.inspectConnectors)
+  menuAction('Assembly', 'Done editing assembly',Check,assembly.done)
 }
 
 function addLoosePanelActions(context: MenuContext, menuAction: AddAction) {
   const {project, selectedPanels, selectedIds, selectedIdSet, canExtendToGround, splitCounts, checkingSplits, canDivideGrid, actions}=context
   const {groupSelected, openConstraints, startAttach, extendToGround, detachSelection, splitSelection}=actions
-  menuAction('Add constraint',SlidersHorizontal,()=>openConstraints(true))
-  menuAction('Group selected',FolderPlus,()=>groupSelected('panels',selectedIds),false,selectedPanels.length<2)
-  if (selectedPanels.length===1) menuAction('Attach a panel (A)',Link2,startAttach,false,context.canAttachPanel===false)
-  menuAction('Extend to ground',ArrowDownToLine,extendToGround,false,!canExtendToGround)
-  if (selectedPanels.length>1) menuAction('Create assembly',Box,()=>actions.openTool('assembly'),false,!!assemblySelectionError(project,selectedIds))
-  if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Disconnect panels',Unlink,detachSelection)
-  if (panelDistribution(selectedPanels)) menuAction('Distribute evenly',Rows3,actions.distributeSelection)
-  if (splitCounts.includes(1)) menuAction('Split in the middle',Scissors,()=>splitSelection())
-  if (canDivideGrid) menuAction('Divide into a grid',Grid2X2,()=>actions.openTool('grid'))
-  if (parallelPanelCut(selectedPanels)) menuAction('Split x times',Rows3,()=>actions.openTool('parallel'),false,checkingSplits||!splitCounts.length)
+  menuAction('Build', 'Add constraint',SlidersHorizontal,()=>openConstraints(true))
+  menuAction('Organize', 'Group selected',FolderPlus,()=>groupSelected('panels',selectedIds),false,selectedPanels.length<2)
+  if (selectedPanels.length===1) menuAction('Build', 'Attach a panel (A)',Link2,startAttach,false,context.canAttachPanel===false)
+  menuAction('Build', 'Extend to ground',ArrowDownToLine,extendToGround,false,!canExtendToGround)
+  if (selectedPanels.length>1) menuAction('Assembly', 'Create assembly',Box,()=>actions.openTool('assembly'),false,!!assemblySelectionError(project,selectedIds))
+  if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Remove', 'Disconnect panels',Unlink,detachSelection)
+  if (panelDistribution(selectedPanels)) menuAction('Build', 'Distribute evenly',Rows3,actions.distributeSelection)
+  if (splitCounts.includes(1)) menuAction('Build', 'Split in the middle',Scissors,()=>splitSelection())
+  if (canDivideGrid) menuAction('Build', 'Divide into a grid',Grid2X2,()=>actions.openTool('grid'))
+  if (parallelPanelCut(selectedPanels)) menuAction('Build', 'Split x times',Rows3,()=>actions.openTool('parallel'),false,checkingSplits||!splitCounts.length)
 }
 
 function addPanelActions(context: MenuContext, menuAction: AddAction) {
@@ -93,41 +95,41 @@ function addPanelActions(context: MenuContext, menuAction: AddAction) {
   const {closeHole, duplicateSelected, deleteSelected, addPanel, addAutoConnectors}=actions
   const instance=assembly.selectedInstance
   if (selectedPanels.length) {
-    menuAction('Inspect selection',SlidersHorizontal,actions.inspectPanels)
+    menuAction('Selection', 'Inspect selection',SlidersHorizontal,actions.inspectPanels)
     if (instance) {
-      menuAction('Edit assembly',Pencil,()=>assembly.edit(instance.id))
-      if (canAttachCopy) menuAction('Attach a copy',Copy,actions.attachCopy)
-      if (project.assemblies?.links.some(link=>link.a.instanceId===instance.id||link.b.instanceId===instance.id)) menuAction('Disconnect from neighbors',Unlink,()=>assembly.disconnect(instance.id))
-      menuAction('Make independent',Unlink,()=>assembly.independent(instance.id))
-      menuAction('Disassemble',Ungroup,()=>assembly.disassemble(instance.id))
+      menuAction('Assembly', 'Edit assembly',Pencil,()=>assembly.edit(instance.id))
+      if (canAttachCopy) menuAction('Assembly', 'Attach a copy',Copy,actions.attachCopy)
+      if (project.assemblies?.links.some(link=>link.a.instanceId===instance.id||link.b.instanceId===instance.id)) menuAction('Assembly', 'Disconnect from neighbors',Unlink,()=>assembly.disconnect(instance.id))
+      menuAction('Assembly', 'Make independent',Unlink,()=>assembly.independent(instance.id))
+      menuAction('Assembly', 'Disassemble',Ungroup,()=>assembly.disassemble(instance.id))
     } else if (assembly.memberInstance) {
       const memberInstance = assembly.memberInstance
-      menuAction('Select assembly',Box,()=>assembly.select(memberInstance.id))
-      menuAction('Edit assembly',Pencil,()=>assembly.edit(memberInstance.id))
+      menuAction('Assembly', 'Select assembly',Box,()=>assembly.select(memberInstance.id))
+      menuAction('Assembly', 'Edit assembly',Pencil,()=>assembly.edit(memberInstance.id))
     } else if (!assembly.hasMembers) {
       addLoosePanelActions(context, menuAction)
     }
-    if (instance || !assembly.hasMembers) for (const hole of holes) menuAction(`${hole.alignment ? 'Review hole fit' : 'Fill hole'} · ${hole.label}`,Square,()=>closeHole(hole.id))
-    menuAction('Copy',Clipboard,actions.copy)
+    if (instance || !assembly.hasMembers) for (const hole of holes) menuAction('Build', `${hole.alignment ? 'Review hole fit' : 'Fill hole'} · ${hole.label}`,Square,()=>closeHole(hole.id))
+    menuAction('Selection', 'Copy',Clipboard,actions.copy)
     if (!assembly.memberInstance || instance) {
-      menuAction('Duplicate',Copy,duplicateSelected)
-      menuAction('Delete selection',Trash2,deleteSelected,true)
+      menuAction('Selection', 'Duplicate',Copy,duplicateSelected)
+      menuAction('Remove', 'Delete selection',Trash2,deleteSelected,true)
     }
-  } else menuAction('Add panel',Plus,addPanel)
-  if (panels.length>1) menuAction('Auto-connect',Link2,addAutoConnectors,false,!canMenuAutoConnect)
+  } else menuAction('Build', 'Add panel',Plus,addPanel)
+  if (panels.length>1) menuAction('Build', 'Auto-connect',Link2,addAutoConnectors,false,!canMenuAutoConnect)
 }
 
 export function buildPreviewMenuActions(context: MenuContext): PreviewMenuAction[] {
   const {panels, assembly, selectedIdSet, inspectingConnectors, hasVisiblePanels, actions}=context
   const {selectAll, openConstraints}=actions
   const menuActions: PreviewMenuAction[]=[]
-  const menuAction: AddAction = (label: string, icon: LucideIcon, run: () => void, danger = false, disabled = false) => menuActions.push({ label, icon, run, danger, disabled })
+  const menuAction: AddAction = (group, label, icon, run, danger = false, disabled = false) => menuActions.push({ group, label, icon, run, danger, disabled })
   if (inspectingConnectors) addConnectorActions(context, menuAction)
   else if (assembly.editingInstance) addEditingActions(context, menuAction)
   else addPanelActions(context, menuAction)
-  if(context.selectedConnectorIds.length&&actions.separateSelectedConnectors&&!assembly.editingInstance&&!context.modalOpen)menuAction('Separate overlapping connectors',Rows3,actions.separateSelectedConnectors)
-  if (panels.length) menuAction('Select all panels',Scan,()=>selectAll(),false,!inspectingConnectors&&(assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):panels.map(panel=>panel.id)).every(id=>selectedIdSet.has(id)))
-  if(!assembly.editingInstance)menuAction('All constraints',SlidersHorizontal,()=>openConstraints())
-  menuAction('Fit view',Maximize,actions.fitView,false,!hasVisiblePanels)
-  return menuActions
+  if(context.selectedConnectorIds.length&&actions.separateSelectedConnectors&&!assembly.editingInstance&&!context.modalOpen)menuAction('Build', 'Separate overlapping connectors',Rows3,actions.separateSelectedConnectors)
+  if (panels.length) menuAction('Preview', 'Select all panels',Scan,()=>selectAll(),false,!inspectingConnectors&&(assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):panels.map(panel=>panel.id)).every(id=>selectedIdSet.has(id)))
+  if(!assembly.editingInstance)menuAction('Preview', 'All constraints',SlidersHorizontal,()=>openConstraints())
+  menuAction('Preview', 'Fit view',Maximize,actions.fitView,false,!hasVisiblePanels)
+  return MENU_GROUPS.flatMap(group => menuActions.filter(action => action.group === group))
 }

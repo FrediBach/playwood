@@ -99,6 +99,8 @@ Instances move as rigid units. Automatic assembly attachment handles compatible 
 
 Select panels, connectors, or a mixture and press **⌘/Ctrl C** (or choose **Copy** in the context menu). Connector selections include the panels joined by that hardware. Copies retain the selected panels’ relative placement, complete internal joints, and hardware overrides; external joints stay behind. Select a destination panel or assembly and press **⌘/Ctrl V**, preview a **+**, then click to attach the whole copy in one undo step. **Escape** cancels. A single whole assembly stays linked; other multi-panel selections paste as ordinary panels. The clipboard lasts for the current session.
 
+Right-click the preview (or focus the canvas and press **Shift+F10**) for grouped actions: **Selection**, **Build**, **Assembly**, **Organize**, **Remove**, and **Preview**. Only groups relevant to the current selection appear. Use arrow keys to navigate, Home/End to jump to the first/last command, and Escape to close.
+
 ## Panel cutting SVGs
 
 Choose **Export project → Panel cutting SVGs** to download a separate full-size SVG for each panel with pegboard holes, slots, TROFAST openings, a custom outline, or rounded corners. Each file includes its outer contour and all openings in millimeters, with circular arcs preserved. Panel numbers distinguish repeated names; hidden panels and materialized assembly panels are included. Plain rectangular panels remain in the CSV cutting list.
