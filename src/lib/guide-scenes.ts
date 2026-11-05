@@ -1,3 +1,5 @@
+import { buildObjectGuideScenes } from './guide-object-scenes'
+import type { ObjectSurface } from './object-geometry'
 import type { GuideId } from './build-guide-types'
 import type { AttachmentOptions, Panel, Project, Vec3 } from './types'
 import { attachPanel, createPanel, createStarterProject, getProjectBounds, moveProject, resolvePanels, rotateProject } from './model'
@@ -22,6 +24,7 @@ import { setDesignConstraint } from './design-constraint-commands'
 
 export interface GuideScene {
   project: Project
+  objectSurfaces?: ObjectSurface[]
   selected: string[]
   ghost: string[]
   labels: { text: string; panelId?: string; point?: Vec3 }[]
@@ -63,6 +66,8 @@ const addedPanels = (original: Project, updated: Project) => {
 
 function buildScenes(id: GuideId): GuideScene[] {
   switch (id) {
+    case 'boolean-objects': return buildObjectGuideScenes(false)
+    case 'object-solver': return buildObjectGuideScenes(true)
     case 'constraints': {
       const lower = createPanel({ id: 'guide-constraint-lower', name: 'Lower shelf', width: 600, height: 300, position: [0, 600, 0], rotation: [-Math.PI / 2, 0, 0] })
       const upper = createPanel({ ...lower, id: 'guide-constraint-upper', name: 'Upper shelf', position: [0, 850, 0] })

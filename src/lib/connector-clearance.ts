@@ -62,10 +62,11 @@ function blockedInterval(moving: Body, fixed: Body, tangent: Vector3): [number, 
 /** Fit only newly installed hardware after a construction operation.
  * Retained pieces are fixed obstacles; no geometry or existing overrides move.
  * Conservative CAD-part envelopes avoid the interleaving that center distances
- * miss at perpendicular rails, without loading rendering meshes in the domain. */
-export function fitAddedConnectorClearance(original: Project, candidate: Project): Project {
+ * miss at perpendicular rails, without loading rendering meshes in the domain.
+ * Optional orders reuse the repair search: narrow rails, reverse, or either end. */
+export function fitAddedConnectorClearance(original: Project, candidate: Project, order: 0 | 1 | 2 | 3 | 4 = 0): Project {
   const retained = new Set(getPhysicalConnectors(original).map(piece => piece.id))
-  return fitConnectorClearance(candidate, new Set(getPhysicalConnectors(candidate).filter(piece => !retained.has(piece.id)).map(piece => piece.id)))
+  return fitConnectorClearance(candidate, new Set(getPhysicalConnectors(candidate).filter(piece => !retained.has(piece.id)).map(piece => piece.id)), order)
 }
 
 function installedBodies(candidate: Project) {

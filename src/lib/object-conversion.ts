@@ -136,6 +136,7 @@ export function convertConstructionObject(source: Project, ids: readonly string[
   const min = [0, 1, 2].map(axis => Math.min(...shapes.map(shape => shape.bounds!.min[axis])))
   const max = [0, 1, 2].map(axis => Math.max(...shapes.map(shape => shape.bounds!.max[axis])))
   if (min.some((v, axis) => Math.abs(v - achieved.min[axis]) > 1e-5) || max.some((v, axis) => Math.abs(v - achieved.max[axis]) > 1e-5)) throw new Error('Conversion changed the requested outside dimensions.')
-  return { project: candidate, panelIds, dimensions: max.map((value, axis) => value - min[axis]) as Vec3, hardwareCount: getPhysicalConnectors(generated).length, compartments, sharedWalls: groups.reduce((sum, group) => sum + (group.grid ? group.grid.sharedWalls : group.axis === undefined ? 0 : group.shapes.length - 1), 0) }
+  const singleSupportPanelIds = generated.panels.filter(panel => new Set(generated.connections.flatMap(c => c.parentId === panel.id ? [c.childId] : c.childId === panel.id ? [c.parentId] : [])).size === 1).map(panel => panel.id)
+  return { project: candidate, panelIds, singleSupportPanelIds, dimensions: max.map((value, axis) => value - min[axis]) as Vec3, hardwareCount: getPhysicalConnectors(generated).length, compartments, sharedWalls: groups.reduce((sum, group) => sum + (group.grid ? group.grid.sharedWalls : group.axis === undefined ? 0 : group.shapes.length - 1), 0) }
 }
 export type ObjectConversion = ReturnType<typeof convertConstructionObject>

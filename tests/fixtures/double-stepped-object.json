@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "name": "Untitled project",
+  "panels": [],
+  "connections": [],
+  "constructionObjects": {
+    "roots": [
+      "802fefd1-a536-4cd9-ad12-3de05121621c"
+    ],
+    "nodes": [
+      {
+        "id": "2136d883-292a-4f8b-aae2-0e04b41f429c",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 123.53336762158989,
+        "height": 600,
+        "depth": 400,
+        "position": [
+          -27.500570266343203,
+          300,
+          138.23331618920506
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "c60d10a2-3102-4fe6-8806-ed085b304223",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 123.53336762158989,
+        "height": 600,
+        "depth": 400,
+        "position": [
+          110.73274592286185,
+          300,
+          0
+        ],
+        "rotation": [
+          0,
+          1.5707963267948966,
+          0
+        ]
+      },
+      {
+        "id": "3807d862-b71e-4723-b365-0ffa2ea869e9",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 123.53336762158989,
+        "height": 600,
+        "depth": 400,
+        "position": [
+          -165.73388645554826,
+          300,
+          0
+        ],
+        "rotation": [
+          0,
+          1.5707963267948966,
+          0
+        ]
+      },
+      {
+        "id": "9961620e-8e84-41da-87e7-0fcddc86fad0",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 123.53336762158989,
+        "height": 600,
+        "depth": 400,
+        "position": [
+          -27.500570266343203,
+          300,
+          -138.23331618920506
+        ],
+        "rotation": [
+          -3.141592653589793,
+          0,
+          -3.141592653589793
+        ]
+      },
+      {
+        "id": "3e61a936-46fb-4eaf-bc0c-b9c3ac99569b",
+        "name": "union",
+        "visible": true,
+        "kind": "boolean",
+        "operation": "union",
+        "children": [
+          "2136d883-292a-4f8b-aae2-0e04b41f429c",
+          "c60d10a2-3102-4fe6-8806-ed085b304223",
+          "3807d862-b71e-4723-b365-0ffa2ea869e9",
+          "9961620e-8e84-41da-87e7-0fcddc86fad0"
+        ]
+      },
+      {
+        "id": "fa6a7bd4-a687-4df5-8f6c-db0cde467a45",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 339.7956418443821,
+        "height": 390.6065277920666,
+        "depth": 400,
+        "position": [
+          -195.8360655333572,
+          404.6967361039667,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "27469cc9-e80c-4f2a-98ee-31a95af5806b",
+        "name": "subtract",
+        "visible": true,
+        "kind": "boolean",
+        "operation": "subtract",
+        "children": [
+          "3e61a936-46fb-4eaf-bc0c-b9c3ac99569b",
+          "fa6a7bd4-a687-4df5-8f6c-db0cde467a45"
+        ]
+      },
+      {
+        "id": "5374a946-7b32-4ac7-b648-2c4d0a1c023f",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 107.92313012060004,
+        "height": 219.3485283695093,
+        "depth": 400,
+        "position": [
+          172.29173671996108,
+          525.2287194093051,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "802fefd1-a536-4cd9-ad12-3de05121621c",
+        "name": "subtract",
+        "visible": true,
+        "kind": "boolean",
+        "operation": "subtract",
+        "children": [
+          "27469cc9-e80c-4f2a-98ee-31a95af5806b",
+          "5374a946-7b32-4ac7-b648-2c4d0a1c023f"
+        ]
+      }
+    ]
+  }
+}

@@ -13,3 +13,5 @@
 .guide-legend-panel{background:#d7bd91;border:1px solid #655e4e}.guide-legend-connector{background:#c94727}.guide-legend-selected{border:2px solid #be482b}.guide-legend-ghost{background:#dce4d4;border:1px dashed #66805a}
 .guide-preview-note{font-size:12px!important;line-height:1.5!important;padding:11px 15px;border-top:1px solid #dfe0d5;background:#f5f5ee;color:#58634e!important;min-height:41px}
 @media(max-width:680px){.guide-preview-note{font-size:11px!important;padding:9px 11px}.guide-preview>svg{min-height:185px}}
+
+.guide-legend-object{background:#c565b4;border:1px solid #655e4e}

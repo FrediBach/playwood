@@ -1,17 +1,18 @@
+import { shellOrientations } from './object-shell-orientation'
 import { Euler, Matrix4, Vector3 } from 'three'
 import { connectClosingPanel, fitClosingConnectorClearance } from './closure-connectors'
 import { getOutlineError } from './panel-shape'
 import { partitionClosingOutline } from './rectangular-closures'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { getPhysicalConnectors } from './connector-selection'
-import { ConnectorClearanceError, overlappingConnectorIds } from './connector-clearance'
+import { ConnectorClearanceError, fitAddedConnectorClearance, overlappingConnectorIds } from './connector-clearance'
 import { createPanel, getProjectBounds, resolvePanels, validateProject } from './model'
 import type { ObjectNotches } from './object-notches'
 import type { Panel, Project, Vec3 } from './types'
 
 type Point = [number, number]
 interface Edge { start: Point; end: Point; inset: number; bare?: boolean }
-interface Face { axis: number; plane: number; sign: number; edges: Edge[] }
+interface Face { axis: number; plane: number; sign: number; edges: Edge[]; endCap: boolean }
 const epsilon = 1e-5
 
 /** Extract simple face loops, preserving the convex/concave seat at each edge. */
@@ -74,7 +75,10 @@ function boundaryFaces(shape: ObjectNotches, thickness: number): Face[] {
       })
       const result = corners.map((e, i): Edge => ({ start: [planes[u][e.start[0]], planes[v][e.start[1]]], end: [planes[u][corners[(i + 1) % corners.length].start[0]], planes[v][corners[(i + 1) % corners.length].start[1]]], inset: e.inset }))
       if (result.length < 4 || result.length > 12) throw new Error('Shell faces support up to twelve edges.')
-      faces.push({ axis, plane: planes[axis][d + Number(sign > 0)], sign, edges: result })
+      const plane = planes[axis][d + Number(sign > 0)]
+      const endCap = result.length === 4 && result.every(e => e.inset > CONNECTOR_PROFILES['90'].seat)
+        && (Math.abs(plane - shape.bounds.min[axis]) < epsilon || Math.abs(plane - shape.bounds.max[axis]) < epsilon)
+      faces.push({ axis, plane, sign, edges: result, endCap })
     }
   }
   return faces
@@ -105,8 +109,12 @@ function relieveNarrowCuts(faces: Face[], thickness: number, orientation: number
     const template = createPanel({ width: high[0] - low[0], height: high[1] - low[1], customOutline: points.map(p => ({ x: (p[0] - low[0]) / (high[0] - low[0]), y: (p[1] - low[1]) / (high[1] - low[1]) })) })
     for (const rect of partitionClosingOutline(template, !!(orientation & (1 << face.axis)))) for (const a of [0, 1]) {
       const lo = (a ? rect.y : rect.x) + low[a], hi = (a ? rect.bottom : rect.right) + low[a]
-      if (hi - lo >= 40) continue
+      let cut = hi - lo
+      if (cut >= 40) continue
       for (const [ei, edge] of face.edges.entries()) {
+        // Keep extra seats on shaped faces once a strip fits; rectangular
+        // end caps can instead meet both ends without corner hardware.
+        if (cut >= 40 && face.edges.length > 4) break
         const p = points[ei], q = points[(ei + 1) % points.length]
         if (edge.inset < CONNECTOR_PROFILES['90'].seat || Math.abs(p[a] - q[a]) > epsilon
           || Math.min(Math.abs(p[a] - lo), Math.abs(p[a] - hi)) > epsilon) continue
@@ -118,7 +126,8 @@ function relieveNarrowCuts(faces: Face[], thickness: number, orientation: number
           const match = worldEdge(other, mate)
           if (!ends.every(point => match.some(next => point.every((v, axis) => Math.abs(v - next[axis]) < epsilon)))) continue
           const own = result[fi].edges[ei], opposite = result[fj].edges[ej]
-          if (own.bare || opposite.bare) continue
+          if (own.bare || opposite.bare) { cut += edge.inset - own.inset; continue }
+          cut += own.inset
           own.inset = 0; own.bare = true
           opposite.inset = thickness; opposite.bare = true
         }
@@ -129,13 +138,26 @@ function relieveNarrowCuts(faces: Face[], thickness: number, orientation: number
 }
 
 export function solveObjectShell(shape: ObjectNotches, thickness: number, rectangularOnly = true): Project {
+  try { return solveAlignedShell(shape, thickness, rectangularOnly) }
+  catch (original) {
+    if (!Number.isFinite(thickness) || thickness < 16 || thickness > 19) throw original
+    for (const { shape: oriented, restore } of shellOrientations(shape)) {
+      try { return restore(solveAlignedShell(oriented, thickness, rectangularOnly)) }
+      catch { /* Try another exact frame before rejecting the construction. */ }
+    }
+    throw original
+  }
+}
+
+function solveAlignedShell(shape: ObjectNotches, thickness: number, rectangularOnly: boolean): Project {
   if (!Number.isFinite(thickness) || thickness < 16 || thickness > 19) throw new Error('90° connectors require a panel thickness from 16 to 19 mm.')
   const faces = boundaryFaces(shape, thickness)
   if (faces.length > 80) throw new Error('Too many shell face pieces.')
   let failure: unknown
-  for (const customAxis of rectangularOnly ? [-1] : [-1, 0, 1, 2]) for (const relieve of [false, true]) for (let orientation = 0; orientation < 8; orientation++) {
+  // Prefer two neighbors; only convex outer caps may use one as a fallback.
+  for (const allowEndCaps of [false, true]) for (const customAxes of rectangularOnly ? [0] : [0, 1, 2, 4, 3, 5, 6, 7]) for (const relieve of [false, true]) for (let orientation = 0; orientation < 8; orientation++) {
     try {
-      const project = solveFaces(relieve ? relieveNarrowCuts(faces, thickness, orientation) : faces, thickness, orientation, customAxis), bounds = getProjectBounds(resolvePanels(project))
+      const project = solveFaces(relieve ? relieveNarrowCuts(faces, thickness, orientation) : faces, thickness, orientation, customAxes, allowEndCaps), bounds = getProjectBounds(resolvePanels(project))
       if ([0, 1, 2].some(a => Math.abs(bounds.min[a] - shape.bounds.min[a]) > epsilon || Math.abs(bounds.max[a] - shape.bounds.max[a]) > epsilon)) throw new Error('Shell conversion changed the outside envelope.')
       return project
     } catch (error) { failure = error }
@@ -144,7 +166,7 @@ export function solveObjectShell(shape: ObjectNotches, thickness: number, rectan
   throw failure
 }
 
-function solveFaces(faces: Face[], thickness: number, orientation: number, customAxis: number): Project {
+function solveFaces(faces: Face[], thickness: number, orientation: number, customAxes: number, allowEndCaps: boolean): Project {
   const pieces: { panel: Panel; face: Face; min: Vec3; max: Vec3; boundary: { axis: number; coordinate: number; tangent: number; lo: number; hi: number; bare?: boolean }[] }[] = []
   for (const [fi, face] of faces.entries()) {
     const { axis, edges } = face, u = (axis + 1) % 3, v = (axis + 2) % 3
@@ -158,7 +180,7 @@ function solveFaces(faces: Face[], thickness: number, orientation: number, custo
     const outlineError = getOutlineError(template.customOutline)
     if (outlineError) throw new Error(`Shell cuts leave an invalid closing face: ${outlineError}`)
     const rotation = new Euler().setFromRotationMatrix(new Matrix4().makeBasis(new Vector3().setComponent(u, 1), new Vector3().setComponent(v, 1), new Vector3().setComponent(axis, 1)))
-    const custom = axis === customAxis && edges.length > 4
+    const custom = !!(customAxes & (1 << axis)) && edges.length > 4
     const cuts = custom ? [{ x: 0, y: 0, right: template.width, bottom: template.height }] : partitionClosingOutline(template, !!(orientation & (1 << axis)))
     for (const [ri, rect] of cuts.entries()) {
       const min: Vec3 = [0, 0, 0], max: Vec3 = [0, 0, 0]
@@ -181,10 +203,13 @@ function solveFaces(faces: Face[], thickness: number, orientation: number, custo
   // Butt-seam layouts require a connected hardware graph with two neighbors
   // per board, rather than a clamp on every short boundary segment.
   const selectiveJoints = faces.some(f => f.edges.some(e => e.bare))
+  const pieceIndex = new Map(pieces.map((piece, index) => [piece.panel.id, index]))
   const neighbors = pieces.map(() => [] as number[]), seat = CONNECTOR_PROFILES['90'].seat
   for (let a = 0; a < pieces.length; a++) for (let b = a + 1; b < pieces.length; b++) {
     const p = pieces[a], q = pieces[b], x = p.face.axis, y = q.face.axis
-    if (x === y) continue
+    // Outline joints require a rectangular parent. Fitted faces on different
+    // axes must connect through the surrounding rectangular boards.
+    if (x === y || (p.panel.customOutline && q.panel.customOutline)) continue
     if (!p.boundary.some(e => !e.bare && e.axis === y && Math.abs(Math.abs(e.coordinate - q.min[y]) - seat) < epsilon
       && q.boundary.some(f => !f.bare && f.axis === x && Math.abs(Math.abs(f.coordinate - p.min[x]) - seat) < epsilon
         && Math.min(e.hi, f.hi) - Math.max(e.lo, f.lo) >= 40))) continue
@@ -201,7 +226,8 @@ function solveFaces(faces: Face[], thickness: number, orientation: number, custo
   const connected = new Set([0]), queue = [0]
   for (let i = 0; i < queue.length; i++) for (const j of neighbors[queue[i]]) if (!connected.has(j)) { connected.add(j); queue.push(j) }
   if (connected.size !== pieces.length) throw new Error('The shell must form one connected construction.')
-  if (neighbors.some(n => n.length < 2)) throw new Error('Every shell piece needs connectors to at least two surrounding faces.')
+  const minimumNeighbors = pieces.map(p => allowEndCaps && p.face.endCap ? 1 : 2)
+  if (neighbors.some((n, i) => n.length < minimumNeighbors[i])) throw new Error('Every shell piece needs connectors to surrounding faces.')
   const empty: Project = { version: 1, name: 'Object shell', panels: [], connections: [] }
   let project = empty
   for (let i = 0; i < pieces.length; i++) project = connectClosingPanel(project, pieces[i].panel, neighbors[i].filter(j => j < i).map(j => pieces[j].panel.id), { fitClearance: false })
@@ -213,19 +239,32 @@ function solveFaces(faces: Face[], thickness: number, orientation: number, custo
     for (;;) {
       try { project = fitClosingConnectorClearance(empty, project); break }
       catch (error) {
+        let reordered: Project | undefined
+        for (const order of [1, 2, 3, 4] as const) {
+          try { reordered = fitAddedConnectorClearance(empty, project, order); break } catch { /* Try another rail order. */ }
+        }
+        if (reordered) { project = reordered; break }
         if (!selectiveJoints || !(error instanceof ConnectorClearanceError)) throw error
-        // Drop a blocked redundant joint only if every board retains two
-        // neighbors and the whole assembly remains connected.
-        const joint = project.connections.find(c => c.id === error.connectionId)
-        if (!joint || joint.type !== '90') throw error
-        const a = pieces.findIndex(p => p.panel.id === joint.parentId), b = pieces.findIndex(p => p.panel.id === joint.childId)
-        if (neighbors[a].length <= 2 || neighbors[b].length <= 2) throw error
-        const retained = neighbors.map((ns, i) => ns.filter(j => !(i === a && j === b || i === b && j === a)))
-        const seen = new Set([0]), pending = [0]
-        for (let k = 0; k < pending.length; k++) for (const j of retained[pending[k]]) if (!seen.has(j)) { seen.add(j); pending.push(j) }
-        if (seen.size !== pieces.length) throw error
-        neighbors[a] = retained[a]; neighbors[b] = retained[b]
-        project = { ...project, connections: project.connections.filter(c => !([c.parentId, c.childId].includes(joint.parentId) && [c.parentId, c.childId].includes(joint.childId))) }
+        // Drop a redundant blocked joint or a neighboring blocker only if
+        // support counts and the connected assembly are preserved.
+        const blocked = project.connections.find(c => c.id === error.connectionId)
+        if (!blocked) throw error
+        const candidates = project.connections.filter(c => c.type === '90' && [c.parentId, c.childId].some(id => id === blocked.parentId || id === blocked.childId))
+          .sort((a, b) => Number(b === blocked) - Number(a === blocked))
+        let removed = false
+        for (const joint of candidates) {
+          const a = pieceIndex.get(joint.parentId), b = pieceIndex.get(joint.childId)
+          if (a === undefined || b === undefined) continue
+          if (neighbors[a].length <= minimumNeighbors[a] || neighbors[b].length <= minimumNeighbors[b]) continue
+          const retained = neighbors.map((ns, i) => ns.filter(j => !(i === a && j === b || i === b && j === a)))
+          const seen = new Set([0]), pending = [0]
+          for (let k = 0; k < pending.length; k++) for (const j of retained[pending[k]]) if (!seen.has(j)) { seen.add(j); pending.push(j) }
+          if (seen.size !== pieces.length) continue
+          neighbors[a] = retained[a]; neighbors[b] = retained[b]
+          project = { ...project, connections: project.connections.filter(c => !([c.parentId, c.childId].includes(joint.parentId) && [c.parentId, c.childId].includes(joint.childId))) }
+          removed = true; break
+        }
+        if (!removed) throw error
       }
     }
   }

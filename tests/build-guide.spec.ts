@@ -30,7 +30,7 @@ test('every building technique has four illustrated steps without another WebGL 
       expect(await illustration.locator('polygon, path').count()).toBeGreaterThan(0)
       await expect(article.getByText('What you should see', { exact: true })).toBeVisible()
       if (id === 'connect-panel' && (step === 2 || step === 4)) await page.screenshot({ path: `test-results/guide-connect-panel-step-${step}.png` })
-      if (id === 'resize' || ['projects', 'box-select', 'grid-split', 'snap-settings', 'constraints', 'palette', 'move-creation', 'rescale', 'room-preview'].includes(id)) await page.screenshot({ path: `test-results/guide-${id}-step-${step}.png` })
+      if (['boolean-objects', 'object-solver', 'resize'].includes(id) || ['projects', 'box-select', 'grid-split', 'snap-settings', 'constraints', 'palette', 'move-creation', 'rescale', 'room-preview'].includes(id)) await page.screenshot({ path: `test-results/guide-${id}-step-${step}.png` })
       if (step < 4) await article.getByRole('button', { name: 'Next step', exact: true }).click()
     }
     await expect(article.getByRole('button', { name: 'Read again', exact: true })).toBeVisible()
@@ -45,7 +45,7 @@ test('search, direct step selection, related guides and keyboard reference are u
   const search = page.getByRole('searchbox', { name: 'Search guides' })
   await search.fill('auto-add')
   await expect(page.locator('[data-guide-id="auto-connect"]')).toBeVisible()
-  for (const [query, id] of [['Auto furnish', 'room-preview'], ['Finish coverage', 'finishes'], ['Shift before', 'resize'], ['50 mm clearance', 'move-creation'], ['Replacement color', 'palette'], ['grid spacings', 'snap-settings'], ['X dividers', 'grid-split'], ['20 cm', 'constraints'], ['Same level above floor', 'constraints']]) {
+  for (const [query, id] of [['Auto furnish', 'room-preview'], ['Finish coverage', 'finishes'], ['Shift before', 'resize'], ['50 mm clearance', 'move-creation'], ['Replacement color', 'palette'], ['grid spacings', 'snap-settings'], ['X dividers', 'grid-split'], ['20 cm', 'constraints'], ['Same level above floor', 'constraints'], ['Boolean logic', 'boolean-objects'], ['Union', 'boolean-objects'], ['Subtract', 'boolean-objects'], ['Intersect', 'boolean-objects'], ['object solver', 'object-solver'], ['Convert to panels', 'object-solver'], ['corner cutouts', 'object-solver'], ['TROFAST', 'first-panel'], ['Filter panels', 'groups'], ['Filter connectors', 'groups'], ['Extend to ground', 'resize'], ['mirror', 'rotate'], ['Distribute evenly', 'multi-select'], ['Only nice values', 'rescale'], ['Metal', 'connectors'], ['Separate overlapping connectors', 'connectors'], ['Add connectors between', 'connectors'], ['Nazena', 'finishes'], ['vacuum', 'room-preview'], ['Panel cutting SVGs', 'save-export'], ['Build space', 'constraints']]) {
     await search.fill(query)
     await expect(page.locator(`[data-guide-id="${id}"]`)).toBeVisible()
   }
@@ -112,7 +112,7 @@ for (const width of [390, 800]) {
       await page.getByRole('button', { name: `Browse ${BUILD_GUIDES.length} techniques` }).click()
       await expect(page.getByRole('searchbox', { name: 'Search guides' })).toBeVisible()
     }
-    await page.locator('[data-guide-id="attach"]').click()
+    await page.locator('[data-guide-id="object-solver"]').click()
     if (width <= 760) await expect(page.getByRole('button', { name: `Browse ${BUILD_GUIDES.length} techniques` })).toHaveAttribute('aria-expanded', 'false')
     await page.getByRole('button', { name: /^Step 2:/ }).click()
     await expect(page.locator('.guide-illustration svg[role="img"]')).toBeVisible()

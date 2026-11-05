@@ -97,7 +97,13 @@ function drawingFor(scene: GuideScene, guideId: GuideId) {
   const right = new Vector3(direction.z, 0, -direction.x).normalize()
   const up = new Vector3().crossVectors(direction, right)
   const projectRaw = (point: Vector3): Point => [point.dot(right), -point.dot(up)]
-  const reference = [0, 1, 2, 3].flatMap(step => resolvePanels(getGuideScene(guideId, step).project))
+  const studies = [0, 1, 2, 3].map(step => getGuideScene(guideId, step))
+  const reference = studies.flatMap(study => resolvePanels(study.project))
+  const sourceVertices = studies.flatMap(study => (study.objectSurfaces ?? []).flatMap(surface => {
+    const points: Vector3[] = []
+    for (let index = 0; index < surface.positions.length; index += 3) points.push(new Vector3().fromArray(surface.positions, index).multiplyScalar(1000))
+    return points
+  }))
   const modelBounds = getProjectBounds(resolvePanels(scene.project))
   const lampX = modelBounds.max[0] + 440, lampBase = modelBounds.min[1]
   const lampWorld = scene.room ? [
@@ -110,7 +116,7 @@ function drawingFor(scene: GuideScene, guideId: GuideId) {
     return Array.from({ length: 8 }, (_, index) => projectRaw(new Vector3(
       (index & 1 ? 1 : -1) * panel.width / 2, (index & 2 ? 1 : -1) * panel.height / 2, (index & 4 ? 1 : -1) * panel.thickness / 2,
     ).applyEuler(rotation).add(new Vector3(...panel.position))))
-  }).concat(lampWorld.flatMap(line => line.map(projectRaw)))
+  }).concat(sourceVertices.map(projectRaw), lampWorld.flatMap(line => line.map(projectRaw)))
   const minX = Math.min(...points.map(point => point[0])), maxX = Math.max(...points.map(point => point[0]))
   const minY = Math.min(...points.map(point => point[1])), maxY = Math.max(...points.map(point => point[1]))
   const hasDocuments = [0, 1, 2, 3].some(step => !!getGuideScene(guideId, step).document)
@@ -139,6 +145,18 @@ function drawingFor(scene: GuideScene, guideId: GuideId) {
       if (normal.dot(direction) < 0) continue
       const vertices = [world(a[0], a[1], panel.thickness / 2), world(b[0], b[1], panel.thickness / 2), world(b[0], b[1], -panel.thickness / 2), world(a[0], a[1], -panel.thickness / 2)]
       faces.push({ points: vertices.map(project), depth: vertices.reduce((sum, point) => sum + point.dot(direction), 0) / 4, color: shade(normal), selected: selected.has(panel.id), ghost: ghosts.has(panel.id) })
+    }
+  }
+  // Project the evaluator's actual boundary triangles, in meters, into the millimeter study.
+  // Paired triangles form one quad, avoiding a diagonal across each source face.
+  for (const surface of scene.objectSurfaces ?? []) {
+    for (let index = 0; index < surface.positions.length; index += 18) {
+      const triangle = [0, 3, 6].map(offset => new Vector3().fromArray(surface.positions, index + offset).multiplyScalar(1000))
+      const normal = triangle[1].clone().sub(triangle[0]).cross(triangle[2].clone().sub(triangle[0])).normalize()
+      if (normal.dot(direction) <= 0) continue
+      const vertices = [0, 3, 6, 12, 15].map(offset => new Vector3().fromArray(surface.positions, index + offset).multiplyScalar(1000))
+      faces.push({ points: hull(vertices.map(project)), depth: vertices.reduce((sum, point) => sum + point.dot(direction), 0) / vertices.length,
+        color: `#${new Color('#c565b4').multiplyScalar(.7 + .3 * Math.max(0, normal.dot(direction))).getHexString()}` })
     }
   }
   const connectorPositions: { point: Point; selected: boolean }[] = []
@@ -269,7 +287,7 @@ export const GuidePreview = memo(function GuidePreview({ guideId, step, caption 
       {dimension !== null && <g className="guide-svg-dimension"><path d={`M 90 305 H 510 M 90 300 V 310 M 510 300 V 310`} fill="none" stroke="#7a826d"/><rect x="193" y="292" width="214" height="25" fill="#eeede6"/><text x="300" y="311" textAnchor="middle">{dimension} mm overall width</text></g>}
       {scene.document && <g><rect x="397" y="110" width="188" height="176" rx="8" fill="#fbfaf7" stroke="#cfd2c3"/><rect x="397" y="110" width="4" height="176" rx="2" fill="#7e8d66"/>{wrapLabel(scene.document.title, 19).map((line, index) => <text key={index} x="411" y={137 + index * 21} className="guide-svg-label">{line}</text>)}{scene.document.lines.flatMap(line => wrapLabel(line, 20)).map((line, index) => <text key={index} x="411" y={153 + wrapLabel(scene.document!.title, 19).length * 21 + index * 21} className="guide-svg-document-line">{line}</text>)}</g>}
     </svg>
-    <div className="guide-preview-legend" aria-label="Drawing legend"><span><i className="guide-legend-panel"/>Panel</span><span><i className="guide-legend-connector"/>Connector</span>{(scene.selected.length > 0 || !!scene.selectedConnectors?.length) && <span><i className="guide-legend-selected"/>Selected</span>}{scene.ghost.length > 0 && <span><i className="guide-legend-ghost"/>Preview</span>}{drawing.resizeHandles.length > 0 && <span><svg width="13" height="13" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="8" stroke="#c94727"/><path d="M4 9h9M9 5l4 4-4 4" stroke="#c94727" strokeLinecap="round" strokeLinejoin="round"/></svg>Resize handle</span>}</div>
+    <div className="guide-preview-legend" aria-label="Drawing legend">{scene.objectSurfaces?.length ? <span><i className="guide-legend-object"/>Source object</span> : <><span><i className="guide-legend-panel"/>Panel</span><span><i className="guide-legend-connector"/>Connector</span></>}{(scene.selected.length > 0 || !!scene.selectedConnectors?.length) && <span><i className="guide-legend-selected"/>Selected</span>}{scene.ghost.length > 0 && <span><i className="guide-legend-ghost"/>Preview</span>}{drawing.resizeHandles.length > 0 && <span><svg width="13" height="13" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="8" stroke="#c94727"/><path d="M4 9h9M9 5l4 4-4 4" stroke="#c94727" strokeLinecap="round" strokeLinejoin="round"/></svg>Resize handle</span>}</div>
     <p className="guide-preview-note">{scene.note}</p>
   </div>
 })

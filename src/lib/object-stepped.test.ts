@@ -2,6 +2,7 @@ import { Euler, Quaternion, Vector3 } from 'three'
 import { outlineWorldPoints } from './outline-closures'
 import { expect, it } from 'vitest'
 import fixture from '../../tests/fixtures/stepped-object.json'
+import doubleFixture from '../../tests/fixtures/double-stepped-object.json'
 import { getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
 import { convertConstructionObject } from './object-conversion'
 import { evaluateConstructionObjects, rotateConstructionSelection } from './object-geometry'
@@ -12,15 +13,17 @@ import { findObjectStepped } from './object-stepped'
 import type { Vec3 } from './types'
 const options = { thickness: 18, material: 'birch' as const, color: '#ffffff', finishCoverage: 0, connectorColor: '#ff0000', connectorMaterial: 'plastic' as const }
 
-it.each([16, 17, 18, 19])('converts stepped crosses at %s mm in every axis and direction', thickness => {
+it.each([fixture, doubleFixture].flatMap(input => [16, 17, 18, 19].map(thickness => ({ input, thickness, cuts: input === fixture ? 1 : 2 }))))('converts $cuts-cut stepped crosses at $thickness mm in every axis and direction', ({ input, thickness }) => {
   for (const scale of [1, 2]) for (const axis of [0, 1, 2] as const) {
-    const source = parseProject(fixture)
+    const source = parseProject(input)
     source.constructionObjects!.nodes = source.constructionObjects!.nodes.map(n => n.kind === 'box' ? { ...n, width: n.width * scale, height: n.height * scale, depth: n.depth * scale, position: n.position.map(v => v * scale) as Vec3 } : n)
     for (let turn = 0; turn < 4; turn++) {
       const objects = source.constructionObjects!, before = JSON.stringify(source)
       const evaluated = evaluateConstructionObjects(objects, true)[0]
       expect(evaluated.solids![0].stepped).toBeDefined()
-      const result = convertConstructionObject(source, objects.roots, { ...options, thickness, rectangularOnly: scale === 2 && turn % 2 === 0 })
+      let result: ReturnType<typeof convertConstructionObject>
+      try { result = convertConstructionObject(source, objects.roots, { ...options, thickness, rectangularOnly: scale === 2 && turn % 2 === 0 }) }
+      catch (error) { throw new Error(`scale ${scale}, axis ${axis}, turn ${turn}: ${String(error)}`) }
       expect(JSON.stringify(source)).toBe(before)
       const panels = resolvePanels(result.project), bounds = getProjectBounds(panels)
       for (let a = 0; a < 3; a++) {
@@ -56,7 +59,16 @@ it.each([16, 17, 18, 19])('converts stepped crosses at %s mm in every axis and d
       expect(validateProject(result.project)).toEqual([])
       expect(overlappingConnectorIds(result.project).size).toBe(0)
       const hardware = getPhysicalConnectors(result.project)
-      expect(panels.every(p => new Set(hardware.flatMap(h => h.connection.parentId === p.id ? [h.connection.childId] : h.connection.childId === p.id ? [h.connection.parentId] : [])).size >= 2)).toBe(true)
+      for (const p of panels) {
+        const neighbors = new Set(hardware.flatMap(h => h.connection.parentId === p.id ? [h.connection.childId] : h.connection.childId === p.id ? [h.connection.parentId] : []))
+        expect(neighbors.size).toBeGreaterThanOrEqual(input === fixture ? 2 : 1)
+        if (neighbors.size === 1) {
+          expect(p.customOutline).toBeUndefined()
+          const normal = new Vector3(0, 0, 1).applyEuler(new Euler(...p.rotation))
+          const a = [0, 1, 2].find(a => Math.abs(normal.getComponent(a)) > .99)!
+          expect(Math.min(Math.abs(p.position[a] - thickness / 2 - bounds.min[a]), Math.abs(p.position[a] + thickness / 2 - bounds.max[a]))).toBeLessThan(1e-5)
+        }
+      }
       const reached = new Set([panels[0].id]), queue = [panels[0].id]
       for (let i = 0; i < queue.length; i++) for (const { connection: c } of hardware) {
         const next = c.parentId === queue[i] ? c.childId : c.childId === queue[i] ? c.parentId : undefined
@@ -68,7 +80,7 @@ it.each([16, 17, 18, 19])('converts stepped crosses at %s mm in every axis and d
       source.constructionObjects = rotateConstructionSelection(objects, objects.roots, axis)
     }
   }
-})
+}, 60000)
 it('converts the original at its unchanged dimensions', () => {
   const source = parseProject(fixture), before = JSON.stringify(source)
   const result = convertConstructionObject(source, source.constructionObjects!.roots, options)
@@ -110,4 +122,13 @@ it('rejects an undersized version atomically and respects rectangular-only', () 
   const small = JSON.stringify(source)
   expect(() => convertConstructionObject(source, source.constructionObjects!.roots, options)).toThrow(/cuts|clearance|attach/)
   expect(JSON.stringify(source)).toBe(small)
+})
+
+it.each([-8, 8])('converts the second cutter shifted by %s mm', offset => {
+  const source = parseProject(doubleFixture), cutter = source.constructionObjects!.nodes.at(-2)!
+  if (cutter.kind !== 'box') throw new Error('Expected box cutter')
+  cutter.position[0] += offset
+  const result = convertConstructionObject(source, source.constructionObjects!.roots, options)
+  expect(validateProject(result.project)).toEqual([])
+  expect(overlappingConnectorIds(result.project).size).toBe(0)
 })
