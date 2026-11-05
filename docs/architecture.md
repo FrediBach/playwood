@@ -56,6 +56,8 @@ This diagram groups responsibilities; it is not a strict module dependency graph
 | [src/lib/model.ts](../src/lib/model.ts) | Panel creation, attachment transforms, world resolution, joint placement, project validation, parsing, starters, and CSV export |
 | [src/lib/assemblies.ts](../src/lib/assemblies.ts) | Reusable definitions, instances, ports, links, materialization, and shared-source changes |
 | [src/lib/structure-edit.ts](../src/lib/structure-edit.ts) | Constraint-preserving panel movement and dimensional edits |
+| [src/lib/construction-objects.ts](../src/lib/construction-objects.ts), [object-geometry.ts](../src/lib/object-geometry.ts), [object-edit.ts](../src/lib/object-edit.ts) | Snapping and edge scaling, saved source-volume forest, immutable object commands, orthogonal transforms, and bounded Boolean surface evaluation |
+| [src/hooks/use-construction-editor.ts](../src/hooks/use-construction-editor.ts), [use-object-preview.ts](../src/hooks/use-object-preview.ts), [use-object-gesture.ts](../src/hooks/use-object-gesture.ts) | Object selection/clipboard/drafts, gesture transactions, and cancellable worker previews, separate from panel editing |
 | [src/lib/](../src/lib/) feature modules | Auto-connect, splitting, closure, rescaling, selection, clipboard, palette, outlines, snapping, example generation, and guide content |
 | [src/components/](../src/components/) | DOM controls, lists, dialogs, SVG illustrations, R3F scene components, mesh/material helpers, and local CSS |
 | [src/components/ui/](../src/components/ui/) | Editable button, dialog, and tooltip primitives; configuration is in [components.json](../components.json) |
@@ -130,3 +132,5 @@ Wood grain, metal detail, and room materials are generated procedurally. Brand i
 `npm run build` runs TypeScript build checking and Vite, producing `dist/`. [vercel.json](../vercel.json) selects Vite, serves `dist`, adds response security headers, and sets year-long immutable caching for `/assets/*`. Public metadata and the configured canonical domain live in [index.html](../index.html) and `public/`; changing the hosting domain requires reviewing those together. Deployment has no application-server migration or environment-secret step.
 
 For setup, verification, and asset regeneration commands, see [development and verification](development.md).
+
+Selected-root cuboid/orthogonal-prism conversion uses `object-conversion.ts` for the validated append transaction and `object-conversion.worker.ts` for cancellable computation. `ObjectConversionDialog` owns transient inputs and a separate preview Scene; App checks the original project identity during acceptance and selects the resulting ordinary panels.

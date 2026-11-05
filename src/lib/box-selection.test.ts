@@ -18,6 +18,15 @@ function camera(perspective = false) {
 }
 
 describe('box selection of rendered parts', () => {
+  it('selects object results separately from furniture and excludes invisible operand picking meshes', () => {
+    const scene = new Scene(), object = panel('unused'), cutter = panel('unused-cutter')
+    delete object.userData.panelId; delete cutter.userData.panelId
+    object.userData.objectId = 'boolean-root'; cutter.userData.objectId = 'cutter'
+    cutter.material.visible = false
+    scene.add(object, cutter, panel('board'))
+    expect(getBoxSelection(scene, camera(), full, 'objects')).toEqual(['boolean-root'])
+    expect(getBoxSelection(scene, camera(), full, 'panels')).toEqual(['board'])
+  })
   it.each([false, true])('requires full projected containment with perspective=%s', perspective => {
     const scene = new Scene()
     scene.add(panel('inside'), panel('crossing', .8), panel('outside', 1.5))

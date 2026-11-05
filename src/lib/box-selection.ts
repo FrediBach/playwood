@@ -14,13 +14,13 @@ interface ProjectedBounds extends SelectionRectangle {
 }
 
 /** Select whole projected parts, including parts occluded by other geometry. */
-export function getBoxSelection(scene: Object3D, camera: Camera, rectangle: SelectionRectangle, kind: 'panels' | 'connectors'): string[] {
+export function getBoxSelection(scene: Object3D, camera: Camera, rectangle: SelectionRectangle, kind: 'panels' | 'connectors' | 'objects'): string[] {
   if (!Object.values(rectangle).every(Number.isFinite) || rectangle.left > rectangle.right || rectangle.bottom > rectangle.top) return []
   // The supplied root may itself be below an invisible scene group.
   for (let parent: Object3D | null = scene; parent; parent = parent.parent) if (!parent.visible) return []
   scene.updateWorldMatrix(true, true)
   camera.updateWorldMatrix(true, false)
-  const key = kind === 'panels' ? 'panelId' : 'connectorId'
+  const key = kind === 'panels' ? 'panelId' : kind === 'connectors' ? 'connectorId' : 'objectId'
   const bounds = new Map<string, ProjectedBounds>()
   const point = new Vector3()
   const visit = (object: Object3D, owner?: string) => {

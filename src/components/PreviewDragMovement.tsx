@@ -26,7 +26,8 @@ interface Gesture {
 }
 
 /** Capture Control-drag before OrbitControls, keeping ordinary clicks and camera gestures intact. */
-export function PreviewDragMovement({ selectedIds, movementEnabled, onSelect, onDragStart, onDragMove, onDragEnd }: PreviewDragProps & {
+export function PreviewDragMovement({ selectedIds, movementEnabled, onSelect, onDragStart, onDragMove, onDragEnd, targetKey = 'panelId' }: PreviewDragProps & {
+  targetKey?: 'panelId' | 'objectId'
   selectedIds: readonly string[]
   movementEnabled?: boolean
   onSelect: (id: string, additive: boolean) => void
@@ -58,16 +59,16 @@ export function PreviewDragMovement({ selectedIds, movementEnabled, onSelect, on
     camera.updateMatrixWorld()
     scene.updateMatrixWorld(true)
     pointAt(event.clientX, event.clientY)
-    const hit = raycaster.intersectObjects(scene.children, true).find(hit => typeof hit.object.userData.panelId === 'string')
+    const hit = raycaster.intersectObjects(scene.children, true).find(hit => typeof hit.object.userData[targetKey] === 'string')
     if (!hit) return
     const plane = new Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new Vector3()), hit.point)
     const offset = pointAt(event.clientX + 14, event.clientY).intersectPlane(plane, new Vector3())
     const orbit = controls as OrbitControls | undefined
     gesture.current = {
-      pointerId: event.pointerId, panelId: hit.object.userData.panelId,
+      pointerId: event.pointerId, panelId: hit.object.userData[targetKey],
       x: event.clientX, y: event.clientY, point: hit.point.clone(), plane,
       snapDistance: Math.min(60, Math.max(5, (offset?.distanceTo(hit.point) ?? 0.03) * 1000)),
-      started: false, moved: false, canDrag: selectedIds.includes(hit.object.userData.panelId), controls: orbit, controlsEnabled: orbit?.enabled ?? true,
+      started: false, moved: false, canDrag: selectedIds.includes(hit.object.userData[targetKey]), controls: orbit, controlsEnabled: orbit?.enabled ?? true,
     }
     if (orbit) orbit.enabled = false
     suppressClick.current = true

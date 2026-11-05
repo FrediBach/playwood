@@ -46,7 +46,9 @@ function blockedInterval(moving: Body, fixed: Body, tangent: Vector3): [number, 
       + fixed.axes.reduce((sum, basis, i) => sum + Math.abs(axis.dot(basis)) * fixed.halfSize[i], 0) + CLEARANCE
     const distance = delta.dot(axis), speed = tangent.dot(axis)
     if (Math.abs(speed) < EPSILON) {
-      if (Math.abs(distance) >= reach) return null
+      // Fitted pieces can sit exactly at the clearance boundary. Use the same
+      // tolerance as the moving-axis interval check when rechecking that pose.
+      if (Math.abs(distance) >= reach - EPSILON) return null
       continue
     }
     const a = (distance - reach) / speed, b = (distance + reach) / speed
@@ -91,6 +93,27 @@ export function overlappingConnectorIds(project: Project): Set<string> {
     }
   })
   return result
+}
+
+/** Check cross-boundary hardware/stock collisions without treating a clamp's own boards as obstacles. */
+export function assertAddedHardwarePanelClearance(original: Project, candidate: Project): void {
+  const existingPanels = new Set(original.panels.map(panel => panel.id))
+  const existingHardware = new Set(getPhysicalConnectors(original).map(piece => piece.id))
+  const panels = resolvePanels(candidate).map(panel => {
+    const rotation = new Quaternion().setFromEuler(new Euler(...panel.rotation))
+    return { panel, body: { center: new Vector3(...panel.position),
+      axes: [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)].map(axis => axis.applyQuaternion(rotation)),
+      halfSize: [panel.width / 2, panel.height / 2, panel.thickness / 2] as Vec3 } }
+  })
+  for (const item of installedBodies(candidate)) {
+    const retained = existingHardware.has(item.piece.id)
+    for (const { panel, body } of panels) {
+      if (retained === existingPanels.has(panel.id)) continue
+      if (item.bodies.some(part => blockedInterval({ ...part, center: part.center.clone().addScaledVector(item.tangent, item.preferred) }, body, new Vector3()))) {
+        throw new Error(`Connector hardware overlaps ${panel.name}. Move the source box and try again.`)
+      }
+    }
+  }
 }
 
 /** Only selected overlapping pieces may move. Retry alternate packing orders;

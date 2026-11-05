@@ -1,0 +1,19 @@
+.assembly-subtabs>button>svg{display:none}
+.object-list,.object-children{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px}
+.object-children{margin:4px 0 8px 10px;padding-left:8px;border-left:1px solid #c5d4e1}
+.object-row{display:flex;min-width:0;border:1px solid transparent;border-radius:5px}
+.object-row.is-selected{background:#e5eef7;border-color:#b6cde3}
+.object-select{display:flex;align-items:center;gap:8px;min-width:0;flex:1;text-align:left;background:none;padding:10px 4px;color:#32628e}
+.object-select>span{display:flex;flex-direction:column;gap:4px;min-width:0}
+.object-select strong{font-size:12px;overflow-wrap:anywhere;font-weight:550}
+.object-select small{font-size:10px;color:#687f91}
+.object-heading{font-size:18px;font-weight:500;margin-bottom:18px;overflow-wrap:anywhere}
+.object-fields{border:0;padding:0;margin:0;min-width:0}
+.object-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.object-actions .ui-button{font-size:12px;padding-inline:9px}
+.object-operands{padding-left:22px;margin:12px 0;font-size:12px}
+.object-operands li{padding:5px 0}
+.object-operands button{margin-left:8px;background:#e5eef7;padding:4px 9px;border-radius:3px}
+.object-preview-status{position:absolute;left:20px;bottom:70px;max-width:calc(100% - 40px);padding:9px 12px;background:#f6f9fddd;color:#32628e;border:1px solid #bdcfdf;border-radius:5px;font-size:11px;pointer-events:none}
+.dialog-content.object-conversion-dialog { width: min(860px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.object-conversion-preview { height: clamp(200px, 34vh, 360px); position: relative; }

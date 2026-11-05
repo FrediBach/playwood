@@ -84,7 +84,20 @@ export type DesignConstraint = DesignConstraintBase & (
 )
 export interface SpaceConstraint { enabled: boolean; width: number; height: number; depth: number; centerX: number; centerZ: number }
 
+export type ObjectBooleanOperation = 'union' | 'subtract' | 'intersect'
+interface ConstructionObjectBase { id: string; name: string; visible: boolean }
+export type ConstructionObject = ConstructionObjectBase & (
+  /** Box center and dimensions in world millimeters; Euler radians in 90° steps. */
+  | { kind: 'box'; width: number; height: number; depth: number; position: Vec3; rotation: Vec3 }
+  /** Ordered operands: subtraction removes every later child from the first. */
+  | { kind: 'boolean'; operation: ObjectBooleanOperation; children: string[] }
+)
+/** A forest with exclusive operand ownership; leaves keep world-space transforms. */
+export interface ConstructionObjects { roots: string[]; nodes: ConstructionObject[] }
+
 export interface Project {
+  /** Editable source volumes, separate from fabricated panels and assembly definitions. */
+  constructionObjects?: ConstructionObjects;
   spaceConstraint?: SpaceConstraint;
   version: 1; name: string; panels: Panel[]; connections: Connection[]; assemblies?: AssemblyData;
   /** Additional panel finish swatches, saved with this project. */

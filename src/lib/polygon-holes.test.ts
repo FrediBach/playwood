@@ -5,6 +5,9 @@ import { CONNECTOR_PROFILES } from './connector-profile'
 import { createPanel, resolvePanels, rotateProject, validateProject } from './model'
 import { outlineConnectionAligned, outlineWorldPoints } from './outline-closures'
 import { pentagonalFrame } from './outline-closure-test-fixtures'
+import { autoConnect } from './auto-connect'
+import { overlappingConnectorIds } from './connector-clearance'
+import { getPhysicalConnectors } from './connector-selection'
 import type { Panel, Project, Vec3 } from './types'
 
 const seat = CONNECTOR_PROFILES['90'].seat
@@ -34,6 +37,27 @@ function expectSupported(project: Project, panelId: string, boundaryIds: string[
 }
 
 describe('polygon opening discovery', () => {
+  it('builds a complete L-shaped shell with six corner joints and both supported closing faces', () => {
+    const source = polygonFrame(concave)
+    let project = autoConnect(source).project
+    expect(project.connections).toHaveLength(6)
+    for (let edge = 0; edge < 6; edge++) {
+      const pair = [source.panels[edge].id, source.panels[(edge + 1) % 6].id]
+      expect(project.connections.some(joint => pair.includes(joint.parentId) && pair.includes(joint.childId))).toBe(true)
+    }
+    for (let face = 0; face < 2; face++) {
+      const hole = findPanelHoles(resolvePanels(project))[0]
+      const result = closePanelHole(project, source.panels.map(panel => panel.id), hole.id)
+      expectSupported(result.project, result.panelId, source.panels.map(panel => panel.id))
+      project = result.project
+    }
+    expect(project.panels).toHaveLength(8)
+    expect(project.connections).toHaveLength(18)
+    expect(getPhysicalConnectors(project)).toHaveLength(36)
+    expect(overlappingConnectorIds(project).size).toBe(0)
+    expect(findPanelHoles(resolvePanels(project))).toEqual([])
+  })
+
   it.each([false, true])('finds and closes both five-sided faces (rotated: %s)', rotated => {
     const source = rotated ? rotateProject(rotateProject(pentagonalFrame(), 'y', 31), 'z', 17) : pentagonalFrame()
     const holes = findPanelHoles(resolvePanels(source))

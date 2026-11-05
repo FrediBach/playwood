@@ -171,6 +171,7 @@ Project
   name
   panels[]           optional panel-local trofastInserts[]
   connections[]
+  constructionObjects? roots[] and nodes[] for editable box/Boolean source trees
   assemblies?         definitions, instances, physical links, loose ports
   customColors?       named panel finish swatches
   connectorOverrides? per-piece color/type/material/removal/slide
@@ -197,6 +198,20 @@ Assembly metadata has an additional consistency boundary. [parseAssemblyData](..
 When adding a persisted property, consider all relevant paths: type definition, model creation/update, parser and backward-compatible defaults, assembly definitions/instances where applicable, export, copy/clone behavior, and representative round-trip tests. The exported JSON currently has version `1`; optional properties provide several compatibility paths within that version.
 
 ## Compatibility repairs and defaults
+
+### Construction object sources
+
+`Project.constructionObjects` is an optional `{ roots, nodes }` forest, validated by [`construction-objects.ts`](../src/lib/construction-objects.ts). Legacy projects omit it; explicit clearing uses `{ roots: [], nodes: [] }`. The project version and browser storage key remain unchanged. Nodes have stable IDs, names, and explicit visibility. Box leaves store world-space center positions, dimensions, and Euler rotations in radians constrained to 90° steps. Boolean nodes contain an operation and ordered child IDs; subtraction means the first operand minus all later operands. Visibility is display metadata, not removal from a Boolean expression.
+
+The parser allows at most 200 nodes and 16 levels, box dimensions from 1 to 10,000 mm, position components within ±100,000 mm, and quarter-turn Euler components within ±100π. It rejects duplicate IDs, missing references, cycles, shared operands, unreachable nodes, and operations with fewer than two operands. Every node belongs to exactly one root tree. These source-volume limits are separate from panel manufacturing limits and Boolean evaluator work limits.
+
+Immutable domain commands add/update boxes and nodes, combine ordered roots, remove complete root trees, and copy/paste/duplicate complete root trees with fresh IDs and remapped child references. Box transforms remain in world space when combining. Clipboard data is a detached snapshot; optional paste translation applies to every copied box once. Nested operands can be updated, but independent deletion or copying currently requires a top-level tree. Objects mode routes copy/paste, duplication, deletion, group rotation, and canvas arrow movement to source objects. Selection and object clipboard contents remain session-only. Numeric changes preview separately until Apply commits the complete draft once; Cancel, Escape, category changes, and project changes discard the draft. See [object rendering and interaction](rendering-and-interaction.md#construction-objects) for worker evaluation and gesture routing.
+
+The existing complete-snapshot history and JSON autosave/export carry sources unchanged. Ordinary commits preserve sources if a reconstructed candidate omits them; explicit document replacement bypasses that preservation, and an empty forest clears them deliberately. Browser coverage imports sources, edits panels, undoes/redoes, reloads, exports, replaces the document, and restores sources with Undo. Sources remain outside panel lists, hardware counts, cutting exports, and standalone assembly definitions/files. No generated-panel relationship or live regeneration is saved. Object conversion appends ordinary panels/connections and hides all selected retained source roots in one history snapshot, preserving all nested operands, unselected roots, and their visibility unchanged. Multiple compartment groups are accepted together; failure in any group commits nothing. A preview stores its originating project identity; acceptance checks that identity again inside the functional commit. Options (including Rectangular panels only), worker results, and dialog state remain transient. Cancel and stale results cannot alter autosave.
+
+Object pointer candidates in `use-object-gesture.ts` remain separate from numeric drafts and saved history. A completed drag or resize commits once; Escape/blur/cancel does not commit. Both the live candidate and its functional acceptance require the original project identity and selection, preventing a replacement project from receiving stale geometry. Snapping settings are captured at gesture start and remain browser preferences.
+
+### Startup and legacy repairs
 
 Startup reads and parses the project, ensures its palette, then runs [repairLegacyShelf](../src/lib/legacy-shelf.ts) followed by [repairLegacyExampleInserts](../src/lib/legacy-example-inserts.ts), and ensures the final palette again. Repairs are prepared before the first render and initial save. If geometry changes, the normalized original is retained as the first undo snapshot and the UI shows a repair notice.
 

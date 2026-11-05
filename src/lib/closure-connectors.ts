@@ -2,7 +2,7 @@ import { Euler, Quaternion, Vector3 } from 'three'
 import { getDefaultConnectorColor } from './connector-selection'
 import { ConnectorClearanceError, fitAddedConnectorClearance } from './connector-clearance'
 import { getConnectorRail } from './connector-movement'
-import { resolvePanels, validateProject } from './model'
+import { getConnectorSeam, resolvePanels, validateProject } from './model'
 import { outlineConnectionAligned } from './outline-closures'
 import type { Connection, Panel, Project, Side } from './types'
 
@@ -47,7 +47,11 @@ function fitJoint(members: Panel[], count: number, color: string): Connection[] 
         for (let outlineEdge = 0; outlineEdge < child.customOutline!.length; outlineEdge++) {
           const candidate: Connection = { id: `${id}:${branch}`, parentId: parent.id, childId: child.id, type, role: 'support', outlineEdge,
             side, flip, offset: 0, inset: 0, count: branch ? 0 : count, color }
-          if (outlineConnectionAligned(parent, child, candidate)) { group.push(candidate); break }
+          if (!outlineConnectionAligned(parent, child, candidate)) continue
+          // Concave profiles can have disjoint edges on the same infinite line.
+          // Keep searching until this rim actually overlaps enough of the edge.
+          const seam = getConnectorSeam(candidate, parent, child)
+          if (seam.upper - seam.lower + 40 >= count * 40) { group.push(candidate); break }
         }
       }
       if (group.length === children.length

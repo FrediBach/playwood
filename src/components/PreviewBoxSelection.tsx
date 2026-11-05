@@ -6,6 +6,7 @@ import { getBoxSelection } from '@/lib/box-selection'
 export interface BoxSelection {
   panelIds: string[]
   connectorIds: string[]
+  objectIds?: string[]
 }
 
 export interface BoxSelectionPreview extends BoxSelection {
@@ -14,6 +15,7 @@ export interface BoxSelectionPreview extends BoxSelection {
 }
 
 export interface BoxSelectionProps {
+  objectSelection?: boolean
   boxSelectActive?: boolean
   resolveBoxPanelIds?: (ids: string[]) => string[]
   resolveBoxConnectorIds?: (ids: string[]) => string[]
@@ -22,7 +24,7 @@ export interface BoxSelectionProps {
 }
 
 /** Own the pointer before orbit, selection clicks, or movement can consume it. */
-export function PreviewBoxSelection({ boxSelectActive = false, resolveBoxPanelIds, resolveBoxConnectorIds,
+export function PreviewBoxSelection({ boxSelectActive = false, objectSelection = false, resolveBoxPanelIds, resolveBoxConnectorIds,
   onBoxSelect, onBoxSelectCancel, onPreview }: BoxSelectionProps & { onPreview: (preview: BoxSelectionPreview | null) => void }) {
   const { camera, scene, gl, controls, invalidate } = useThree()
   const gesture = useRef<{ pointerId: number; startX: number; startY: number; x: number; y: number; moved: boolean } | null>(null)
@@ -42,11 +44,12 @@ export function PreviewBoxSelection({ boxSelectActive = false, resolveBoxPanelId
       left: left / rect.width * 2 - 1, right: (left + width) / rect.width * 2 - 1,
       top: 1 - top / rect.height * 2, bottom: 1 - (top + height) / rect.height * 2,
     }
-    const panelIds = getBoxSelection(scene, camera, bounds, 'panels')
-    const connectorIds = getBoxSelection(scene, camera, bounds, 'connectors')
+    const panelIds = objectSelection ? [] : getBoxSelection(scene, camera, bounds, 'panels')
+    const connectorIds = objectSelection ? [] : getBoxSelection(scene, camera, bounds, 'connectors')
     const result = { rectangle: { left, top, width, height }, additive,
       panelIds: resolveBoxPanelIds?.(panelIds) ?? panelIds,
-      connectorIds: resolveBoxConnectorIds?.(connectorIds) ?? connectorIds }
+      connectorIds: resolveBoxConnectorIds?.(connectorIds) ?? connectorIds,
+      ...(objectSelection ? { objectIds: getBoxSelection(scene, camera, bounds, 'objects') } : {}) }
     onPreview(result)
     return result
   })
@@ -83,7 +86,7 @@ export function PreviewBoxSelection({ boxSelectActive = false, resolveBoxPanelId
     event.stopImmediatePropagation()
     const result = event.type === 'pointerup' ? preview(event.clientX, event.clientY, event.shiftKey) : null
     cancel()
-    if (result) onBoxSelect?.({ panelIds: result.panelIds, connectorIds: result.connectorIds }, result.additive)
+    if (result) onBoxSelect?.({ panelIds: result.panelIds, connectorIds: result.connectorIds, ...(result.objectIds ? { objectIds: result.objectIds } : {}) }, result.additive)
   })
   const key = useEffectEvent((event: KeyboardEvent) => {
     if (!boxSelectActive) return

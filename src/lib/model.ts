@@ -1,4 +1,5 @@
 import { parseSpaceConstraint, spaceClearances } from './space-constraint'
+import { parseConstructionObjects } from './construction-objects'
 import { getOutlineError, panelCornerRadius, panelOutlineCorners } from './panel-shape'
 import { getPhysicalConnectors } from './connector-selection'
 import { connectorDisplayColor, getConnectorMaterial } from './connector-options'
@@ -538,6 +539,7 @@ export function parseProject(input: unknown): Project {
     while (current) { if (visited.has(current)) throw new Error('Circular attachments are not supported.'); visited.add(current); current = parents.get(current) }
   }
   const project: Project = { version: 1, name: stringIn(input.name, 'project name'), panels, connections }
+  if (input.constructionObjects !== undefined) project.constructionObjects = parseConstructionObjects(input.constructionObjects)
   if (input.spaceConstraint !== undefined) project.spaceConstraint = parseSpaceConstraint(input.spaceConstraint)
   if (input.niceValues !== undefined) project.niceValues = parseNiceValues(input.niceValues)
   if (input.constraints !== undefined) project.constraints = parseDesignConstraints(input.constraints, panels)

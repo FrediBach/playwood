@@ -5,6 +5,7 @@ import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { ensureProjectPalette } from '@/lib/custom-colors'
 import { assertDesignConstraintEdit } from '@/lib/design-constraint-edits'
 import { assertOutlineConnectionEdit } from '@/lib/outline-connection-edits'
+import { preserveConstructionObjects } from '@/lib/construction-objects'
 import type { Project } from '@/lib/types'
 const STORAGE_KEY = 'playwood-studio-project-v1'
 interface ProjectHistory {past:Project[];present:Project;future:Project[];repairNotice:string;group?:string}
@@ -35,7 +36,8 @@ export function useProject() {
   },[])
   const commit = useCallback((next:Project|((current:Project)=>Project), options?:{group?:string;repeat?:boolean;replace?:boolean}) => {
     changeHistory(h=>{
-      const candidate = typeof next === 'function' ? next(h.present) : next
+      const proposed = typeof next === 'function' ? next(h.present) : next
+      const candidate = options?.replace ? proposed : preserveConstructionObjects(h.present, proposed)
       const present = ensureProjectPalette(options?.replace ? candidate : assertDesignConstraintEdit(h.present, assertOutlineConnectionEdit(h.present, candidate)))
       if (JSON.stringify(present) === JSON.stringify(h.present)) return h
       return {...h,past:options?.repeat&&h.group===options.group?h.past:[...h.past.slice(-59),h.present],present,future:[],group:options?.group}

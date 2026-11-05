@@ -1,3 +1,5 @@
+import { ConstructionObjectLayer, type ConstructionLayerProps } from './ConstructionObjectLayer'
+import { constructionBounds } from '@/lib/object-geometry'
 import { spaceBounds } from '@/lib/space-constraint'
 import { SpaceConstraintOverlay } from './SpaceConstraintOverlay'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
@@ -49,6 +51,7 @@ export interface AssemblyAttachmentHandle {
 }
 
 export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
+  constructionLayer?: ConstructionLayerProps
   panels: Panel[]
   connections: Connection[]
   connectorOverrides?: Project['connectorOverrides']
@@ -452,9 +455,9 @@ function SceneParts(props: WorldProps & { shownPanels: Panel[] }) {
   const repeatPanelIds = new Set(props.repeatPreview?.addedPanelIds)
   const repeatConnectionIds = new Set(props.repeatPreview?.connectionIds)
   return <>
-    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} selected={selectedIdSet.has(panel.id)} ghost={repeatPanelIds.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
+    {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} interactive={!props.constructionLayer?.active} selected={selectedIdSet.has(panel.id)} ghost={repeatPanelIds.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
     {realisticPreview && !!props.furnishings?.length && <PreviewFurnishings placements={props.furnishings} />}
-    {!exploded && <ConnectorMeshes panels={panels} connections={connections.filter(connection => !repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview ? undefined : props.onSelectConnector} />}
+    {!exploded && <ConnectorMeshes panels={panels} connections={connections.filter(connection => !repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview || props.constructionLayer?.active ? undefined : props.onSelectConnector} />}
     {!exploded && !!repeatConnectionIds.size && <ConnectorMeshes panels={panels} connections={connections.filter(connection => repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} ghost />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
@@ -492,6 +495,15 @@ function World(props: WorldProps) {
   const vacuumPlan = useMemo(() => realisticPreview ? createVacuumPlan(bounds, displayPanels, props.furnishings) : null, [realisticPreview, bounds, displayPanels, props.furnishings])
   const cameraBounds = useMemo(() => {
     const bounds = boundsOf([...displayPanels, ...previewPanels, ...attachmentBoundsPanels])
+    if (props.constructionLayer && !realisticPreview && !exploded) {
+      const layer = props.constructionLayer
+      const visibleRoots = layer.objects.roots.filter(id => layer.objects.nodes.find(node => node.id === id)?.visible)
+      const objectBounds = constructionBounds(layer.objects, [...visibleRoots, ...(layer.active ? layer.selectedIds : [])])
+      if (objectBounds) {
+        if (!displayPanels.length && !previewPanels.length && !attachmentBoundsPanels.length) bounds.makeEmpty()
+        bounds.expandByPoint(vector(objectBounds.min)); bounds.expandByPoint(vector(objectBounds.max))
+      }
+    }
     if (props.spaceConstraint?.enabled && !exploded && !realisticPreview) {
       const space = spaceBounds(props.spaceConstraint)
       bounds.expandByPoint(vector(space.min))
@@ -502,7 +514,7 @@ function World(props: WorldProps) {
       if (props.designConstraint.kind === 'floor') bounds.min.y = Math.min(bounds.min.y, 0)
     }
     return bounds
-  }, [displayPanels, previewPanels, attachmentBoundsPanels, props.designConstraint, props.spaceConstraint, exploded, realisticPreview])
+  }, [displayPanels, previewPanels, attachmentBoundsPanels, props.designConstraint, props.spaceConstraint, props.constructionLayer, exploded, realisticPreview])
   const shownPanels = displayPanels.filter(panel => panel.visible)
   const floorY = props.spaceConstraint?.enabled || props.hasFloorConstraint || props.designConstraint?.kind === 'floor' ? -0.012 : bounds.min.y - 0.012
   const feedback = useSceneSnapFeedback(props)
@@ -516,6 +528,8 @@ function World(props: WorldProps) {
     <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} snapSettings={props.snapSettings} guides={feedback.guides}/>
     {vacuumPlan && <RobotVacuum plan={vacuumPlan} projectPanels={displayPanels} controlsEnabled={!props.dragging && !props.resizing && !props.boxSelectActive && !props.designConstraint} />}
     <SceneParts {...props} shownPanels={shownPanels}/>
+    {!realisticPreview && !exploded && props.constructionLayer && <ConstructionObjectLayer {...props.constructionLayer}
+      selectedIds={props.boxSelectActive && props.boxPreview?.objectIds ? [...(props.boxPreview.additive ? props.constructionLayer.selectedIds : []), ...props.boxPreview.objectIds] : props.constructionLayer.selectedIds}/>}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     <SceneOverlays {...props} shownPanels={shownPanels}/>
     <SceneResizeHandles {...props} feedback={feedback}/>
@@ -537,6 +551,7 @@ export default function Scene(props: SceneProps) {
   const attachmentElements = useRef(new Map<string, HTMLDivElement>())
   const [boxPreview, setBoxPreview] = useState<BoxSelectionPreview | null>(null)
   const boxSelectionLabel = boxPreview ? [
+    boxPreview.objectIds?.length ? `${boxPreview.objectIds.length} object${boxPreview.objectIds.length === 1 ? '' : 's'}` : '',
     boxPreview.panelIds.length ? `${boxPreview.panelIds.length} panel${boxPreview.panelIds.length === 1 ? '' : 's'}` : '',
     boxPreview.connectorIds.length ? `${boxPreview.connectorIds.length} connector${boxPreview.connectorIds.length === 1 ? '' : 's'}` : '',
   ].filter(Boolean).join(' · ') || '0 parts' : ''
