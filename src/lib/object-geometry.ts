@@ -1,3 +1,4 @@
+import type { ObjectNotches } from './object-notches'
 import { findObjectRecess, findObjectTunnel, type ObjectRecess, type ObjectTunnel } from './object-tunnel'
 import { findObjectSolids, type ObjectSolid } from './object-solids'
 import { findObjectPrism, type ObjectPrism } from './object-prism'
@@ -6,7 +7,7 @@ import { parseConstructionObjects } from './construction-objects'
 import type { ConstructionObject, ConstructionObjects, Vec3 } from './types'
 
 export interface ObjectBounds { min: Vec3; max: Vec3 }
-export interface ObjectSurface { id: string; positions: Float32Array; volume: number; bounds: ObjectBounds | null; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel; recess?: ObjectRecess; solids?: ObjectSolid[] }
+export interface ObjectSurface { id: string; positions: Float32Array; volume: number; bounds: ObjectBounds | null; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel; recess?: ObjectRecess; notches?: ObjectNotches; solids?: ObjectSolid[] }
 export const OBJECT_CELL_LIMIT = 100000
 const SURFACE_VERTEX_LIMIT = 600000
 
