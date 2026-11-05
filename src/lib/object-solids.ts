@@ -1,8 +1,9 @@
+import { findObjectTunnel, type ObjectTunnel } from './object-tunnel'
 import { findObjectPrism, type ObjectPrism } from './object-prism'
 import type { ObjectBounds } from './object-geometry'
 import type { Vec3 } from './types'
 
-export interface ObjectSolid { bounds: ObjectBounds; cuboid: boolean; prism?: ObjectPrism }
+export interface ObjectSolid { bounds: ObjectBounds; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel }
 
 /** Split exact occupied cells by face connectivity. Edge/corner contacts remain
  * distinct solids and are rejected later by conversion's contact checks. */
@@ -31,7 +32,7 @@ export function findObjectSolids(planes: number[][], occupied: Uint8Array): Obje
     const count = extent.reduce((product, size) => product * size, 1)
     const bounds = { min: first.map((value, axis) => planes[axis][value]) as Vec3, max: last.map((value, axis) => planes[axis][value + 1]) as Vec3 }
     const cuboid = cells.length === count
-    let prism: ObjectPrism | undefined
+    let prism: ObjectPrism | undefined, tunnel: ObjectTunnel | undefined
     if (!cuboid) {
       remainingCells -= count
       if (remainingCells < 0) throw new Error('Disconnected object pieces are too complex. Simplify the shape.')
@@ -40,9 +41,11 @@ export function findObjectSolids(planes: number[][], occupied: Uint8Array): Obje
         const cell = coordinates(i).map((value, axis) => value - first[axis])
         local[(cell[0] * extent[1] + cell[1]) * extent[2] + cell[2]] = 1
       }
-      prism = findObjectPrism(planes.map((values, axis) => values.slice(first[axis], last[axis] + 2)), local)
+      const localPlanes = planes.map((values, axis) => values.slice(first[axis], last[axis] + 2))
+      prism = findObjectPrism(localPlanes, local)
+      if (!prism) tunnel = findObjectTunnel(localPlanes, local)
     }
-    solids.push({ bounds, cuboid, prism })
+    solids.push({ bounds, cuboid, prism, tunnel })
   }
   return solids
 }

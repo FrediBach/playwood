@@ -337,3 +337,34 @@ test('four roots convert as a rectangular grid with cross hardware in one undo s
   await page.reload()
   expect(await saved(page)).toEqual(created)
 })
+
+test('a rectangular through-opening converts without covering the passage and survives undo and reload', async ({ page }) => {
+  await open(page)
+  const project: Project = { ...createStarterProject('blank'), constructionObjects: { roots: ['tunnel'], nodes: [
+    { id: 'outer', name: 'Outer', kind: 'box', visible: true, width: 1000, height: 1000, depth: 400, position: [0, 500, 0], rotation: [0, 0, 0] },
+    { id: 'cut', name: 'Opening', kind: 'box', visible: false, width: 400, height: 400, depth: 800, position: [0, 500, 0], rotation: [0, 0, 0] },
+    { id: 'tunnel', name: 'Through opening', kind: 'boolean', visible: true, operation: 'subtract', children: ['outer', 'cut'] },
+  ] } }
+  await page.getByLabel('Import project file').setInputFiles({ name: 'tunnel.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  await page.getByRole('tab', { name: 'Objects', exact: true }).click()
+  await page.getByRole('button', { name: 'Select object Through opening', exact: true }).click()
+  await convert(page)
+  await expect(page.getByRole('status').filter({ hasText: '16 panels' })).toContainText('1000 × 1000 × 400 mm')
+  await page.getByRole('checkbox', { name: 'Rectangular panels only', exact: true }).check()
+  await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeEnabled()
+  await expect.poll(() => page.getByRole('dialog').locator('canvas').evaluate(canvas => canvas.toDataURL().length)).toBeGreaterThan(10000)
+  await page.screenshot({ path: 'test-results/object-tunnel.png' })
+  expect(await saved(page)).toEqual(project)
+  await page.getByRole('button', { name: 'Create panels', exact: true }).click()
+  await expect.poll(async () => (await saved(page)).panels.length).toBe(16)
+  const created = await saved(page)
+  expect(created.panels.every(p => !p.customOutline)).toBe(true)
+  expect(created.connections).toHaveLength(32)
+  expect(created.constructionObjects!.nodes.find(n => n.id === 'tunnel')!.visible).toBe(false)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  await expect.poll(() => saved(page)).toEqual(project)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  await expect.poll(() => saved(page)).toEqual(created)
+  await page.reload()
+  expect(await saved(page)).toEqual(created)
+})

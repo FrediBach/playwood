@@ -78,3 +78,9 @@ The implementation plan has six stages.
    Run relevant Vitest coverage, the build, React Doctor and focused Playwright workflows, then broader suites for integration. Update the domain, state and rendering documentation plus the README and illustrated guide.
 
 The first implementation milestone would be **one editable blue box → validated six-panel construction → remove a panel → undo and reload correctly**. That provides a complete foundation for Boolean modeling and increasingly capable conversion.
+
+## Implementation progress
+
+The editable source forest, Boolean previews, transforms, conversion preview/transaction, undo/persistence, and ordinary-panel refinement are implemented. Current tested conversion families are cuboids; common-depth L/U/stepped profiles up to twelve edges; disconnected supported pieces; shared straight rows and complete planar compartment grids; and boxes with one rectangular through-opening. Rectangular-only conversion can partition profile closing faces into pieces supported by surrounding walls.
+
+Remaining geometry families include connected differing-depth compositions, enclosed cavities, and multiple or non-rectangular tunnels. Partial shared faces and three-dimensional compartment arrays also remain unsupported. Conversion errors explain rejected cases; spatial highlighting of failed regions remains to be implemented. Broader end-to-end verification should accompany completion of those families. These are remaining tasks, not claims that the complete plan is finished.

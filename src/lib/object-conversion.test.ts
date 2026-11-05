@@ -105,11 +105,11 @@ describe('Boolean conversion', () => {
       expect(result.project.constructionObjects).toEqual(before.constructionObjects)
       expect(source).toEqual(before)
     })
-  it.each(['cavity', 'tunnel', 'empty'] as const)('rejects %s without substituting its bounds', kind => {
+  it.each(['cavity', 'empty'] as const)('rejects %s without substituting its bounds', kind => {
     const source = booleanProject('subtract', 0)
     const cutter = source.constructionObjects!.nodes[1]
     if (cutter.kind !== 'box') throw new Error('Expected box')
-    if (kind === 'cavity' || kind === 'tunnel') { cutter.width = 1; cutter.height = 1; cutter.depth = kind === 'cavity' ? 1 : 800 }
+    if (kind === 'cavity') { cutter.width = 1; cutter.height = 1; cutter.depth = 1 }
     const before = structuredClone(source)
     expect(() => convertConstructionObject(source, ['result'], options)).toThrow(kind === 'empty' ? /empty result/ : /not a supported cuboid/)
     expect(source).toEqual(before)

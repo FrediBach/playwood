@@ -1,3 +1,4 @@
+import { findObjectTunnel, type ObjectTunnel } from './object-tunnel'
 import { findObjectSolids, type ObjectSolid } from './object-solids'
 import { findObjectPrism, type ObjectPrism } from './object-prism'
 import { Euler, Matrix4, Vector3 } from 'three'
@@ -5,7 +6,7 @@ import { parseConstructionObjects } from './construction-objects'
 import type { ConstructionObject, ConstructionObjects, Vec3 } from './types'
 
 export interface ObjectBounds { min: Vec3; max: Vec3 }
-export interface ObjectSurface { id: string; positions: Float32Array; volume: number; bounds: ObjectBounds | null; cuboid: boolean; prism?: ObjectPrism; solids?: ObjectSolid[] }
+export interface ObjectSurface { id: string; positions: Float32Array; volume: number; bounds: ObjectBounds | null; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel; solids?: ObjectSolid[] }
 export const OBJECT_CELL_LIMIT = 100000
 const SURFACE_VERTEX_LIMIT = 600000
 
@@ -98,8 +99,9 @@ export function evaluateConstructionObjects(input: ConstructionObjects, splitSol
     // Count cells, not approximate volumes: even a tiny cavity must prevent cuboid conversion.
     const cuboid = occupiedCount > 0 && occupiedCount === first.reduce((count, value, axis) => count * (last[axis] - value + 1), 1)
     const prism = !cuboid && occupiedCount ? findObjectPrism(planes, occupied) : undefined
-    const solids = splitSolids && occupiedCount && !cuboid && !prism ? findObjectSolids(planes, occupied) : undefined
-    return { id, solids, positions: new Float32Array(positions), volume, bounds: occupiedCount ? { min, max } : null, cuboid, prism }
+    const tunnel = !cuboid && !prism && occupiedCount ? findObjectTunnel(planes, occupied) : undefined
+    const solids = splitSolids && occupiedCount && !cuboid && !prism && !tunnel ? findObjectSolids(planes, occupied) : undefined
+    return { id, solids, positions: new Float32Array(positions), volume, bounds: occupiedCount ? { min, max } : null, cuboid, prism, tunnel }
   })
 }
 
