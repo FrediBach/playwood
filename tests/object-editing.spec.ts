@@ -18,16 +18,19 @@ async function apply(page: Page) {
   await expect(page.getByRole('button', { name: 'Apply object changes', exact: true })).not.toBeVisible()
   await ready(page)
 }
-async function bluePixels(page: Page) {
-  return page.locator('canvas').evaluate(canvas => {
+async function objectPixels(page: Page, color: 'blue' | 'magenta' = 'magenta') {
+  return page.locator('canvas').evaluate((canvas, color) => {
     const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
     if (!gl) return 0
     const pixels = new Uint8Array(canvas.width * canvas.height * 4)
     gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
-    let blue = 0
-    for (let i = 0; i < pixels.length; i += 4) if (pixels[i + 2] > pixels[i] + 20 && pixels[i + 2] > pixels[i + 1] + 5) blue++
-    return blue
-  })
+    let count = 0
+    for (let i = 0; i < pixels.length; i += 4) {
+      const [r, g, b] = pixels.subarray(i, i + 3)
+      if (color === 'blue' ? b > r + 20 && b > g + 5 : r > g + 20 && b > g + 20) count++
+    }
+    return count
+  }, color)
 }
 
 test('box drafts, Boolean operands, keyboard movement and persistence form one usable editing workflow', async ({ page }) => {
@@ -38,7 +41,13 @@ test('box drafts, Boolean operands, keyboard movement and persistence form one u
   await page.getByRole('tab', { name: 'Objects', exact: true }).click()
   await page.getByRole('button', { name: 'Add a box', exact: true }).click()
   await expect.poll(async () => (await savedObjects(page))?.nodes.length).toBe(1)
-  await expect.poll(() => bluePixels(page)).toBeGreaterThan(3000)
+  await expect.poll(() => objectPixels(page)).toBeGreaterThan(3000)
+  await page.getByRole('tab', { name: 'Panels', exact: true }).click()
+  await expect.poll(() => objectPixels(page, 'blue')).toBeGreaterThan(3000)
+  await expect.poll(() => objectPixels(page)).toBeLessThan(100)
+  await page.getByRole('tab', { name: 'Objects', exact: true }).click()
+  await page.getByRole('button', { name: 'Select object Box', exact: true }).click()
+  await expect.poll(() => objectPixels(page)).toBeGreaterThan(3000)
   const original = await savedObjects(page)
   await field(page, 'Box width', '800')
   await ready(page)
@@ -62,7 +71,7 @@ test('box drafts, Boolean operands, keyboard movement and persistence form one u
   await page.getByRole('button', { name: 'Subtract', exact: true }).click()
   await expect.poll(async () => (await savedObjects(page)).roots.length).toBe(1)
   await ready(page)
-  await expect.poll(() => bluePixels(page)).toBeGreaterThan(1000)
+  await expect.poll(() => objectPixels(page)).toBeGreaterThan(1000)
   const beforeMove = await savedObjects(page)
   const canvas = page.getByLabel('3D preview canvas', { exact: true })
   await canvas.focus()
@@ -84,9 +93,9 @@ test('box drafts, Boolean operands, keyboard movement and persistence form one u
   await page.getByRole('button', { name: 'Select object subtract', exact: true }).click()
   await page.getByRole('button', { name: 'Show object subtract', exact: true }).click()
   await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
-  await expect.poll(() => bluePixels(page)).toBeLessThan(100)
+  await expect.poll(() => objectPixels(page)).toBeLessThan(100)
   await page.getByRole('button', { name: 'Studio', exact: true }).click()
-  await expect.poll(() => bluePixels(page)).toBeGreaterThan(1000)
+  await expect.poll(() => objectPixels(page)).toBeGreaterThan(1000)
   await page.screenshot({ path: 'test-results/object-editor-desktop.png' })
   const final = await savedObjects(page)
   await page.reload()

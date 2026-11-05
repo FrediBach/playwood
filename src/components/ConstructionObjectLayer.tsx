@@ -1,7 +1,7 @@
-import { useEffect, useEffectEvent, useRef } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import { Edges } from '@react-three/drei'
-import { DoubleSide } from 'three'
+import { BufferAttribute, BufferGeometry, DoubleSide } from 'three'
 import type { ConversionRegion } from '@/lib/object-conversion-diagnostics'
 import type { ObjectBounds } from '@/lib/object-geometry'
 import { constructionBounds, constructionLeaves, type ObjectSurface } from '@/lib/object-geometry'
@@ -40,11 +40,8 @@ export function ConstructionObjectLayer(props: ConstructionLayerProps) {
         distance={gesture.distance} limited={gesture.limited} keyboardStep={props.step}
         onResizeStart={id=>gesture.start(id)} onResizeMove={gesture.update} onResizeEnd={gesture.end}/>
     </>}
-    {surfaces?.filter(surface => surface.positions.length).map(surface => <mesh key={surface.id} name={`Object ${surface.id}`} userData={active ? { objectId: surface.id } : undefined} raycast={active ? undefined : noRaycast}
-      onClick={active ? event => { event.stopPropagation(); onSelect(surface.id, event.shiftKey || event.metaKey || event.ctrlKey) } : undefined}>
-      <bufferGeometry><bufferAttribute attach="attributes-position" args={[surface.positions, 3]}/></bufferGeometry>
-      <meshBasicMaterial color={selected.has(surface.id) && active ? '#187cd2' : '#3b91db'} transparent opacity={active ? 0.27 : 0.12} depthWrite={false} side={DoubleSide}/>
-    </mesh>)}
+    {surfaces?.filter(surface => surface.positions.length).map(surface => <ObjectSurfaceMesh key={surface.id} surface={surface}
+      selected={selected.has(surface.id) && active} active={active} onSelect={onSelect}/>)}
     {props.highlightedRegions?.map(region => <mesh key={region.id} name={`Affected source region ${region.name}`} raycast={noRaycast}
       position={region.bounds.min.map((value, axis) => (value + region.bounds.max[axis]) / 2000) as Vec3}>
       <boxGeometry args={region.bounds.max.map((value, axis) => Math.max(1, value - region.bounds.min[axis]) / 1000) as Vec3}/>
@@ -53,9 +50,21 @@ export function ConstructionObjectLayer(props: ConstructionLayerProps) {
     </mesh>)}
     {boxes.map(box => <mesh key={box.id} name={`Object outline ${box.id}`} userData={{objectId:box.id}} position={box.position.map(value => value / 1000) as Vec3} rotation={box.rotation}>
       <boxGeometry args={[box.width / 1000, box.height / 1000, box.depth / 1000]}/>
-      <meshBasicMaterial visible={false}/><Edges color="#1769aa" raycast={noRaycast} depthTest={false}/>
+      <meshBasicMaterial visible={false}/><Edges color="#d52cb8" transparent opacity={0.65} depthWrite={false} raycast={noRaycast} depthTest={false}/>
     </mesh>)}
   </group>
+}
+
+function ObjectSurfaceMesh({ surface, selected, active, onSelect }: {
+  surface: ObjectSurface; selected: boolean; active: boolean; onSelect: ConstructionLayerProps['onSelect'];
+}) {
+  const geometry = useMemo(() => new BufferGeometry().setAttribute('position', new BufferAttribute(surface.positions, 3)), [surface.positions])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  return <mesh geometry={geometry} name={`Object ${surface.id}`} userData={active ? { objectId: surface.id } : undefined} raycast={active ? undefined : noRaycast}
+    onClick={active ? event => { event.stopPropagation(); onSelect(surface.id, event.shiftKey || event.metaKey || event.ctrlKey) } : undefined}>
+    <meshBasicMaterial color={selected ? '#d52cb8' : '#3b91db'} transparent opacity={active ? 0.27 : 0.12} depthWrite={false} side={DoubleSide}/>
+    <Edges geometry={geometry} color={selected ? '#d52cb8' : '#1769aa'} transparent opacity={active ? 0.65 : 0.35} depthWrite={false} depthTest={false} raycast={noRaycast}/>
+  </mesh>
 }
 
 function ObjectKeyboardMovement({ objects, selectedIds, active, movementEnabled, onMove, step }: ConstructionLayerProps) {
