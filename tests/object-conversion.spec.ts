@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createStarterProject } from '../src/lib/model'
+import { createStarterProject, getProjectBounds, resolvePanels } from '../src/lib/model'
 import type { Project } from '../src/lib/types'
 const key = 'playwood-studio-project-v1'
 async function saved(page: Page): Promise<Project> { return page.evaluate(key => JSON.parse(localStorage.getItem(key)!), key) }
@@ -113,6 +113,10 @@ test('a touching Boolean union converts once with no internal wall; a cavity rep
   await importProject(cavity)
   await page.getByRole('button', { name: 'Convert to panels', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('not a supported cuboid')
+  await expect(page.getByRole('region', { name: 'Conversion failure preview', exact: true })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Affected source regions', exact: true })).toHaveText('Combined')
+  await expect.poll(() => page.getByRole('dialog').locator('canvas').evaluate(canvas => canvas.toDataURL().length)).toBeGreaterThan(10000)
+  await page.screenshot({ path: 'test-results/object-failure-cavity.png' })
   await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeDisabled()
   await page.keyboard.press('Escape')
   await expect.poll(() => saved(page)).toEqual(cavity)
@@ -212,9 +216,12 @@ for (const separation of [600, 1200]) test(`multiple roots at ${separation} mm c
   if (shared) {
     await page.getByLabel('Conversion thickness', { exact: true }).fill('16')
     await expect(page.getByRole('alert')).toContainText('18–19 mm')
+    await expect(page.getByRole('list', { name: 'Affected source regions', exact: true })).toContainText('First compartment')
+    await expect(page.getByRole('list', { name: 'Affected source regions', exact: true })).toContainText('Second compartment')
     await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeDisabled()
     await page.getByLabel('Conversion thickness', { exact: true }).fill('18')
     await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeEnabled()
+    await expect(page.getByRole('region', { name: 'Conversion failure preview', exact: true })).toHaveCount(0)
     await expect(page.getByText('First compartment · Clear interior 573 × 564 × 364 mm · Shared divider', { exact: true })).toBeVisible()
   }
   await expect.poll(() => page.getByRole('dialog').locator('canvas').evaluate(canvas => canvas.toDataURL().length)).toBeGreaterThan(10000)
@@ -367,4 +374,69 @@ test('a rectangular through-opening converts without covering the passage and su
   await expect.poll(() => saved(page)).toEqual(created)
   await page.reload()
   expect(await saved(page)).toEqual(created)
+})
+
+
+test('a blind recess preserves its internal depth and commits one connected rectangular construction', async ({ page }) => {
+  await open(page)
+  const project: Project = { ...createStarterProject('blank'), constructionObjects: { roots: ['recess'], nodes: [
+    { id: 'outer', name: 'Outer', kind: 'box', visible: true, width: 1000, height: 1000, depth: 700, position: [0, 500, 0], rotation: [0, 0, 0] },
+    { id: 'cut', name: 'Pocket', kind: 'box', visible: false, width: 400, height: 400, depth: 800, position: [0, 500, 350], rotation: [0, 0, 0] },
+    { id: 'recess', name: 'Blind recess', kind: 'boolean', visible: true, operation: 'subtract', children: ['outer', 'cut'] },
+  ] } }
+  await page.getByLabel('Import project file').setInputFiles({ name: 'recess.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  await page.getByRole('tab', { name: 'Objects', exact: true }).click()
+  await page.getByRole('button', { name: 'Select object Blind recess', exact: true }).click()
+  await convert(page)
+  await expect(page.getByRole('status').filter({ hasText: '14 panels' })).toContainText('1000 × 1000 × 700 mm')
+  await page.getByRole('checkbox', { name: 'Rectangular panels only', exact: true }).check()
+  await page.getByLabel('Conversion thickness', { exact: true }).fill('19')
+  await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeEnabled()
+  await expect.poll(() => page.getByRole('dialog').locator('canvas').evaluate(canvas => canvas.toDataURL().length)).toBeGreaterThan(10000)
+  await page.screenshot({ path: 'test-results/object-recess.png' })
+  expect(await saved(page)).toEqual(project)
+  await page.getByRole('button', { name: 'Create panels', exact: true }).click()
+  await expect.poll(async () => (await saved(page)).panels.length).toBe(14)
+  const created = await saved(page)
+  expect(created.panels.every(p => !p.customOutline && p.thickness === 19)).toBe(true)
+  expect(created.connections).toHaveLength(28)
+  const back = resolvePanels(created).find(p => p.name.endsWith('Recess Back'))!
+  expect(getProjectBounds([back]).max[2]).toBeCloseTo(-50, 6)
+  expect(created.constructionObjects!.nodes.find(n => n.id === 'recess')!.visible).toBe(false)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  await expect.poll(() => saved(page)).toEqual(project)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  await expect.poll(() => saved(page)).toEqual(created)
+  await page.reload()
+  expect(await saved(page)).toEqual(created)
+})
+
+
+test('failure preview identifies only the unbuildable source and clears on project replacement', async ({ page }) => {
+  await open(page)
+  const project: Project = { ...createStarterProject('blank'), constructionObjects: { roots: ['valid', 'narrow'], nodes: [
+    { id: 'valid', name: 'Valid box', kind: 'box', visible: true, width: 600, height: 600, depth: 400, position: [0, 300, 0], rotation: [0, 0, 0] },
+    { id: 'narrow', name: 'Narrow box', kind: 'box', visible: false, width: 50, height: 600, depth: 400, position: [1200, 300, 0], rotation: [0, 0, 0] },
+  ] } }
+  await page.getByLabel('Import project file').setInputFiles({ name: 'failure.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  await page.getByRole('tab', { name: 'Objects', exact: true }).click()
+  await page.getByRole('button', { name: 'Select object Valid box', exact: true }).click()
+  await page.getByRole('button', { name: 'Select object Narrow box', exact: true }).click({ modifiers: ['Shift'] })
+  await page.getByRole('button', { name: 'Convert to panels', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('cuts')
+  await expect(page.getByRole('list', { name: 'Affected source regions', exact: true })).toHaveText('Narrow box')
+  await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeDisabled()
+  await expect.poll(() => page.getByRole('dialog').locator('canvas').evaluate(canvas => canvas.toDataURL().length)).toBeGreaterThan(10000)
+  await page.screenshot({ path: 'test-results/object-failure-region.png' })
+  expect(await saved(page)).toEqual(project)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: 'Cancel', exact: true }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeInViewport()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  const replacement = { ...createStarterProject('blank'), name: 'Replacement' }
+  await page.getByLabel('Import project file').setInputFiles({ name: 'replacement.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(replacement)) })
+  await expect(page.getByRole('alert')).toContainText('project changed')
+  await expect(page.getByRole('region', { name: 'Conversion failure preview', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect.poll(() => saved(page)).toEqual(replacement)
 })

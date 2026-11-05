@@ -1,5 +1,6 @@
+import { ObjectConversionError, withConversionRegions, type ConversionRegion } from './object-conversion-diagnostics'
 import { getConnectorMaterial } from './connector-options'
-import { solveObjectTunnel } from './object-tunnel-solver'
+import { solveObjectRecess, solveObjectTunnel } from './object-tunnel-solver'
 import { solveObjectPrism } from './object-prism-solver'
 import { cuboidGridLayout, solveCuboidGrid } from './object-grid'
 import { solveCuboidCompartments } from './object-compartments'
@@ -28,18 +29,18 @@ export function objectConversionReason(project: Project, ids: readonly string[])
 }
 
 /** Separate roots retain compartment boundaries. Matching cuboid rows and rectangular grids share their dividing walls. */
-function compartmentGroups(shapes: ObjectSurface[]) {
+function compartmentGroups(shapes: ObjectSurface[], region: (shape: ObjectSurface) => ConversionRegion) {
   const edgeContacts: [number, number][] = []
   const neighbors = shapes.map(() => [] as { index: number; axis: number }[])
   for (let a = 0; a < shapes.length; a++) for (let b = a + 1; b < shapes.length; b++) {
     const first = shapes[a].bounds!, second = shapes[b].bounds!
     const overlaps = [0, 1, 2].map(axis => Math.min(first.max[axis], second.max[axis]) - Math.max(first.min[axis], second.min[axis]))
     if (overlaps.some(value => value < -1e-6)) continue
-    if (overlaps.every(value => value > 1e-6)) throw new Error('Selected object bounds overlap. Combine overlapping sources with a Boolean operation before converting.')
+    if (overlaps.every(value => value > 1e-6)) throw new ObjectConversionError('Selected object bounds overlap. Combine overlapping sources with a Boolean operation before converting.', [region(shapes[a]), region(shapes[b])])
     const touching = overlaps.flatMap((value, axis) => Math.abs(value) <= 1e-6 ? [axis] : [])
     if (touching.length > 1) { edgeContacts.push([a, b]); continue }
     const axis = touching[0]
-    if (touching.length !== 1 || !shapes[a].cuboid || !shapes[b].cuboid || [0, 1, 2].some(i => i !== axis && (Math.abs(first.min[i] - second.min[i]) > 1e-6 || Math.abs(first.max[i] - second.max[i]) > 1e-6))) throw new Error('Touching compartments need matching full cuboid faces. Separate them or combine them with a Boolean operation.')
+    if (touching.length !== 1 || !shapes[a].cuboid || !shapes[b].cuboid || [0, 1, 2].some(i => i !== axis && (Math.abs(first.min[i] - second.min[i]) > 1e-6 || Math.abs(first.max[i] - second.max[i]) > 1e-6))) throw new ObjectConversionError('Touching compartments need matching full cuboid faces. Separate them or combine them with a Boolean operation.', [region(shapes[a]), region(shapes[b])])
     neighbors[a].push({ index: b, axis }); neighbors[b].push({ index: a, axis })
   }
   const visited = new Set<number>(), groups: { shapes: ObjectSurface[]; axis?: number; grid?: ReturnType<typeof cuboidGridLayout> }[] = []
@@ -55,10 +56,10 @@ function compartmentGroups(shapes: ObjectSurface[]) {
     const axis = axes.values().next().value
     const members = indices.map(index => shapes[index])
     if (axis !== undefined) members.sort((a, b) => a.bounds!.min[axis] - b.bounds!.min[axis])
-    const grid = axes.size > 1 ? cuboidGridLayout(members.map(shape => shape.bounds!)) : undefined
+    const grid = axes.size > 1 ? withConversionRegions(members.map(region), () => cuboidGridLayout(members.map(shape => shape.bounds!))) : undefined
     groups.push({ shapes: members, axis, grid })
   }
-  for (const [a, b] of edgeContacts) if (!groups.some(group => group.grid && group.shapes.includes(shapes[a]) && group.shapes.includes(shapes[b]))) throw new Error('Touching compartments need matching full cuboid faces or a complete rectangular grid. Edge/corner contacts alone cannot be converted.')
+  for (const [a, b] of edgeContacts) if (!groups.some(group => group.grid && group.shapes.includes(shapes[a]) && group.shapes.includes(shapes[b]))) throw new ObjectConversionError('Touching compartments need matching full cuboid faces or a complete rectangular grid. Edge/corner contacts alone cannot be converted.', [region(shapes[a]), region(shapes[b])])
   return groups
 }
 
@@ -78,14 +79,15 @@ export function convertConstructionObject(source: Project, ids: readonly string[
       return { ...shape, ...piece, id }
     })
   })
+  const region = (shape: ObjectSurface): ConversionRegion => ({ id: shape.id, name: names.get(shape.id)!, bounds: shape.bounds! })
   for (const shape of shapes) {
     if (!shape.bounds) throw new Error(`${names.get(shape.id)} has an empty result. Edit its Boolean operands before converting.`)
-    if (!shape.cuboid && !shape.prism && !shape.tunnel) throw new Error(`${names.get(shape.id)} is not a supported cuboid, rectangular tunnel, or common-depth profile with 6–12 edges. Cavities, other tunnel shapes, and changing-depth profiles are not supported yet.`)
+    if (!shape.cuboid && !shape.prism && !shape.tunnel && !shape.recess) throw new ObjectConversionError(`${names.get(shape.id)} is not a supported cuboid, rectangular tunnel/recess, or common-depth profile with 6–12 edges. Enclosed cavities, other opening shapes, and general changing-depth profiles are not supported yet.`, [region(shape)])
   }
-  const groups = compartmentGroups(shapes)
-  const panelCount = groups.reduce((sum, group) => sum + (group.grid ? 6 * group.shapes.length - group.grid.sharedWalls : group.axis !== undefined ? 5 * group.shapes.length + 1 : group.shapes[0].tunnel ? 16 : group.shapes[0].prism ? group.shapes[0].prism!.outline.length + 2 : 6), 0)
+  const groups = compartmentGroups(shapes, region)
+  const panelCount = groups.reduce((sum, group) => sum + (group.grid ? 6 * group.shapes.length - group.grid.sharedWalls : group.axis !== undefined ? 5 * group.shapes.length + 1 : group.shapes[0].recess ? 14 : group.shapes[0].tunnel ? 16 : group.shapes[0].prism ? group.shapes[0].prism!.outline.length + 2 : 6), 0)
   if (source.panels.length + panelCount > 200) throw new Error('Projects support up to 200 panels.')
-  const connectionCount = groups.reduce((sum, group) => sum + (group.grid ? group.grid.connectionCount : group.axis !== undefined ? 12 * group.shapes.length : group.shapes[0].tunnel ? 32 : group.shapes[0].prism ? 3 * group.shapes[0].prism!.outline.length : 12), 0)
+  const connectionCount = groups.reduce((sum, group) => sum + (group.grid ? group.grid.connectionCount : group.axis !== undefined ? 12 * group.shapes.length : group.shapes[0].recess ? 28 : group.shapes[0].tunnel ? 32 : group.shapes[0].prism ? 3 * group.shapes[0].prism!.outline.length : 12), 0)
   if (source.connections.length + connectionCount > 400) throw new Error('Projects support up to 400 connections.')
   let generated: Project = { version: 1, name: 'Converted objects', panels: [], connections: [] }
   const compartments: { id: string; name: string; dimensions: Vec3; clearDimensions?: Vec3; sharedWall: boolean }[] = []
@@ -93,11 +95,11 @@ export function convertConstructionObject(source: Project, ids: readonly string[
     const shape = group.shapes[0], bounds = shape.bounds!
     const [width, height, depth] = bounds.max.map((v, axis) => v - bounds.min[axis])
     const shared = group.axis !== undefined
-    const solved = group.grid ? solveCuboidGrid(group.shapes.map(shape => shape.bounds!), options.thickness) : shared ? solveCuboidCompartments(group.shapes.map(shape => shape.bounds!), group.axis!, options.thickness)
-      : shape.tunnel ? solveObjectTunnel(shape.tunnel, options.thickness) : shape.prism ? solveObjectPrism(shape.prism, options.thickness, options.rectangularOnly) : solveCuboid({ width, height, depth, thickness: options.thickness })
+    const solved = withConversionRegions(group.shapes.map(region), () => group.grid ? solveCuboidGrid(group.shapes.map(shape => shape.bounds!), options.thickness) : shared ? solveCuboidCompartments(group.shapes.map(shape => shape.bounds!), group.axis!, options.thickness)
+      : shape.recess ? solveObjectRecess(shape.recess, options.thickness) : shape.tunnel ? solveObjectTunnel(shape.tunnel, options.thickness) : shape.prism ? solveObjectPrism(shape.prism, options.thickness, options.rectangularOnly) : solveCuboid({ width, height, depth, thickness: options.thickness }))
     if (source.panels.length + generated.panels.length + solved.panels.length > 200) throw new Error('Projects support up to 200 panels.')
     if (source.connections.length + generated.connections.length + solved.connections.length > 400) throw new Error('Projects support up to 400 connections.')
-    const delta: Vec3 = shared || shape.prism || shape.tunnel ? [0, 0, 0] : [(bounds.min[0] + bounds.max[0]) / 2, bounds.min[1], (bounds.min[2] + bounds.max[2]) / 2]
+    const delta: Vec3 = shared || shape.prism || shape.tunnel || shape.recess ? [0, 0, 0] : [(bounds.min[0] + bounds.max[0]) / 2, bounds.min[1], (bounds.min[2] + bounds.max[2]) / 2]
     const name = group.shapes.map(shape => names.get(shape.id)).join(' + ').slice(0, 100)
     const next: Project = { ...generated,
       panels: [...generated.panels, ...solved.panels.map(panel => ({ ...panel, name: `${name} · ${panel.name}`, material: options.material, color: options.color, finishCoverage: options.finishCoverage,

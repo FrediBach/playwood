@@ -498,7 +498,7 @@ function World(props: WorldProps) {
     if (props.constructionLayer && !realisticPreview && !exploded) {
       const layer = props.constructionLayer
       const visibleRoots = layer.objects.roots.filter(id => layer.objects.nodes.find(node => node.id === id)?.visible)
-      const objectBounds = constructionBounds(layer.objects, [...visibleRoots, ...(layer.active ? layer.selectedIds : [])])
+      const objectBounds = layer.previewBounds ?? constructionBounds(layer.objects, [...visibleRoots, ...(layer.active ? layer.selectedIds : [])])
       if (objectBounds) {
         if (!displayPanels.length && !previewPanels.length && !attachmentBoundsPanels.length) bounds.makeEmpty()
         bounds.expandByPoint(vector(objectBounds.min)); bounds.expandByPoint(vector(objectBounds.max))

@@ -2,6 +2,8 @@ import { useEffect, useEffectEvent, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import { Edges } from '@react-three/drei'
 import { DoubleSide } from 'three'
+import type { ConversionRegion } from '@/lib/object-conversion-diagnostics'
+import type { ObjectBounds } from '@/lib/object-geometry'
 import { constructionBounds, constructionLeaves, type ObjectSurface } from '@/lib/object-geometry'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
 import type { ConstructionObjects, Vec3 } from '@/lib/types'
@@ -11,6 +13,8 @@ import type { useObjectGesture } from '@/hooks/use-object-gesture'
 
 export interface ConstructionLayerProps {
   objects: ConstructionObjects;
+  highlightedRegions?: ConversionRegion[];
+  previewBounds?: ObjectBounds;
   surfaces?: ObjectSurface[];
   selectedIds: readonly string[];
   active: boolean;
@@ -40,6 +44,12 @@ export function ConstructionObjectLayer(props: ConstructionLayerProps) {
       onClick={active ? event => { event.stopPropagation(); onSelect(surface.id, event.shiftKey || event.metaKey || event.ctrlKey) } : undefined}>
       <bufferGeometry><bufferAttribute attach="attributes-position" args={[surface.positions, 3]}/></bufferGeometry>
       <meshBasicMaterial color={selected.has(surface.id) && active ? '#187cd2' : '#3b91db'} transparent opacity={active ? 0.27 : 0.12} depthWrite={false} side={DoubleSide}/>
+    </mesh>)}
+    {props.highlightedRegions?.map(region => <mesh key={region.id} name={`Affected source region ${region.name}`} raycast={noRaycast}
+      position={region.bounds.min.map((value, axis) => (value + region.bounds.max[axis]) / 2000) as Vec3}>
+      <boxGeometry args={region.bounds.max.map((value, axis) => Math.max(1, value - region.bounds.min[axis]) / 1000) as Vec3}/>
+      <meshBasicMaterial color="#dc392e" transparent opacity={0.08} depthWrite={false}/>
+      <Edges color="#dc392e" depthTest={false} raycast={noRaycast}/>
     </mesh>)}
     {boxes.map(box => <mesh key={box.id} name={`Object outline ${box.id}`} userData={{objectId:box.id}} position={box.position.map(value => value / 1000) as Vec3} rotation={box.rotation}>
       <boxGeometry args={[box.width / 1000, box.height / 1000, box.depth / 1000]}/>
