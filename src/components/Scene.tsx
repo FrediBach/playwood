@@ -21,7 +21,7 @@ import { useSceneSnapFeedback } from '@/hooks/use-scene-snap-feedback'
 import { PreviewFurnishings } from './PreviewFurnishings'
 import type { FurnishingPlacement } from '@/lib/preview-furnishings'
 import { DesignConstraintOverlay } from './DesignConstraintOverlay'
-import { getRoomLayout } from './room-layout'
+import { getRoomLayout, PREVIEW_FLOOR_Y } from './room-layout'
 import { RobotVacuum } from './RobotVacuum'
 import { createVacuumPlan, type VacuumPoint } from './robot-vacuum-navigation'
 import { getConnectorKeyboardSlides, getConnectorRail } from '@/lib/connector-movement'
@@ -516,7 +516,7 @@ function World(props: WorldProps) {
     return bounds
   }, [displayPanels, previewPanels, attachmentBoundsPanels, props.designConstraint, props.spaceConstraint, props.constructionLayer, exploded, realisticPreview])
   const shownPanels = displayPanels.filter(panel => panel.visible)
-  const floorY = props.spaceConstraint?.enabled || props.hasFloorConstraint || props.designConstraint?.kind === 'floor' ? -0.012 : bounds.min.y - 0.012
+  const floorY = PREVIEW_FLOOR_Y
   const feedback = useSceneSnapFeedback(props)
   return <>
     <PreviewBoxSelection {...props} onPreview={props.onBoxPreview}/>

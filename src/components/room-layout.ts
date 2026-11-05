@@ -1,5 +1,8 @@
 import * as THREE from 'three'
 
+// Leave clearance for hardware below panels resting at world Y = 0.
+export const PREVIEW_FLOOR_Y = -0.012
+
 // All room dimensions are meters. Reference furnishings deliberately keep their
 // real dimensions when the user's assembly grows or moves. Room placement is
 // anchored to the world origin so translating a creation does not move its wall.
@@ -16,7 +19,7 @@ export function getRoomLayout(bounds: THREE.Box3) {
   const artAboveFurnitureY = Math.max(1.85, size.y + artHalfHeight + artMargin)
   const artFitsAboveFurniture = artAboveFurnitureY + artHalfHeight + artMargin <= height
   return {
-    floorY: -0.012,
+    floorY: PREVIEW_FLOOR_Y,
     centerX: 0,
     backZ, leftX, rightX,
     width: rightX - leftX,

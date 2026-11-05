@@ -31,6 +31,30 @@ async function expectRenderedRoom(page: Page) {
   await expect(page.getByRole('alert')).not.toBeVisible()
 }
 
+test('Studio keeps the floor fixed for elevated furniture and Place on floor grounds it', async ({ page }) => {
+  await page.goto('/')
+  await importPanels(page, [createPanel({ name: 'Raised panel', width: 600, height: 400, position: [0, 700, 0] })])
+  const grid = page.getByRole('button', { name: 'Show grid', exact: true })
+  if (await grid.getAttribute('aria-pressed') !== 'true') await grid.click()
+  const floorHeight = () => page.locator('canvas').evaluate(async canvas => {
+    const url = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/@react-three_fiber.js'))!
+    const { _roots } = await import(url)
+    const { scene } = _roots.get(canvas).store.getState()
+    return scene.getObjectByName('studio-ground-grid')?.position.y
+  })
+  await expect.poll(floorHeight).toBe(-0.012)
+  const raised = await exportedProject(page)
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await expectRenderedRoom(page)
+  expect(await exportedProject(page)).toEqual(raised)
+  await page.getByRole('button', { name: 'Studio', exact: true }).click()
+  await page.getByRole('button', { name: 'Move creation', exact: true }).click()
+  await page.getByRole('button', { name: 'Place on floor', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Move creation', exact: true }).click()
+  expect((await exportedProject(page)).panels[0].position[1]).toBe(200)
+  await expect.poll(floorHeight).toBe(-0.012)
+})
+
 test('room preview preserves the assembly, selection and studio controls', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
