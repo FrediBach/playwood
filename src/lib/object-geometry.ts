@@ -7,7 +7,7 @@ import { parseConstructionObjects } from './construction-objects'
 import type { ConstructionObject, ConstructionObjects, Vec3 } from './types'
 
 export interface ObjectBounds { min: Vec3; max: Vec3 }
-export interface ObjectSurface { id: string; positions: Float32Array; volume: number; bounds: ObjectBounds | null; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel; recess?: ObjectRecess; notches?: ObjectNotches; solids?: ObjectSolid[] }
+export interface ObjectSurface { id: string; positions: Float32Array; volume: number; bounds: ObjectBounds | null; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel; recess?: ObjectRecess; notches?: ObjectNotches; cross?: ObjectNotches; solids?: ObjectSolid[] }
 export const OBJECT_CELL_LIMIT = 100000
 const SURFACE_VERTEX_LIMIT = 600000
 
@@ -47,7 +47,13 @@ export function evaluateConstructionObjects(input: ConstructionObjects, splitSol
   let remainingCells = OBJECT_CELL_LIMIT, remainingVertices = SURFACE_VERTEX_LIMIT
   return objects.roots.filter(id => byId.get(id)!.visible).map(id => {
     const boxes = constructionLeaves(objects, [id]).map(box => ({ id: box.id, ...constructionBoxBounds(box) }))
-    const planes = [0, 1, 2].map(axis => [...new Set(boxes.flatMap(box => [box.min[axis], box.max[axis]]))].sort((a, b) => a - b))
+    // Coalesce only floating-point roundoff from quarter-turn transforms.
+    // Meaningful small gaps remain separate coordinate intervals.
+    const planes = [0, 1, 2].map(axis => {
+      const values = [...new Set(boxes.flatMap(box => [box.min[axis], box.max[axis]]))].sort((a, b) => a - b)
+      const roundoff = 8 * Number.EPSILON * Math.max(1, ...values.map(Math.abs))
+      return values.filter((value, i) => i === 0 || value - values[i - 1] > roundoff)
+    })
     const [nx, ny, nz] = planes.map(axis => axis.length - 1), count = nx * ny * nz
     remainingCells -= count
     if (remainingCells < 0) throw new Error('Object preview is too complex. Use fewer boxes or align their boundaries.')

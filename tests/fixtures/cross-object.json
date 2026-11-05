@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "name": "The everyday shelf",
+  "panels": [],
+  "connections": [],
+  "constructionObjects": {
+    "roots": [
+      "ef5c741f-9e3c-4e8b-9bfe-b244219a7e2e"
+    ],
+    "nodes": [
+      {
+        "id": "9cd21812-58f2-4d6c-8955-1efce866794b",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 250,
+        "height": 1000,
+        "depth": 250,
+        "position": [
+          -182.20108283755346,
+          568.0897558660016,
+          -76.18474821101151
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "0d975b52-b99b-40e2-a1cd-cce52128e9d6",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 250,
+        "height": 1000,
+        "depth": 250,
+        "position": [
+          -182.20108283755377,
+          193.0897558660016,
+          -451.18474821101154
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "7c930c9c-e496-4ac9-b702-46840ec46137",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 250,
+        "height": 1000,
+        "depth": 250,
+        "position": [
+          192.79891716244617,
+          193.0897558660016,
+          -76.1847482110116
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          -1.5707963267948966
+        ]
+      },
+      {
+        "id": "e1a93a8e-c027-4868-a34e-86d7608d869d",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 250,
+        "height": 1000,
+        "depth": 250,
+        "position": [
+          -182.20108283755383,
+          193.0897558660016,
+          298.81525178898835
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          -3.141592653589793
+        ]
+      },
+      {
+        "id": "b78186f8-797a-4507-b035-ba03725d5beb",
+        "name": "Box",
+        "visible": true,
+        "kind": "box",
+        "width": 250,
+        "height": 1000,
+        "depth": 250,
+        "position": [
+          -557.2010828375535,
+          193.0897558660016,
+          -76.18474821101154
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          1.5707963267948966
+        ]
+      },
+      {
+        "id": "ef5c741f-9e3c-4e8b-9bfe-b244219a7e2e",
+        "name": "union",
+        "visible": true,
+        "kind": "boolean",
+        "operation": "union",
+        "children": [
+          "9cd21812-58f2-4d6c-8955-1efce866794b",
+          "b78186f8-797a-4507-b035-ba03725d5beb",
+          "e1a93a8e-c027-4868-a34e-86d7608d869d",
+          "7c930c9c-e496-4ac9-b702-46840ec46137",
+          "0d975b52-b99b-40e2-a1cd-cce52128e9d6"
+        ]
+      }
+    ]
+  }
+}

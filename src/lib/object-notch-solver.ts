@@ -26,49 +26,68 @@ function boundaryFaces(shape: ObjectNotches, thickness: number): Face[] {
       const neighbor = [...cell]; neighbor[axis] += sign
       if (at(cell) && !at(neighbor)) cells.set(`${a},${b}`, cell)
     }
-    const edges = new Map<string, Edge>()
-    const add = (cell: number[], a: Point, b: Point, otherAxis: number, direction: number) => {
-      const neighbor = [...cell]; neighbor[otherAxis] += direction
-      const key = a.join(',')
-      if (edges.has(key)) throw new Error('Corner cutouts must leave simple, separate face boundaries.')
-      edges.set(key, { start: a, end: b, inset: CONNECTOR_PROFILES['90'].seat + (at(neighbor) ? -1 : 1) * thickness / 2 })
+    // Separate coplanar patches before tracing: cross arms can meet only at a
+    // vertex on this plane while belonging to different faces of the shell.
+    const patches: Map<string, number[]>[] = []
+    const pending = new Map(cells)
+    while (pending.size) {
+      const first = pending.keys().next().value!, patch = new Map<string, number[]>(), queue = [first]
+      for (let i = 0; i < queue.length; i++) {
+        const key = queue[i], cell = pending.get(key)
+        if (!cell) continue
+        pending.delete(key); patch.set(key, cell)
+        for (const [da, db] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          const next = `${cell[u] + da},${cell[v] + db}`
+          if (pending.has(next)) queue.push(next)
+        }
+      }
+      patches.push(patch)
     }
-    for (const cell of cells.values()) {
-      const a = cell[u], b = cell[v]
-      if (!cells.has(`${a},${b - 1}`)) add(cell, [a, b], [a + 1, b], v, -1)
-      if (!cells.has(`${a + 1},${b}`)) add(cell, [a + 1, b], [a + 1, b + 1], u, 1)
-      if (!cells.has(`${a},${b + 1}`)) add(cell, [a + 1, b + 1], [a, b + 1], v, 1)
-      if (!cells.has(`${a - 1},${b}`)) add(cell, [a, b + 1], [a, b], u, -1)
+    for (const cells of patches) {
+      const edges = new Map<string, Edge>()
+      const add = (cell: number[], a: Point, b: Point, otherAxis: number, direction: number) => {
+        const neighbor = [...cell]; neighbor[otherAxis] += direction
+        const key = a.join(',')
+        if (edges.has(key)) throw new Error('Shell faces must leave simple, separate face boundaries.')
+        edges.set(key, { start: a, end: b, inset: CONNECTOR_PROFILES['90'].seat + (at(neighbor) ? -1 : 1) * thickness / 2 })
+      }
+      for (const cell of cells.values()) {
+        const a = cell[u], b = cell[v]
+        if (!cells.has(`${a},${b - 1}`)) add(cell, [a, b], [a + 1, b], v, -1)
+        if (!cells.has(`${a + 1},${b}`)) add(cell, [a + 1, b], [a + 1, b + 1], u, 1)
+        if (!cells.has(`${a},${b + 1}`)) add(cell, [a + 1, b + 1], [a, b + 1], v, 1)
+        if (!cells.has(`${a - 1},${b}`)) add(cell, [a, b + 1], [a, b], u, -1)
+      }
+      if (!edges.size) continue
+      const loop: Edge[] = [], start = edges.keys().next().value!
+      let key = start
+      do {
+        const edge = edges.get(key)
+        if (!edge) throw new Error('The shell face is not a closed boundary.')
+        loop.push(edge); edges.delete(key); key = edge.end.join(',')
+      } while (key !== start)
+      if (edges.size) throw new Error('Shell faces cannot contain holes.')
+      // Keep collinear vertices only when their seating allowance changes.
+      const corners = loop.filter((e, i) => {
+        const prev = loop[(i + loop.length - 1) % loop.length]
+        return e.inset !== prev.inset || (e.end[0] - e.start[0]) * (prev.end[1] - prev.start[1]) !== (e.end[1] - e.start[1]) * (prev.end[0] - prev.start[0])
+      })
+      const result = corners.map((e, i): Edge => ({ start: [planes[u][e.start[0]], planes[v][e.start[1]]], end: [planes[u][corners[(i + 1) % corners.length].start[0]], planes[v][corners[(i + 1) % corners.length].start[1]]], inset: e.inset }))
+      if (result.length < 4 || result.length > 12) throw new Error('Shell faces support up to twelve edges.')
+      faces.push({ axis, plane: planes[axis][d + Number(sign > 0)], sign, edges: result })
     }
-    if (!edges.size) continue
-    const loop: Edge[] = [], start = edges.keys().next().value!
-    let key = start
-    do {
-      const edge = edges.get(key)
-      if (!edge) throw new Error('The cutout face is not a closed boundary.')
-      loop.push(edge); edges.delete(key); key = edge.end.join(',')
-    } while (key !== start)
-    if (edges.size) throw new Error('Corner cutouts must leave one simple loop per face.')
-    // Keep collinear vertices only when their seating allowance changes.
-    const corners = loop.filter((e, i) => {
-      const prev = loop[(i + loop.length - 1) % loop.length]
-      return e.inset !== prev.inset || (e.end[0] - e.start[0]) * (prev.end[1] - prev.start[1]) !== (e.end[1] - e.start[1]) * (prev.end[0] - prev.start[0])
-    })
-    const result = corners.map((e, i): Edge => ({ start: [planes[u][e.start[0]], planes[v][e.start[1]]], end: [planes[u][corners[(i + 1) % corners.length].start[0]], planes[v][corners[(i + 1) % corners.length].start[1]]], inset: e.inset }))
-    if (result.length < 4 || result.length > 12) throw new Error('Corner-cut faces support up to twelve edges.')
-    faces.push({ axis, plane: planes[axis][d + Number(sign > 0)], sign, edges: result })
   }
   return faces
 }
 
-export function solveObjectNotches(shape: ObjectNotches, thickness: number): Project {
+export function solveObjectShell(shape: ObjectNotches, thickness: number): Project {
   if (!Number.isFinite(thickness) || thickness < 16 || thickness > 19) throw new Error('90° connectors require a panel thickness from 16 to 19 mm.')
   const faces = boundaryFaces(shape, thickness)
   let failure: unknown
   for (let orientation = 0; orientation < 8; orientation++) {
     try {
       const project = solveFaces(faces, thickness, orientation), bounds = getProjectBounds(resolvePanels(project))
-      if ([0, 1, 2].some(a => Math.abs(bounds.min[a] - shape.bounds.min[a]) > epsilon || Math.abs(bounds.max[a] - shape.bounds.max[a]) > epsilon)) throw new Error('Corner-cut conversion changed the outside envelope.')
+      if ([0, 1, 2].some(a => Math.abs(bounds.min[a] - shape.bounds.min[a]) > epsilon || Math.abs(bounds.max[a] - shape.bounds.max[a]) > epsilon)) throw new Error('Shell conversion changed the outside envelope.')
       return project
     } catch (error) { failure = error }
   }
@@ -91,18 +110,18 @@ function solveFaces(faces: Face[], thickness: number, orientation: number): Proj
     if (points.some((p, i) => {
       const next = points[(i + 1) % points.length], e = edges[i]
       return (next[0] - p[0]) * (e.end[0] - e.start[0]) + (next[1] - p[1]) * (e.end[1] - e.start[1]) <= 0
-    })) throw new Error('Corner cutouts leave insufficient panel cuts after connector clearances.')
+    })) throw new Error('Shell faces leave insufficient panel cuts after connector clearances.')
     const low = [0, 1].map(a => Math.min(...points.map(p => p[a]))), high = [0, 1].map(a => Math.max(...points.map(p => p[a])))
     const template = createPanel({ width: high[0] - low[0], height: high[1] - low[1], customOutline: points.map(p => ({ x: (p[0] - low[0]) / (high[0] - low[0]), y: (p[1] - low[1]) / (high[1] - low[1]) })) })
     const outlineError = getOutlineError(template.customOutline)
-    if (outlineError) throw new Error(`Corner cuts leave an invalid closing face: ${outlineError}`)
+    if (outlineError) throw new Error(`Shell cuts leave an invalid closing face: ${outlineError}`)
     const rotation = new Euler().setFromRotationMatrix(new Matrix4().makeBasis(new Vector3().setComponent(u, 1), new Vector3().setComponent(v, 1), new Vector3().setComponent(axis, 1)))
     for (const [ri, rect] of partitionClosingOutline(template, !!(orientation & (1 << axis))).entries()) {
       const min: Vec3 = [0, 0, 0], max: Vec3 = [0, 0, 0]
       min[u] = rect.x + low[0]; max[u] = rect.right + low[0]; min[v] = rect.y + low[1]; max[v] = rect.bottom + low[1]
       min[axis] = max[axis] = face.plane - face.sign * thickness / 2
       const width = max[u] - min[u], height = max[v] - min[v]
-      if ([width, height].some(n => !Number.isFinite(n) || n < 40 || n > 4000)) throw new Error('Corner cutouts require rectangular cuts between 40 and 4000 mm.')
+      if ([width, height].some(n => !Number.isFinite(n) || n < 40 || n > 4000)) throw new Error('Shell faces require rectangular cuts between 40 and 4000 mm.')
       const boundary = points.flatMap((p, i) => {
         const end = points[(i + 1) % points.length], alongU = Math.abs(end[1] - p[1]) < epsilon
         const normal = alongU ? v : u, tangent = alongU ? u : v, coordinate = p[alongU ? 1 : 0]
@@ -111,10 +130,10 @@ function solveFaces(faces: Face[], thickness: number, orientation: number): Proj
         return hi - lo > epsilon && (Math.abs(min[normal] - coordinate) < epsilon || Math.abs(max[normal] - coordinate) < epsilon)
           ? [{ axis: normal, coordinate, tangent, lo, hi }] : []
       })
-      pieces.push({ face, min, max, boundary, panel: createPanel({ name: `Corner-cut face ${fi + 1}.${ri + 1}`, width, height, thickness, position: min.map((n, a) => (n + max[a]) / 2) as Vec3, rotation: [rotation.x, rotation.y, rotation.z] }) })
+      pieces.push({ face, min, max, boundary, panel: createPanel({ name: `Shell face ${fi + 1}.${ri + 1}`, width, height, thickness, position: min.map((n, a) => (n + max[a]) / 2) as Vec3, rotation: [rotation.x, rotation.y, rotation.z] }) })
     }
   }
-  if (pieces.length > 80) throw new Error('Too many corner-cut face pieces.')
+  if (pieces.length > 80) throw new Error('Too many shell face pieces.')
   const neighbors = pieces.map(() => [] as number[]), seat = CONNECTOR_PROFILES['90'].seat
   for (let a = 0; a < pieces.length; a++) for (let b = a + 1; b < pieces.length; b++) {
     const p = pieces[a], q = pieces[b], x = p.face.axis, y = q.face.axis
@@ -129,13 +148,13 @@ function solveFaces(faces: Face[], thickness: number, orientation: number): Proj
       const other = pieces[j]
       return other.face.axis === edge.axis && Math.abs(Math.abs(other.min[edge.axis] - edge.coordinate) - seat) < epsilon
         && Math.min(edge.hi, other.max[edge.tangent]) - Math.max(edge.lo, other.min[edge.tangent]) >= 40
-    })) throw new Error('Cannot attach every boundary segment of the corner-cut faces.')
+    })) throw new Error('Cannot attach every boundary segment of the shell faces.')
   }
   const connected = new Set([0]), queue = [0]
   for (let i = 0; i < queue.length; i++) for (const j of neighbors[queue[i]]) if (!connected.has(j)) { connected.add(j); queue.push(j) }
-  if (connected.size !== pieces.length) throw new Error('The corner-cut shell must form one connected construction.')
-  if (neighbors.some(n => n.length < 2)) throw new Error('Every corner-cut piece needs connectors to at least two surrounding faces.')
-  const empty: Project = { version: 1, name: 'Corner-cut shell', panels: [], connections: [] }
+  if (connected.size !== pieces.length) throw new Error('The shell must form one connected construction.')
+  if (neighbors.some(n => n.length < 2)) throw new Error('Every shell piece needs connectors to at least two surrounding faces.')
+  const empty: Project = { version: 1, name: 'Object shell', panels: [], connections: [] }
   let project = empty
   for (let i = 0; i < pieces.length; i++) project = connectClosingPanel(project, pieces[i].panel, neighbors[i].filter(j => j < i).map(j => pieces[j].panel.id), { fitClearance: false })
   try { project = fitClosingConnectorClearance(empty, project) }
@@ -145,9 +164,9 @@ function solveFaces(faces: Face[], thickness: number, orientation: number): Proj
     project = fitClosingConnectorClearance(empty, { ...project, connections: project.connections.map(c => ({ ...c, count: c.count ? 1 : 0 })) })
   }
   const hardware = getPhysicalConnectors(project)
-  if (neighbors.some((ns, i) => ns.some(j => !hardware.some(({ connection: c }) => c.type === '90' && [c.parentId, c.childId].includes(pieces[i].panel.id) && [c.parentId, c.childId].includes(pieces[j].panel.id))))) throw new Error('Cannot fit every corner-cut face joint.')
+  if (neighbors.some((ns, i) => ns.some(j => !hardware.some(({ connection: c }) => c.type === '90' && [c.parentId, c.childId].includes(pieces[i].panel.id) && [c.parentId, c.childId].includes(pieces[j].panel.id))))) throw new Error('Cannot fit every shell face joint.')
   const issue = validateProject(project)[0]
   if (issue) throw new Error(issue.message)
-  if (overlappingConnectorIds(project).size) throw new Error('Corner-cut hardware does not have enough clearance.')
+  if (overlappingConnectorIds(project).size) throw new Error('Shell hardware does not have enough clearance.')
   return project
 }

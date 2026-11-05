@@ -113,3 +113,14 @@ describe('object group transforms', () => {
     expect(objects.nodes[0].depth).toBe(200)
   })
 })
+
+it('merges rotation roundoff without erasing small real gaps or cavities', () => {
+  const touching = evaluateConstructionObjects(shape('union', box('a'), box('b', [100 + 1e-13, 0, 0])), true)[0]
+  expect(touching.cuboid).toBe(true)
+  const separated = evaluateConstructionObjects(shape('union', box('a'), box('b', [100 + 1e-6, 0, 0])), true)[0]
+  expect(separated.cuboid).toBe(false)
+  expect(separated.solids).toHaveLength(2)
+  const cavity = evaluateConstructionObjects(shape('subtract', box('a'), { ...box('b'), width: 1, height: 1, depth: 1 }), true)[0]
+  expect(cavity.cuboid).toBe(false)
+  expect(cavity.solids?.[0].cross).toBeUndefined()
+})

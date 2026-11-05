@@ -1,10 +1,11 @@
+import { findObjectCross } from './object-cross'
 import { findObjectNotches, type ObjectNotches } from './object-notches'
 import { findObjectRecess, findObjectTunnel, type ObjectRecess, type ObjectTunnel } from './object-tunnel'
 import { findObjectPrism, type ObjectPrism } from './object-prism'
 import type { ObjectBounds } from './object-geometry'
 import type { Vec3 } from './types'
 
-export interface ObjectSolid { bounds: ObjectBounds; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel; recess?: ObjectRecess; notches?: ObjectNotches }
+export interface ObjectSolid { bounds: ObjectBounds; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel; recess?: ObjectRecess; notches?: ObjectNotches; cross?: ObjectNotches }
 
 /** Split exact occupied cells by face connectivity. Edge/corner contacts remain
  * distinct solids and are rejected later by conversion's contact checks. */
@@ -33,7 +34,7 @@ export function findObjectSolids(planes: number[][], occupied: Uint8Array): Obje
     const count = extent.reduce((product, size) => product * size, 1)
     const bounds = { min: first.map((value, axis) => planes[axis][value]) as Vec3, max: last.map((value, axis) => planes[axis][value + 1]) as Vec3 }
     const cuboid = cells.length === count
-    let prism: ObjectPrism | undefined, tunnel: ObjectTunnel | undefined, recess: ObjectRecess | undefined, notches: ObjectNotches | undefined
+    let prism: ObjectPrism | undefined, tunnel: ObjectTunnel | undefined, recess: ObjectRecess | undefined, notches: ObjectNotches | undefined, cross: ObjectNotches | undefined
     if (!cuboid) {
       remainingCells -= count
       if (remainingCells < 0) throw new Error('Disconnected object pieces are too complex. Simplify the shape.')
@@ -47,8 +48,9 @@ export function findObjectSolids(planes: number[][], occupied: Uint8Array): Obje
       if (!prism) tunnel = findObjectTunnel(localPlanes, local)
       if (!prism && !tunnel) recess = findObjectRecess(localPlanes, local)
       if (!prism && !tunnel && !recess) notches = findObjectNotches(localPlanes, local)
+      if (!prism && !tunnel && !recess && !notches) cross = findObjectCross(localPlanes, local)
     }
-    solids.push({ bounds, cuboid, prism, tunnel, recess, notches })
+    solids.push({ bounds, cuboid, prism, tunnel, recess, notches, cross })
   }
   return solids
 }

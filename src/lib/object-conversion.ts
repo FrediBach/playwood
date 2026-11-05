@@ -1,4 +1,4 @@
-import { solveObjectNotches } from './object-notch-solver'
+import { solveObjectShell } from './object-notch-solver'
 import { ObjectConversionError, withConversionRegions, type ConversionRegion } from './object-conversion-diagnostics'
 import { getConnectorMaterial } from './connector-options'
 import { solveObjectRecess, solveObjectTunnel } from './object-tunnel-solver'
@@ -83,7 +83,7 @@ export function convertConstructionObject(source: Project, ids: readonly string[
   const region = (shape: ObjectSurface): ConversionRegion => ({ id: shape.id, name: names.get(shape.id)!, bounds: shape.bounds! })
   for (const shape of shapes) {
     if (!shape.bounds) throw new Error(`${names.get(shape.id)} has an empty result. Edit its Boolean operands before converting.`)
-    if (!shape.cuboid && !shape.prism && !shape.tunnel && !shape.recess && !shape.notches) throw new ObjectConversionError(`${names.get(shape.id)} is not a supported cuboid, rectangular tunnel/recess, corner-cut cuboid, or common-depth profile with 6–12 edges. Enclosed cavities, other opening shapes, and general changing-depth profiles are not supported yet.`, [region(shape)])
+    if (!shape.cuboid && !shape.prism && !shape.tunnel && !shape.recess && !shape.notches && !shape.cross) throw new ObjectConversionError(`${names.get(shape.id)} is not a supported cuboid, rectangular tunnel/recess, corner-cut cuboid, three-axis cross, or common-depth profile with 6–12 edges. Enclosed cavities, other opening shapes, and general changing-depth profiles are not supported yet.`, [region(shape)])
   }
   const groups = compartmentGroups(shapes, region)
   // Early lower bounds; rectangular face partitions are checked again after solving.
@@ -98,10 +98,10 @@ export function convertConstructionObject(source: Project, ids: readonly string[
     const [width, height, depth] = bounds.max.map((v, axis) => v - bounds.min[axis])
     const shared = group.axis !== undefined
     const solved = withConversionRegions(group.shapes.map(region), () => group.grid ? solveCuboidGrid(group.shapes.map(shape => shape.bounds!), options.thickness) : shared ? solveCuboidCompartments(group.shapes.map(shape => shape.bounds!), group.axis!, options.thickness)
-      : shape.notches ? solveObjectNotches(shape.notches, options.thickness) : shape.recess ? solveObjectRecess(shape.recess, options.thickness) : shape.tunnel ? solveObjectTunnel(shape.tunnel, options.thickness) : shape.prism ? solveObjectPrism(shape.prism, options.thickness, options.rectangularOnly) : solveCuboid({ width, height, depth, thickness: options.thickness }))
+      : shape.cross || shape.notches ? solveObjectShell((shape.cross ?? shape.notches)!, options.thickness) : shape.recess ? solveObjectRecess(shape.recess, options.thickness) : shape.tunnel ? solveObjectTunnel(shape.tunnel, options.thickness) : shape.prism ? solveObjectPrism(shape.prism, options.thickness, options.rectangularOnly) : solveCuboid({ width, height, depth, thickness: options.thickness }))
     if (source.panels.length + generated.panels.length + solved.panels.length > 200) throw new Error('Projects support up to 200 panels.')
     if (source.connections.length + generated.connections.length + solved.connections.length > 400) throw new Error('Projects support up to 400 connections.')
-    const delta: Vec3 = shared || shape.prism || shape.tunnel || shape.recess || shape.notches ? [0, 0, 0] : [(bounds.min[0] + bounds.max[0]) / 2, bounds.min[1], (bounds.min[2] + bounds.max[2]) / 2]
+    const delta: Vec3 = shared || shape.prism || shape.tunnel || shape.recess || shape.notches || shape.cross ? [0, 0, 0] : [(bounds.min[0] + bounds.max[0]) / 2, bounds.min[1], (bounds.min[2] + bounds.max[2]) / 2]
     const name = group.shapes.map(shape => names.get(shape.id)).join(' + ').slice(0, 100)
     const next: Project = { ...generated,
       panels: [...generated.panels, ...solved.panels.map(panel => ({ ...panel, name: `${name} · ${panel.name}`, material: options.material, color: options.color, finishCoverage: options.finishCoverage,

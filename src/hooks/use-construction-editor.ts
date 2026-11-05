@@ -29,7 +29,8 @@ export function useConstructionEditor({ project, commit, notify, snapSettings }:
   }
   const cancel = () => setDraft(undefined)
   const select = (id: string | null, additive = false) => {
-    cancel()
+    // Preview clicks must not implicitly discard an inspector transaction.
+    if (editing) return
     setSelection(current => !id ? [] : additive ? current.includes(id) ? current.filter(item => item !== id) : [...current, id] : [id])
   }
   const change = (operation: (source: ConstructionObjects) => ConstructionObjects) => attempt(() => {
@@ -51,8 +52,8 @@ export function useConstructionEditor({ project, commit, notify, snapSettings }:
     }, { group: `object-move:${selectedIds.join('/')}`, repeat })
   })
   return { objects: preview, selectedIds, editing, change, apply, cancel, select,
-    selectMany: (ids: string[], additive: boolean) => { cancel(); setSelection(current => additive ? [...new Set([...current, ...ids])] : ids) },
-    selectAll: () => { cancel(); setSelection(objects.roots) },
+    selectMany: (ids: string[], additive: boolean) => { if (!editing) setSelection(current => additive ? [...new Set([...current, ...ids])] : ids) },
+    selectAll: () => { if (!editing) setSelection(objects.roots) },
     update: (node: ConstructionObject) => change(source => updateConstructionObject({ ...project, constructionObjects: source }, node).constructionObjects!),
     add: () => attempt(() => { const result = addConstructionBox(project); commit(result.project); cancel(); setSelection([result.objectId]) }),
     combine: (operation: ObjectBooleanOperation) => attempt(() => {
