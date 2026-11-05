@@ -17,3 +17,7 @@
 .object-preview-status{position:absolute;left:20px;bottom:70px;max-width:calc(100% - 40px);padding:9px 12px;background:#f6f9fddd;color:#32628e;border:1px solid #bdcfdf;border-radius:5px;font-size:11px;pointer-events:none}
 .dialog-content.object-conversion-dialog { width: min(860px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
 .object-conversion-preview { height: clamp(200px, 34vh, 360px); position: relative; }
+
+.object-clearance-warning{display:flex;position:relative;padding:5px;border:1px solid #a95800;border-radius:50%;background:#fff1cc;color:#874600;cursor:help}
+.object-clearance-tooltip{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);width:min(260px,70vw);padding:10px;border:1px solid #a95800;border-radius:5px;background:#fff8e7;color:#643900;font-size:12px;line-height:1.5;box-shadow:0 2px 8px #0002;pointer-events:none}
+.object-clearance-warning:hover .object-clearance-tooltip,.object-clearance-warning:focus .object-clearance-tooltip{display:block}

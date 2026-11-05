@@ -112,6 +112,8 @@ Use **Filter panels** or **Filter connectors** above the corresponding list to c
 
 With the complete connected selection selected, press **Shift + X/Y/Z** to mirror across that world axis through the selection center. Selected linked assemblies receive an independent mirrored design. Select all connected parts or detach them first; incompatible edits leave the construction unchanged. **Undo** restores the previous design.
 
+While editing Objects, amber surface highlights and focusable warning icons identify narrow sections of the evaluated solid. Hover or focus an icon for details. The early check flags continuous solid spans below 91 mm (40 mm minimum panel cut, 16 mm stock, and two measured 17.5 mm connector seats), including Boolean remnants; operand subdivisions alone do not trigger it. It is advisory: fitted-face exceptions may work, and wider sections can still fail hardware clearance. Convert to panels performs the full check for the chosen thickness. Warnings update with drafts and gestures, remain outside saved projects, and disappear outside Objects mode.
+
 ## Panel cutting SVGs
 
 Choose **Export project → Panel cutting SVGs** to download a separate full-size SVG for each panel with pegboard holes, slots, TROFAST openings, a custom outline, or rounded corners. Each file includes its outer contour and all openings in millimeters, with circular arcs preserved. Panel numbers distinguish repeated names; hidden panels and materialized assembly panels are included. Plain rectangular panels remain in the CSV cutting list.

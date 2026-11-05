@@ -1,6 +1,8 @@
 import { useEffect, useEffectEvent, useMemo, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
-import { Edges } from '@react-three/drei'
+import { TriangleAlert } from 'lucide-react'
+import { OBJECT_CONNECTOR_MIN_SPAN } from '@/lib/object-clearance'
+import { Edges, Html } from '@react-three/drei'
 import { BufferAttribute, BufferGeometry, DoubleSide, Mesh } from 'three'
 import type { ConversionRegion } from '@/lib/object-conversion-diagnostics'
 import type { ObjectPreviewSurface } from '@/lib/object-preview'
@@ -43,6 +45,8 @@ export function ConstructionObjectLayer(props: ConstructionLayerProps) {
     </>}
     {surfaces?.filter(surface => surface.positions.length).map(surface => <ObjectSurfaceMesh key={surface.id} surface={surface}
       selected={selected.has(surface.id) && active} active={active} onSelect={onSelect}/>)}
+    {active && surfaces?.filter(surface => surface.warningPositions?.length).map(surface => <ObjectClearanceWarning key={`warning-${surface.id}`}
+      positions={surface.warningPositions!} name={objects.nodes.find(node => node.id === surface.id)?.name ?? 'Object'}/>)}
     {props.highlightedRegions?.map(region => <mesh key={region.id} name={`Affected source region ${region.name}`} raycast={noRaycast}
       position={region.bounds.min.map((value, axis) => (value + region.bounds.max[axis]) / 2000) as Vec3}>
       <boxGeometry args={region.bounds.max.map((value, axis) => Math.max(1, value - region.bounds.min[axis]) / 1000) as Vec3}/>
@@ -53,6 +57,25 @@ export function ConstructionObjectLayer(props: ConstructionLayerProps) {
       <boxGeometry args={[box.width / 1000, box.height / 1000, box.depth / 1000]}/>
       <meshBasicMaterial visible={false}/><Edges color="#d52cb8" transparent opacity={0.65} depthWrite={false} raycast={noRaycast} depthTest={false}/>
     </mesh>)}
+  </group>
+}
+
+function ObjectClearanceWarning({ positions, name }: { positions: Float32Array; name: string }) {
+  const geometry = useMemo(() => new BufferGeometry().setAttribute('position', new BufferAttribute(positions, 3)), [positions])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  const anchor = [0, 1, 2].map(axis => (positions[axis] + positions[axis + 3] + positions[axis + 6]) / 3) as Vec3
+  const message = `${name}: narrow geometry may not fit connectors. Highlighted sections are under ${OBJECT_CONNECTOR_MIN_SPAN} mm, allowing for 16 mm stock, connector seats and a 40 mm panel cut. Widen these sections and use Convert to panels to check the full hardware fit.`
+  return <group>
+    <mesh geometry={geometry} raycast={noRaycast} renderOrder={5}>
+      <meshBasicMaterial color="#ef9b18" transparent opacity={0.55} depthWrite={false} side={DoubleSide} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2}/>
+      <Edges color="#a95800" depthTest={false} raycast={noRaycast}/>
+    </mesh>
+    <Html position={anchor} center zIndexRange={[20, 0]}>
+      <span className="object-clearance-warning" tabIndex={0} role="img" aria-label={message}>
+        <TriangleAlert size={20} aria-hidden="true"/>
+        <span className="object-clearance-tooltip">{message}</span>
+      </span>
+    </Html>
   </group>
 }
 

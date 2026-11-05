@@ -1,3 +1,4 @@
+import { narrowObjectCells } from './object-clearance'
 import type { ObjectNotches } from './object-notches'
 import { findObjectRecess, findObjectTunnel, type ObjectRecess, type ObjectTunnel } from './object-tunnel'
 import { findObjectSolids, type ObjectSolid } from './object-solids'
@@ -7,7 +8,7 @@ import { parseConstructionObjects } from './construction-objects'
 import type { ConstructionObject, ConstructionObjects, Vec3 } from './types'
 
 export interface ObjectBounds { min: Vec3; max: Vec3 }
-export interface ObjectSurface { id: string; positions: Float32Array; volume: number; bounds: ObjectBounds | null; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel; recess?: ObjectRecess; notches?: ObjectNotches; cross?: ObjectNotches; stepped?: ObjectNotches; solids?: ObjectSolid[] }
+export interface ObjectSurface { id: string; positions: Float32Array; volume: number; warningPositions?: Float32Array; bounds: ObjectBounds | null; cuboid: boolean; prism?: ObjectPrism; tunnel?: ObjectTunnel; recess?: ObjectRecess; notches?: ObjectNotches; cross?: ObjectNotches; stepped?: ObjectNotches; solids?: ObjectSolid[] }
 export const OBJECT_CELL_LIMIT = 100000
 const SURFACE_VERTEX_LIMIT = 600000
 
@@ -84,7 +85,8 @@ export function evaluateConstructionObjects(input: ConstructionObjects, splitSol
       volume += (hi[0] - lo[0]) * (hi[1] - lo[1]) * (hi[2] - lo[2])
       lo.forEach((value, axis) => { min[axis] = Math.min(min[axis], value); max[axis] = Math.max(max[axis], hi[axis]) })
     }
-    const positions: number[] = []
+    const positions: number[] = [], warningPositions: number[] = []
+    const narrow = narrowObjectCells(planes, occupied)
     for (let x = 0; x < nx; x++) for (let y = 0; y < ny; y++) for (let z = 0; z < nz; z++) {
       if (!occupied[index(x, y, z)]) continue
       const cell = [x, y, z]
@@ -100,7 +102,11 @@ export function evaluateConstructionObjects(input: ConstructionObjects, splitSol
         })
         remainingVertices -= 6
         if (remainingVertices < 0) throw new Error('Object preview has too many surface faces. Simplify the shape.')
-        for (const corner of sign > 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]) positions.push(...corners[corner].map(value => value / 1000))
+        for (const corner of sign > 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]) {
+          const point = corners[corner].map(value => value / 1000)
+          positions.push(...point)
+          if (narrow[index(x, y, z)]) warningPositions.push(...point)
+        }
       }
     }
     // Count cells, not approximate volumes: even a tiny cavity must prevent cuboid conversion.
@@ -109,7 +115,7 @@ export function evaluateConstructionObjects(input: ConstructionObjects, splitSol
     const tunnel = !cuboid && !prism && occupiedCount ? findObjectTunnel(planes, occupied) : undefined
     const recess = !cuboid && !prism && !tunnel && occupiedCount ? findObjectRecess(planes, occupied) : undefined
     const solids = splitSolids && occupiedCount && !cuboid && !prism && !tunnel && !recess ? findObjectSolids(planes, occupied) : undefined
-    return { id, solids, positions: new Float32Array(positions), volume, bounds: occupiedCount ? { min, max } : null, cuboid, prism, tunnel, recess }
+    return { id, solids, warningPositions: warningPositions.length ? new Float32Array(warningPositions) : undefined, positions: new Float32Array(positions), volume, bounds: occupiedCount ? { min, max } : null, cuboid, prism, tunnel, recess }
   })
 }
 

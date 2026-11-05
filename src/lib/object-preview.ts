@@ -1,7 +1,7 @@
 import type { ObjectSurface } from './object-geometry'
 import type { ConstructionObjects, Vec3 } from './types'
 
-export type ObjectPreviewSurface = Pick<ObjectSurface, 'id' | 'positions' | 'volume'>
+export type ObjectPreviewSurface = Pick<ObjectSurface, 'id' | 'positions' | 'volume' | 'warningPositions'>
 
 /** Reuse only shapes proven identical up to translation; never display stale Boolean results. */
 export function reuseObjectPreview(source: ConstructionObjects, current: ConstructionObjects, surfaces: ObjectPreviewSurface[]): ObjectPreviewSurface[] {
@@ -26,6 +26,6 @@ export function reuseObjectPreview(source: ConstructionObjects, current: Constru
     if (!matches(surface.id) || !delta) return []
     if (delta.every(value => value === 0)) return [surface]
     const offset = delta
-    return [{ id: surface.id, volume: surface.volume, positions: surface.positions.map((value, index) => value + offset[index % 3] / 1000) }]
+    return [{ id: surface.id, volume: surface.volume, warningPositions: surface.warningPositions?.map((value, index) => value + offset[index % 3] / 1000), positions: surface.positions.map((value, index) => value + offset[index % 3] / 1000) }]
   })
 }

@@ -48,3 +48,23 @@ test('construction sources survive import, ordinary edits, undo, redo, reload an
   await expect.poll(async () => (await stored(page)).constructionObjects).toEqual(source.constructionObjects)
   expect(errors).toEqual([])
 })
+
+test('narrow object warnings follow numeric drafts and cancellation without saving diagnostics', async ({ page }) => {
+  const source = addConstructionBox(createStarterProject('blank')).project
+  source.name = 'Narrow geometry preview'
+  await page.goto('/')
+  await importProject(page, source)
+  await page.getByRole('tab', { name: 'Objects', exact: true }).click()
+  await page.locator('.object-select').first().click()
+  const width = page.getByLabel('Box width', { exact: true })
+  await width.fill('60')
+  await width.press('Tab')
+  const warning = page.getByRole('img', { name: /narrow geometry may not fit connectors/ })
+  await expect(warning).toBeVisible()
+  await warning.focus()
+  await expect(page.locator('.object-clearance-tooltip')).toBeVisible()
+  expect((await stored(page)).constructionObjects).toEqual(source.constructionObjects)
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(warning).toHaveCount(0)
+  expect((await stored(page)).constructionObjects).toEqual(source.constructionObjects)
+})
