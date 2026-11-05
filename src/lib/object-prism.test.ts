@@ -128,10 +128,59 @@ it('converts a disconnected L and cuboid as separate complete shells', () => {
   expect(source).toEqual(before)
 })
 
-it('rejects custom profile panels when rectangular-only conversion is requested', () => {
+it('fits rectangular profile pieces when rectangular-only conversion is requested', () => {
   const source = { ...createStarterProject('blank'), constructionObjects: structuredClone(shape) }, before = structuredClone(source)
   const options = { thickness: 18, material: 'birch' as const, color: '#d9bb87', finishCoverage: 0, connectorColor: '#ff0000', connectorMaterial: 'plastic' as const }
-  expect(() => convertConstructionObject(source, ['l'], { ...options, rectangularOnly: true })).toThrow(/requires custom-shaped closing panels/)
+  const result = convertConstructionObject(source, ['l'], { ...options, rectangularOnly: true })
+  expect(result.project.panels).toHaveLength(10)
+  expect(result.project.panels.every(p => !p.customOutline)).toBe(true)
   expect(source).toEqual(before)
   expect(convertConstructionObject(source, ['l'], { ...options, rectangularOnly: false }).project.panels.filter(p => p.customOutline)).toHaveLength(2)
+})
+
+it('closes a U with three rectangles per face attached only to surrounding walls', () => {
+  const prism = evaluateConstructionObjects(profile('u'))[0].prism!
+  const project = solveObjectPrism(prism, 18, true)
+  expect(project.panels).toHaveLength(14)
+  expect(project.panels.every(p => !p.customOutline)).toBe(true)
+  expect(validateProject(project)).toEqual([])
+})
+
+describe.each(['u', 'steps'] as const)('rectangular %s closing faces', kind => {
+  it.each([16, 18, 19])('fits %s mm stock with complete wall support and no seam connectors', thickness => {
+    const prism = evaluateConstructionObjects(profile(kind))[0].prism!
+    const project = solveObjectPrism(prism, thickness, true)
+    const rimIds = new Set(project.panels.slice(0, 8).map(p => p.id)), pieces = project.panels.slice(8)
+    expect(pieces).toHaveLength(6)
+    expect(project.panels.every(p => !p.customOutline)).toBe(true)
+    for (const piece of pieces) {
+      const hardware = getPhysicalConnectors(project).filter(({ connection: c }) => c.parentId === piece.id || c.childId === piece.id)
+      expect(hardware.length).toBeGreaterThanOrEqual(2)
+      expect(hardware.every(({ connection: c }) => c.type === '90' && (rimIds.has(c.parentId) || rimIds.has(c.childId)))).toBe(true)
+      expect(validateProject(removePanel(project, piece.id))).toEqual([])
+    }
+    const custom = solveObjectPrism(prism, thickness).panels.filter(p => p.customOutline)
+    const area = custom.reduce((sum, p) => sum + Math.abs(p.customOutline!.reduce((area, a, i, points) => {
+      const b = points[(i + 1) % points.length]; return area + a.x * b.y - b.x * a.y
+    }, 0)) * p.width * p.height / 2, 0)
+    expect(Math.abs(pieces.reduce((sum, p) => sum + p.width * p.height, 0) - area)).toBeLessThan(.1)
+    expect(parseProject(JSON.parse(JSON.stringify(project))).panels).toHaveLength(14)
+    expect(validateProject(project)).toEqual([])
+    if (kind === 'u') {
+      const heights = pieces.slice(0, 3).map(p => p.height).sort((a, b) => a - b)
+      expect(heights[0]).toBeLessThan(heights[1])
+      expect(heights[1]).toBeCloseTo(heights[2], 6)
+    }
+  })
+  it.each([0, 1, 2] as const)('preserves the rotated envelope around axis %s', axis => {
+    const objects = rotateConstructionSelection(profile(kind), ['result'], axis)
+    const evaluated = evaluateConstructionObjects(objects)[0]
+    const project = solveObjectPrism(evaluated.prism!, 18, true)
+    const bounds = getProjectBounds(resolvePanels(project))
+    for (let i = 0; i < 3; i++) {
+      expect(bounds.min[i]).toBeCloseTo(evaluated.bounds!.min[i], 6)
+      expect(bounds.max[i]).toBeCloseTo(evaluated.bounds!.max[i], 6)
+    }
+    expect(project.panels).toHaveLength(14)
+  })
 })

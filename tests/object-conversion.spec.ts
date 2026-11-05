@@ -134,8 +134,8 @@ test('an L union previews eight panels, preserves the notch, and survives accept
   await expect(rectangles).not.toBeChecked()
   await rectangles.check()
   await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeDisabled()
-  await expect(page.getByRole('alert')).toContainText('requires custom-shaped closing panels')
-  await expect(page.getByRole('dialog').locator('canvas')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeEnabled()
+  await expect(page.getByRole('status').filter({ hasText: '10 panels' })).toBeVisible()
   expect(await saved(page)).toEqual(project)
   await rectangles.uncheck()
   await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeEnabled()
@@ -155,7 +155,7 @@ test('an L union previews eight panels, preserves the notch, and survives accept
   expect(await saved(page)).toEqual(created)
 })
 
-for (const kind of ['U', 'Steps'] as const) test(`${kind} profile conversion keeps both concave faces and commits all joints`, async ({ page }) => {
+for (const rectangularOnly of [false, true]) for (const kind of ['U', 'Steps'] as const) test(`${kind} profile conversion with rectangularOnly=${rectangularOnly} commits both faces and all joints`, async ({ page }) => {
   await open(page)
   const boxes = kind === 'U' ? [
     { width: 900, height: 850, position: [450, 425, 0] },
@@ -173,15 +173,18 @@ for (const kind of ['U', 'Steps'] as const) test(`${kind} profile conversion kee
   await page.getByRole('tab', { name: 'Objects', exact: true }).click()
   await page.getByRole('button', { name: `Select object ${kind}`, exact: true }).click()
   await convert(page)
-  await expect(page.getByRole('status').filter({ hasText: '10 panels · 48 connectors' })).toContainText('900 × 850 × 400 mm')
+  if (rectangularOnly) await page.getByRole('checkbox', { name: 'Rectangular panels only', exact: true }).check()
+  await expect(page.getByRole('button', { name: 'Create panels', exact: true })).toBeEnabled()
+  await expect(page.getByRole('status').filter({ hasText: rectangularOnly ? '14 panels' : '10 panels · 48 connectors' })).toContainText('900 × 850 × 400 mm')
   await expect.poll(() => page.getByRole('dialog').locator('canvas').evaluate(canvas => canvas.toDataURL().length)).toBeGreaterThan(10000)
-  await page.screenshot({ path: `test-results/object-conversion-${kind}.png` })
+  await page.screenshot({ path: `test-results/object-conversion-${kind}-${rectangularOnly}.png` })
   await page.getByRole('button', { name: 'Create panels', exact: true }).click()
-  await expect.poll(async () => (await saved(page)).panels.length).toBe(10)
+  await expect.poll(async () => (await saved(page)).panels.length).toBe(rectangularOnly ? 14 : 10)
   const created = await saved(page)
   const faces = created.panels.filter(p => p.customOutline?.length === 8)
-  expect(faces).toHaveLength(2)
-  expect(created.connections).toHaveLength(24)
+  expect(faces).toHaveLength(rectangularOnly ? 0 : 2)
+  if (rectangularOnly) expect(created.panels.every(p => !p.customOutline)).toBe(true)
+  else expect(created.connections).toHaveLength(24)
   for (const face of faces) expect(new Set(created.connections.filter(c => c.childId === face.id).map(c => c.outlineEdge)).size).toBe(8)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
   await expect.poll(() => saved(page)).toEqual(project)

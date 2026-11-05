@@ -1,4 +1,5 @@
 import { Euler, Matrix4, Vector3 } from 'three'
+import { closeWithRectangles } from './rectangular-closures'
 import { autoConnect } from './auto-connect'
 import { closePanelHole, findPanelHoles } from './close-holes'
 import { CONNECTOR_PROFILES } from './connector-profile'
@@ -9,7 +10,7 @@ import { OBJECT_PRISM_EDGE_LIMIT, type ObjectPrism } from './object-prism'
 import type { Project, Vec3 } from './types'
 
 /** Build one orthogonal prism at its world coordinates. Never return an incomplete shell. */
-export function solveObjectPrism(prism: ObjectPrism, thickness: number): Project {
+export function solveObjectPrism(prism: ObjectPrism, thickness: number, rectangularOnly = false): Project {
   if (!Number.isFinite(thickness) || thickness < 16 || thickness > 19) throw new Error('90° connectors require a panel thickness from 16 to 19 mm.')
   const seat = CONNECTOR_PROFILES['90'].seat, u = (prism.axis + 1) % 3, v = (prism.axis + 2) % 3
   const outline = prism.outline
@@ -37,16 +38,31 @@ export function solveObjectPrism(prism: ObjectPrism, thickness: number): Project
   })
   let project = autoConnect({ version: 1, name: 'Solved orthogonal prism', panels, connections: [] }).project
   const required: [string, string][] = panels.map((panel, i) => [panel.id, panels[(i + 1) % panels.length].id])
-  for (let face = 0; face < 2; face++) {
-    const hole = findPanelHoles(resolvePanels(project))[0]
-    if (!hole) throw new Error('Cannot fit both closing faces of this profile.')
-    const closed = closePanelHole(project, panels.map(panel => panel.id), hole.id)
-    required.push(...panels.map(panel => [panel.id, closed.panelId] as [string, string]))
-    project = closed.project
+  if (rectangularOnly) {
+    const holes = findPanelHoles(resolvePanels(project)).filter(hole => hole.panel.customOutline && hole.boundaryIds.length === panels.length)
+    if (holes.length !== 2) throw new Error('Cannot identify both closing faces for rectangular panels.')
+    let solved: Project | undefined, failure: unknown
+    for (const horizontal of [false, true]) {
+      try {
+        let candidate = project
+        for (const hole of holes) candidate = closeWithRectangles(candidate, hole, horizontal)
+        solved = candidate; break
+      } catch (error) { failure = error }
+    }
+    if (!solved) throw new Error(`Cannot build rectangular closing faces: ${failure instanceof Error ? failure.message : 'No supported wall attachments.'}`)
+    project = solved
+  } else {
+    for (let face = 0; face < 2; face++) {
+      const hole = findPanelHoles(resolvePanels(project))[0]
+      if (!hole) throw new Error('Cannot fit both closing faces of this profile.')
+      const closed = closePanelHole(project, panels.map(panel => panel.id), hole.id)
+      required.push(...panels.map(panel => [panel.id, closed.panelId] as [string, string]))
+      project = closed.project
+    }
   }
   const hardware = getPhysicalConnectors(project)
   for (const [a, b] of required) if (!hardware.some(({ connection: c }) => c.type === '90' && (c.parentId === a && c.childId === b || c.parentId === b && c.childId === a))) throw new Error('Cannot fit every required profile joint.')
-  if (project.panels.length !== outline.length + 2 || project.connections.length !== outline.length * 3) throw new Error('The profile shell is incomplete.')
+  if (!rectangularOnly && (project.panels.length !== outline.length + 2 || project.connections.length !== outline.length * 3)) throw new Error('The profile shell is incomplete.')
   const issue = validateProject(project)[0]
   if (issue) throw new Error(issue.message)
   if (overlappingConnectorIds(project).size) throw new Error('The profile hardware does not have enough clearance.')

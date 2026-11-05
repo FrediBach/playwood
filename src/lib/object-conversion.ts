@@ -81,10 +81,6 @@ export function convertConstructionObject(source: Project, ids: readonly string[
     if (!shape.bounds) throw new Error(`${names.get(shape.id)} has an empty result. Edit its Boolean operands before converting.`)
     if (!shape.cuboid && !shape.prism) throw new Error(`${names.get(shape.id)} is not a supported cuboid or common-depth profile with 6–12 edges. Cavities, tunnels, and changing-depth profiles are not supported yet.`)
   }
-  if (options.rectangularOnly) {
-    const profile = shapes.find(shape => shape.prism)
-    if (profile) throw new Error(`${names.get(profile.id)} requires custom-shaped closing panels in the current solver. Turn off Rectangular panels only or use cuboid source shapes.`)
-  }
   const groups = compartmentGroups(shapes)
   const panelCount = groups.reduce((sum, group) => sum + (group.grid ? 6 * group.shapes.length - group.grid.sharedWalls : group.axis !== undefined ? 5 * group.shapes.length + 1 : group.shapes[0].prism ? group.shapes[0].prism!.outline.length + 2 : 6), 0)
   if (source.panels.length + panelCount > 200) throw new Error('Projects support up to 200 panels.')
@@ -97,7 +93,9 @@ export function convertConstructionObject(source: Project, ids: readonly string[
     const [width, height, depth] = bounds.max.map((v, axis) => v - bounds.min[axis])
     const shared = group.axis !== undefined
     const solved = group.grid ? solveCuboidGrid(group.shapes.map(shape => shape.bounds!), options.thickness) : shared ? solveCuboidCompartments(group.shapes.map(shape => shape.bounds!), group.axis!, options.thickness)
-      : shape.prism ? solveObjectPrism(shape.prism, options.thickness) : solveCuboid({ width, height, depth, thickness: options.thickness })
+      : shape.prism ? solveObjectPrism(shape.prism, options.thickness, options.rectangularOnly) : solveCuboid({ width, height, depth, thickness: options.thickness })
+    if (source.panels.length + generated.panels.length + solved.panels.length > 200) throw new Error('Projects support up to 200 panels.')
+    if (source.connections.length + generated.connections.length + solved.connections.length > 400) throw new Error('Projects support up to 400 connections.')
     const delta: Vec3 = shared || shape.prism ? [0, 0, 0] : [(bounds.min[0] + bounds.max[0]) / 2, bounds.min[1], (bounds.min[2] + bounds.max[2]) / 2]
     const name = group.shapes.map(shape => names.get(shape.id)).join(' + ').slice(0, 100)
     const next: Project = { ...generated,
