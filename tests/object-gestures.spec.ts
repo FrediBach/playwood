@@ -51,6 +51,34 @@ async function drag(page: Page, distance = 80) {
   await page.mouse.move(q.x, q.y, { steps: 8 })
 }
 async function release(page: Page) { await page.mouse.up(); await page.keyboard.up('Control') }
+test('preview clicks select objects after switching from panels, including additive selection', async ({ page }) => {
+  const project = source()
+  await page.addInitScript(({ key, project }) => localStorage.setItem(key, JSON.stringify(project)), { key, project })
+  await page.goto('/')
+  await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
+  await expect(page.getByText('Updating object preview…', { exact: true })).not.toBeVisible()
+  // Let the passive object meshes mount before activating object editing.
+  await expect.poll(() => page.locator('canvas').evaluate(async canvas => {
+    const url = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/@react-three_fiber.js'))!
+    const { _roots } = await import(url)
+    return !!_roots.get(canvas).store.getState().scene.getObjectByName('Object a')
+  })).toBe(true)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.getByRole('tab', { name: 'Objects', exact: true }).click()
+    const first = await point(page, [0, 320, 50])
+    await page.mouse.click(first.x, first.y)
+    await expect(page.getByLabel('Object name', { exact: true })).toHaveValue('Moving box')
+    const second = await point(page, [400, 320, 50])
+    await page.keyboard.down('Shift')
+    await page.mouse.click(second.x, second.y)
+    await page.keyboard.up('Shift')
+    await expect(page.getByRole('heading', { name: '2 objects', exact: true })).toBeVisible()
+    await page.mouse.click(second.x, second.y)
+    await expect(page.getByLabel('Object name', { exact: true })).toHaveValue('Fixed box')
+    await page.getByRole('tab', { name: 'Panels', exact: true }).click()
+  }
+  expect(await saved(page)).toEqual(project)
+})
 async function resize(page: Page, distance: number) {
   const b = (await page.locator('[data-resize-handle="object-0-1"]').boundingBox())!
   const p = await point(page, [100, 300, 0]), q = await point(page, [100 + distance, 300, 0])

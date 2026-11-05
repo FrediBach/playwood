@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import { Edges } from '@react-three/drei'
-import { BufferAttribute, BufferGeometry, DoubleSide } from 'three'
+import { BufferAttribute, BufferGeometry, DoubleSide, Mesh } from 'three'
 import type { ConversionRegion } from '@/lib/object-conversion-diagnostics'
 import type { ObjectBounds } from '@/lib/object-geometry'
 import { constructionBounds, constructionLeaves, type ObjectSurface } from '@/lib/object-geometry'
@@ -60,7 +60,8 @@ function ObjectSurfaceMesh({ surface, selected, active, onSelect }: {
 }) {
   const geometry = useMemo(() => new BufferGeometry().setAttribute('position', new BufferAttribute(surface.positions, 3)), [surface.positions])
   useEffect(() => () => geometry.dispose(), [geometry])
-  return <mesh geometry={geometry} name={`Object ${surface.id}`} userData={active ? { objectId: surface.id } : undefined} raycast={active ? undefined : noRaycast}
+  // R3F skips undefined props, so explicitly restore raycasting after passive mode.
+  return <mesh geometry={geometry} name={`Object ${surface.id}`} userData={active ? { objectId: surface.id } : {}} raycast={active ? Mesh.prototype.raycast : noRaycast}
     onClick={active ? event => { event.stopPropagation(); onSelect(surface.id, event.shiftKey || event.metaKey || event.ctrlKey) } : undefined}>
     <meshBasicMaterial color={selected ? '#d52cb8' : '#3b91db'} transparent opacity={active ? 0.27 : 0.12} depthWrite={false} side={DoubleSide}/>
     <Edges geometry={geometry} color={selected ? '#d52cb8' : '#1769aa'} transparent opacity={active ? 0.65 : 0.35} depthWrite={false} depthTest={false} raycast={noRaycast}/>
