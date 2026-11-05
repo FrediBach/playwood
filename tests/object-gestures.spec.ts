@@ -183,3 +183,41 @@ test('resizing a rotated object changes the corresponding local dimension', asyn
   const bounds = constructionBounds((await saved(page)).constructionObjects!, ['a'])!
   expect(bounds.min[0]).toBeCloseTo(-50, 5)
 })
+
+test('top-view movement keeps both object surfaces visible on every frame', async ({ page }) => {
+  await open(page, source(), 'top')
+  await page.locator('canvas').evaluate(async canvas => {
+    const url = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/@react-three_fiber.js'))!
+    const { _roots } = await import(url)
+    const store = _roots.get(canvas).store
+    const samples: { missing: boolean; movingX?: number; fixedX?: number }[] = []
+    const sample = () => {
+      const scene = store.getState().scene
+      const a = scene.getObjectByName('Object a'), b = scene.getObjectByName('Object b')
+      a?.geometry.computeBoundingBox(); b?.geometry.computeBoundingBox()
+      samples.push({ missing: !a || !b, movingX: a?.geometry.boundingBox.min.x, fixedX: b?.geometry.boundingBox.min.x })
+      if (samples.length < 600) requestAnimationFrame(sample)
+    }
+    ;(window as unknown as { objectFrames: typeof samples }).objectFrames = samples
+    requestAnimationFrame(sample)
+  })
+  const p = await point(page, [0, 450, 0])
+  await page.mouse.move(p.x, p.y)
+  await page.keyboard.down('Control'); await page.mouse.down()
+  for (const distance of [20, 40, 60, 80]) {
+    const q = await point(page, [distance, 450, 0])
+    await page.mouse.move(q.x, q.y, { steps: 3 })
+    await page.waitForTimeout(80)
+  }
+  await expect(page.getByText(/Object move ·/)).toBeVisible()
+  await release(page)
+  await expect.poll(async () => {
+    const box = (await saved(page)).constructionObjects!.nodes[0]
+    return box.kind === 'box' ? box.position[0] : 0
+  }).toBeCloseTo(80, 3)
+  const samples = await page.evaluate(() => (window as unknown as { objectFrames: { missing: boolean; movingX?: number; fixedX?: number }[] }).objectFrames)
+  expect(samples.length).toBeGreaterThan(5)
+  expect(samples.every(frame => !frame.missing)).toBe(true)
+  expect(samples.every(frame => Math.abs(frame.fixedX! - .3) < 1e-6)).toBe(true)
+  expect(samples.some(frame => Math.abs(frame.movingX! + .02) < 1e-6)).toBe(true)
+})

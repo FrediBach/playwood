@@ -3,8 +3,9 @@ import { useThree } from '@react-three/fiber'
 import { Edges } from '@react-three/drei'
 import { BufferAttribute, BufferGeometry, DoubleSide, Mesh } from 'three'
 import type { ConversionRegion } from '@/lib/object-conversion-diagnostics'
+import type { ObjectPreviewSurface } from '@/lib/object-preview'
 import type { ObjectBounds } from '@/lib/object-geometry'
-import { constructionBounds, constructionLeaves, type ObjectSurface } from '@/lib/object-geometry'
+import { constructionBounds, constructionLeaves } from '@/lib/object-geometry'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
 import type { ConstructionObjects, Vec3 } from '@/lib/types'
 import { PreviewDragMovement } from './PreviewDragMovement'
@@ -15,7 +16,7 @@ export interface ConstructionLayerProps {
   objects: ConstructionObjects;
   highlightedRegions?: ConversionRegion[];
   previewBounds?: ObjectBounds;
-  surfaces?: ObjectSurface[];
+  surfaces?: ObjectPreviewSurface[];
   selectedIds: readonly string[];
   active: boolean;
   movementEnabled: boolean;
@@ -56,7 +57,7 @@ export function ConstructionObjectLayer(props: ConstructionLayerProps) {
 }
 
 function ObjectSurfaceMesh({ surface, selected, active, onSelect }: {
-  surface: ObjectSurface; selected: boolean; active: boolean; onSelect: ConstructionLayerProps['onSelect'];
+  surface: ObjectPreviewSurface; selected: boolean; active: boolean; onSelect: ConstructionLayerProps['onSelect'];
 }) {
   const geometry = useMemo(() => new BufferGeometry().setAttribute('position', new BufferAttribute(surface.positions, 3)), [surface.positions])
   useEffect(() => () => geometry.dispose(), [geometry])
