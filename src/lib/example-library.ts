@@ -1,3 +1,4 @@
+import { connectedExample } from './connected-examples'
 import { ASSEMBLY_LIBRARY } from './assembly-library'
 import { createStarterProject } from './model'
 import { CAD_EXAMPLES } from './cad-examples'
@@ -21,8 +22,9 @@ export const EXAMPLE_LIBRARY: readonly ExampleDefinition[] = [
   { id: 'desk', name: 'Work table', description: 'Room for your next big idea.', category: 'Starter builds', create: () => createStarterProject('desk') },
   { id: 'display', name: 'Creative display', description: 'Put your creativity on display.', category: 'Starter builds', create: () => createStarterProject('display') },
   { id: 'diamond-shelf', name: 'Diamond shelf', description: 'Five diamond compartments, white panels, and black connectors. Rotated 45°.', category: 'Shelving', create: diamondShelfProject },
-  ...CAD_EXAMPLES,
-  ...PDF_EXAMPLES,
+  ...[...CAD_EXAMPLES, ...PDF_EXAMPLES].map(example => ({
+    ...example, description: example.description.replace(/doors/gi, 'fixed fronts').replace(/divider inserts/g, 'connected dividers'), create: () => connectedExample(example.id, example.create()),
+  })),
 ]
 
 export function createExampleProject(id: string): Project {

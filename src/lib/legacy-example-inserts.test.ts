@@ -2,11 +2,14 @@ import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import fixtures from './fixtures/legacy-example-inserts.json'
 import { EXAMPLE_LIBRARY, createExampleProject } from './example-library'
+import { CAD_EXAMPLES } from './cad-examples'
+import { PDF_EXAMPLES } from './pdf-examples'
 import { LEGACY_INSERT_SHAPES } from './legacy-example-inserts-data'
 import { repairLegacyExampleInserts } from './legacy-example-inserts'
 import { createPanel, parseProject, resolvePanels, validateProject } from './model'
 import type { Panel, Project } from './types'
 
+const historicalExample = (id: string) => [...CAD_EXAMPLES, ...PDF_EXAMPLES].find(example => example.id === id)!.create()
 const legacy = (id: keyof typeof fixtures) => parseProject(structuredClone(fixtures[id]))
 const shape = (panel: Panel) => [panel.width, panel.height, panel.thickness, ...panel.position, ...panel.rotation].map(value => Math.round(value * 1e6) / 1e6).join('|')
 const shapes = (project: Project) => resolvePanels(project).map(shape).sort()
@@ -18,7 +21,7 @@ describe('saved library insert repairs', () => {
     const repaired = repairLegacyExampleInserts(project)
     expect(repaired).not.toBe(project)
     expect(project).toEqual(original)
-    expect(shapes(repaired)).toEqual(shapes(createExampleProject(id)))
+    expect(shapes(repaired)).toEqual(shapes(historicalExample(id)))
     expect(repaired.connections).toBe(project.connections)
     expect(roundTripProject(repaired)).toEqual(repaired)
     expect(validateProject(repaired)).toEqual([])
@@ -26,7 +29,7 @@ describe('saved library insert repairs', () => {
   })
 
   it.each(Object.keys(LEGACY_INSERT_SHAPES))('recognizes the original thin panels of %s', id => {
-    const template = createExampleProject(id)
+    const template = historicalExample(id)
     const original: Project = { ...template, panels: [
       ...resolvePanels(template).filter(panel => panel.thickness === 18),
       ...LEGACY_INSERT_SHAPES[id].map(spec => createPanel(spec)),
@@ -59,7 +62,7 @@ describe('saved library insert repairs', () => {
       for (const key of ['name', 'color', 'material', 'finishCoverage', 'pattern', 'visible', 'holeSize', 'holeSpacing'] as const) expect(panel[key]).toBe(before[key])
     }
     expect(repaired.connections).toBe(project.connections)
-    expect(shapes(repaired)).toEqual(shapes(createExampleProject('modular-shelf')))
+    expect(shapes(repaired)).toEqual(shapes(historicalExample('modular-shelf')))
   })
 
   it('adds the high table’s supporting insert sides with the saved insert finish', () => {

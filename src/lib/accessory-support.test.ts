@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createExampleProject, EXAMPLE_LIBRARY } from './example-library'
+import { CAD_EXAMPLES } from './cad-examples'
+import { PDF_EXAMPLES } from './pdf-examples'
 import { workstationProject } from './platform-examples'
 import { getProjectBounds, resolvePanels, validateProject } from './model'
 import type { Panel, Project } from './types'
@@ -31,8 +32,8 @@ function unsupportedAccessories(project: Project): Panel[] {
   return panels.filter((panel, index) => panel.thickness !== 18 && !supported.has(index))
 }
 
-describe('supported accessory inserts', () => {
-  const examples = EXAMPLE_LIBRARY.filter(example => example.source)
+describe('historical supported accessory inserts', () => {
+  const examples = [...CAD_EXAMPLES, ...PDF_EXAMPLES]
 
   it.each(examples)('$name connects every insert to the structural cabinet without intersections', ({ create }) => {
     const project = create()
@@ -49,7 +50,7 @@ describe('supported accessory inserts', () => {
   })
 
   it('detects the four short dividers from the reported modular shelf', () => {
-    const project = createExampleProject('modular-shelf')
+    const project = PDF_EXAMPLES.find(example => example.id === 'modular-shelf')!.create()
     const dividers = project.panels.filter(panel => panel.name.endsWith(' divider'))
     expect(dividers).toHaveLength(4)
     expect(dividers.every(panel => panel.height === 367)).toBe(true)

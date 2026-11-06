@@ -1,4 +1,5 @@
-import { EXAMPLE_LIBRARY } from './example-library'
+import { CAD_EXAMPLES } from './cad-examples'
+import { PDF_EXAMPLES } from './pdf-examples'
 import { LEGACY_INSERT_SHAPES } from './legacy-example-inserts-data'
 import { createPanel, resolvePanels } from './model'
 import type { Connection, Panel, Project } from './types'
@@ -21,7 +22,7 @@ export function repairLegacyExampleInserts(project: Project): Project {
   if (project.panels.some(panel => panel.trofastInserts?.length)) return project
   const actual = resolvePanels(project)
   for (const [exampleId, shapes] of Object.entries(LEGACY_INSERT_SHAPES)) {
-    const definition = EXAMPLE_LIBRARY.find(example => example.id === exampleId)
+    const definition = [...CAD_EXAMPLES, ...PDF_EXAMPLES].find(example => example.id === exampleId)
     if (!definition) continue
     const template = definition.create()
     const current = resolvePanels(template)

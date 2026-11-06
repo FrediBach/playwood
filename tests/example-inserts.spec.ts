@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { test, expect, type Page } from '@playwright/test'
-import { getProjectBounds, resolvePanels } from '../src/lib/model'
+import { getProjectBounds, parseProject, resolvePanels, validateProject } from '../src/lib/model'
 import type { Project } from '../src/lib/types'
 
 const storageKey = 'playwood-studio-project-v1'
@@ -35,7 +35,7 @@ function expectSupportedDividers(project: Project): void {
   }
 }
 
-test('modular shelf inserts fill their compartments in the library and exported project', async ({ page }) => {
+test('modular shelf has connected 18 mm panels in the library, export and reload', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
@@ -44,15 +44,18 @@ test('modular shelf inserts fill their compartments in the library and exported 
   await page.locator('[data-example-id="modular-shelf"]').click()
   await page.getByRole('dialog', { name: 'Replace current project?' }).getByRole('button', { name: 'Replace project', exact: true }).click()
   await expect(page.locator('.project-name')).toHaveText('Modular rectangular shelf')
-  await expect.poll(async () => dividerHeights(await savedProject(page))).toEqual([367, 367, 367, 367])
-  expectSupportedDividers((await savedProject(page))!)
+  await expect.poll(async () => (await savedProject(page))?.panels.length).toBe(22)
+  const saved = (await savedProject(page))!
+  expect(saved.panels.every(panel => panel.thickness === 18)).toBe(true)
+  expect(validateProject(saved)).toEqual([])
+  expect(saved.panels.every(panel => saved.connections.some(joint => joint.parentId === panel.id || joint.childId === panel.id))).toBe(true)
 
   await page.getByRole('button', { name: 'Export project', exact: true }).click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: /Project file All panels/ }).click()
   const download = await downloadPromise
   const exported = JSON.parse(await readFile((await download.path())!, 'utf8')) as Project
-  expectSupportedDividers(exported)
+  expect(exported).toEqual(saved)
   await page.getByRole('button', { name: 'Close dialog' }).click()
 
   await page.keyboard.press('Escape')
@@ -62,6 +65,8 @@ test('modular shelf inserts fill their compartments in the library and exported 
   await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
   await page.getByRole('button', { name: 'Fit assembly (F)' }).click()
   await page.getByRole('main', { name: '3D assembly workspace' }).screenshot({ path: 'test-results/modular-shelf-supported-inserts-front.png' })
+  await page.reload()
+  await expect.poll(() => savedProject(page)).toEqual(saved)
   expect(errors).toEqual([])
 })
 
@@ -78,7 +83,7 @@ test('saved floating dividers are repaired once, with undo, redo and persistence
   expectSupportedDividers(repaired)
 
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
-  await expect.poll(() => savedProject(page)).toEqual(legacyShelf)
+  await expect.poll(() => savedProject(page)).toEqual(parseProject(structuredClone(legacyShelf)))
   await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
   await expect.poll(() => savedProject(page)).toEqual(repaired)
   await page.reload()
