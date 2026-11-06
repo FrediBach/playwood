@@ -1,3 +1,4 @@
+import { boundsOf } from './scene-bounds'
 import { useSceneSnapFeedback } from '@/hooks/use-scene-snap-feedback'
 import { getConnectorKeyboardSlides,getConnectorRail } from '@/lib/connector-movement'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
@@ -7,7 +8,6 @@ import type { FurnishingPlacement } from '@/lib/preview-furnishings'
 import type { PreviewResizeHandle,PreviewResizeMode,RepeatPreview } from '@/lib/preview-resize'
 import { snapPanelDelta,type SnapSettings } from '@/lib/preview-snap'
 import { spaceBounds } from '@/lib/space-constraint'
-import { getTrofastInsertLocalBounds } from '@/lib/trofast'
 import type { CameraView,Connection,Panel,Project,Vec3 } from '@/lib/types'
 import { Html,Line,OrbitControls,OrthographicCamera,PerspectiveCamera } from '@react-three/drei'
 import { Canvas,useFrame,useThree,type ThreeEvent } from '@react-three/fiber'
@@ -107,28 +107,7 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
 
 function vector(values: Vec3) { return new THREE.Vector3(...values).multiplyScalar(MM) }
 
-function boundsOf(panels: Panel[]) {
-  const bounds = new THREE.Box3()
-  for (const panel of panels.filter(p => p.visible)) {
-    const rotation = new THREE.Euler(...panel.rotation)
-    for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
-      const point = new THREE.Vector3(x * panel.width / 2, y * panel.height / 2, z * panel.thickness / 2)
-        .applyEuler(rotation).add(new THREE.Vector3(...panel.position)).multiplyScalar(MM)
-      bounds.expandByPoint(point)
-    }
-    for (const insert of panel.trofastInserts ?? []) {
-      const local = getTrofastInsertLocalBounds(panel, insert)
-      if (!local) continue
-      for (const x of [local.min[0], local.max[0]]) for (const y of [local.min[1], local.max[1]]) for (const z of [local.min[2], local.max[2]]) {
-        bounds.expandByPoint(new THREE.Vector3(x, y, z).applyEuler(rotation).add(new THREE.Vector3(...panel.position)).multiplyScalar(MM))
-      }
-    }
-  }
-  if (bounds.isEmpty()) bounds.set(new THREE.Vector3(-0.4, 0, -0.3), new THREE.Vector3(0.4, 0.7, 0.3))
-  return bounds
-}
-
-function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDrillIn }: {
+export function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDrillIn }: {
   panel: Panel; selected: boolean; ghost?: boolean; interactive?: boolean; onSelect: SceneProps['onSelect']; onDrillIn?: SceneProps['onDrillIn']
 }) {
   const { width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline, trofastInserts } = panel

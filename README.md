@@ -138,6 +138,12 @@ Choose **Export project → Panel cutting SVGs** to download a separate full-siz
 
 The SVG uses black outside contours and white inside cuts for tools such as Shaper Origin. Coordinates follow the panel’s top-left corner, independent of its placement in the furniture. Set cut depth and tool offsets on your cutter. TROFAST opening dimensions remain approximations: measure your real insert before cutting.
 
+## Blender export
+
+Choose **Export project → Construction · GLB** for the furniture alone, or **Realistic scene · GLB** for the furniture in the modern home. In Blender, choose **File → Import → glTF 2.0**, open the downloaded GLB, and save as `.blend` if desired.
+
+Exports include visible panels (with actual openings), installed connectors, TROFAST inserts, materials, embedded textures, and a fitted camera in meters. Hidden parts, source objects, editing guides, selection highlights, and temporary edits are excluded. Realistic scene adds the room and decor; enable **Include auto furnishings in realistic scene** to add generated books, accessories, and people independently of the viewport setting. The vacuum is docked and static. Exports use assembled positions even in exploded view. Shader-based finish blending and plywood edges, bump detail, reflections, ambient/area lighting, and shadows are not reproduced exactly in GLB; adjust lighting and materials in Blender. Export runs locally and leaves the project unchanged.
+
 ## Resource examples
 
 The Library and Templates chooser include 22 resource examples alongside the three original starters and a photo-inspired Diamond shelf. Search or filter by category to find editable assemblies from `resources/library-3d`. Numbered CAD resources supply the totem, corner, shelf with doors, H-table 180, and promotional desk. The collection PDFs add shelves, tables, counters, a bench, a trade fair display, an island display, and individual exhibition plinths. Each thumbnail is generated from the assembly it opens; switching examples supports Undo.
