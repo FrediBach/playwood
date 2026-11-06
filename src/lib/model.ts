@@ -1,7 +1,7 @@
 import { parseSpaceConstraint, spaceClearances } from './space-constraint'
 import { parseConstructionObjects } from './construction-objects'
 import { getOutlineError, panelCornerRadius, panelOutlineCorners } from './panel-shape'
-import { getPhysicalConnectors } from './connector-selection'
+import { getPhysicalConnectors, parseConnectorId } from './connector-selection'
 import { connectorDisplayColor, getConnectorMaterial } from './connector-options'
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
@@ -548,9 +548,8 @@ export function parseProject(input: unknown): Project {
   if (input.connectorOverrides !== undefined) {
     if (!object(input.connectorOverrides) || Object.keys(input.connectorOverrides).length > 8000) throw new Error('Invalid connector overrides.')
     project.connectorOverrides = Object.fromEntries(Object.entries(input.connectorOverrides).map(([id, raw]) => {
-      let key: unknown
-      try { key = JSON.parse(id) } catch { throw new Error('Invalid connector selection ID.') }
-      if (!Array.isArray(key) || key.length !== 2 || typeof key[0] !== 'string' || !Number.isInteger(key[1]) || key[1] < 0 || key[1] >= 20 || !object(raw)) throw new Error('Invalid connector override.')
+      const key = parseConnectorId(id)
+      if (!object(raw)) throw new Error('Invalid connector override.')
       if (raw.removed !== undefined && typeof raw.removed !== 'boolean') throw new Error('Invalid connector removal.')
       const type = raw.type !== undefined ? enumIn(raw.type, ['90', '105', '150', 't', 'cross'] as const, 'connector type') : connections.find(c => c.id === key[0])?.type
       return [id, {

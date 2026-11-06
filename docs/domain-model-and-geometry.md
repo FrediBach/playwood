@@ -80,6 +80,8 @@ Polygonal closing panels use the optional `Connection.outlineEdge` index into th
 
 ## Connector dimensions, meshes, and individual hardware
 
+`parseConnectorId` in [`connector-selection.ts`](../src/lib/connector-selection.ts) validates the JSON pair used for a physical hardware identity: a connection ID string and an integer piece index from 0 through 19. Project import, automatic joint upgrades, and repeated compartments share this decoder before using override keys. This preserves the existing saved format and index limits.
+
 [`connector-profile.ts`](../src/lib/connector-profile.ts) defines the geometric bend and seat depth derived from the bundled CAD model:
 
 | Type | Bend used by the transform | Seat distance |

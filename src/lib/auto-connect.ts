@@ -4,7 +4,7 @@ import { createPanel, resolvePanels, validateProject } from './model'
 import { isPanelConnectedToAssembly } from './assemblies'
 import { CONNECTOR_PROFILES } from './connector-profile'
 import { connectorSlide, getConnectorRail } from './connector-movement'
-import { connectorId, getDefaultConnectorColor, getPhysicalConnectors } from './connector-selection'
+import { connectorId, getDefaultConnectorColor, getPhysicalConnectors, parseConnectorId } from './connector-selection'
 import { prepareJointUpgrade } from './prepare-joint-upgrade'
 import type { Connection, ConnectorType, Panel, Project, Side } from './types'
 
@@ -133,7 +133,7 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
         connections: [...baked.project.connections.filter(connection => !removedIds.has(connection.id)), ...group] }
       if (next.connections.length > 400) throw new Error('Projects support up to 400 connections. Remove unused connectors first.')
       if (removedIds.size) {
-        const overrides = Object.fromEntries(Object.entries(project.connectorOverrides ?? {}).filter(([key]) => !removedIds.has(JSON.parse(key)[0])))
+        const overrides = Object.fromEntries(Object.entries(project.connectorOverrides ?? {}).filter(([key]) => !removedIds.has(parseConnectorId(key)[0])))
         // Keep per-piece finishes; old type/slide/removal overrides cannot be
         // applied to replacement hardware on a newly fitted shared rail.
         placements.forEach((position, index) => {

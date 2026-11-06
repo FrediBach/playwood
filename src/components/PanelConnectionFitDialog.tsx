@@ -11,12 +11,14 @@ export interface PanelConnectionAdjustment {
   after: number
 }
 
+interface ConnectionOperations { connectors: number; joints: number; upgrades: number; splits: number; disassembledNames: string[] }
+
 const millimeters = (value: number) => Number(value.toFixed(2)).toLocaleString()
 
 export function PanelConnectionFitDialog({ adjustment, adjustments, operations, onConfirm, onCancel }: {
   adjustments?: PanelConnectionAdjustment[]
   adjustment?: PanelConnectionAdjustment
-  operations?: { connectors: number; joints: number; upgrades: number; splits: number; disassembledNames: string[] }
+  operations?: ConnectionOperations
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -34,16 +36,22 @@ export function PanelConnectionFitDialog({ adjustment, adjustments, operations, 
         <strong>{millimeters(change.before)} → {millimeters(change.after)} mm</strong>
         <small>{change.after > change.before ? 'Extend' : 'Shorten'} by {millimeters(Math.abs(change.after - change.before))} mm</small>
       </div>)}
-      <p className="dialog-note">{coordinated ? 'The surrounding panels and existing connectors stay fixed; panel angles and thicknesses are unchanged.' : 'The size adjustment keeps the opposite edge fixed.'} {operations && <>Auto-connect will fit {operations.connectors} connectors at {operations.joints} {operations.joints === 1 ? 'joint' : 'joints'}. </>}
-        {operations?.upgrades ? <>This includes {operations.upgrades} existing {operations.upgrades === 1 ? 'joint upgrade' : 'joint upgrades'}. </> : null}
-        {operations?.splits ? <>This includes {operations.splits} panel {operations.splits === 1 ? 'split' : 'splits'} for T joints, keeping outer dimensions. </> : null}
-        {!coordinated && !operations?.splits && !operations?.upgrades && <>Other panels and existing connectors stay in place. </>}
-        Resizing and connecting apply together and can be undone in one step.</p>
-      {!!operations?.disassembledNames.length && <p className="dialog-note">These assembly instances will become independent: {operations.disassembledNames.join(', ')}.</p>}
+      <ConnectionFitSummary coordinated={coordinated} operations={operations}/>
       <div className="dialog-footer">
         <Button variant="ghost" onClick={onCancel}>Cancel</Button>
         <Button onClick={onConfirm}>Resize and connect</Button>
       </div>
     </DialogContent>
   </Dialog>
+}
+
+function ConnectionFitSummary({ coordinated, operations }: { coordinated: boolean; operations?: ConnectionOperations }) {
+  return <>
+      <p className="dialog-note">{coordinated ? 'The surrounding panels and existing connectors stay fixed; panel angles and thicknesses are unchanged.' : 'The size adjustment keeps the opposite edge fixed.'} {operations && <>Auto-connect will fit {operations.connectors} connectors at {operations.joints} {operations.joints === 1 ? 'joint' : 'joints'}. </>}
+        {operations?.upgrades ? <>This includes {operations.upgrades} existing {operations.upgrades === 1 ? 'joint upgrade' : 'joint upgrades'}. </> : null}
+        {operations?.splits ? <>This includes {operations.splits} panel {operations.splits === 1 ? 'split' : 'splits'} for T joints, keeping outer dimensions. </> : null}
+        {!coordinated && !operations?.splits && !operations?.upgrades && <>Other panels and existing connectors stay in place. </>}
+        Resizing and connecting apply together and can be undone in one step.</p>
+      {!!operations?.disassembledNames.length && <p className="dialog-note">These assembly instances will become independent: {operations.disassembledNames.join(', ')}.</p>}
+  </>
 }

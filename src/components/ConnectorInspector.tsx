@@ -25,28 +25,13 @@ export function ConnectorInspector({ onAddBetween, infillReason, connectors, pan
   const first = connectors[0]
   if (!first) return null
   const sameType = connectors.every(connector => connector.type === first.type)
-  const sameColor = connectors.every(connector => connector.color.toLowerCase() === first.color.toLowerCase())
-  const sameMaterial = connectors.every(connector => connector.material === first.material)
   const single = connectors.length === 1
   const typeName = CONNECTORS.find(type => type.id === first.type)?.name ?? first.type
   const panelNames = [first.connection.parentId, first.connection.childId].map(id => panels.find(panel => panel.id === id)?.name).filter(Boolean)
   const jointCount = new Set(connectors.map(connector => connector.connection.id)).size
-  const changedLayout = connectors.some(connector => connector.type !== connector.connection.type)
   return <>
-    <div className="connector-selection-heading">
-      <div><Link2 size={18}/><h2>{single ? `${typeName} connector` : `${connectors.length} connectors`}</h2></div>
-      <p className="inspector-summary">{single
-        ? panelNames.length ? panelNames.join(' ↔ ') : 'Selected hardware'
-        : `${jointCount} ${jointCount === 1 ? 'joint' : 'joints'} · ${sameType ? `${typeName} hardware` : 'Mixed types'}`}</p>
-    </div>
-    <section className="inspector-section" aria-label="Hardware">
-      <ConnectorTypeField value={sameType ? first.type : ''} onChange={onTypeChange}/>
-      <p className="field-note">90°, 105° and 150° change the whole joint, including its other connectors. Attached panels and their connected branches follow the angle. T and Cross change selected hardware only.</p>
-      {typeError && <p className="validation-note warning connector-type-warning" role="alert">{typeError}</p>}
-      {changedLayout && <p className="validation-note warning connector-type-warning" role="status">Hardware changed; panel angles stay unchanged. Check that the openings fit the joint.</p>}
-      <ConnectorMaterialField material={sameMaterial ? first.material : ''} metalAvailable={connectors.every(connector => connector.type === '90')} onChange={material => onChange({ material })}/>
-      {sameMaterial && first.material === 'plastic' && <ConnectorColorField color={first.color} mixed={!sameColor} onChange={color => onChange({ color })}/>}
-    </section>
+    <ConnectorSelectionHeading count={connectors.length} typeName={typeName} panelNames={panelNames} jointCount={jointCount} sameType={sameType}/>
+    <ConnectorHardware connectors={connectors} first={first} sameType={sameType} onChange={onChange} onTypeChange={onTypeChange} typeError={typeError}/>
     <section className="inspector-section connector-build-section" aria-label="Connect a panel">
       {single ? <p className="field-note">To add a panel, select at least two connectors with free T or Cross openings.</p> : <>
         <Button variant={panelFitReason ? 'outline' : 'default'} className="full-button" onClick={onConnectPanel} disabled={!!panelFitReason} aria-describedby="connector-fit-status"><Plus size={15}/>Connect with a panel</Button>
@@ -66,4 +51,35 @@ export function ConnectorInspector({ onAddBetween, infillReason, connectors, pan
       <p className="field-note">Panels stay in place.</p>
     </div>
   </>
+}
+
+function ConnectorSelectionHeading({ count, typeName, panelNames, jointCount, sameType }: { count: number; typeName: string; panelNames: (string | undefined)[]; jointCount: number; sameType: boolean }) {
+  const single = count === 1
+  return <div className="connector-selection-heading">
+      <div><Link2 size={18}/><h2>{single ? `${typeName} connector` : `${count} connectors`}</h2></div>
+      <p className="inspector-summary">{single
+        ? panelNames.length ? panelNames.join(' ↔ ') : 'Selected hardware'
+        : `${jointCount} ${jointCount === 1 ? 'joint' : 'joints'} · ${sameType ? `${typeName} hardware` : 'Mixed types'}`}</p>
+    </div>
+}
+
+function ConnectorHardware({ connectors, first, sameType, onChange, onTypeChange, typeError }: {
+  connectors: ReturnType<typeof getPhysicalConnectors>;
+  first: ReturnType<typeof getPhysicalConnectors>[number];
+  sameType: boolean;
+  onChange: (patch: ConnectorOverride) => void;
+  onTypeChange: (type: ConnectorType) => void;
+  typeError?: string;
+}) {
+  const sameColor = connectors.every(connector => connector.color.toLowerCase() === first.color.toLowerCase())
+  const sameMaterial = connectors.every(connector => connector.material === first.material)
+  const changedLayout = connectors.some(connector => connector.type !== connector.connection.type)
+  return <section className="inspector-section" aria-label="Hardware">
+      <ConnectorTypeField value={sameType ? first.type : ''} onChange={onTypeChange}/>
+      <p className="field-note">90°, 105° and 150° change the whole joint, including its other connectors. Attached panels and their connected branches follow the angle. T and Cross change selected hardware only.</p>
+      {typeError && <p className="validation-note warning connector-type-warning" role="alert">{typeError}</p>}
+      {changedLayout && <p className="validation-note warning connector-type-warning" role="status">Hardware changed; panel angles stay unchanged. Check that the openings fit the joint.</p>}
+      <ConnectorMaterialField material={sameMaterial ? first.material : ''} metalAvailable={connectors.every(connector => connector.type === '90')} onChange={material => onChange({ material })}/>
+      {sameMaterial && first.material === 'plastic' && <ConnectorColorField color={first.color} mixed={!sameColor} onChange={color => onChange({ color })}/>}
+    </section>
 }

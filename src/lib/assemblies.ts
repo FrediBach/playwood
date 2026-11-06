@@ -610,8 +610,14 @@ export function updateAssemblyDefinition(project: Project, instanceId: string, p
   if (definition.panels.filter(panel => ids.has(panel.id)).every(panel => entries.every(([key, value]) => key === 'finishCoverage'
     ? panelValuesEqual(panel[key] ?? 0, value) : panelValuesEqual(panel[key], value)))) return project
   const controlled = definition.parameters?.flatMap(parameter => parameter.bindings) ?? []
-  if (controlled.some(binding => ids.has(binding.panelId) && patch[binding.dimension] !== undefined
-    && definition.panels.find(panel => panel.id === binding.panelId)![binding.dimension] !== patch[binding.dimension])) {
+  const sourcePanels = new Map(definition.panels.map(panel => [panel.id, panel]))
+  const controlledPanels = controlled.map(binding => {
+    const panel = sourcePanels.get(binding.panelId)
+    if (!panel) throw new Error('A configurable value references a missing source panel.')
+    return { binding, panel }
+  })
+  if (controlledPanels.some(({ binding, panel }) => ids.has(binding.panelId) && patch[binding.dimension] !== undefined
+    && panel[binding.dimension] !== patch[binding.dimension])) {
     throw new Error('This dimension is controlled by an editable value. Edit its default in Editable values, or remove that dimension from the value first.')
   }
   const { width, height, ...properties } = Object.fromEntries(entries) as Partial<Panel>
@@ -619,8 +625,12 @@ export function updateAssemblyDefinition(project: Project, instanceId: string, p
   if (width !== undefined || height !== undefined) edited = resizePanels(edited, [...ids], { width, height }, { trofastWorld: false })
   edited = parseProject({ ...edited, panels: resolvePanels(edited) })
   ensureValid(edited, undefined, undefined, false)
-  if (controlled.some(binding => Math.abs(edited.panels.find(panel => panel.id === binding.panelId)![binding.dimension]
-    - definition.panels.find(panel => panel.id === binding.panelId)![binding.dimension]) > 1e-6)) {
+  const editedPanels = new Map(edited.panels.map(panel => [panel.id, panel]))
+  if (controlledPanels.some(({ binding, panel }) => {
+    const updated = editedPanels.get(binding.panelId)
+    if (!updated) throw new Error('This edit removed a panel controlled by a configurable value.')
+    return Math.abs(updated[binding.dimension] - panel[binding.dimension]) > 1e-6
+  })) {
     throw new Error('This edit would change a dimension controlled by a configurable value. Edit the configurable value instead.')
   }
   const nextDefinition = { ...definition, panels: edited.panels, connections: edited.connections }
@@ -718,7 +728,7 @@ export function parseAssemblyData(value: unknown, project: Project): AssemblyDat
     if (!record(raw)) throw new Error('Invalid assembly connection endpoint.')
     const result: AssemblyEndpoint = { ...(raw.instanceId === undefined ? {} : { instanceId: text(raw.instanceId) }), portId: text(raw.portId) }
     const instance = instances.find(item => item.id === result.instanceId)
-    const found = result.instanceId ? instance && definitions.find(item => item.id === instance.definitionId)!.ports.some(port => port.id === result.portId)
+    const found = result.instanceId ? instance && definitions.find(item => item.id === instance.definitionId)?.ports.some(port => port.id === result.portId)
       : loosePorts?.some(port => port.id === result.portId)
     if (!found || usedPorts.has(endpointKey(result))) throw new Error('An assembly corner is missing or connected more than once.')
     usedPorts.add(endpointKey(result)); return result

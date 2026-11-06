@@ -1,9 +1,21 @@
 import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createStarterProject, parseProject, projectToCsv, resolvePanels } from './model'
-import { editConnectors, getPhysicalConnectors } from './connector-selection'
+import { connectorId, editConnectors, getPhysicalConnectors, parseConnectorId } from './connector-selection'
 import { createAssembly, materializeAssemblies } from './assemblies'
 import { METAL_CONNECTOR_COLOR } from './connector-options'
+
+describe('connector identity validation', () => {
+  it.each([0, 19])('preserves escaped connection IDs and piece index %i', index => {
+    const connection = 'joint/"corner"/[part]'
+    expect(parseConnectorId(connectorId(connection, index))).toEqual([connection, index])
+  })
+  it.each(['invalid', 'null', '{}', '"joint"', '[]', '["joint"]', '["joint",0,1]', '[4,0]', '["joint","0"]', '["joint",-1]', '["joint",0.5]', '["joint",20]'])('rejects malformed identity %s', id => {
+    expect(() => parseConnectorId(id)).toThrow(/connector selection ID/)
+    const project = createStarterProject('blank')
+    expect(() => parseProject({ ...project, connectorOverrides: { [id]: { removed: true } } })).toThrow(/connector selection ID/)
+  })
+})
 
 describe('physical connector edits', () => {
   it('edits one piece independently of the other hardware and preserves panel poses', () => {

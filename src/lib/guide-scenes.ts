@@ -64,6 +64,19 @@ const addedPanels = (original: Project, updated: Project) => {
   return updated.panels.filter(panel => !originalIds.has(panel.id))
 }
 
+function libraryAssembly(id: string): Project {
+  const example = ASSEMBLY_LIBRARY.find(example => example.id === id)
+  if (!example) throw new Error(`Guide assembly is missing from the library: ${id}`)
+  return example.create()
+}
+
+function attachedGuideCopy(project: Project, instanceId: string): Project {
+  const targets = getAssemblyAttachmentTargets(project, instanceId)
+  const target = targets.find(target => target.label === 'Top right' && target.project)
+  if (!target?.project) throw new Error(`Guide assembly cannot attach at Top right: ${targets.find(target => target.label === 'Top right')?.error ?? 'no target'}`)
+  return target.project
+}
+
 function buildScenes(id: GuideId): GuideScene[] {
   switch (id) {
     case 'boolean-objects': return buildObjectGuideScenes(false)
@@ -83,7 +96,7 @@ function buildScenes(id: GuideId): GuideScene[] {
     }
     case 'projects': {
       const p = createStarterProject('shelf'), cube = box()
-      const module = ASSEMBLY_LIBRARY.find(example => example.id === 'assembly-cube')!.create().assemblies!.definitions[0]
+      const module = libraryAssembly('assembly-cube').assemblies!.definitions[0]
       const added = insertAssemblyDefinition(cube, module)
       return [scene(p, 'Export a project file before replacing the current build if you want a separate backup.', { document: { title: 'Project file · JSON', lines: ['Editable backup', 'Keep your current build'] } }),
         scene(p, 'The current build remains until you confirm Start new project in the dialog.', { document: { title: 'Start a new project?', lines: ['Export current project', 'Start new project', 'Cancel'] } }),
@@ -314,7 +327,7 @@ function buildScenes(id: GuideId): GuideScene[] {
     }
     case 'assembly-attach': {
       const original = box(), p = createAssembly(original, ids(original), 'My box'), first = p.assemblies!.instances[0]
-      const joined = getAssemblyAttachmentTargets(p, first.id).find(target => target.label === 'Top right' && target.project)!.project!
+      const joined = attachedGuideCopy(p, first.id)
       const copy = joined.assemblies!.instances[1], copyIds = Object.values(copy.panelIds)
       return [scene(p, 'Select a whole instance to build outward from its corners.', { selected: ids(p) }),
         scene(joined, 'Attach a copy previews a second instance at a compatible +.', { selected: ids(p), ghost: copyIds, labels: [{ text: 'Copy preview', point: copy.position }] }),
@@ -322,7 +335,7 @@ function buildScenes(id: GuideId): GuideScene[] {
         scene(disconnectAssembly(joined, copy.id), 'Disconnect from neighbors separates the copy while keeping its source link.', { selected: copyIds })]
     }
     case 'assembly-values': {
-      const p = ASSEMBLY_LIBRARY.find(example => example.id === 'assembly-cube')!.create(), instance = p.assemblies!.instances[0]
+      const p = libraryAssembly('assembly-cube'), instance = p.assemblies!.instances[0]
       const two = duplicateAssembly(p, instance.id), copy = two.assemblies!.instances[1], selected = Object.values(copy.panelIds)
       const larger = updateAssemblyParameterValues(two, copy.id, { 'side-length': 450 })
       return [scene(two, 'Both instances start with the same 350 mm cut lengths.'),
@@ -342,12 +355,12 @@ function buildScenes(id: GuideId): GuideScene[] {
         scene(resized, 'The new shared control can configure each instance separately.', { selected: Object.values(second.panelIds), document: { title: 'Instance values', lines: ['Side length: 450', 'Other copy: 350'] } })]
     }
     case 'assembly-files': {
-      const original = ASSEMBLY_LIBRARY.find(example => example.id === 'assembly-cube')!.create(), first = original.assemblies!.instances[0]
+      const original = libraryAssembly('assembly-cube'), first = original.assemblies!.instances[0]
       const configured = updateAssemblyFinish(updateAssemblyParameterValues(original, first.id, { 'side-length': 450 }), first.id, { color: '#91a7b2' })
       const file = createAssemblyFile(configured, first.id)
       const imported = insertAssemblyDefinition({ version: 1, name: 'New project', panels: [], connections: [] }, parseAssemblyFile(file))
       const instance = imported.assemblies!.instances[0]
-      const joined = getAssemblyAttachmentTargets(imported, instance.id).find(target => target.label === 'Top right' && target.project)!.project!
+      const joined = attachedGuideCopy(imported, instance.id)
       const newIds = Object.values(joined.assemblies!.instances[1].panelIds)
       return [scene(configured, 'Select the configured instance whose size and finish should travel.', { selected: ids(configured), labels: [{ text: '450 mm · blue finish', point: first.position }] }),
         scene(configured, 'The assembly file keeps this instance’s settings as its new defaults.', { selected: ids(configured), document: { title: 'Assembly · JSON', lines: ['450 mm default', 'Blue panel finish', 'Editable controls'] } }),

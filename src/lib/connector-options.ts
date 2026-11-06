@@ -1,7 +1,14 @@
 import type { ConnectorMaterial, ConnectorType, Side } from './types'
 
 export const SIDES: Side[] = ['left','right','top','bottom','front','back']
-export const CONNECTORS: {id:ConnectorType;name:string;description:string}[] = [{id:'90',name:'90°',description:'Right angle'},{id:'105',name:'105°',description:'Open angle'},{id:'150',name:'150°',description:'Wide angle'},{id:'t',name:'T',description:'3-way joint'},{id:'cross',name:'Cross',description:'4-way joint'}]
+export const CONNECTOR_DETAILS: Record<ConnectorType, { name: string; description: string }> = {
+  '90': { name: '90°', description: 'Right angle' },
+  '105': { name: '105°', description: 'Open angle' },
+  '150': { name: '150°', description: 'Wide angle' },
+  t: { name: 'T', description: '3-way joint' },
+  cross: { name: 'Cross', description: '4-way joint' },
+}
+export const CONNECTORS = (Object.keys(CONNECTOR_DETAILS) as ConnectorType[]).map(id => ({ id, ...CONNECTOR_DETAILS[id] }))
 
 // Screenshot palette converted to sRGB, plus the available black and white finishes.
 export const CONNECTOR_COLORS = [

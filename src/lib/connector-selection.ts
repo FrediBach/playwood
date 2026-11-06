@@ -4,6 +4,17 @@ import { DEFAULT_CONNECTOR_COLOR, getConnectorMaterial } from './connector-optio
 /** Stable identity for each physical piece of hardware along a joint. */
 export const connectorId = (connectionId: string, index: number) => JSON.stringify([connectionId, index])
 
+/** Decode persisted hardware identities before using their connection or index. */
+export function parseConnectorId(id: string): [string, number] {
+  let key: unknown
+  try { key = JSON.parse(id) } catch { throw new Error('Invalid connector selection ID.') }
+  if (!Array.isArray(key) || key.length !== 2 || typeof key[0] !== 'string'
+    || typeof key[1] !== 'number' || !Number.isInteger(key[1]) || key[1] < 0 || key[1] >= 20) {
+    throw new Error('Invalid connector selection ID.')
+  }
+  return [key[0], key[1]]
+}
+
 export function getPhysicalConnectors(project: Pick<Project, 'connections' | 'connectorOverrides'>) {
   return project.connections.flatMap(connection => Array.from({ length: connection.count }, (_, index) => {
     const id = connectorId(connection.id, index)

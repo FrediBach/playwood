@@ -13,7 +13,11 @@ export function InspectorDisclosure({ title, summary, badge, preferenceKey, defa
   const [mounted, setMounted] = useState(open)
   const details = useRef<HTMLDetailsElement>(null)
   const focusedRequest = useRef(0)
-  useEffect(() => { if (openRequest) { setOpen(true); setMounted(true) } }, [openRequest])
+  const [handledRequest, setHandledRequest] = useState(0)
+  if (handledRequest !== openRequest) {
+    setHandledRequest(openRequest)
+    if (openRequest) { setOpen(true); setMounted(true) }
+  }
   useEffect(() => {
     if (!open || !openRequest || focusedRequest.current === openRequest) return
     focusedRequest.current = openRequest

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { EyeOff, GripVertical, Link2 } from 'lucide-react'
-import { CONNECTORS, CONNECTOR_COLORS, CONNECTOR_MATERIALS, METAL_CONNECTOR_COLOR, connectorDisplayColor } from '@/lib/connector-options'
+import { CONNECTORS, CONNECTOR_DETAILS, CONNECTOR_COLORS, CONNECTOR_MATERIALS, METAL_CONNECTOR_COLOR, connectorDisplayColor } from '@/lib/connector-options'
 import type { getPhysicalConnectors } from '@/lib/connector-selection'
 import type { Panel } from '@/lib/types'
 import { ConnectorGlyph } from './editor-controls'
@@ -23,7 +23,7 @@ export function ConnectorList({ connectors, panels, selectedIds, onSelect, onSel
   const selected = new Set(selectedIds)
   const [filters, setFilters] = useState(emptyFilters)
   const filtering = filterCount(filters) > 0
-  const matching = connectors.filter(connector => matchesCommon(filters, `${CONNECTORS.find(type => type.id === connector.type)?.name} ${connector.material} ${panelsById.get(connector.connection.parentId)?.name ?? ''} ${panelsById.get(connector.connection.childId)?.name ?? ''}`, connectorDisplayColor(connector), !!panelsById.get(connector.connection.parentId)?.visible && !!panelsById.get(connector.connection.childId)?.visible, selected.has(connector.id)) && matchesChoice(filters.types, connector.type) && matchesChoice(filters.materials, connector.material))
+  const matching = connectors.filter(connector => matchesCommon(filters, `${CONNECTOR_DETAILS[connector.type].name} ${connector.material} ${panelsById.get(connector.connection.parentId)?.name ?? ''} ${panelsById.get(connector.connection.childId)?.name ?? ''}`, connectorDisplayColor(connector), !!panelsById.get(connector.connection.parentId)?.visible && !!panelsById.get(connector.connection.childId)?.visible, selected.has(connector.id)) && matchesChoice(filters.types, connector.type) && matchesChoice(filters.materials, connector.material))
   const selectMatching = (value: boolean) => filtering ? grouping.onSelectGroup(matching.map(connector => connector.id), value) : onSelectAll(value)
   const selectedCount = connectors.filter(connector => selected.has(connector.id)).length
   const allSelected = matching.length > 0 && matching.every(connector => selected.has(connector.id))
@@ -46,11 +46,11 @@ export function ConnectorList({ connectors, panels, selectedIds, onSelect, onSel
     </div>
     {filtering && <FilterResults count={matching.length} total={connectors.length} onReset={() => setFilters(emptyFilters())}/>}
     <GroupedList {...grouping} onSelect={onSelect} items={matching} selectedIds={selectedIds} kind="connectors"
-      label={connector => `${CONNECTORS.find(type => type.id === connector.type)!.name} connector ${connector.index + 1}: ${panelsById.get(connector.connection.parentId)?.name ?? 'Panel'} ↔ ${panelsById.get(connector.connection.childId)?.name ?? 'Panel'}`}
+      label={connector => `${CONNECTOR_DETAILS[connector.type].name} connector ${connector.index + 1}: ${panelsById.get(connector.connection.parentId)?.name ?? 'Panel'} ↔ ${panelsById.get(connector.connection.childId)?.name ?? 'Panel'}`}
       renderItem={(connector, handle) => {
         const parent = panelsById.get(connector.connection.parentId)
         const child = panelsById.get(connector.connection.childId)
-        const type = CONNECTORS.find(type => type.id === connector.type)!
+        const type = CONNECTOR_DETAILS[connector.type]
         const color = connector.material === 'metal' ? 'Cast metal · Silver' : CONNECTOR_COLORS.find(color => color.color.toLowerCase() === connector.color.toLowerCase())?.name ?? connector.color
         const joint = `${parent?.name ?? 'Panel'} ↔ ${child?.name ?? 'Panel'}`
         const label = `${type.name} connector ${connector.index + 1}: ${joint}`

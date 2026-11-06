@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   createAssembly, duplicateAssembly, getAssemblyAttachmentTargets, getAssemblyInstance,
   instantiateAssembly, removeAssembly, disconnectAssembly, makeAssemblyIndependent,
@@ -24,11 +24,9 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
   const [hover, setHover] = useState<{ project: Project; id: string } | null>(null)
   const instances = project.assemblies?.instances ?? []
   const definitions = project.assemblies?.definitions ?? []
-  useEffect(() => {
-    const ids = new Set(project.assemblies?.instances.map(instance => instance.id))
-    if (editingId && !ids.has(editingId)) setEditingId(null)
-    if (placement && (!ids.has(placement.targetId) || placement.sourceId && !ids.has(placement.sourceId))) setPlacement(null)
-  }, [project.assemblies, editingId, placement])
+  const instanceIds = new Set(instances.map(instance => instance.id))
+  if (editingId && !instanceIds.has(editingId)) setEditingId(null)
+  if (placement && (!instanceIds.has(placement.targetId) || placement.sourceId && !instanceIds.has(placement.sourceId))) setPlacement(null)
   const editingInstance = instances.find(instance => instance.id === editingId)
   const editingDefinition = definitions.find(definition => definition.id === editingInstance?.definitionId)
   const owners = selectedIds.map(id => getAssemblyInstance(project, id))

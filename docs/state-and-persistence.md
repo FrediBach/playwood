@@ -86,9 +86,9 @@ Control-drag preparation releases joints crossing the selection boundary in the 
 
 ### Insertion and assembly placement
 
-[use-copy-paste.ts](../src/hooks/use-copy-paste.ts) holds candidate projects alongside the project reference and selection signature used to generate them. A project or selection change invalidates that placement. Hover selects a candidate for display; clicking a target commits it once. Cancellation has no project side effects.
+[use-copy-paste.ts](../src/hooks/use-copy-paste.ts) holds candidate projects alongside the project reference and selection signature used to generate them. A project or selection change clears the placement and hover state during rendering, before descendants receive the new selection. Hover selects a candidate for display; clicking a target commits it once. Cancellation has no project side effects.
 
-[use-assembly-editor.ts](../src/hooks/use-assembly-editor.ts) similarly generates corner-attachment candidates and ties the hovered target to the source project reference. Its preview identifies added/moved panels, changed hardware, and suppressed original hardware. Committing a placement includes the necessary shared-joint changes in the same undo step.
+[use-assembly-editor.ts](../src/hooks/use-assembly-editor.ts) similarly generates corner-attachment candidates and ties the hovered target to the source project reference. Missing editing/placement instances clear their local state during rendering. Its preview identifies added/moved panels, changed hardware, and suppressed original hardware. Committing a placement includes the necessary shared-joint changes in the same undo step.
 
 ### TROFAST placement drafts
 

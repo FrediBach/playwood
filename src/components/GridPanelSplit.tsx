@@ -9,12 +9,17 @@ type Result = ReturnType<typeof splitPanelGrid>
 type Frame = NonNullable<ReturnType<typeof gridPanelCut>>
 type Preview = { result?: Result; error?: string }
 
+function dividerCount(text: string, maximum: number): number | null {
+  const value = text === '' ? NaN : Number(text)
+  return Number.isInteger(value) && value >= 0 && value <= maximum ? value : null
+}
+
 export function GridPanelSplit({ project, ids, frame, onSplit }: {
   project: Project; ids: string[]; frame: Frame; onSplit: (result: Result, x: number, y: number) => void
 }) {
   const [x, setX] = useState(String(Math.min(1, frame.maxX))), [y, setY] = useState(String(Math.min(1, frame.maxY)))
-  const nx = x === '' ? NaN : Number(x), ny = y === '' ? NaN : Number(y)
-  const valid = Number.isInteger(nx) && Number.isInteger(ny) && nx >= 0 && ny >= 0 && nx <= frame.maxX && ny <= frame.maxY && nx + ny > 0
+  const nx = dividerCount(x, frame.maxX), ny = dividerCount(y, frame.maxY)
+  const valid = nx !== null && ny !== null && nx + ny > 0
   const [preview, setPreview] = useState<{ project: Project; ids: string[]; x: string; y: string; value: Preview }>()
   const current = preview?.project === project && preview.ids === ids && preview.x === x && preview.y === y ? preview.value : undefined
   useEffect(() => {
@@ -28,8 +33,8 @@ export function GridPanelSplit({ project, ids, frame, onSplit }: {
     }, 120)
     return () => { window.clearTimeout(timer); worker?.terminate() }
   }, [project, ids, x, y, nx, ny, valid])
-  const shownX = Number.isInteger(nx) && nx >= 0 && nx <= frame.maxX ? nx : 0
-  const shownY = Number.isInteger(ny) && ny >= 0 && ny <= frame.maxY ? ny : 0
+  const shownX = nx ?? 0
+  const shownY = ny ?? 0
   const error = !valid ? `Use whole numbers from 0–${frame.maxX} on X and 0–${frame.maxY} on Y, with at least one divider.` : current?.error
   return <section className="inspector-section panel-split" aria-label="Split opening into a grid">
     <div className="panel-split-heading"><Grid2X2 size={16}/><h2>Divide into a grid</h2></div>
@@ -45,21 +50,24 @@ export function GridPanelSplit({ project, ids, frame, onSplit }: {
       </svg>
       <div className="panel-split-caption"><strong>{shownX + 1} × {shownY + 1} compartments</strong><span>equal spacing</span></div>
     </div>
-    {(['X', 'Y'] as const).map(axis => {
-      const value = axis === 'X' ? x : y, numeric = axis === 'X' ? nx : ny
-      const setValue = axis === 'X' ? setX : setY, maximum = axis === 'X' ? frame.maxX : frame.maxY
-      return <div className="panel-split-controls" key={axis}>
-        <label htmlFor={`grid-split-${axis}`}>{axis} dividers <span className="grid-split-axis">{axis === 'X' ? 'Columns' : 'Rows'}</span></label>
-        <div className="panel-split-stepper">
-          <button type="button" aria-label={`Fewer ${axis} dividers`} disabled={!Number.isInteger(numeric) || numeric <= 0} onClick={() => setValue(String(numeric - 1))}><Minus size={14}/></button>
-          <input id={`grid-split-${axis}`} aria-label={`${axis} dividers`} type="number" min="0" max={maximum} step="1" value={value} onChange={event => setValue(event.target.value)} aria-invalid={!Number.isInteger(numeric) || numeric < 0 || numeric > maximum} aria-describedby="grid-split-status"/>
-          <button type="button" aria-label={`More ${axis} dividers`} disabled={!Number.isInteger(numeric) || numeric >= maximum} onClick={() => setValue(String(numeric + 1))}><Plus size={14}/></button>
-        </div>
-      </div>
-    })}
+    <GridDividerField axis="X" value={x} maximum={frame.maxX} onChange={setX}/>
+    <GridDividerField axis="Y" value={y} maximum={frame.maxY} onChange={setY}/>
     <Button className="full-button panel-split-apply" disabled={!valid || !current?.result} onClick={() => { if (valid && current?.result) onSplit(current.result, nx, ny) }}>
       Create {shownX + 1} × {shownY + 1} grid<ArrowRight size={15}/>
     </Button>
     <p id="grid-split-status" className={`panel-split-note${error ? ' grid-split-error' : ''}`} role="status">{error ?? (!current ? 'Checking connector clearance…' : 'T and cross connectors included. Outer size unchanged.')}</p>
   </section>
+}
+
+function GridDividerField({ axis, value, maximum, onChange }: { axis: 'X' | 'Y'; value: string; maximum: number; onChange: (value: string) => void }) {
+  const numeric = value === '' ? NaN : Number(value)
+  const integer = Number.isInteger(numeric)
+  return <div className="panel-split-controls">
+    <label htmlFor={`grid-split-${axis}`}>{axis} dividers <span className="grid-split-axis">{axis === 'X' ? 'Columns' : 'Rows'}</span></label>
+    <div className="panel-split-stepper">
+      <button type="button" aria-label={`Fewer ${axis} dividers`} disabled={!integer || numeric <= 0} onClick={() => onChange(String(numeric - 1))}><Minus size={14}/></button>
+      <input id={`grid-split-${axis}`} aria-label={`${axis} dividers`} type="number" min="0" max={maximum} step="1" value={value} onChange={event => onChange(event.target.value)} aria-invalid={!integer || numeric < 0 || numeric > maximum} aria-describedby="grid-split-status"/>
+      <button type="button" aria-label={`More ${axis} dividers`} disabled={!integer || numeric >= maximum} onClick={() => onChange(String(numeric + 1))}><Plus size={14}/></button>
+    </div>
+  </div>
 }

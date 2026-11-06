@@ -18,9 +18,11 @@ export function usePreviewDrag({ project, selectedIds, commit, notify, select, s
   const [preview, setPreview] = useState<ReturnType<typeof movePreviewDrag> | null>(null)
   const current = session.current?.original === project ? preview : null
   const panels = useMemo(() => current ? resolvePanels(current.project) : null, [current])
+  const movingId = session.current?.movingIds[0]
+  const movingPanel = panels?.find(panel => panel.id === movingId)
+  const sourcePanel = session.current?.project.panels.find(panel => panel.id === movingId)
   return {
-    snapDirection: current && panels && session.current ? panels.find(panel => panel.id === session.current!.movingIds[0])?.position.map((value, axis) =>
-      value - session.current!.project.panels.find(panel => panel.id === session.current!.movingIds[0])!.position[axis]) as Vec3 : undefined,
+    snapDirection: current && movingPanel && sourcePanel ? movingPanel.position.map((value, axis) => value - sourcePanel.position[axis]) as Vec3 : undefined,
     active: !!current,
     project: current?.project,
     panels,

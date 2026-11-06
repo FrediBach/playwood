@@ -614,8 +614,10 @@ export default function App() {
     if(!reviewed&&holes.find(hole=>hole.id===id)?.alignment){setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'holes',selection:selectionKey,token:Date.now(),holeId:id});return}
     try {
       const result=closePanelHole(project,selectedIds,id)
+      const closedInstance=result.instanceId?result.project.assemblies?.instances.find(item=>item.id===result.instanceId):undefined
+      if(result.instanceId&&!closedInstance)throw new Error('The closed opening has no assembly instance.')
       commit(result.project)
-      if(result.instanceId)setSelectedIds(Object.values(result.project.assemblies!.instances.find(item=>item.id===result.instanceId)!.panelIds))
+      if(closedInstance)setSelectedIds(Object.values(closedInstance.panelIds))
       else setSelectedIds([...selectedIds,result.panelId])
       notify(`${result.label} hole closed. Undo to restore the opening.`)
     } catch(error) { notify(error instanceof Error?error.message:'Could not close this opening.') }

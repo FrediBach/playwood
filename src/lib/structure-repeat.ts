@@ -5,7 +5,7 @@ import { samePanelPlacement } from './assembly-placement'
 import { autoConnect } from './auto-connect'
 import { findPanelHoles } from './close-holes'
 import { CONNECTOR_PROFILES } from './connector-profile'
-import { connectorId } from './connector-selection'
+import { connectorId, parseConnectorId } from './connector-selection'
 import { fitAddedConnectorClearance } from './connector-clearance'
 import { copyDesignConstraints, designConstraintPanelIds, MAX_DESIGN_CONSTRAINTS } from './design-constraints'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
@@ -228,7 +228,7 @@ function addCompartment(session: StructureRepeatSession, count: number) {
     const original = session.original.connections.find(item => item.type === '90'
       && (item.parentId === a && item.childId === b || item.parentId === b && item.childId === a))
     if (!original) return connection
-    for (const key of Object.keys(overrides)) if (JSON.parse(key)[0] === connection.id) delete overrides[key]
+    for (const key of Object.keys(overrides)) if (parseConnectorId(key)[0] === connection.id) delete overrides[key]
     for (let index = 0; index < original.count; index++) {
       const override = session.original.connectorOverrides?.[connectorId(original.id, index)]
       if (override) overrides[connectorId(connection.id, index)] = { ...override }

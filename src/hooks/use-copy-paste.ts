@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { copySelection, getPasteTargets, getInsertionTargets, type CopiedItem } from '@/lib/clipboard'
 import { designConstraintPanelIds } from '@/lib/design-constraints'
 import type { AssemblyAttachmentTarget } from '@/lib/assemblies'
@@ -19,9 +19,9 @@ export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commi
   const [placement, setPlacement] = useState<{ project: Project; selection: string; insertion?: 'panel' | 'assembly'; targets: AssemblyAttachmentTarget[] } | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const selection = JSON.stringify([selectedIds, selectedConnectorIds])
-  useEffect(() => {
-    if (placement && (placement.project !== project || placement.selection !== selection)) { setPlacement(null); setHoverId(null) }
-  }, [project, selection, placement])
+  if (placement && (placement.project !== project || placement.selection !== selection)) {
+    setPlacement(null); setHoverId(null)
+  }
   const active = !!placement && placement.project === project && placement.selection === selection
   const targets = active ? placement.targets : []
   const hovered = targets.find(target => target.id === hoverId)

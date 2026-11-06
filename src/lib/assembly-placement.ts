@@ -64,13 +64,15 @@ export function reconcileAssemblyPlacement(project: Project, movingIds: readonly
   const entries = [...centers]
   for (let i = 0; i < entries.length; i++) for (let j = i + 1; j < entries.length; j++) {
     const [aId, a] = entries[i], [bId, b] = entries[j]
-    const members = [...groups.get(aId)!, ...groups.get(bId)!].flatMap(connection => [connection.parentId, connection.childId])
+    const aGroup = groups.get(aId), bGroup = groups.get(bId)
+    if (!aGroup || !bGroup) throw new Error('A shared corner has lost its source joint.')
+    const members = [...aGroup, ...bGroup].flatMap(connection => [connection.parentId, connection.childId])
     if (!members.some(id => moving.has(id)) || a.position.distanceTo(b.position) > tolerance || Math.abs(a.tangent.dot(b.tangent)) < 0.999999) continue
-    const aMembers = new Set(groups.get(aId)!.flatMap(connection => [remap(connection.parentId), remap(connection.childId)]))
-    const bMembers = new Set(groups.get(bId)!.flatMap(connection => [remap(connection.parentId), remap(connection.childId)]))
+    const aMembers = new Set(aGroup.flatMap(connection => [remap(connection.parentId), remap(connection.childId)]))
+    const bMembers = new Set(bGroup.flatMap(connection => [remap(connection.parentId), remap(connection.childId)]))
     if (aMembers.size === bMembers.size && [...aMembers].every(id => bMembers.has(id))
-      && groups.get(aId)![0].type === groups.get(bId)![0].type) {
-      const aMoves = groups.get(aId)!.some(connection => moving.has(connection.parentId) || moving.has(connection.childId))
+      && aGroup[0].type === bGroup[0].type) {
+      const aMoves = aGroup.some(connection => moving.has(connection.parentId) || moving.has(connection.childId))
       discarded.add(aMoves ? aId : bId)
       continue
     }
@@ -78,9 +80,9 @@ export function reconcileAssemblyPlacement(project: Project, movingIds: readonly
   }
   // A duplicate may have opposite local axes. Refit that joint instead of
   // retaining coordinates that referred to the removed panel's orientation.
-  for (const id of touched) {
-    if (discarded.has(id)) continue
-    const remapped = groups.get(id)!.map(connection => ({ ...connection, parentId: remap(connection.parentId), childId: remap(connection.childId), role: 'support' as const }))
+  for (const [id, group] of groups) {
+    if (!touched.has(id) || discarded.has(id)) continue
+    const remapped = group.map(connection => ({ ...connection, parentId: remap(connection.parentId), childId: remap(connection.childId), role: 'support' as const }))
     if (remapped.some(connection => connection.parentId === connection.childId)
       || validateProject({ ...project, panels: kept, connections: remapped }).some(issue => issue.severity === 'error')) rebuild.add(id)
   }
@@ -107,8 +109,16 @@ export function reconcileAssemblyPlacement(project: Project, movingIds: readonly
     // Connectivity through other corners cannot make an unsupported clamp fit.
     for (const id of rebuild) {
       const center = centers.get(id)
-      const related = [...rebuild].filter(other => other === id || center && centers.has(other) && centers.get(other)!.position.distanceTo(center.position) < tolerance)
-      const members = new Set(related.flatMap(other => groups.get(other)!.flatMap(connection => [remap(connection.parentId), remap(connection.childId)])))
+      const related = [...rebuild].filter(other => {
+        const otherCenter = centers.get(other)
+        return other === id || center && otherCenter && otherCenter.position.distanceTo(center.position) < tolerance
+      })
+      const relatedGroups = related.map(other => {
+        const group = groups.get(other)
+        if (!group) throw new Error('A rebuilt corner has lost its source joint.')
+        return group
+      })
+      const members = new Set(relatedGroups.flatMap(group => group.flatMap(connection => [remap(connection.parentId), remap(connection.childId)])))
       const replacement = [...rebuiltGroups.values()].find(group => {
         const memberIds = new Set(group.flatMap(connection => [connection.parentId, connection.childId]))
         if (![...members].every(member => memberIds.has(member))) return false
@@ -117,7 +127,7 @@ export function reconcileAssemblyPlacement(project: Project, movingIds: readonly
         return parent && child && vector(getConnectorPlacements({ ...connection, count: 1 }, parent, child)[0].position).distanceTo(center.position) < tolerance
       })
       if (!replacement) throw new Error('These overlapping connectors cannot form a compatible shared joint.')
-      const original = related.map(other => groups.get(other)!).sort((a, b) => Number(a.some(connection => moving.has(connection.parentId) || moving.has(connection.childId)))
+      const original = relatedGroups.sort((a, b) => Number(a.some(connection => moving.has(connection.parentId) || moving.has(connection.childId)))
         - Number(b.some(connection => moving.has(connection.parentId) || moving.has(connection.childId))))[0][0]
       const color = original.color
       const replacementId = jointId(replacement[0])
