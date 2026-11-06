@@ -2,12 +2,46 @@ import { expect, test, type Page } from '@playwright/test'
 import { createPanel, createStarterProject, parseProject, resolvePanels, validateProject } from '../src/lib/model'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { preparePreviewResize } from '../src/lib/preview-resize'
+import { autoConnect } from '../src/lib/auto-connect'
+import hTable from '../src/test/fixtures/h-table-auto-connect.json' with { type: 'json' }
 import type { Project, Vec3 } from '../src/lib/types'
 
 import { readFileSync } from 'node:fs'
 const cornerShelf = JSON.parse(readFileSync(new URL('../src/lib/fixtures/everyday-shelf-corner.json', import.meta.url), 'utf8'))
 
 const STORAGE_KEY = 'playwood-studio-project-v1'
+
+test('raising the table middle shelf keeps the back panels and desktop fixed through undo and reload', async ({ page }) => {
+  let project = parseProject(hTable)
+  for (const side of ['Left', 'Right']) {
+    project = autoConnect(project, project.panels.filter(panel => [`${side} front leg`, `${side} rear leg`].includes(panel.name)).map(panel => panel.id)).project
+  }
+  await openProject(page, project)
+  await page.getByRole('button', { name: 'Center divider', exact: true }).click()
+  const before = await savedProject(page)
+  const shelf = resolvePanels(before).find(panel => panel.name === 'Center divider')!
+  const handle = directionHandle(before, { panelId: shelf.id }, [0, 1, 0])
+  await beginResize(page, handle, 60)
+  await page.mouse.up()
+  await expect.poll(async () => resolvePanels(await savedProject(page)).find(panel => panel.id === shelf.id)!.position[1]).toBeGreaterThan(shelf.position[1] + 30)
+  const after = await savedProject(page)
+  const panels = resolvePanels(after)
+  const distance = panels.find(panel => panel.id === shelf.id)!.position[1] - shelf.position[1]
+  for (const original of resolvePanels(before)) {
+    const current = panels.find(panel => panel.id === original.id)!
+    const split = /^(Left|Right) rear leg/.test(original.name)
+    expect(current.position[1], original.name).toBeCloseTo(original.position[1] + (original.id === shelf.id ? distance : split ? distance / 2 : 0), 4)
+    expect(current.height, original.name).toBeCloseTo(original.height + (split ? original.name.endsWith('(section)') ? -distance : distance : 0), 4)
+  }
+  expectAnglesAndJoints(before, after)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect.poll(() => savedProject(page)).toEqual(before)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect.poll(() => savedProject(page)).toEqual(after)
+  await page.reload()
+  expect(await savedProject(page)).toEqual(after)
+})
+
 type Handle = NonNullable<ReturnType<typeof preparePreviewResize>>['handles'][number]
 
 async function openProject(page: Page, project: Project, view = 'front') {

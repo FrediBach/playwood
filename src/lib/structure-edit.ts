@@ -187,9 +187,9 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   // plane. Dimensions are allowed to adapt while thickness remains physical.
   const weights = frames.flatMap(() => [1, 1, 64, 0.25, 0.25])
   const connections = [...project.connections, ...(edit.kind === 'fit' ? [edit.connection] : [])].filter(connection => indices.has(connection.parentId) && indices.has(connection.childId))
-  // Independent edge pulls may shift one branch center along a shared T/cross
-  // joint without shifting the other branches or the physical hardware.
-  const offsetKey = (connection: Connection) => ((edit.kind === 'resize' && edit.local) || edit.kind === 'fit') ? connection.id : jointId(connection)
+  // Movement and independent edge pulls may shift one branch center along a
+  // shared T/cross joint without dragging the other branches along its seam.
+  const offsetKey = (connection: Connection) => (edit.kind === 'move' || (edit.kind === 'resize' && edit.local) || edit.kind === 'fit') ? connection.id : jointId(connection)
   const offsetVariables = new Map<string, number>()
   for (const connection of connections) if (!offsetVariables.has(offsetKey(connection))) {
     offsetVariables.set(offsetKey(connection), weights.length)
@@ -197,6 +197,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   }
   const rows: Row[] = []
   const preferences = new Set<Row>()
+  const interiorPreferences = new Set<Row>()
   const bounds: Row[] = []
   const thicknessChange = (index: number) => edit.kind === 'resize'
     ? (edit.patches?.[frames[index].panel.id]?.thickness ?? frames[index].panel.thickness) - frames[index].panel.thickness : 0
@@ -445,6 +446,24 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       const maximum = Math.max(...group.map(index => coordinate(frames[index], axis, 1)))
       const touchesMin = moving.some(index => Math.abs(coordinate(frames[index], axis, -1) - minimum) < CONTACT_TOLERANCE)
       const touchesMax = moving.some(index => Math.abs(coordinate(frames[index], axis, 1) - maximum) < CONTACT_TOLERANCE)
+      if (edit.kind === 'move' && moving.length === 1 && !touchesMin && !touchesMax
+        && Math.abs(frames[moving[0]].axes[2].dot(axis)) > 1 - EPSILON) {
+        // An interior shelf divides local spans, even when feet and upper
+        // compartments do not coincide with the component's outermost bounds.
+        // Keep each neighbor's far edge; continuous panels spanning the shelf
+        // keep both edges. Branch offsets may slide independently along them.
+        const level = coordinate(frames[moving[0]], axis)
+        for (const index of group) {
+          if (ids.has(frames[index].panel.id)) continue
+          for (const side of [-1, 1]) {
+            if (side * (coordinate(frames[index], axis, side) - level) > CONTACT_TOLERANCE) {
+              const anchor = preference()
+              interiorPreferences.add(anchor)
+              edge(anchor, index, axis, side)
+            }
+          }
+        }
+      }
       for (const [side, boundary, touched] of [[-1, minimum, touchesMin], [1, maximum, touchesMax]] as const) {
         if (touched && !(touchesMin && touchesMax)) continue
         for (const index of group) {
@@ -487,7 +506,16 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
 
   let changes: number[]
   try {
-    try { changes = constraints.length ? solveWithBounds(rows, bounds, weights) : solve(rows, weights) }
+    try {
+      try { changes = constraints.length ? solveWithBounds(rows, bounds, weights) : solve(rows, weights) }
+      catch (error) {
+        if (!interiorPreferences.size) throw error
+        // Shared grid boundaries may have to move with the selected shelf.
+        // Relax only local anchors before the established outer-boundary solve.
+        const outerRows = rows.filter(row => !interiorPreferences.has(row))
+        changes = constraints.length ? solveWithBounds(outerRows, bounds, weights) : solve(outerRows, weights)
+      }
+    }
     catch (error) {
       if (!constraints.length || !preferences.size) throw error
       // Explicit design intent outranks automatic center/exterior anchoring.
