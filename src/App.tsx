@@ -1,184 +1,84 @@
-import { ObjectConversionDialog } from '@/components/ObjectConversionDialog'
-import { objectConversionReason } from '@/lib/object-conversion'
-import { useObjectGesture } from '@/hooks/use-object-gesture'
-import { useConstructionEditor } from '@/hooks/use-construction-editor'
-import { useObjectPreview } from '@/hooks/use-object-preview'
-import { ConstructionObjectsList } from '@/components/ConstructionObjectsList'
-import { ConstructionObjectInspector } from '@/components/ConstructionObjectInspector'
-import { updateConstructionObject } from '@/lib/construction-objects'
-import { separateOverlappingConnectors } from '@/lib/connector-clearance'
-import { addConnectorsBetween, connectorInfillReason } from '@/lib/connector-infill'
-import { ConnectorInfillDialog } from '@/components/ConnectorInfillDialog'
-import { SpaceConstraintInspector } from '@/components/SpaceConstraintInspector'
-import { buildPreviewMenuActions } from '@/components/preview-menu-actions'
-import { panelSvgFilename, panelToSvg } from '@/lib/panel-svg'
-import { readSnapSettings } from '@/lib/preview-snap'
-import { createListGroup, moveListItems, orderedConnectors, renameListGroup, ungroupList } from '@/lib/list-groups'
-import type { ListGroupingProps } from '@/components/GroupedList'
-import { PreviewContextMenu } from '@/components/PreviewContextMenu'
-import { ConnectorInspector } from '@/components/ConnectorInspector'
-import { CloseHoles } from '@/components/CloseHoles'
-import { closePanelHole, findClosingPanelHoles } from '@/lib/close-holes'
-import { editConnectors, getDefaultConnectorColor } from '@/lib/connector-selection'
-import { changeConnectorType } from '@/lib/connector-type-edit'
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
-import { Box, Check, CheckCheck, Copy, Link2, MousePointer2, Plus, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { ProjectHeader } from '@/components/ProjectHeader'
-import { ProjectDialogs, type ProjectDialog } from '@/components/ProjectDialogs'
 import { PanelPaletteProvider } from '@/components/PanelColorField'
-import { NiceValuesContext } from '@/components/nice-values-context'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { AssemblyWorkspace } from '@/components/AssemblyWorkspace'
-import { InspectorDisclosure } from '@/components/InspectorPrimitives'
-import { InspectorSidebar } from '@/components/InspectorSidebar'
-import { SinglePanelInspector } from '@/components/SinglePanelInspector'
-import { TrofastInspector } from '@/components/TrofastInspector'
-import { DesignConstraintsInspector } from '@/components/DesignConstraintsInspector'
-import { useDesignConstraints } from '@/hooks/use-design-constraints'
-import { copyDesignConstraints, designConstraintPanelIds } from '@/lib/design-constraints'
-import { assertNoNewTrofastIssues } from '@/lib/trofast'
 import { PanelConnectionFitDialog } from '@/components/PanelConnectionFitDialog'
-import { AttachmentInspector } from '@/components/AttachmentInspector'
-import type { AttachmentSideGuideState } from '@/components/AttachmentSideGuide'
-import { AssemblyInspector, CreateAssemblyForm } from '@/components/AssemblyInspector'
-import { AssemblyEditingInspector, AssemblyPartInspector } from '@/components/AssemblyEditingInspector'
-import { CONNECTORS, DEFAULT_CONNECTOR_COLOR } from '@/lib/connector-options'
-import { MultiPanelInspector } from '@/components/MultiPanelInspector'
+import { PreviewContextMenu } from '@/components/PreviewContextMenu'
+import { ProjectHeader } from '@/components/ProjectHeader'
 import { ProjectStatus } from '@/components/ProjectStatus'
-import { ProjectSidebar } from '@/components/ProjectSidebar'
-import { insertAssemblyDefinition } from '@/lib/assembly-library'
-import { createAssemblyFile, parseAssemblyFile } from '@/lib/assembly-file'
-import { createExampleProject } from '@/lib/example-library'
-import { getSharedPanelFields, panelValuesEqual, selectPanelIds, updateSelectedPanels, updateSelectedConnections } from '@/lib/selection'
-import { useParallelPanelSplitCounts } from '@/hooks/useParallelPanelSplitCounts'
-import { GridPanelSplit } from '@/components/GridPanelSplit'
-import { gridPanelCut } from '@/lib/grid-split'
-import { ParallelPanelSplit } from '@/components/ParallelPanelSplit'
-import { distributePanels } from '@/lib/panel-distribution'
-import { parallelPanelCut, splitParallelPanels } from '@/lib/parallel-panels'
-import { autoConnectNearby } from '@/lib/auto-connect-nearby'
-import { getAutoConnectFit } from '@/lib/auto-connect-fit'
-import { getPanelGroundExtension } from '@/lib/extend-to-ground'
-import { getConnectorPanelFit } from '@/lib/connect-panel'
-import { movePanels, resizePanelDimensions, resizePanels } from '@/lib/structure-edit'
-import { rescaleProject } from '@/lib/project-rescale'
-import { getNiceValueStep, roundPanelDraft } from '@/lib/nice-values'
-import { rotateSelection } from '@/lib/selection-rotation'
-import { mirrorSelection } from '@/lib/selection-mirror'
-import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
-import { useProject } from '@/hooks/use-project'
-import { addCustomColor, getProjectPalette, removeCustomColor, updateCustomColor } from '@/lib/custom-colors'
-import { useCopyPaste } from '@/hooks/use-copy-paste'
+import { TrofastInspector } from '@/components/TrofastInspector'
+import { NiceValuesContext } from '@/components/nice-values-context'
+import { buildPreviewMenuActions } from '@/components/preview-menu-actions'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { EditorConstraints } from '@/editor/EditorConstraints'
+import { EditorConnectorInfill,EditorDialogs,EditorObjectConversion } from '@/editor/EditorDialogs'
+import { EditorInspector,SelectionBuildTools } from '@/editor/EditorInspector'
+import { EditorSidebar } from '@/editor/EditorSidebar'
+import { EditorWorkspace } from '@/editor/EditorWorkspace'
+import { createCloseHoleCommand,createConnectionCommands,createPanelInsertionCommands,getAssemblyPlacementFeedback } from '@/editor/attachment-commands'
+import { contextMenuTitle } from '@/editor/context-menu-title'
+import { createEditorKeyHandler } from '@/editor/editor-keyboard'
+import { createProjectFileCommands } from '@/editor/project-file-commands'
+import { createBoxSelectionCommands,createConnectorEditCommands,createListGroupingCommands,createObjectSelectionCommands,createPanelEditCommands,createPanelSelectionCommand,createSelectionCommands } from '@/editor/selection-commands'
+import { useDisplayedPanels } from '@/editor/use-displayed-panels'
+import { useConstraintActions } from '@/editor/use-editor-constraints'
+import { canShowBuildTools,panelAttachmentAvailable,selectionMovementAvailable,useObjectInteractions } from '@/editor/use-editor-interactions'
+import { useConnectorSelectionDetails,usePanelSelectionDetails } from '@/editor/use-editor-selection'
+import { createPaletteActions,useEditorNotifications,useEditorState,useSelectionPruning } from '@/editor/use-editor-state'
 import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
+import { useAttachmentPreview } from '@/hooks/use-attachment-preview'
+import { useConstructionEditor } from '@/hooks/use-construction-editor'
+import { useCopyPaste } from '@/hooks/use-copy-paste'
+import { useDesignConstraints } from '@/hooks/use-design-constraints'
 import { usePreviewDrag } from '@/hooks/use-preview-drag'
 import { usePreviewResize } from '@/hooks/use-preview-resize'
-import type { BoxSelection } from '@/components/PreviewBoxSelection'
-import { assemblySelectionError, duplicateAssembly, getAssemblyInstance, getAssemblyMovementPanelIds, isPanelConnectedToAssembly, moveAssemblies, removeAssembly } from '@/lib/assemblies'
-import { repairLegacyShelf } from '@/lib/legacy-shelf'
-import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
-import { detachPanel, createPanel, duplicatePanel, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, moveProject, rotateProject, validateProject } from '@/lib/model'
-import type { AssemblyDefinition, AttachmentOptions, CameraView, ConnectorType, Panel, Project, Side, Vec3, ListKind, TrofastInsert } from '@/lib/types'
-
-const INITIAL_ATTACHMENT: AttachmentOptions = {side:'right',type:'90',offset:0,inset:0,flip:false,color:DEFAULT_CONNECTOR_COLOR,count:2}
-function download(content:string,name:string,type:string) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
+import { useProject } from '@/hooks/use-project'
+import { getAssemblyInstance } from '@/lib/assemblies'
+import { findClosingPanelHoles } from '@/lib/close-holes'
+import { resolvePanels } from '@/lib/model'
+import { readSnapSettings } from '@/lib/preview-snap'
+import { assertNoNewTrofastIssues } from '@/lib/trofast'
+import type { Project } from '@/lib/types'
+import { CheckCheck } from 'lucide-react'
+import { useCallback,useEffect,useMemo,useState } from 'react'
 
 export default function App() {
   const {project,commit,undo,redo,canUndo,canRedo,saveStatus,repairNotice}=useProject()
-  const [assemblyTab,setAssemblyTab]=useState<ListKind|'objects'>('panels')
-  const [selectedConnectorIds,setSelectedConnectorIds]=useState<string[]>([])
-  const [connectorTypeError,setConnectorTypeError]=useState<{source:Project;selection:string;message:string}|null>(null)
-  const [selectedIds,setPanelSelection]=useState<string[]>(()=>{const first=project.panels[0];const instance=first&&getAssemblyInstance(project,first.id);return instance?Object.values(instance.panelIds):first?[first.id]:[]})
-  const setSelectedIds=useCallback((next:SetStateAction<string[]>)=>{setAssemblyTab('panels');setSelectedConnectorIds([]);setPanelSelection(next)},[])
-  const setSelectedId=useCallback((id:string|null)=>setSelectedIds(id?[id]:[]),[])
-  const [contextMenu,setContextMenu]=useState<{x:number;y:number}|null>(null)
-  const [constraintFooter,setConstraintFooter]=useState<HTMLDivElement|null>(null)
-  const [projectConstraintsOpen,setProjectConstraintsOpen]=useState(false)
-  const constraintPicker=useRef<((id:string)=>boolean)|null>(null)
-  const [pickingConstraint,setPickingConstraint]=useState(false)
-  const [panelEditError,setPanelEditError]=useState<{selection:string;message:string}|null>(null)
-  const closeContextMenu=useCallback(()=>setContextMenu(null),[])
-  const [toolRequest,setToolRequest]=useState<{tool:'grid'|'parallel'|'assembly'|'holes';selection:string;token:number;holeId?:string}>()
-  const [inspectorTab,setInspectorTab]=useState<'panel'|'attach'>('panel')
-  const [trofastPreview,setTrofastPreview]=useState<{source:Project;panelId:string;inserts:TrofastInsert[]}|null>(null)
-  const previewTrofast=useCallback((panelId:string,inserts:TrofastInsert[]|null)=>{
-    setTrofastPreview(inserts?{source:project,panelId,inserts}:null)
-  },[project])
-  const [dialog,setDialog]=useState<ProjectDialog>(null)
-  const [pendingConnectionFit,setPendingConnectionFit]=useState<{source:Project;fit:NonNullable<ReturnType<typeof getAutoConnectFit>>}|null>(null)
-  const [connectorInfill,setConnectorInfill]=useState<{source:Project;ids:string[]}|null>(null)
-  const [objectConversion,setObjectConversion]=useState<{source:Project;ids:string[]}|null>(null)
-  const modalOpen=!!dialog||!!pendingConnectionFit||!!connectorInfill||!!objectConversion
-  useEffect(()=>setPendingConnectionFit(current=>current&&current.source!==project?null:current),[project])
-  const [pendingTemplate,setPendingTemplate]=useState<{id:string;project:Project;returnTo:ProjectDialog}|null>(null)
-  const [draft,setDraft]=useState(()=>createPanel({name:'My panel',width:600,height:360,thickness:18}))
-  const projectPalette=useMemo(()=>getProjectPalette({customColors:project.customColors}),[project.customColors])
-  const previousPalette=useRef(projectPalette)
-  useEffect(()=>{
-    const previous=previousPalette.current
-    previousPalette.current=projectPalette
-    setDraft(current=>{
-      if(projectPalette.some(option=>option.color===current.color.toLowerCase()))return current
-      const before=previous.find(option=>option.color===current.color.toLowerCase())
-      const replacement=before&&projectPalette.find(option=>option.id===before.id)
-      return {...current,color:replacement?.color??projectPalette[0].color}
-    })
-  },[projectPalette])
-  const [attachTarget,setAttachTarget]=useState('new')
-  const [attachment,setAttachment]=useState<AttachmentOptions>(INITIAL_ATTACHMENT)
-  const [attachmentSideHighlight,setAttachmentSideHighlight]=useState<{panelId:string;side:Side}|null>(null)
-  const [view,setView]=useState<CameraView>('perspective')
-  const [boxSelectActive,setBoxSelectActive]=useState(false)
-  const [realisticPreview,setRealisticPreview]=useState(false)
-  const [showGrid,setShowGrid]=useState(true),[showDimensions,setShowDimensions]=useState(false),[exploded,setExploded]=useState(false)
-  const [fitSignal,setFitSignal]=useState(0),[zoomSignal,setZoomSignal]=useState({direction:0,key:0})
-  const [frameSignal,setFrameSignal]=useState(0)
-  const [leftOpen,setLeftOpen]=useState(window.innerWidth>900),[rightOpen,setRightOpen]=useState(window.innerWidth>680)
-  useEffect(()=>{
-    const closeOverlappingSidebar=()=>{if(window.innerWidth<=900)setLeftOpen(false)}
-    window.addEventListener('resize',closeOverlappingSidebar)
-    return()=>window.removeEventListener('resize',closeOverlappingSidebar)
-  },[])
-  const [toast,setToast]=useState(''),[importError,setImportError]=useState('')
-  const importRef=useRef<HTMLInputElement>(null)
-  const assemblyImportRef=useRef<HTMLInputElement>(null)
-  const [assemblyImportError,setAssemblyImportError]=useState('')
-  const panels=useMemo(()=>resolvePanels(project),[project])
+  const {
+  assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds,
+  connectorTypeError, setConnectorTypeError, selectedIds, setPanelSelection,
+  setSelectedIds, setSelectedId, contextMenu, setContextMenu,
+  constraintFooter, setConstraintFooter, projectConstraintsOpen, setProjectConstraintsOpen,
+  constraintPicker, pickingConstraint, setPickingConstraint, panelEditError,
+  setPanelEditError, closeContextMenu, toolRequest, setToolRequest,
+  inspectorTab, setInspectorTab, trofastPreview, previewTrofast,
+  dialog, setDialog, pendingConnectionFit, setPendingConnectionFit,
+  connectorInfill, setConnectorInfill, objectConversion, setObjectConversion,
+  modalOpen, pendingTemplate, setPendingTemplate, draft,
+  setDraft, attachTarget, setAttachTarget, attachment,
+  setAttachment, attachmentSideHighlight, setAttachmentSideHighlight, view,
+  setView, boxSelectActive, setBoxSelectActive, realisticPreview,
+  setRealisticPreview, showGrid, setShowGrid, showDimensions,
+  setShowDimensions, exploded, setExploded, fitSignal,
+  setFitSignal, zoomSignal, setZoomSignal, frameSignal,
+  setFrameSignal, leftOpen, setLeftOpen, rightOpen,
+  setRightOpen, toast, setToast, importError,
+  setImportError, importRef, assemblyImportRef, assemblyImportError,
+  setAssemblyImportError
+} = useEditorState(project)
+    const panels=useMemo(()=>resolvePanels(project),[project])
   const selectionKey=selectedIds.join('/')
-  useEffect(()=>setToolRequest(undefined),[selectionKey])
-  useEffect(()=>{if(selectionKey||selectedConnectorIds.length)setProjectConstraintsOpen(false)},[selectionKey,selectedConnectorIds])
-  const selectedIdSet=useMemo(()=>new Set(selectedIds),[selectedIds])
-  const selectedPanels=panels.filter(p=>selectedIdSet.has(p.id))
-  const {counts:splitCounts,checking:checkingSplits}=useParallelPanelSplitCounts(project,selectedIds)
-  const gridCut=gridPanelCut(selectedPanels)
-  const selectedFinishCoverages=selectedPanels.map(p=>p.material==='painted'?1:p.finishCoverage??0)
-  const selected=selectedPanels.length===1?selectedPanels[0]:undefined
-  const selectedId=selected?.id??null
-  const groundPanelFit=useMemo(()=>selectedId?getPanelGroundExtension(project,selectedId):{result:undefined,reason:'Select one panel to extend.'},[project,selectedId])
-  const attachmentSideGuide: AttachmentSideGuideState | undefined=selected?{
-    panelId:selected.id,
-    side:attachment.side,
-    highlightedSide:attachmentSideHighlight?.panelId===selected.id?attachmentSideHighlight.side:null,
-    onHighlight:side=>setAttachmentSideHighlight(side?{panelId:selected.id,side}:null),
-    onSelect:side=>setAttachment(current=>({...current,side,flip:current.side===side?!current.flip:current.flip})),
-  }:undefined
-  const connection=project.connections.find(c=>c.childId===selectedId&&c.role!=='support')
-  const bounds=useMemo(()=>getProjectBounds(panels),[panels])
-  const visibleBounds=useMemo(()=>getProjectBounds(panels.filter(panel=>panel.visible)),[panels])
-  const hasVisiblePanels=panels.some(panel=>panel.visible)
-  const issues=useMemo(()=>validateProject(project),[project])
-  const physicalConnectors=useMemo(()=>orderedConnectors(project),[project])
-  const selectedConnectorIdSet=useMemo(()=>new Set(selectedConnectorIds),[selectedConnectorIds])
-  const selectedConnectors=physicalConnectors.filter(connector=>selectedConnectorIdSet.has(connector.id))
-  const inspectingConnectors=selectedConnectors.length>0&&(!selectedPanels.length||assemblyTab==='connectors')
-  const managingProjectConstraints=projectConstraintsOpen&&!selectedPanels.length&&!inspectingConnectors
-  const selectionKind=inspectingConnectors?'connectors':'panels'
-  const connectorPanelFit=useMemo(()=>getConnectorPanelFit(project,selectedConnectorIds),[project,selectedConnectorIds])
-  const infillReason=connectorInfillReason(project,selectedConnectorIds)
-  const openConnectorInfill=()=>setConnectorInfill({source:project,ids:[...selectedConnectorIds]})
-  const connectorCount=physicalConnectors.length
-  const connectorSummary=CONNECTORS.map(type=>({name:type.name,count:physicalConnectors.filter(c=>c.type===type.id).length})).filter(type=>type.count>0).map(type=>`${type.count} × ${type.name}`).join(' · ')
-  const notify=useCallback((message:string)=>setToast(message),[])
+  useEffect(()=>setToolRequest(undefined),[selectionKey,setToolRequest])
+  useEffect(()=>{if(selectionKey||selectedConnectorIds.length)setProjectConstraintsOpen(false)},[selectionKey,selectedConnectorIds,setProjectConstraintsOpen])
+  const {
+  selectedIdSet, selectedPanels, splitCounts, checkingSplits,
+  gridCut, selectedFinishCoverages, selected, selectedId,
+  groundPanelFit, attachmentSideGuide, connection, bounds,
+  visibleBounds, hasVisiblePanels, issues
+} = usePanelSelectionDetails({ selectedIds, panels, project, attachment, attachmentSideHighlight, setAttachmentSideHighlight, setAttachment })
+    const {
+  inspectingConnectors, physicalConnectors, connectorPanelFit, selectedConnectors,
+  infillReason, openConnectorInfill, connectorCount, connectorSummary,
+  selectionKind, managingProjectConstraints
+}=useConnectorSelectionDetails({ project, selectedConnectorIds, selectedPanels, assemblyTab, projectConstraintsOpen, setConnectorInfill })
+  const notify=useCallback((message:string)=>setToast(message),[setToast])
   const [snapSettings,setSnapSettings]=useState(readSnapSettings)
   const objectMode=assemblyTab==='objects'
   const objects=useConstructionEditor({project,commit,notify,snapSettings})
@@ -201,473 +101,43 @@ export default function App() {
     prepare:()=>{assembly.clearPlacement();setInspectorTab('panel');setExploded(false);setRealisticPreview(false);setFrameSignal(v=>v+1)},
     select:ids=>{assembly.close();setSelectedIds(ids);setInspectorTab('panel');setRightOpen(true);setFrameSignal(v=>v+1)}})
   const assemblyCount=(definitionId:string)=>assembly.instances.filter(instance=>instance.definitionId===definitionId).length
-  useEffect(()=>{if(repairNotice)notify(repairNotice)},[repairNotice,notify])
-  useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(''),3500);return()=>clearTimeout(t)}},[toast])
-  useEffect(()=>{setPanelSelection(ids=>{const remaining=ids.filter(id=>project.panels.some(p=>p.id===id));return remaining.length===ids.length?ids:remaining})},[project.panels])
-  useEffect(()=>{setSelectedConnectorIds(ids=>{
-    const remaining=ids.filter(id=>physicalConnectors.some(connector=>connector.id===id))
-    return remaining.length===ids.length?ids:remaining
-  })},[physicalConnectors])
-  const separateSelectedConnectors=()=>{
-    if(modalOpen||assembly.editingInstance)return
-    let changed=false
-    if(commitWithInsertChecks(current=>{
-      const next=separateOverlappingConnectors(current,selectedConnectorIds)
-      changed=next!==current
-      return next
-    }))notify(changed?'Selected overlapping connectors separated. Undo is available.':'No selected connectors overlap.')
-  }
-  const removeSelectedConnectors=()=>{
-    commit(current=>editConnectors(current,selectedConnectorIds,{removed:true}))
-    setSelectedConnectorIds([]);notify('Connectors removed. Undo to bring them back.')
-  }
-  const updateConnectorType=(type:ConnectorType)=>{
-    try {
-      commit(current=>changeConnectorType(current,selectedConnectorIds,type))
-      setConnectorTypeError(null)
-    } catch(error) {
-      const message=error instanceof Error?error.message:'This connector angle cannot keep the joints aligned.'
-      setConnectorTypeError({source:project,selection:selectedConnectorIds.join('/'),message});notify(message)
-    }
-  }
-  const selectConnectors=(next:SetStateAction<string[]>,revealInspector=true,additive=false)=>{
-    if(constraints.editing)return
-    if(objectMode){objects.cancel();setAssemblyTab('connectors')}
-    clipboard.cancel();assembly.close();if(!additive)setPanelSelection([])
-    setSelectedConnectorIds(next)
-    setInspectorTab('panel');setRightOpen(true)
-    if(revealInspector&&window.innerWidth<=900)setLeftOpen(false)
-  }
-  const chooseConnector=(id:string,additive=false)=>selectConnectors(ids=>selectPanelIds(ids,id,additive),true,additive)
-  const checkLoosePanelPatch=(patch:Partial<Panel>)=>{
-    if(selectedPanels.some(panel=>isPanelConnectedToAssembly(project,panel.id)&&(['position','rotation','thickness'] as const).some(key=>patch[key]!==undefined&&!panelValuesEqual(panel[key],patch[key])))) {
-      throw new Error('These panels still connect to an assembly. Detach the panels before changing their placement or thickness.')
-    }
-  }
-  const updatePanel=(patch:Partial<Panel>)=>{
-    if(!selectedId)return false
-    if(assembly.hasMembers)return assembly.editingInstance?assembly.updateDefinition(patch):false
-    try {
-      checkLoosePanelPatch(patch)
-      const {width,height,thickness,position,...rest}=patch
-      commit(current=>{
-        if(patch.trofastInserts!==undefined&&current!==project)throw new Error('The project changed. Review the TROFAST placement before saving it.')
-        const constrained=current.constraints?.some(rule=>rule.enabled)
-        const fields=!constrained&&thickness!==undefined?{...rest,thickness}:rest
-        let base={...current,panels:current.panels.map(panel=>panel.id===selectedId?{...panel,...fields}:panel)}
-        if(position){const before=resolvePanels(base).find(panel=>panel.id===selectedId)!;base=constrained?movePanels(base,[selectedId],position.map((value,axis)=>value-before.position[axis]) as Vec3):{...base,panels:base.panels.map(panel=>panel.id===selectedId?{...panel,position}:panel)}}
-        if(constrained&&thickness!==undefined)return assertNoNewTrofastIssues(current,resizePanelDimensions(base,{[selectedId]:{width,height,thickness}}))
-        return assertNoNewTrofastIssues(current,width!==undefined||height!==undefined?resizePanels(base,[selectedId],{width,height}):base)
-      })
-      setPanelEditError(null)
-      return true
-    } catch(error) {const message=error instanceof Error?error.message:'This panel size cannot keep the joints aligned.';setPanelEditError({selection:selectionKey,message});notify(message);return false}
-  }
-  const updateMultiplePanels=(patch:Partial<Panel>)=>{
-    if(assembly.hasMembers)return assembly.editingInstance?assembly.updateDefinition(patch):false
-    try {
-      checkLoosePanelPatch(patch)
-      const {width,height,thickness,position,...rest}=patch
-      const shared=getSharedPanelFields(selectedPanels)
-      const dimensions={width:shared.has('width')?width:undefined,height:shared.has('height')?height:undefined}
-      commit(current=>{
-        const constrained=current.constraints?.some(rule=>rule.enabled)
-        let base=updateSelectedPanels(current,selectedIds,!constrained&&thickness!==undefined?{...rest,thickness}:rest)
-        if(position){const before=resolvePanels(base).find(panel=>panel.id===selectedIds[0])!;base=constrained?movePanels(base,selectedIds,position.map((value,axis)=>value-before.position[axis]) as Vec3):updateSelectedPanels(base,selectedIds,{position})}
-        if(constrained&&thickness!==undefined)return assertNoNewTrofastIssues(current,resizePanelDimensions(base,Object.fromEntries(selectedIds.map(id=>[id,{...dimensions,thickness}]))))
-        return assertNoNewTrofastIssues(current,dimensions.width!==undefined||dimensions.height!==undefined?resizePanels(base,selectedIds,dimensions):base)
-      })
-      setPanelEditError(null)
-      return true
-    } catch(error) {const message=error instanceof Error?error.message:'These panel sizes cannot keep the joints aligned.';setPanelEditError({selection:selectionKey,message});notify(message);return false}
-  }
-  const moveSelection=(delta:Vec3,repeat:boolean)=>{
-    try {
-      if(assembly.editingInstance)return
-      commit(current=>{
-        const instanceIds=[...new Set(selectedIds.map(id=>getAssemblyInstance(current,id)?.id).filter((id):id is string=>!!id))]
-        const carriedIds=new Set(getAssemblyMovementPanelIds(current,instanceIds))
-        const looseIds=selectedIds.filter(id=>!getAssemblyInstance(current,id)&&!carriedIds.has(id))
-        const next=instanceIds.length?moveAssemblies(current,instanceIds,delta):current
-        return looseIds.length?movePanels(next,looseIds,delta):next
-      },{group:'panel-move',repeat})
-    } catch(error) {notify(error instanceof Error?error.message:'This move cannot keep the joints aligned.')}
-  }
-  const distributeSelection=()=>{
-    try {commit(current=>distributePanels(current,selectedIds))}
-    catch(error){notify(error instanceof Error?error.message:'These panels cannot be distributed while keeping their joints aligned.')}
-  }
-  const splitSelection=(count=1)=>{
-    try {
-      const result=splitParallelPanels(project,selectedIds,count)
-      commit(result.project);setSelectedIds(result.panelIds)
-      notify(`Panels split into ${count+1} equal sections each with ${count} ${count===1?'divider':'dividers'} and ${result.connectors} new connectors. Undo is available.`)
-    } catch(error) {notify(error instanceof Error?error.message:'These panels could not be split.')}
-  }
-  const detachSelection=()=>{
-    try{commit(current=>selectedIds.reduce((next,id)=>detachPanel(next,id),current));setInspectorTab('panel');notify('Panels detached. Their positions are unchanged.')}
-    catch(error){notify(error instanceof Error?error.message:'These panels could not be detached.')}
-  }
-  const deleteSelected=()=>{
-    if(inspectingConnectors){removeSelectedConnectors();return}
-    if(assembly.editingInstance||assembly.memberInstance&&!assembly.selectedInstance){notify('Select the whole instance to remove it.');return}
-    if(!selectedIds.length)return
-    const removedRules=project.constraints?.filter(rule=>designConstraintPanelIds(rule).some(id=>selectedIdSet.has(id))).length??0
-    try{commit(current=>{
-      const instanceIds=[...new Set(selectedIds.map(id=>getAssemblyInstance(current,id)?.id).filter((id):id is string=>!!id))]
-      const looseIds=selectedIds.filter(id=>!getAssemblyInstance(current,id))
-      const next=instanceIds.reduce((p,id)=>removeAssembly(p,id),current)
-      return looseIds.reduce((p,id)=>removePanel(p,id),next)
-    });assembly.clearPlacement();notify(`Selection removed.${removedRules?` Removed ${removedRules} dependent ${removedRules===1?'constraint':'constraints'}.`:''} Undo to bring it back.`)}catch(error){notify(error instanceof Error?error.message:'This selection could not be removed.')}
-  }
-  const duplicateSelected=()=>{
-    if(inspectingConnectors)return
-    if(assembly.editingInstance||assembly.memberInstance&&!assembly.selectedInstance){notify('Select the whole instance to duplicate it.');return}
-    if(!selectedIds.length)return
-    try{let next=project;const copies:string[]=[];const copied=new Set<string>();const copiedPanels=new Map<string,string>()
-      for(const id of selectedIds){const instance=getAssemblyInstance(project,id)
-        if(instance){if(copied.has(instance.id))continue;copied.add(instance.id);next=duplicateAssembly(next,instance.id);const newInstance=next.assemblies!.instances.at(-1)!;copies.push(...Object.values(newInstance.panelIds));for(const [local,original] of Object.entries(instance.panelIds))copiedPanels.set(original,newInstance.panelIds[local])}
-        else{const duplicate=duplicatePanel(next,id);if(duplicate!==next){const newId=duplicate.panels.at(-1)!.id;copies.push(newId);copiedPanels.set(id,newId)}next=duplicate}
-      }
-      const assemblyPanelIds=project.assemblies?.instances.map(instance=>new Set(Object.values(instance.panelIds)))
-      const pairRules=project.constraints?.filter(rule=>'panelIds' in rule&&!assemblyPanelIds?.some(ids=>rule.panelIds.every(id=>ids.has(id))))
-      const copiedRules=copyDesignConstraints(pairRules,copiedPanels)
-      if(copiedRules.length)next={...next,constraints:[...next.constraints??[],...copiedRules]}
-      const omittedRules=project.constraints?.filter(rule=>designConstraintPanelIds(rule).some(id=>copiedPanels.has(id))&&(rule.kind==='floor'||designConstraintPanelIds(rule).some(id=>!copiedPanels.has(id)))).length??0
-      commit(next);assembly.close();setSelectedIds(copies);if(copied.size)setFrameSignal(v=>v+1);notify(`${copied.size?'Linked instances duplicated':'Panels duplicated'}${omittedRules?`. ${omittedRules} floor or external ${omittedRules===1?'constraint stays':'constraints stay'} with the originals.`:''}`)
-    }catch(error){notify(error instanceof Error?error.message:'This selection could not be duplicated.')}
-  }
-  const finishAutoConnect=(result:ReturnType<typeof autoConnectNearby>,resized=0)=>{
-    commit(result.project);clipboard.cancel();assembly.clearPlacement();setInspectorTab('panel');setExploded(false)
-    if(result.splits&&selectedIds.length>1)setSelectedIds(ids=>[...ids,...result.addedPanelIds])
-    const placementMessage=[resized?(resized>1?'Panels resized to fit.':'Panel resized to fit.'):'',result.splits?`${result.splits} panel ${result.splits===1?'split':'splits'} for T joints; outer dimensions kept.`:'',result.movedPanelIds.length?`${result.movedPanelIds.length} loose ${result.movedPanelIds.length===1?'panel moved':'panels moved'} to fit.`:''].filter(Boolean).join(' ')||'Panel positions kept.'
-    notify(`${result.connectors} connectors ${result.upgrades?'fitted':'added'} at ${result.joints} ${result.joints===1?'joint':'joints'}. ${result.upgrades?`${result.upgrades} existing ${result.upgrades===1?'joint':'joints'} upgraded. `:''}${placementMessage}${result.disassembledNames.length?` Made independent: ${result.disassembledNames.join(', ')}.`:''} Undo is available.`)
-  }
-  const addAutoConnectors=()=>{
-    if(modalOpen||assembly.editingInstance)return
-    try {
-      const result=autoConnectNearby(project,selectedIds)
-      const fitSelection=result.splits&&selectedIds.length>1?[...selectedIds,...result.addedPanelIds]:selectedIds
-      const fit=getAutoConnectFit(result.project,fitSelection)
-      if(fit){
-        setPendingConnectionFit({source:project,fit:{...fit,result:{...fit.result,
-          movedPanelIds:result.movedPanelIds,joints:result.joints+fit.result.joints,connectors:result.connectors+fit.result.connectors,
-          upgrades:result.upgrades+fit.result.upgrades,splits:result.splits+fit.result.splits,
-          addedPanelIds:[...result.addedPanelIds,...fit.result.addedPanelIds],
-          disassembledNames:[...new Set([...result.disassembledNames,...fit.result.disassembledNames])],
-        }}})
-        return
-      }
-      if(!result.joints){notify('No compatible unconnected edges found. Check panel angles, edge alignment, and connector clearance.');return}
-      finishAutoConnect(result)
-    } catch(error){notify(error instanceof Error?error.message:'Connectors could not be added.')}
-  }
-  const acceptConnectionFit=()=>{
-    if(!pendingConnectionFit||pendingConnectionFit.source!==project)return
-    finishAutoConnect(pendingConnectionFit.fit.result,pendingConnectionFit.fit.adjustments?.length??1);setPendingConnectionFit(null)
-  }
-  const extendToGround=()=>{
-    if(modalOpen||assembly.hasMembers||!groundPanelFit.result)return
-    commit(groundPanelFit.result.project);clipboard.cancel();assembly.clearPlacement();setInspectorTab('panel');setExploded(false);setFitSignal(value=>value+1)
-    notify('Panel extended to ground. Upper edge and existing joints kept in place. Undo is available.')
-  }
-  const connectWithPanel=()=>{
-    if(assembly.editingInstance||modalOpen)return
-    const result=connectorPanelFit.result
-    if(!result){notify(connectorPanelFit.reason);return}
-    commit(result.project);clipboard.cancel();assembly.clearPlacement();setSelectedId(result.panelId);setInspectorTab('panel');setRightOpen(true);setExploded(false);setFitSignal(v=>v+1)
-    notify(`Panel fitted to ${selectedConnectors.length} connectors.${result.disassembledNames.length?` Made independent: ${result.disassembledNames.join(', ')}.`:''} Undo is available.`)
-  }
-  const selectAll=(includeConnectors=false)=>{
-    if(includeConnectors&&inspectingConnectors){setSelectedConnectorIds(resolveBoxConnectorIds(physicalConnectors.filter(c=>[c.connection.parentId,c.connection.childId].every(id=>panels.some(p=>p.id===id&&p.visible))).map(c=>c.id)));return}
-    const ids=assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):project.panels.map(p=>p.id)
-    setPanelSelection(ids);assembly.clearPlacement();setInspectorTab('panel');setRightOpen(true)
-  }
-  const movementEnabled=!objectMode&&!constraints.editing&&!clipboard.active&&!modalOpen&&!assembly.editingInstance&&(inspectingConnectors||!(assembly.memberInstance&&!assembly.selectedInstance))&&!assembly.placementActive&&(realisticPreview||(!exploded&&inspectorTab!=='attach'))
+  useEditorNotifications(repairNotice,notify,toast,setToast)
+  useSelectionPruning(setPanelSelection,project,setSelectedConnectorIds,physicalConnectors)
+  const { removeSelectedConnectors,selectConnectors,separateSelectedConnectors,chooseConnector,updateConnectorType }=createConnectorEditCommands({ modalOpen, assembly, commitWithInsertChecks, selectedConnectorIds, notify, commit, setSelectedConnectorIds, setConnectorTypeError, project, constraints, objectMode, objects, setAssemblyTab, clipboard, setPanelSelection, setInspectorTab, setRightOpen, setLeftOpen })
+  const { updatePanel,updateMultiplePanels }=createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds })
+  const { duplicateSelected,deleteSelected,detachSelection,splitSelection,distributeSelection,moveSelection }=createSelectionCommands({ assembly, commit, selectedIds, notify, project, setSelectedIds, setInspectorTab, inspectingConnectors, removeSelectedConnectors, selectedIdSet, setFrameSignal })
+  const { connectWithPanel,extendToGround,addAutoConnectors,acceptConnectionFit }=createConnectionCommands({ commit, clipboard, assembly, setInspectorTab, setExploded, selectedIds, setSelectedIds, notify, modalOpen, project, setPendingConnectionFit, pendingConnectionFit, groundPanelFit, setFitSignal, connectorPanelFit, setSelectedId, setRightOpen, selectedConnectors })
+  const movementEnabled=selectionMovementAvailable({ objectMode, constraints, clipboard, modalOpen, assembly, inspectingConnectors, realisticPreview, exploded, inspectorTab })
   const resize=usePreviewResize({project,selectedIds:inspectingConnectors?[]:selectedIds,selectedConnectorIds:inspectingConnectors?selectedConnectorIds:[],snapSettings,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify,select:setSelectedId})
-  const objectInteractionDisabled=modalOpen||drag.active||resize.active||constraints.editing||!!assembly.editingInstance||clipboard.active||assembly.placementActive||realisticPreview||exploded
-  const objectGesture=useObjectGesture({project,selectedIds:objects.selectedIds,enabled:objectMode&&!objectInteractionDisabled&&!objects.editing&&!boxSelectActive,snapSettings,commit,notify})
-  const displayedObjects=objectGesture.objects??objects.objects
-  const objectPreview=useObjectPreview(displayedObjects,!realisticPreview&&!exploded)
-  const boxSelectAvailable=!constraints.editing&&!modalOpen&&!clipboard.active&&!drag.active&&!resize.active&&!assembly.placementActive&&inspectorTab!=='attach'
-    &&(objectMode?!objectInteractionDisabled&&!objects.editing&&!objectGesture.active&&objects.objects.roots.some(id=>objects.objects.nodes.find(node=>node.id===id)?.visible):hasVisiblePanels)
-  const cancelBoxSelect=useCallback(()=>setBoxSelectActive(false),[])
-  useEffect(()=>{setBoxSelectActive(false)},[project,view,realisticPreview,exploded,boxSelectAvailable])
+  const { boxSelectAvailable,objectInteractionDisabled,objectGesture,displayedObjects,objectPreview }=useObjectInteractions({ modalOpen, drag, resize, constraints, assembly, clipboard, realisticPreview, exploded, project, objects, objectMode, boxSelectActive, snapSettings, commit, notify, inspectorTab, hasVisiblePanels })
+  const cancelBoxSelect=useCallback(()=>setBoxSelectActive(false),[setBoxSelectActive])
+  useEffect(()=>{setBoxSelectActive(false)},[project,view,realisticPreview,exploded,boxSelectAvailable,setBoxSelectActive])
   const toggleBoxSelect=()=>{
     if(!boxSelectAvailable)return
     closeContextMenu();assembly.clearPlacement();setBoxSelectActive(active=>!active)
   }
-  const resolveBoxPanelIds=(ids:string[])=>{
-    if(assembly.editingInstance){const allowed=new Set(Object.values(assembly.editingInstance.panelIds));return ids.filter(id=>allowed.has(id))}
-    return [...new Set(ids.flatMap(id=>{const owner=getAssemblyInstance(project,id);return owner?Object.values(owner.panelIds):[id]}))]
-  }
-  const resolveBoxConnectorIds=(ids:string[])=>{
-    if(!assembly.editingInstance)return ids
-    const members=new Set(Object.values(assembly.editingInstance.panelIds))
-    const allowed=new Set(physicalConnectors.filter(({connection})=>members.has(connection.parentId)&&members.has(connection.childId)).map(connector=>connector.id))
-    return ids.filter(id=>allowed.has(id))
-  }
-  const selectBox=(selection:BoxSelection,additive:boolean)=>{
-    setBoxSelectActive(false)
-    if(objectMode){objects.selectMany(selection.objectIds??[],additive);setRightOpen(true);return}
-    assembly.clearPlacement();setInspectorTab('panel')
-    setPanelSelection(current=>additive?[...new Set([...current,...selection.panelIds])]:selection.panelIds)
-    setSelectedConnectorIds(current=>additive?[...new Set([...current,...selection.connectorIds])]:selection.connectorIds)
-    if(selection.panelIds.length||selection.connectorIds.length)setRightOpen(true)
-  }
+  const { resolveBoxConnectorIds,selectBox,resolveBoxPanelIds,selectAll }=createBoxSelectionCommands({ inspectingConnectors, panels, assembly, project, physicalConnectors, setBoxSelectActive, objectMode, objects, setRightOpen, setInspectorTab, setPanelSelection, setSelectedConnectorIds })
   const objectControlsDisabled=objectInteractionDisabled||objectGesture.active
-  const chooseObject=(id:string|null,additive=false)=>{
-    if(objectControlsDisabled)return
-    objects.select(id,additive);setRightOpen(true)
-    if(id&&window.innerWidth<=900)setLeftOpen(false)
-  }
-  const changeAssemblyTab=(tab:ListKind|'objects')=>{
-    if(drag.active||resize.active||objectGesture.active||modalOpen)return
-    objects.cancel()
-    if(tab==='objects'){
-      clipboard.cancel();assembly.close();constraints.cancel();setProjectConstraintsOpen(false);setPickingConstraint(false);constraintPicker.current=null
-      setSelectedIds([]);setRightOpen(true);setExploded(false)
-    }
-
-    setAssemblyTab(tab);setInspectorTab('panel');assembly.clearPlacement();closeContextMenu()
-    if(selectedPanels.length||selectedConnectors.length)setRightOpen(true)
-  }
-  const canAttachPanel=selectedPanels.length===1&&!inspectingConnectors&&!assembly.hasMembers&&!assembly.editingInstance&&!assembly.placementActive&&!clipboard.active&&!constraints.editing&&!modalOpen&&!drag.active&&!resize.active&&!boxSelectActive&&inspectorTab!=='attach'
+  const { chooseObject,changeAssemblyTab }=createObjectSelectionCommands({ objectControlsDisabled, objects, setRightOpen, setLeftOpen, drag, resize, objectGesture, modalOpen, clipboard, assembly, constraints, setProjectConstraintsOpen, setPickingConstraint, constraintPicker, setSelectedIds, setExploded, setAssemblyTab, setInspectorTab, closeContextMenu, selectedPanels, selectedConnectors })
+  const canAttachPanel=panelAttachmentAvailable({ selectedPanels, inspectingConnectors, assembly, clipboard, constraints, modalOpen, drag, resize, boxSelectActive, inspectorTab })
   useEffect(()=>{
-    const onKey=(e:KeyboardEvent)=>{
-      const target=e.target as HTMLElement
-      if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||target.closest('dialog,[role="dialog"]')||modalOpen)return
-      if(constraints.editing){if(e.key==='Escape'){e.preventDefault();if(pickingConstraint){constraintPicker.current=null;setPickingConstraint(false);setRightOpen(true)}else constraints.cancel()}return}
-      if(projectConstraintsOpen&&e.key==='Escape'){e.preventDefault();closeProjectConstraints();return}
-      if(objectMode&&!realisticPreview){
-        const key=e.key.toLowerCase(), command=e.metaKey||e.ctrlKey
-        if(command&&key==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
-        if(e.key==='Escape'){e.preventDefault();if(objects.editing)objects.cancel();else objects.select(null);return}
-        if(objectControlsDisabled||objects.editing)return
-        if(!command&&!e.altKey&&key==='b'){e.preventDefault();if(!e.repeat)toggleBoxSelect();return}
-        if(boxSelectActive)return
-        if(!command&&!e.altKey&&(key==='g'||key==='s')){e.preventDefault();if(!e.repeat)setSnapSettings(value=>({...value,[key==='g'?'grid':'geometry']:!value[key==='g'?'grid':'geometry']}));return}
-        if(command&&['a','c','v','d'].includes(key)){
-          e.preventDefault();if(e.repeat)return
-          if(key==='a')objects.selectAll();else if(key==='c')objects.copy();else if(key==='v')objects.paste();else objects.duplicate()
-          return
-        }
-        if(!command&&!e.altKey){
-          if(['x','y','z'].includes(key)){e.preventDefault();if(!e.repeat)objects.rotate(['x','y','z'].indexOf(key) as 0|1|2)}
-          if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();if(objects.selectedIds.length)objects.remove()}
-          if(key==='f')setFitSignal(v=>v+1)
-        }
-        return
-      }
-      if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='b'){
-        if(boxSelectAvailable){e.preventDefault();if(!e.repeat)toggleBoxSelect()}
-        return
-      }
-      if(boxSelectActive)return
-      if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='a'){
-        if(canAttachPanel){e.preventDefault();if(!e.repeat)startAttach()}
-        return
-      }
-      if((e.metaKey||e.ctrlKey)&&['c','v'].includes(e.key.toLowerCase())){
-        e.preventDefault();if(!e.repeat){if(e.key.toLowerCase()==='c')clipboard.copy();else clipboard.paste()}return
-      }
-      if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&['g','s'].includes(e.key.toLowerCase())){
-        e.preventDefault()
-        if(!e.repeat)setSnapSettings(value=>({...value,[e.key.toLowerCase()==='g'?'grid':'geometry']:!value[e.key.toLowerCase()==='g'?'grid':'geometry']}))
-        return
-      }
-      const axis=e.key.toLowerCase()
-      if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&(axis==='x'||axis==='y'||axis==='z')){
-        if(!inspectingConnectors&&movementEnabled&&!drag.active&&!resize.active&&!assembly.target&&selectedPanels.length){
-          e.preventDefault()
-          if(!e.repeat){
-            try{commit(current=>e.shiftKey?mirrorSelection(current,selectedIds,axis):rotateSelection(current,selectedIds,axis))}
-            catch(error){notify(error instanceof Error?error.message:'This selection cannot rotate while keeping its joints aligned.')}
-          }
-        }
-        return
-      }
-      if(realisticPreview){
-        if(e.metaKey||e.ctrlKey){if(['a','d','z'].includes(e.key.toLowerCase()))e.preventDefault();if(e.key.toLowerCase()==='z')e.shiftKey?redo():undo();return}
-        if(e.key.toLowerCase()==='f')setFitSignal(v=>v+1)
-        if(e.key==='Escape')setRealisticPreview(false)
-        return
-      }
-      if(e.metaKey||e.ctrlKey){
-        if(e.key.toLowerCase()==='a'){e.preventDefault();selectAll(true)}
-        else if(e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}
-        else if(e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected()}
-      }else{
-        if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected()}
-        if(e.key.toLowerCase()==='f')setFitSignal(v=>v+1)
-        if(e.key==='Escape'){
-          if(clipboard.active){clipboard.cancel();(document.activeElement as HTMLElement)?.blur()}
-          else if(assembly.target||assembly.placementActive){assembly.clearPlacement();(document.activeElement as HTMLElement)?.blur()}
-          else if(assembly.editingInstance)assembly.done()
-          else if(!inspectingConnectors&&assembly.memberInstance&&!assembly.selectedInstance)assembly.select(assembly.memberInstance.id)
-          else{setInspectorTab('panel');setSelectedId(null)}
-        }
-      }
-    }
+    const onKey=createEditorKeyHandler({ modalOpen, constraints, pickingConstraint, constraintPicker, setPickingConstraint, setRightOpen, projectConstraintsOpen, closeProjectConstraints, objectMode, realisticPreview, redo, undo, objects, objectControlsDisabled, toggleBoxSelect, boxSelectActive, setSnapSettings, setFitSignal, boxSelectAvailable, canAttachPanel, startAttach, clipboard, inspectingConnectors, movementEnabled, drag, resize, assembly, selectedPanels, commit, selectedIds, notify, setRealisticPreview, selectAll, duplicateSelected, deleteSelected, setInspectorTab, setSelectedId })
     window.addEventListener('keydown',onKey)
     return()=>window.removeEventListener('keydown',onKey)
   })
   const {previewResult,previewProject,previewPanels,previewConnections,previewIssues,attachmentErrors}=useAttachmentPreview({project,selected,panels,draft,attachment,inspectorTab,attachTarget})
-  const choosePanel=(id:string|null,additive=false)=>{
-    if(objectMode){objects.cancel();setAssemblyTab('panels')}
-    if(constraintPicker.current){if(id&&constraintPicker.current(id)){constraintPicker.current=null;setPickingConstraint(false);setRightOpen(true)}return}
-    if(constraints.editing)return
-    if(!id&&additive&&selectedConnectors.length)return
-    if(!additive)setSelectedConnectorIds([])
-    const updateSelection=additive?setPanelSelection:setSelectedIds
-    clipboard.cancel()
-    const owner=id?getAssemblyInstance(project,id):undefined
-    if(assembly.editingInstance){
-      if(owner?.id===assembly.editingInstance.id){updateSelection(ids=>selectPanelIds(ids,id,additive));return}
-      if(owner?.definitionId===assembly.editingDefinition?.id&&id){assembly.drillIn(id);return}
-      if(!id)return
-      assembly.close()
-    }
-    if(owner){
-      if(additive){
-        const members=Object.values(owner.panelIds),memberIds=new Set(members)
-        assembly.clearPlacement()
-        updateSelection(ids=>{
-          const selected=new Set(ids)
-          return members.every(member=>selected.has(member))?ids.filter(member=>!memberIds.has(member)):[...new Set([...ids,...members])]
-        })
-        setInspectorTab('panel');setRightOpen(true)
-      }
-      else assembly.select(owner.id)
-      return
-    }
-    assembly.clearPlacement();updateSelection(ids=>selectPanelIds(ids,id,additive));if(additive||!id)setInspectorTab('panel');if(id)setRightOpen(true)
-  }
-  const addPanel=()=>{objects.cancel();setAssemblyTab('panels');clipboard.cancel();assembly.close();setDraft(roundPanelDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:600,height:360,thickness:18,position:[0,500,0]}),project.niceValues));setDialog('add')}
-  const addDraftPanel = () => {
-    let panel: Panel
-    try { panel = roundPanelDraft({ ...draft, name: draft.name.trim() || 'My panel' },project.niceValues) }
-    catch(error) {notify(error instanceof Error?error.message:'These panel measurements cannot use the chosen nice-value step.');return}
-    setDialog(null)
-    if (!inspectingConnectors&&selectedIds.length) { clipboard.insert({ kind: 'panel', panel }); return }
-    commit(p => ({ ...p, panels: [...p.panels, panel] }))
-    setSelectedId(panel.id); setInspectorTab('panel'); setRightOpen(true)
-    setFitSignal(v => v + 1); notify('Your panel is ready')
-  }
-  const startAttach=()=>{clipboard.cancel();if(!selected||assembly.hasMembers)return;setAttachment(current=>({...current,color:getDefaultConnectorColor(project)}));setAttachTarget('new');setAttachmentSideHighlight(null);setRealisticPreview(false);setExploded(false);setDraft(roundPanelDraft(createPanel({name:`Panel ${project.panels.length+1}`,width:selected?.width??600,height:360,thickness:selected?.thickness??18,material:selected?.material??'birch',color:selected?.color??'#d9bb87',...(selected.finishCoverage!==undefined?{finishCoverage:selected.finishCoverage}:{})}),project.niceValues));setInspectorTab('attach');setRightOpen(true)}
-  const applyAttachment=()=>{if(!previewProject||attachmentErrors.length)return;commit(previewProject);setSelectedId(attachTarget==='new'?draft.id:attachTarget);setInspectorTab('panel');setDraft(createPanel());notify(`${previewPanels.length===1?'Panel':`${previewPanels.length} panels`} attached`)}
-  const updateConnection=(patch:Partial<AttachmentOptions>)=>{if(!connection)return false;const group=connection.id.replace(/:\d+$/,'');return commitWithInsertChecks(p=>({...p,connections:p.connections.map(c=>c.id.replace(/:\d+$/,'')===group?{...c,...patch}:c)}))}
-  const insertModuleDefinition = (definition: AssemblyDefinition) => {
-    try {
-      if (!inspectingConnectors&&selectedIds.length) {
-        clipboard.insert({ kind: 'assembly', definition, instance: {
-          id: crypto.randomUUID(), definitionId: definition.id, name: definition.name,
-          position: [0, 0, 0], rotation: [0, 0, 0], panelIds: {},
-        } })
-        return
-      }
-      clipboard.cancel()
-      const next = insertAssemblyDefinition(project, definition)
-      commit(next); assembly.close()
-      setSelectedIds(Object.values(next.assemblies!.instances.at(-1)!.panelIds))
-      setInspectorTab('panel'); setRightOpen(true); setExploded(false); setRealisticPreview(false); setFitSignal(v => v + 1)
-      notify('Assembly inserted. Duplicate it or attach it to your build.')
-    } catch (error) { notify(error instanceof Error ? error.message : 'Could not insert assembly.') }
-  }
-  const insertModule = (id: string) => insertModuleDefinition(createExampleProject(id).assemblies!.definitions[0])
-  const exportAssembly = () => {
-    if (!assembly.selectedInstance) return
-    try {
-      const file = createAssemblyFile(project, assembly.selectedInstance.id)
-      const name = file.definition.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'assembly'
-      download(JSON.stringify(file, null, 2), `${name}.playwood-assembly.json`, 'application/json')
-      notify('Assembly exported')
-    } catch (error) { notify(error instanceof Error ? error.message : 'Could not export assembly.') }
-  }
-  const importAssembly = async (file: File) => {
-    try {
-      if (file.size > 2_000_000) throw new Error('Choose an assembly file smaller than 2 MB.')
-      const definition = parseAssemblyFile(JSON.parse(await file.text()))
-      setAssemblyImportError('')
-      insertModuleDefinition(definition)
-    } catch (error) { setAssemblyImportError(error instanceof Error ? error.message : 'This assembly file could not be read.') }
-  }
-  const insertSavedAssembly = (id: string) => {
-    if (inspectingConnectors||!selectedIds.length) { clipboard.cancel(); assembly.insert(id); return }
-    const definition = assembly.definitions.find(item => item.id === id)
-    if (!definition) return
-    clipboard.insert({ kind: 'assembly', definition, instance: {
-      id: crypto.randomUUID(), definitionId: id, name: definition.name,
-      position: [0, 0, 0], rotation: [0, 0, 0], panelIds: {},
-    } })
-  }
-  const loadTemplate=(template:string)=>{setPendingTemplate({id:template,project:createExampleProject(template),returnTo:dialog});setDialog('replace')}
-  const applyTemplate=(template:string,next:Project)=>{setProjectConstraintsOpen(false);constraints.cancel();clipboard.cancel();commit(next,{replace:true});assembly.close();const instance=next.assemblies?.instances[0];setSelectedIds(instance?Object.values(instance.panelIds):next.panels.slice(0,1).map(p=>p.id));setInspectorTab('panel');setDialog(null);setPendingTemplate(null);setExploded(false);setFitSignal(v=>v+1);notify(template==='blank'?'A fresh start. Add your first panel.':'Template loaded. Make it your own.')}
-  const closeProjectDialog=()=>{setDialog(dialog==='replace'?pendingTemplate?.returnTo??null:null);setPendingTemplate(null)}
-  const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
-  const startNewProject=()=>{closeContextMenu();applyTemplate('blank',createExampleProject('blank'));setRealisticPreview(false);setView('perspective');setAttachTarget('new');setAttachment(INITIAL_ATTACHMENT);setImportError('');notify('New project started. Undo to restore your previous project.')}
-  const exportProject=()=>{download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json');notify('Project exported')}
-  const importProject=async(file:File)=>{try{if(file.size>2_000_000)throw new Error('Choose a project file smaller than 2 MB.');const imported=parseProject(JSON.parse(await file.text()));const shelf=(imported.constraints?.length||imported.spaceConstraint?.enabled)?imported:repairLegacyShelf(imported);const repaired=(imported.constraints?.length||imported.spaceConstraint?.enabled)?shelf:repairLegacyExampleInserts(shelf);setProjectConstraintsOpen(false);constraints.cancel();commit(repaired,{replace:true});assembly.close();const first=repaired.assemblies?.instances[0];setSelectedIds(first?Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel=>panel.id));setInspectorTab('panel');setFitSignal(v=>v+1);setImportError('');setDialog(null);notify(repaired===imported?'Project imported':repaired!==shelf?'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}catch(e){setImportError(e instanceof Error?e.message:'This project file could not be read.');setDialog('export')}}
+  const choosePanel=createPanelSelectionCommand({ objectMode, objects, setAssemblyTab, constraintPicker, setPickingConstraint, setRightOpen, constraints, selectedConnectors, setSelectedConnectorIds, setPanelSelection, setSelectedIds, clipboard, project, assembly, setInspectorTab })
+  const { startAttach,addPanel,applyAttachment,updateConnection,addDraftPanel }=createPanelInsertionCommands({ objects, setAssemblyTab, clipboard, assembly, setDraft, project, setDialog, draft, notify, inspectingConnectors, selectedIds, commit, setSelectedId, setInspectorTab, setRightOpen, setFitSignal, selected, setAttachment, setAttachTarget, setAttachmentSideHighlight, setRealisticPreview, setExploded, previewProject, attachmentErrors, attachTarget, previewPanels, connection, commitWithInsertChecks })
+  const { loadTemplate,insertModule,insertSavedAssembly,exportAssembly,startNewProject,closeProjectDialog,applyTemplate,exportName,exportProject,importProject,importAssembly }=createProjectFileCommands({ inspectingConnectors, selectedIds, clipboard, project, commit, assembly, setSelectedIds, setInspectorTab, setRightOpen, setExploded, setRealisticPreview, setFitSignal, notify, setAssemblyImportError, setPendingTemplate, dialog, setDialog, setProjectConstraintsOpen, constraints, pendingTemplate, closeContextMenu, setView, setAttachTarget, setAttachment, setImportError })
   const instance=assembly.selectedInstance
   const holes=useMemo(()=>findClosingPanelHoles(project,selectedIds),[project,selectedIds])
-  const closeHole=(id:string,reviewed=false)=>{
-    if(!reviewed&&holes.find(hole=>hole.id===id)?.alignment){setInspectorTab('panel');setRightOpen(true);setToolRequest({tool:'holes',selection:selectionKey,token:Date.now(),holeId:id});return}
-    try {
-      const result=closePanelHole(project,selectedIds,id)
-      const closedInstance=result.instanceId?result.project.assemblies?.instances.find(item=>item.id===result.instanceId):undefined
-      if(result.instanceId&&!closedInstance)throw new Error('The closed opening has no assembly instance.')
-      commit(result.project)
-      if(closedInstance)setSelectedIds(Object.values(closedInstance.panelIds))
-      else setSelectedIds([...selectedIds,result.panelId])
-      notify(`${result.label} hole closed. Undo to restore the opening.`)
-    } catch(error) { notify(error instanceof Error?error.message:'Could not close this opening.') }
-  }
-  const validTargets=assembly.targets.filter(target=>target.project)
-  const assemblyHint=clipboard.active?`Hover a + to preview the ${clipboard.inserting||'copy'}. Click to attach · Esc to cancel.`:instance&&!inspectingConnectors&&!exploded&&!realisticPreview
-    ?validTargets.length?'Hover a + to preview. Click to attach.':assembly.targets.find(target=>target.error)?.error??'This assembly has no compatible corner attachments. Duplicate it to place another instance.'
-    :undefined
-  const attachmentWarning=clipboard.active?clipboard.hovered?.warning:assembly.target?.warning
-  const attachmentSummary=attachmentWarning??(clipboard.active?clipboard.hovered?.error:assembly.target?.error??(assembly.preview?'Corner connectors replaced with shared cross connectors.':undefined))
+  const closeHole=createCloseHoleCommand({ holes, setInspectorTab, setRightOpen, setToolRequest, selectionKey, project, selectedIds, commit, setSelectedIds, notify })
+  const { validTargets,assemblyHint,attachmentSummary,attachmentWarning }=getAssemblyPlacementFeedback({ assembly, clipboard, instance, inspectingConnectors, exploded, realisticPreview })
   const loosePanels=panels.filter(panel=>!getAssemblyInstance(project,panel.id))
 
-  const listGrouping = (kind: ListKind): ListGroupingProps => ({
-    groups: (project.listGroups ?? []).filter(group => group.kind === kind),
-    onSelectGroup: (ids, selected) => {
-      const members = new Set(ids)
-      const update = (current: string[]) => selected ? [...new Set([...current, ...ids])] : current.filter(id => !members.has(id))
-      if (kind === 'connectors') selectConnectors(update, false, true)
-      else {
-        clipboard.cancel();assembly.close();setPanelSelection(update)
-        setInspectorTab('panel');setRightOpen(true)
-      }
-    },
-    onCreateGroup: (id, ids) => commit(p => createListGroup(p, kind, ids, id)),
-    onRenameGroup: (id, name) => commit(p => renameListGroup(p, id, name)),
-    onUngroup: id => commit(p => ungroupList(p, id)),
-    onMove: (ids, groupId, beforeId) => commit(p => moveListItems(p, kind, ids, groupId, beforeId)),
-  })
-  const groupSelected = (kind: ListKind, ids: string[]) => {
-    commit(p => createListGroup(p, kind, ids, crypto.randomUUID()))
-    setLeftOpen(true)
-  }
+  const { groupSelected,listGrouping }=createListGroupingCommands({ project, selectConnectors, clipboard, assembly, setPanelSelection, setInspectorTab, setRightOpen, commit, setLeftOpen })
 
-  const canMenuAutoConnect = useMemo(() => {
-    if (!contextMenu || inspectingConnectors || assembly.editingInstance || project.panels.length < 2) return false
-    try {
-      const result = autoConnectNearby(project, selectedIds)
-      return result.joints > 0 || !!getAutoConnectFit(result.project, selectedIds)
-    } catch { return false }
-  }, [contextMenu, inspectingConnectors, assembly.editingInstance, project, selectedIds])
-
-  const openConstraints=(add=false)=>{
-    objects.cancel();setAssemblyTab('panels')
-    if(assembly.editingInstance){notify('Finish editing the shared assembly before managing project constraints.');return}
-    clipboard.cancel();assembly.clearPlacement();closeContextMenu();if(selectedConnectorIds.length)setSelectedConnectorIds([])
-    setProjectConstraintsOpen(!add)
-    setInspectorTab('panel');setRightOpen(true);setRealisticPreview(false);setExploded(false)
-    if(window.innerWidth<=900)setLeftOpen(false)
-    if(add)constraints.open();else constraints.manage()
-  }
+  const { canMenuAutoConnect,openConstraints }=useConstraintActions({ contextMenu, inspectingConnectors, assembly, project, selectedIds, objects, setAssemblyTab, notify, clipboard, closeContextMenu, selectedConnectorIds, setSelectedConnectorIds, setProjectConstraintsOpen, setInspectorTab, setRightOpen, setRealisticPreview, setExploded, setLeftOpen, constraints })
   const menuActions = buildPreviewMenuActions({
     project, panels, selectedPanels, selectedIds, selectedConnectorIds, selectedIdSet,
     inspectingConnectors, modalOpen, assembly, splitCounts, checkingSplits, canDivideGrid: !!gridCut, holes,
@@ -685,155 +155,80 @@ export default function App() {
     },
   })
 
-  const buildTools = !assembly.editingInstance && !clipboard.active && !assembly.placementActive && inspectorTab==='panel' && selectedPanels.length>0 ? <section className="inspector-section inspector-build-tools" aria-label="Build tools" key={`tools:${selectedIds.join('/')}`}>
-    <div className="section-title"><h2>Build tools</h2><Plus size={16}/></div>
-    {!assembly.hasMembers&&gridCut&&<InspectorDisclosure openRequest={toolRequest?.tool==='grid'&&toolRequest.selection===selectedIds.join('/')?toolRequest.token:0} focusTarget="#grid-split-X" title="Divide into a grid" summary="Rows & columns" lazy><GridPanelSplit project={project} ids={selectedIds} frame={gridCut} onSplit={(result,x,y)=>{commit(result.project);setSelectedIds(result.panelIds);notify(`Created a ${x+1} × ${y+1} grid with ${result.connectors} new connectors. Undo is available.`)}}/></InspectorDisclosure>}
-    {!assembly.hasMembers&&parallelPanelCut(selectedPanels)&&<InspectorDisclosure openRequest={toolRequest?.tool==='parallel'&&toolRequest.selection===selectedIds.join('/')?toolRequest.token:0} focusTarget="select" title="Divide evenly" summary="Add equally spaced dividers" lazy><ParallelPanelSplit counts={splitCounts} checking={checkingSplits} onSplit={splitSelection}/></InspectorDisclosure>}
-    {(instance||!assembly.hasMembers)&&holes.length>0&&<InspectorDisclosure openRequest={toolRequest?.tool==='holes'&&toolRequest.selection===selectionKey?toolRequest.token:0} focusTarget="select" title="Close holes" summary={`${holes.length} ${holes.length===1?'opening':'openings'} available`} lazy><CloseHoles key={toolRequest?.tool==='holes'?toolRequest.token:'holes'} initialHoleId={toolRequest?.tool==='holes'?toolRequest.holeId:undefined} holes={holes} assembly={!!instance} onClose={id=>closeHole(id,true)}/></InspectorDisclosure>}
-    <InspectorDisclosure title="Auto-add connectors" summary="Connect matching or nearly fitting edges" lazy><p className="field-note">{selectedPanels.length>1?'Connect matching edges between selected panels.':'Connect this panel to matching nearby edges.'} If a small size change is needed, review it before applying. Interior T joints split continuous panels, keeping their outer dimensions. Undo restores the original panels.</p><Button variant="outline" size="sm" onClick={addAutoConnectors} disabled={panels.length<2||modalOpen}><Link2 size={15}/>Auto-add connectors</Button></InspectorDisclosure>
-    {!assembly.hasMembers&&selectedPanels.length>1&&<InspectorDisclosure openRequest={toolRequest?.tool==='assembly'&&toolRequest.selection===selectedIds.join('/')?toolRequest.token:0} focusTarget="input" title="Create assembly" summary="Reuse these panels as linked copies" lazy><CreateAssemblyForm panelCount={selectedPanels.length} panels={selectedPanels} onCreate={assembly.create}/></InspectorDisclosure>}
-  </section> : undefined
+  const buildToolsProps: React.ComponentProps<typeof SelectionBuildTools> = { assembly, selectedPanels, selectedIds, gridCut, toolRequest, project, commit, setSelectedIds, notify, splitCounts, checkingSplits, splitSelection, instance, holes, closeHole, addAutoConnectors, panels, modalOpen }
+  const buildTools = renderBuildTools(buildToolsProps, clipboard, inspectorTab)
   const fittedConnectorPanel=connectorPanelFit.result?.project.panels.find(panel=>panel.id===connectorPanelFit.result?.panelId)
   const trofastInspector=selected?<TrofastInspector key={`${selected.id}:${JSON.stringify(selected.trofastInserts)}`} project={project} panel={selected} onApply={inserts=>updatePanel({trofastInserts:inserts})} onPreview={previewTrofast}/>:undefined
-  const trofastPreviewActive=trofastPreview?.source===project&&trofastPreview.panelId===selectedId&&inspectorTab==='panel'&&!modalOpen&&!clipboard.active&&!assembly.placementActive&&!exploded
-  const constraintPreviewProject=!modalOpen&&inspectorTab==='panel'&&!clipboard.active&&!assembly.placementActive?constraints.previewProject:undefined
-  useEffect(()=>{if(constraintPreviewProject)setFrameSignal(value=>value+1)},[constraintPreviewProject])
-  const displayPanels=constraintPreviewProject?resolvePanels(constraintPreviewProject):trofastPreviewActive?panels.map(panel=>panel.id===trofastPreview.panelId?{...panel,trofastInserts:trofastPreview.inserts}:panel):panels
-  const constraintsInspector=<DesignConstraintsInspector panels={panels} constraints={project.constraints??[]} selectedIds={selectedIds}
-    unavailablePanelIds={panels.filter(panel=>getAssemblyInstance(project,panel.id)||isPanelConnectedToAssembly(project,panel.id)).map(panel=>panel.id)}
-    previewError={constraints.previewError} previewSummary={constraints.previewSummary} openRequest={constraints.openRequest} manageRequest={constraints.manageRequest} cancelRequest={constraints.cancelRequest}
-    onPreview={constraints.onPreview} onApply={constraints.onApply} onRemove={constraints.onRemove} onToggle={constraints.onToggle} onEditingChange={editing=>{constraints.onEditingChange(editing);if(!editing){constraintPicker.current=null;setPickingConstraint(false)}}}
-    onHighlight={constraints.onHighlight} footerContainer={constraintFooter}
-    onPickPanel={onPicked=>{constraintPicker.current=onPicked;setPickingConstraint(true);if(window.innerWidth<=900)setRightOpen(false)}}
-    onFindPanels={ids=>{setSelectedIds(ids);setRightOpen(true);setFrameSignal(value=>value+1)}}/>
+  const { constraintPreviewProject,displayPanels }=useDisplayedPanels({ trofastPreview, project, selectedId, inspectorTab, modalOpen, clipboard, assembly, exploded, constraints, setFrameSignal, panels })
+  const editorConstraintsProps: React.ComponentProps<typeof EditorConstraints> = {
+    panels, project, selectedIds, constraints, constraintPicker, setPickingConstraint, constraintFooter, setRightOpen,
+    setSelectedIds, setFrameSignal
+  }
+  const constraintsInspector=<EditorConstraints {...editorConstraintsProps}/>
 
-  return <NiceValuesContext value={project.niceValues}><PanelPaletteProvider project={project}
-    onAddColor={color=>commit(current=>addCustomColor(current,color))}
-    onUpdateColor={(id,color)=>{
-      const previous=project.customColors?.find(option=>option.id===id)?.color
-      commit(current=>updateCustomColor(current,id,color))
-      setDraft(current=>current.color.toLowerCase()===previous?{...current,color:color.color.toLowerCase()}:current)
-    }}
-    onRemoveColor={(id,replacement)=>{
-      const previous=project.customColors?.find(option=>option.id===id)?.color
-      commit(current=>removeCustomColor(current,id,replacement))
-      setDraft(current=>current.color.toLowerCase()===previous?{...current,color:replacement??'#d9bb87'}:current)
-    }}><TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
-    {objectConversion&&<ObjectConversionDialog source={objectConversion.source} project={project} ids={objectConversion.ids} onCancel={()=>setObjectConversion(null)} onAccept={result=>{
-      try {
-        commit(current=>{if(current!==objectConversion.source)throw new Error('The project changed. Convert again.');return result.project})
-        setObjectConversion(null);objects.select(null);setSelectedIds(result.panelIds);setInspectorTab('panel');setRightOpen(true);setFitSignal(v=>v+1)
-        notify(`Created ${result.panelIds.length} panels. Source objects are retained and hidden.`)
-      } catch(error){notify(error instanceof Error?error.message:'Could not create panels.')}
-    }}/>}
+  const paletteActions = createPaletteActions(commit,project,setDraft)
+  const editorSidebarProps: React.ComponentProps<typeof EditorSidebar> = {
+    objects, objectControlsDisabled, chooseObject, setRightOpen, setFrameSignal, setLeftOpen, commit, notify, assemblyTab,
+    changeAssemblyTab, listGrouping, panels, selectedIds, issues, choosePanel, selectedPanels, connectorCount,
+    connectorSummary, assembly, setPanelSelection, selectAll, physicalConnectors, selectedConnectorIds, selectConnectors,
+    setDialog, addPanel, loadTemplate, insertModule, instance, clipboard, insertSavedAssembly, setAssemblyImportError,
+    assemblyImportRef, assemblyImportError
+  }
+  const editorWorkspaceProps: React.ComponentProps<typeof EditorWorkspace> = {
+    objectMode, displayedObjects, objectPreview, objects, objectInteractionDisabled, objectGesture, boxSelectActive,
+    snapSettings, chooseObject, project, boxSelectAvailable, selectionKind, toggleBoxSelect, selectBox, cancelBoxSelect,
+    resolveBoxPanelIds, resolveBoxConnectorIds, resize, drag, setSnapSettings, constraints, modalOpen, clipboard,
+    assembly, inspectorTab, realisticPreview, selectedConnectorIds, chooseConnector, selectedIds, choosePanel,
+    setContextMenu, constraintPreviewProject, displayPanels, openConstraints, pickingConstraint, addAutoConnectors,
+    panels, commitWithInsertChecks, moveSelection, movementEnabled, previewPanels, previewConnections, view, showGrid,
+    showDimensions, exploded, fitSignal, frameSignal, zoomSignal, setRealisticPreview, leftOpen, rightOpen, setLeftOpen,
+    setRightOpen, setShowDimensions, setShowGrid, setView, setZoomSignal, setFitSignal, setExploded, setDialog, addPanel,
+    selected, attachment, attachmentSideGuide, visibleBounds, hasVisiblePanels, inspectingConnectors, validTargets,
+    assemblyHint, attachmentSummary, attachmentWarning, assemblyCount
+  }
+  const editorInspectorProps: React.ComponentProps<typeof EditorInspector> = {
+    objectMode, objects, inspectingConnectors, selectedConnectorIds, selectionKey, inspectorTab, instance, assembly,
+    clipboard, managingProjectConstraints, selectedPanels, selected, setRightOpen, setInspectorTab, startAttach,
+    applyAttachment, previewProject, attachmentErrors, attachment, assemblyCount, previewResult, constraints,
+    setConstraintFooter, attachmentSummary, attachmentWarning, assemblyHint, closeProjectConstraints,
+    projectConstraintsOpen, project, panels, commit, setFitSignal, notify, objectControlsDisabled, setObjectConversion,
+    openConnectorInfill, infillReason, fittedConnectorPanel, selectedConnectors, commitWithInsertChecks,
+    updateConnectorType, connectorTypeError, removeSelectedConnectors, connectWithPanel, modalOpen, connectorPanelFit,
+    selectedIdSet, trofastInspector, buildTools, selectedFinishCoverages, validTargets, duplicateSelected, exportAssembly,
+    deleteSelected, distributeSelection, panelEditError, openConstraints, constraintsInspector, issues,
+    updateMultiplePanels, selectedIds, detachSelection, extendToGround, groundPanelFit, connection, updatePanel,
+    updateConnection, loosePanels, draft, setDraft, setAttachment, attachTarget, setAttachTarget, previewIssues,
+    attachmentSideGuide, addPanel
+  }
+  const editorDialogsProps: React.ComponentProps<typeof EditorDialogs> = {
+    startNewProject, dialog, closeProjectDialog, draft, setDraft, loadTemplate, pendingTemplate, applyTemplate,
+    exportName, notify, exportProject, project, importRef, importError, panels, connectorCount, issues, commit, assembly,
+    setInspectorTab, setExploded, setDialog, setFitSignal, inspectingConnectors, selectedIds, addDraftPanel
+  }
+  return <NiceValuesContext value={project.niceValues}><PanelPaletteProvider {...paletteActions} project={project}><TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
+    {objectConversion&&<EditorObjectConversion objectConversion={objectConversion} project={project} setObjectConversion={setObjectConversion} commit={commit} objects={objects} setSelectedIds={setSelectedIds} setInspectorTab={setInspectorTab} setRightOpen={setRightOpen} setFitSignal={setFitSignal} notify={notify}/>}
     <ProjectHeader projectName={project.name} saveStatus={saveStatus} canUndo={canUndo} canRedo={canRedo} undo={undo} redo={redo}
       onNew={()=>setDialog('new')} onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')}/>
 
-    <ProjectSidebar objectsContent={<ConstructionObjectsList objects={objects.objects} selectedIds={objects.selectedIds} disabled={objectControlsDisabled||objects.editing}
-      onSelect={chooseObject} onAdd={()=>{if(objects.add()){setRightOpen(true);setFrameSignal(v=>v+1);if(window.innerWidth<=900)setLeftOpen(false)}}}
-      onVisibility={node=>{try{commit(current=>updateConstructionObject(current,node))}catch(error){notify(error instanceof Error?error.message:'Could not change object visibility.')}}}/>} assemblyTab={assemblyTab} onAssemblyTabChange={changeAssemblyTab} panelListProps={{...listGrouping('panels'),panels: panels,
-      selectedIds: selectedIds,
-      issues: issues,
-      onSelect: choosePanel,
-      onRename: (id,name)=>commit(p=>({...p,panels:p.panels.map(panel=>panel.id===id?{...panel,name}:panel)})),
-      onRemove: id=>{commit(p=>removePanel(p,id));notify('Panel removed. Undo to bring it back.')},
-      onToggleVisibility: id=>commit(p=>({...p,panels:p.panels.map(panel=>panel.id===id?{...panel,visible:!panel.visible}:panel)})),
-      }} selectedCount={selectedPanels.length} connectorCount={connectorCount} connectorSummary={connectorSummary}
-      onSelectAll={()=>{if(selectedPanels.length===panels.length&&!assembly.editingInstance)setPanelSelection([]);else selectAll()}}
-      connectorListProps={{...listGrouping('connectors'),connectors:physicalConnectors,panels,selectedIds:selectedConnectorIds,
-        onSelect:(id,additive=false)=>selectConnectors(ids=>selectPanelIds(ids,id,additive),!additive,additive),
-        onSelectAll:selected=>selectConnectors(selected?physicalConnectors.map(connector=>connector.id):[],selected,true)}}
-      onCollapse={()=>setLeftOpen(false)} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')} addPanel={addPanel} loadTemplate={loadTemplate} onInsertLibraryAssembly={insertModule}
-      assemblies={assembly.sidebarAssemblies} selectedAssemblyId={instance?.id} onSelectAssembly={id=>{clipboard.cancel();assembly.select(id)}}
-      onSelectAssemblyPanel={assembly.drillIn} libraryAssemblies={assembly.libraryAssemblies} onInsertAssembly={insertSavedAssembly}
-      onImportAssembly={()=>{setAssemblyImportError('');assemblyImportRef.current?.click()}} assemblyImportError={assemblyImportError}/>
+    <EditorSidebar {...editorSidebarProps}/>
 
-    {connectorInfill&&<ConnectorInfillDialog project={project} ids={connectorInfill.ids} onCancel={()=>setConnectorInfill(null)} onApply={count=>{
-      if(project!==connectorInfill.source){notify('The project changed. Select the connectors again.');setConnectorInfill(null);return}
-      if(commitWithInsertChecks(current=>addConnectorsBetween(current,connectorInfill.ids,count))){setConnectorInfill(null);notify(`Added ${count} connectors. Undo is available.`)}
-    }}/>}
-    {contextMenu&&<PreviewContextMenu {...contextMenu} title={inspectingConnectors?`${selectedConnectors.length} connectors`:instance?.name??(selectedPanels.length===1?selectedPanels[0].name:selectedPanels.length?`${selectedPanels.length} panels`:'Preview')} actions={menuActions} onClose={closeContextMenu}/>}
-    <AssemblyWorkspace objectSelection={objectMode} constructionLayer={{objects:displayedObjects,surfaces:objectPreview.surfaces,selectedIds:objects.selectedIds,active:objectMode&&!objectInteractionDisabled,movementEnabled:objectMode&&!objectInteractionDisabled&&!objects.editing,gesture:objectGesture,boxSelecting:boxSelectActive,step:snapSettings.grid?snapSettings.spacing:10,onSelect:chooseObject,onMove:objects.move}}
-      objectPreviewStatus={objectGesture.active?`Object ${objectGesture.resizing?'resize':'move'}${objectGesture.limited?' · limit reached':''} · release to apply · Esc to cancel`:objectPreview.error??(objectPreview.pending?'Updating object preview…':objects.editing?'Object preview · Apply to keep changes · Esc to cancel':objectMode&&objectPreview.surfaces?.some(surface=>!surface.volume)?'A selected operation may produce an empty shape. Edit its operands in the Objects list.':undefined)}
-      spaceConstraint={project.spaceConstraint} niceValueStep={getNiceValueStep(project.niceValues)} boxSelectActive={boxSelectActive&&boxSelectAvailable} boxSelectDisabled={!boxSelectAvailable} selectionKind={selectionKind} onToggleBoxSelect={toggleBoxSelect} onBoxSelect={selectBox} onBoxSelectCancel={cancelBoxSelect} resolveBoxPanelIds={resolveBoxPanelIds} resolveBoxConnectorIds={resolveBoxConnectorIds}
-      snapProbe={resize.snapProbe} snapDirection={drag.snapDirection} snapSettings={snapSettings} setSnapSettings={setSnapSettings} onPreviewContextMenu={objectMode||constraints.editing||modalOpen||drag.active||resize.active||clipboard.active||assembly.placementActive||inspectorTab==='attach'?undefined:(target,x,y)=>{
-      if(target.connectorId&&!realisticPreview){if(!selectedConnectorIds.includes(target.connectorId))chooseConnector(target.connectorId)}
-      else if(target.panelId!==undefined){if(!target.panelId||!selectedIds.includes(target.panelId))choosePanel(target.panelId||null)}
-      setContextMenu({x,y})
-    }} connectorOverrides={(resize.project??drag.project??constraintPreviewProject??clipboard.preview??assembly.preview??project).connectorOverrides} selectedConnectorIds={selectedConnectorIds} onSelectConnector={chooseConnector} panels={resize.panels??drag.panels??displayPanels} connections={(resize.project??drag.project??constraintPreviewProject??project).connections} selectedIds={selectedIds} choosePanel={objectMode&&!realisticPreview?(id,additive)=>{if(!id)objects.select(null,additive)}:choosePanel}
-      hasFloorConstraint={project.constraints?.some(rule=>rule.enabled&&rule.kind==='floor')} designConstraint={constraints.activeRule} constraintPanelIds={constraints.highlightedPanelIds} onConstraints={()=>openConstraints()} constraintEditing={constraints.editing} constraintPicking={pickingConstraint}
-      onDragStart={drag.start} onDragMove={drag.move} onDragEnd={drag.end} dragging={drag.active} dragSnap={drag.snap}
-      resizeHandles={resize.handles} onResizeStart={resize.start} onResizeMove={resize.move} onResizeEnd={resize.end} resizing={resize.active} resizeDistance={resize.distance} resizeLimited={resize.limited} repeatPreview={resize.repeatPreview}
-      onAutoConnect={addAutoConnectors} autoConnectDisabled={constraints.editing||modalOpen||!!assembly.editingInstance||panels.length<2}
-      onMoveConnectors={(slides,repeat)=>commitWithInsertChecks(current=>{
-        let next=current
-        for(const [id,slide] of Object.entries(slides))next=editConnectors(next,[id],{slide})
-        return next
-      },{group:'connector-move',repeat})}
-      onMove={moveSelection} movementEnabled={movementEnabled}
-      previewPanels={clipboard.active?clipboard.previewPanels:assembly.preview?assembly.previewPanels:previewPanels} previewConnections={clipboard.active?clipboard.previewConnections:assembly.preview?assembly.previewConnections:previewConnections} view={view} showGrid={showGrid} showDimensions={showDimensions}
-      exploded={exploded} realisticPreview={realisticPreview} fitSignal={fitSignal} frameSignal={frameSignal} zoomSignal={zoomSignal}
-      setRealisticPreview={next=>{objects.cancel();setRealisticPreview(next)}} leftOpen={leftOpen} rightOpen={rightOpen} setLeftOpen={setLeftOpen} setRightOpen={setRightOpen}
-      setShowDimensions={setShowDimensions} setShowGrid={setShowGrid} setView={setView} setZoomSignal={setZoomSignal} setFitSignal={setFitSignal}
-      setExploded={setExploded} onMoveCreation={()=>setDialog('move')} onRescale={()=>setDialog('rescale')} onRotate={()=>setDialog('rotate')} addPanel={addPanel} isAttaching={inspectorTab==='attach'&&!!selected}
-      attachmentSide={attachment.side} attachmentSideGuide={inspectorTab==='attach'&&!modalOpen?attachmentSideGuide:undefined} visibleBounds={visibleBounds} hasVisiblePanels={hasVisiblePanels}
-      attachmentHandles={!constraints.editing&&!modalOpen&&!inspectingConnectors?(clipboard.active?clipboard.targets:validTargets).map(target=>({id:target.id,label:`${clipboard.active?(clipboard.inserting?`Attach ${clipboard.inserting} at`:'Paste at'):'Attach'} ${target.label}${target.warning?` · ${target.warning}`:''}`,position:target.position,warning:target.warning,active:(clipboard.active?clipboard.hovered:assembly.target)?.id===target.id})):[]}
-      onAttachmentPreview={clipboard.active?clipboard.hover:assembly.hover} onAttachmentCommit={clipboard.active?clipboard.attach:assembly.attach} suppressedConnectionIds={clipboard.active?clipboard.suppressedConnectionIds:assembly.suppressedConnectionIds}
-      suppressedPanelIds={clipboard.active?clipboard.suppressedPanelIds:assembly.suppressedPanelIds}
-      attachmentBoundsPanels={clipboard.active?clipboard.boundsPanels:assembly.attachmentBoundsPanels}
-      onDrillIn={constraints.editing?undefined:assembly.drillIn} assemblyHint={assemblyHint} attachmentSummary={attachmentSummary} attachmentWarning={!!attachmentWarning}
-      editingAssembly={assembly.editingDefinition?{name:assembly.editingDefinition.name,instanceCount:assemblyCount(assembly.editingDefinition.id),onDone:assembly.done}:undefined}/>
+    {connectorInfill&&<EditorConnectorInfill project={project} connectorInfill={connectorInfill} setConnectorInfill={setConnectorInfill} notify={notify} commitWithInsertChecks={commitWithInsertChecks}/>}
+    {contextMenu&&<PreviewContextMenu {...contextMenu} title={contextMenuTitle(inspectingConnectors,selectedConnectors,instance,selectedPanels)} actions={menuActions} onClose={closeContextMenu}/>}
+    <EditorWorkspace {...editorWorkspaceProps}/>
 
-    <InspectorSidebar selectionKey={`${objectMode?objects.selectedIds.join('/'):inspectingConnectors?selectedConnectorIds.join('/'):selectionKey}:${inspectorTab}:${instance?.id??assembly.memberInstance?.id??''}:${assembly.editingInstance?.id??''}:${assembly.placementActive}:${clipboard.active}:${managingProjectConstraints}`} inspectorTab={inspectorTab} selectedCount={selectedPanels.length} hasSelection={!!selected}
-      onCollapse={()=>setRightOpen(false)} onPanel={()=>setInspectorTab('panel')} startAttach={startAttach} applyAttachment={applyAttachment}
-      canAttach={!!previewProject&&!attachmentErrors.length} attachmentType={attachment.type}
-      contextLabel={objectMode?'Objects':managingProjectConstraints?'All constraints':inspectingConnectors?'Connectors':assembly.editingInstance?'Shared assembly':assembly.hasMembers?'Assembly':undefined}
-      onDoneEditing={assembly.editingInstance?assembly.done:undefined}
-      contextDetail={assembly.editingDefinition?`${assembly.editingDefinition.name} · affects ${assemblyCount(assembly.editingDefinition.id)} linked ${assemblyCount(assembly.editingDefinition.id)===1?'instance':'instances'}`:undefined}
-      attachmentStatus={previewResult.error||attachmentErrors[0]?.message||(previewProject?'Panel thickness is compatible · Ready to attach':undefined)}
-      footer={constraints.editing?<div ref={setConstraintFooter}/>:clipboard.active?<><p className="inspector-task-status" role="status">{attachmentSummary||'Choose a + in the workspace to attach.'}</p><Button variant="outline" className="full-button" onClick={clipboard.cancel}>Cancel placement</Button></>:assembly.placementActive?<><p className={`inspector-task-status ${attachmentWarning?'is-blocked':''}`} role="status">{attachmentSummary||assemblyHint}</p><Button variant="outline" className="full-button" onClick={assembly.clearPlacement}>Cancel attachment</Button></>:managingProjectConstraints?<Button variant="outline" className="full-button" aria-label="Done managing constraints" onClick={closeProjectConstraints}>Done</Button>:undefined}>
-        {projectConstraintsOpen&&!clipboard.active&&!assembly.editingInstance&&inspectorTab==='panel'&&!constraints.editing&&<SpaceConstraintInspector key={JSON.stringify(project.spaceConstraint && {...project.spaceConstraint,enabled:undefined})} value={project.spaceConstraint} panels={panels} onToggle={spaceConstraint=>{commit(current=>({...current,spaceConstraint}));if(spaceConstraint.enabled)setFitSignal(v=>v+1)}} onSave={spaceConstraint=>{commit(current=>({...current,spaceConstraint}));setFitSignal(v=>v+1);notify('Build space saved')}}/>}
-        {objectMode?<ConstructionObjectInspector editor={objects} disabled={objectControlsDisabled} conversionReason={objectConversionReason(project,objects.selectedIds)} onConvert={()=>setObjectConversion({source:project,ids:[...objects.selectedIds]})}/>:inspectingConnectors?<ConnectorInspector onAddBetween={openConnectorInfill} infillReason={infillReason} panels={panels} fitSummary={fittedConnectorPanel?`${Math.round(fittedConnectorPanel.width)} × ${Math.round(fittedConnectorPanel.height)} × ${fittedConnectorPanel.thickness} mm`:undefined} connectors={selectedConnectors} onChange={patch=>commitWithInsertChecks(current=>editConnectors(current,selectedConnectorIds,patch))} onTypeChange={updateConnectorType} typeError={connectorTypeError?.source===project&&connectorTypeError.selection===selectedConnectorIds.join('/')?connectorTypeError.message:undefined} onRemove={removeSelectedConnectors} onConnectPanel={connectWithPanel} panelFitReason={assembly.editingInstance?'Finish editing the assembly before connecting a panel.':modalOpen?'Close the dialog before connecting a panel.':connectorPanelFit.reason}/>:<>
-        {clipboard.active?<div className="multi-selection-heading"><h2>Place {clipboard.inserting||'copy'}</h2><p>Hover a + in the workspace to preview. Click to attach, or cancel to return.</p></div>:assembly.editingInstance&&assembly.editingDefinition?<AssemblyEditingInspector
-          panels={assembly.editingDefinition.panels.filter(panel=>selectedIdSet.has(assembly.editingInstance!.panelIds[panel.id]))}
-          definitionPanels={assembly.editingDefinition.panels} parameters={assembly.editingDefinition.parameters} onParametersChange={assembly.parameters}
-          name={assembly.editingDefinition.name} count={assemblyCount(assembly.editingDefinition.id)} onChange={assembly.updateDefinition} accessories={trofastInspector}/>
-        :instance&&assembly.definition?<AssemblyInspector buildTools={buildTools} key={instance.id} name={instance.name} definitionName={assembly.definition.name}
-          parameters={assembly.definition.parameters} parameterValues={instance.parameterValues} onParameterChange={(id,value)=>assembly.parameter(instance.id,id,value)} onResetParameters={()=>assembly.resetParameters(instance.id)}
-          instanceCount={assemblyCount(instance.definitionId)} panelCount={Object.keys(instance.panelIds).length} color={instance.finish?.color??selectedPanels[0]?.color??'#d9bb87'} hasColorOverride={!!instance.finish?.color}
-          finishCoverage={selectedFinishCoverages[0]??0} finishCoverageMixed={selectedFinishCoverages.some(value=>value!==selectedFinishCoverages[0])} finishCoverageDisabled={selectedPanels.every(p=>p.material==='painted')}
-          hasFinishCoverageOverride={instance.finish?.finishCoverage!==undefined} onFinishCoverageChange={finishCoverage=>assembly.finish(instance.id,{finishCoverage})} onResetFinishCoverage={()=>assembly.resetFinish(instance.id,'finishCoverage')}
-          connected={project.assemblies?.links.some(link=>link.a.instanceId===instance.id||link.b.instanceId===instance.id)}
-          attachmentTargets={assembly.instances.filter(item=>item.id!==instance.id&&!project.assemblies?.links.some(link=>link.a.instanceId===item.id||link.b.instanceId===item.id)).map(item=>({id:item.id,name:item.name}))}
-          attachmentActive={assembly.placementActive} attachmentMessage={assemblyHint} onCancelAttach={assembly.clearPlacement} canAttachCopy={validTargets.length>0}
-          onRename={name=>assembly.rename(instance.id,name)} onColorChange={color=>assembly.finish(instance.id,{color})} onResetColor={()=>assembly.resetFinish(instance.id,'color')}
-          onDuplicate={duplicateSelected} onExport={exportAssembly} onAttachCopy={()=>{clipboard.cancel();assembly.startAttach()}} onAttachExisting={id=>{clipboard.cancel();assembly.startAttach(id)}}
-          onEdit={()=>assembly.edit(instance.id)} onDisconnect={()=>assembly.disconnect(instance.id)} onMakeIndependent={()=>assembly.independent(instance.id)} onDisassemble={()=>assembly.disassemble(instance.id)} onDelete={deleteSelected}/>
-        :assembly.memberInstance&&selected&&assembly.definition?<><AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={()=>assembly.select(assembly.memberInstance!.id)} onEdit={()=>assembly.edit(assembly.memberInstance!.id)}/>{buildTools}</>
-        :assembly.hasMembers?<><div className="selected-heading"><Box size={15}/><span>MULTIPLE OBJECTS</span></div><p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p>{buildTools}<div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15}/>Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15}/>Remove</Button></div></>
-        :<>
-          {selectedPanels.length>1&&<MultiPanelInspector onDistribute={distributeSelection} editError={panelEditError?.selection===selectionKey?panelEditError.message:undefined} onManageConstraints={()=>openConstraints()} constraints={constraintsInspector} buildTools={buildTools} panels={selectedPanels} connections={project.connections} issues={issues} onChange={updateMultiplePanels} onConnectionChange={patch=>commitWithInsertChecks(p=>updateSelectedConnections(p,selectedIds,patch))} onDuplicate={duplicateSelected} onDelete={deleteSelected} onDetach={detachSelection}/>}
-          {selected&&(inspectorTab==='panel'?<SinglePanelInspector editError={panelEditError?.selection===selectionKey?panelEditError.message:undefined} onManageConstraints={()=>openConstraints()} constraints={constraintsInspector} accessories={trofastInspector} onExtendToGround={extendToGround} groundFitReason={groundPanelFit.reason} buildTools={buildTools} selected={selected} connected={project.connections.some(c=>c.parentId===selected.id||c.childId===selected.id)} panels={panels} connection={connection} supportConnected={project.connections.some(c=>c.role==='support'&&(c.parentId===selected.id||c.childId===selected.id))} issues={issues} updatePanel={updatePanel} updateConnection={updateConnection} onDetach={detachSelection} duplicateSelected={duplicateSelected} deleteSelected={deleteSelected}/>:<AttachmentInspector selected={selected} panels={loosePanels} draft={draft} setDraft={setDraft} attachment={attachment} setAttachment={setAttachment} attachTarget={attachTarget} setAttachTarget={setAttachTarget} previewIssues={previewIssues} sideGuide={attachmentSideGuide!}/>)}
-          {!selectedPanels.length&&!managingProjectConstraints&&<div className="no-selection"><MousePointer2 size={28}/><h2>A little more detail.</h2><p>Select a panel or connector in the workspace<br/>to make it your own.</p><Button variant="outline" onClick={addPanel}><Plus size={16}/>Add a panel</Button></div>}
-        </>}
-        {!clipboard.active&&!assembly.editingInstance&&inspectorTab==='panel'&&(assembly.hasMembers||managingProjectConstraints)&&constraintsInspector}
-        </>}
-    </InspectorSidebar>
+    <EditorInspector {...editorInspectorProps}/>
 
     <ProjectStatus panelCount={project.panels.length} connectorCount={connectorCount} issueCount={issues.length} bounds={bounds} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')}/>
     {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
 
     <PanelConnectionFitDialog adjustments={pendingConnectionFit?.fit.adjustments} adjustment={pendingConnectionFit?.fit.adjustment} operations={pendingConnectionFit?.fit.result} onConfirm={acceptConnectionFit} onCancel={()=>setPendingConnectionFit(null)}/>
-    <ProjectDialogs onNew={startNewProject} dialog={dialog} onClose={closeProjectDialog} draft={draft} setDraft={setDraft} loadTemplate={loadTemplate}
-      replacementName={pendingTemplate?.project.name??''} onReplace={()=>{if(pendingTemplate)applyTemplate(pendingTemplate.id,pendingTemplate.project)}}
-      onExportPanelSvg={(panel,index)=>{download(panelToSvg(panel),`${exportName}-${panelSvgFilename(panel,index)}`,'image/svg+xml');notify('Panel SVG exported')}}
-      exportProject={exportProject} onExportParts={()=>{download(projectToCsv(project),`${exportName}-parts.csv`,'text/csv');notify('Parts list exported')}}
-      onImport={()=>importRef.current?.click()} importError={importError} project={project} panels={panels} connectorCount={connectorCount} issues={issues}
-      onMoveCreation={delta=>{commit(p=>moveProject(p,delta));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);notify('Creation moved. Undo is available.')}}
-      onRescale={(changes,niceValues)=>{commit(p=>{if(p!==project)throw new Error('The project changed. Close and reopen Rescale creation.');return rescaleProject(p,changes,niceValues)});assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify('Rescale settings applied. Undo is available.')}}
-      onRotate={(axis,degrees)=>{commit(p=>rotateProject(p,axis,degrees));assembly.close();setInspectorTab('panel');setExploded(false);setDialog(null);setFitSignal(v=>v+1);notify(`Creation rotated ${degrees}° around ${axis.toUpperCase()}. Undo is available.`)}}
-      attachNewPanel={!inspectingConnectors&&selectedIds.length>0} onAdd={addDraftPanel}/>
+    <EditorDialogs {...editorDialogsProps}/>
     <input ref={importRef} type="file" accept=".json,.playwood.json" className="visually-hidden" aria-label="Import project file" onChange={e=>{const file=e.target.files?.[0];if(file)void importProject(file);e.target.value=''}}/>
     <input ref={assemblyImportRef} type="file" accept=".json,.playwood-assembly.json" className="visually-hidden" aria-label="Import assembly file" onChange={e=>{const file=e.target.files?.[0];if(file)void importAssembly(file);e.target.value=''}}/>
   </div></TooltipProvider></PanelPaletteProvider></NiceValuesContext>
+}
+
+// An absent slot must stay undefined so inspectors can choose their default content.
+function renderBuildTools(props: React.ComponentProps<typeof SelectionBuildTools>, clipboard: ReturnType<typeof useCopyPaste>, inspectorTab: 'panel' | 'attach') {
+  return canShowBuildTools({ ...props, clipboard, inspectorTab }) ? <SelectionBuildTools {...props}/> : undefined
 }

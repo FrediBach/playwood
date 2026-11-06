@@ -1,39 +1,39 @@
-import { ConstructionObjectLayer, type ConstructionLayerProps } from './ConstructionObjectLayer'
-import { constructionBounds } from '@/lib/object-geometry'
-import { spaceBounds } from '@/lib/space-constraint'
-import { SpaceConstraintOverlay } from './SpaceConstraintOverlay'
+import { useSceneSnapFeedback } from '@/hooks/use-scene-snap-feedback'
+import { getConnectorKeyboardSlides,getConnectorRail } from '@/lib/connector-movement'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
-import { snapPanelDelta, type SnapSettings } from '@/lib/preview-snap'
-import { Component, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
-import { Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
+import { constructionBounds } from '@/lib/object-geometry'
+import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
+import type { FurnishingPlacement } from '@/lib/preview-furnishings'
+import type { PreviewResizeHandle,PreviewResizeMode,RepeatPreview } from '@/lib/preview-resize'
+import { snapPanelDelta,type SnapSettings } from '@/lib/preview-snap'
+import { spaceBounds } from '@/lib/space-constraint'
+import { getTrofastInsertLocalBounds } from '@/lib/trofast'
+import type { CameraView,Connection,Panel,Project,Vec3 } from '@/lib/types'
+import { Html,Line,OrbitControls,OrthographicCamera,PerspectiveCamera } from '@react-three/drei'
+import { Canvas,useFrame,useThree,type ThreeEvent } from '@react-three/fiber'
+import { Plus } from 'lucide-react'
+import { Component,useEffect,useEffectEvent,useLayoutEffect,useMemo,useRef,useState,type ReactNode,type RefObject } from 'react'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import type { CameraView, Connection, Panel, Project, Vec3 } from '@/lib/types'
-import { ConnectorMeshes } from './ConnectorMeshes'
-import { makePanelGeometry } from './scene-geometry'
-import { TrofastMeshes } from './TrofastMeshes'
-import { getTrofastInsertLocalBounds } from '@/lib/trofast'
-import { createWoodTextures } from './wood-texture'
-import { createPanelMaterials } from './panel-materials'
-import { SceneEnvironment } from './SceneEnvironment'
-import { useSceneSnapFeedback } from '@/hooks/use-scene-snap-feedback'
-import { PreviewFurnishings } from './PreviewFurnishings'
-import type { FurnishingPlacement } from '@/lib/preview-furnishings'
-import { DesignConstraintOverlay } from './DesignConstraintOverlay'
-import { getRoomLayout, PREVIEW_FLOOR_Y } from './room-layout'
-import { RobotVacuum } from './RobotVacuum'
-import { createVacuumPlan, type VacuumPoint } from './robot-vacuum-navigation'
-import { getConnectorKeyboardSlides, getConnectorRail } from '@/lib/connector-movement'
-import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
-import { PreviewDragMovement, type PreviewDragProps } from './PreviewDragMovement'
-import { PreviewResizeHandles } from './PreviewResizeHandles'
-import { AttachmentSideGuide, type AttachmentSideGuideState } from './AttachmentSideGuide'
-import { PreviewBoxSelection, type BoxSelectionProps, type BoxSelectionPreview } from './PreviewBoxSelection'
-import type { PreviewResizeHandle, PreviewResizeMode, RepeatPreview } from '@/lib/preview-resize'
-import { Plus } from 'lucide-react'
 import './assemblies.css'
+import { AttachmentSideGuide,type AttachmentSideGuideState } from './AttachmentSideGuide'
 import './box-selection.css'
+import { ConnectorMeshes } from './ConnectorMeshes'
+import { ConstructionObjectLayer,type ConstructionLayerProps } from './ConstructionObjectLayer'
+import { DesignConstraintOverlay } from './DesignConstraintOverlay'
+import { createPanelMaterials } from './panel-materials'
+import { PreviewBoxSelection,type BoxSelectionPreview,type BoxSelectionProps } from './PreviewBoxSelection'
+import { PreviewDragMovement,type PreviewDragProps } from './PreviewDragMovement'
+import { PreviewFurnishings } from './PreviewFurnishings'
+import { PreviewResizeHandles } from './PreviewResizeHandles'
+import { createVacuumPlan,type VacuumPoint } from './robot-vacuum-navigation'
+import { RobotVacuum } from './RobotVacuum'
+import { getRoomLayout,PREVIEW_FLOOR_Y } from './room-layout'
+import { makePanelGeometry } from './scene-geometry'
+import { SceneEnvironment } from './SceneEnvironment'
+import { SpaceConstraintOverlay } from './SpaceConstraintOverlay'
+import { TrofastMeshes } from './TrofastMeshes'
+import { createWoodTextures } from './wood-texture'
 
 const MM = 0.001
 const ACCENT = '#e75a35'
@@ -147,13 +147,14 @@ function PanelMesh({ panel, selected, ghost, interactive = true, onSelect, onDri
   useEffect(() => () => { materials.forEach(material => material.dispose()) }, [materials])
   useEffect(() => () => { outline.dispose() }, [outline])
   useEffect(() => () => { document.body.style.cursor = '' }, [])
+  const canInteract = !ghost && interactive
   const position = panel.position.map(value => value * MM) as Vec3
   return <group position={position} rotation={panel.rotation}>
-    <mesh name={panel.name} userData={ghost || !interactive ? undefined : { panelId: panel.id }} geometry={geometry} material={materials} castShadow={!ghost} receiveShadow={!ghost}
-      onClick={ghost || !interactive ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey) }}
-      onDoubleClick={ghost || !interactive || !onDrillIn ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onDrillIn(panel.id) }}
-      onPointerOver={ghost || !interactive ? undefined : event => { event.stopPropagation(); document.body.style.cursor = 'pointer' }}
-      onPointerOut={ghost || !interactive ? undefined : () => { document.body.style.cursor = 'auto' }}>
+    <mesh name={panel.name} userData={!canInteract ? undefined : { panelId: panel.id }} geometry={geometry} material={materials} castShadow={!ghost} receiveShadow={!ghost}
+      onClick={!canInteract ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey) }}
+      onDoubleClick={!canInteract || !onDrillIn ? undefined : (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onDrillIn(panel.id) }}
+      onPointerOver={!canInteract ? undefined : event => { event.stopPropagation(); document.body.style.cursor = 'pointer' }}
+      onPointerOut={!canInteract ? undefined : () => { document.body.style.cursor = 'auto' }}>
     </mesh>
     <TrofastMeshes panel={panel} ghost={ghost} interactive={interactive} onSelect={onSelect} onDrillIn={onDrillIn} />
     {(selected || ghost) && <lineSegments geometry={outline} raycast={() => null}>
@@ -270,9 +271,22 @@ function CameraController({ bounds, vacuumDock, view, fitSignal, frameSignal, zo
     camera.updateProjectionMatrix()
     invalidate()
   }, [camera, zoomSignal.key, zoomSignal.direction, invalidate, realisticPreview, roomMaxDistance])
-  return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.12} minZoom={25} maxZoom={4000}
-    minDistance={realisticPreview ? 0.6 : 0.08} maxDistance={realisticPreview ? roomMaxDistance : 100} minPolarAngle={realisticPreview ? 0.25 : 0} maxPolarAngle={Math.PI * (realisticPreview ? 0.49 : 0.94)}
-    minAzimuthAngle={realisticPreview ? 0 : -Infinity} maxAzimuthAngle={realisticPreview ? Math.PI / 3 : Infinity} enableRotate={view === 'perspective'} enablePan screenSpacePanning
+  return <OrbitControls
+    ref={controls}
+    makeDefault
+    enableDamping
+    dampingFactor={0.12}
+    minZoom={25}
+    maxZoom={4000}
+    minDistance={realisticPreview ? 0.6 : 0.08}
+    maxDistance={realisticPreview ? roomMaxDistance : 100}
+    minPolarAngle={realisticPreview ? 0.25 : 0}
+    maxPolarAngle={Math.PI * (realisticPreview ? 0.49 : 0.94)}
+    minAzimuthAngle={realisticPreview ? 0 : -Infinity}
+    maxAzimuthAngle={realisticPreview ? Math.PI / 3 : Infinity}
+    enableRotate={view === 'perspective'}
+    enablePan
+    screenSpacePanning
     mouseButtons={{ LEFT: panMode || view !== 'perspective' ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
     touches={{ ONE: panMode || view !== 'perspective' ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }} />
 }
@@ -471,9 +485,13 @@ function SceneOverlays(props: SceneProps & { shownPanels: Panel[] }) {
   return <>
     {!exploded && !realisticPreview && props.spaceConstraint && <SpaceConstraintOverlay space={props.spaceConstraint} panels={panels}/> }
     {!exploded && !realisticPreview && props.designConstraint && <DesignConstraintOverlay constraint={props.designConstraint} panels={panels}/>}
-    {props.dragSnap && <Html position={vector(props.dragSnap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${props.dragSnap.warning ? ' has-warning' : ''}`}>Snapped · {props.dragSnap.label}{props.dragSnap.warning && <strong>{props.dragSnap.warning}</strong>}</span></Html>}
+    {props.dragSnap && <DragSnapNotice snap={props.dragSnap}/>}
     {sideGuidePanel && props.attachmentSideGuide && <AttachmentSideGuide panel={sideGuidePanel} guide={props.attachmentSideGuide}/>}
   </>
+}
+
+function DragSnapNotice({ snap }: { snap: NonNullable<SceneProps['dragSnap']> })  {
+  return <Html position={vector(snap.position)} center style={{ pointerEvents: 'none' }}><span className={`preview-drag-snap${snap.warning? ' has-warning':''}`}>Snapped · {snap.label}{snap.warning&&<strong>{snap.warning}</strong>}</span></Html>
 }
 
 function SceneMovement(props: SceneProps & { feedback: ReturnType<typeof useSceneSnapFeedback> }) {
@@ -494,25 +512,7 @@ function World(props: WorldProps) {
   const bounds = useMemo(() => boundsOf(displayPanels), [displayPanels])
   const vacuumPlan = useMemo(() => realisticPreview ? createVacuumPlan(bounds, displayPanels, props.furnishings) : null, [realisticPreview, bounds, displayPanels, props.furnishings])
   const cameraBounds = useMemo(() => {
-    const bounds = boundsOf([...displayPanels, ...previewPanels, ...attachmentBoundsPanels])
-    if (props.constructionLayer && !realisticPreview && !exploded) {
-      const layer = props.constructionLayer
-      const visibleRoots = layer.objects.roots.filter(id => layer.objects.nodes.find(node => node.id === id)?.visible)
-      const objectBounds = layer.previewBounds ?? constructionBounds(layer.objects, [...visibleRoots, ...(layer.active ? layer.selectedIds : [])])
-      if (objectBounds) {
-        if (!displayPanels.length && !previewPanels.length && !attachmentBoundsPanels.length) bounds.makeEmpty()
-        bounds.expandByPoint(vector(objectBounds.min)); bounds.expandByPoint(vector(objectBounds.max))
-      }
-    }
-    if (props.spaceConstraint?.enabled && !exploded && !realisticPreview) {
-      const space = spaceBounds(props.spaceConstraint)
-      bounds.expandByPoint(vector(space.min))
-      bounds.expandByPoint(vector(space.max))
-    }
-    if (props.designConstraint) {
-      bounds.expandByScalar(0.1)
-      if (props.designConstraint.kind === 'floor') bounds.min.y = Math.min(bounds.min.y, 0)
-    }
+    const bounds=expandCameraBounds(displayPanels,previewPanels,attachmentBoundsPanels,props,realisticPreview,exploded)
     return bounds
   }, [displayPanels, previewPanels, attachmentBoundsPanels, props.designConstraint, props.spaceConstraint, props.constructionLayer, exploded, realisticPreview])
   const shownPanels = displayPanels.filter(panel => panel.visible)
@@ -522,14 +522,11 @@ function World(props: WorldProps) {
     <PreviewBoxSelection {...props} onPreview={props.onBoxPreview}/>
     <PreviewContextGesture onOpen={props.boxSelectActive ? undefined : props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
     <SceneMovement {...props} feedback={feedback}/>
-    {props.view === 'perspective'
-      ? <PerspectiveCamera key={realisticPreview ? 'room' : 'studio'} makeDefault fov={realisticPreview ? 45 : 35} near={0.01} far={200} position={[2, 1.5, 2.5]} />
-      : <OrthographicCamera makeDefault near={0.01} far={200} position={[2, 1.5, 2.5]} zoom={450} />}
+    <SceneCamera props={props} realisticPreview={realisticPreview}/>
     <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} snapSettings={props.snapSettings} guides={feedback.guides}/>
     {vacuumPlan && <RobotVacuum plan={vacuumPlan} projectPanels={displayPanels} controlsEnabled={!props.dragging && !props.resizing && !props.boxSelectActive && !props.designConstraint} />}
     <SceneParts {...props} shownPanels={shownPanels}/>
-    {!realisticPreview && !exploded && props.constructionLayer && <ConstructionObjectLayer {...props.constructionLayer}
-      selectedIds={props.boxSelectActive && props.boxPreview?.objectIds ? [...(props.boxPreview.additive ? props.constructionLayer.selectedIds : []), ...props.boxPreview.objectIds] : props.constructionLayer.selectedIds}/>}
+    {!realisticPreview && !exploded && props.constructionLayer && <SceneObjects layer={props.constructionLayer} boxSelectActive={props.boxSelectActive} boxPreview={props.boxPreview}/>}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     <SceneOverlays {...props} shownPanels={shownPanels}/>
     <SceneResizeHandles {...props} feedback={feedback}/>
@@ -547,14 +544,93 @@ class ViewportBoundary extends Component<{ children: ReactNode }, { error: boole
   }
 }
 
+function SceneObjects({ layer, boxSelectActive, boxPreview }: { layer: NonNullable<SceneProps['constructionLayer']>; boxSelectActive: SceneProps['boxSelectActive']; boxPreview: WorldProps['boxPreview'] }) {
+  return <ConstructionObjectLayer {...layer}
+    selectedIds={boxSelectActive&&boxPreview?.objectIds? [...(boxPreview.additive? layer.selectedIds:[]),...boxPreview.objectIds]:layer.selectedIds} />
+}
+
+function SceneCamera({ props, realisticPreview }: { props: WorldProps; realisticPreview: boolean|undefined })  {
+  return props.view==='perspective'
+    ? <PerspectiveCamera key={realisticPreview? 'room':'studio'} makeDefault fov={realisticPreview? 45:35} near={0.01} far={200} position={[2,1.5,2.5]} />
+    :<OrthographicCamera makeDefault near={0.01} far={200} position={[2,1.5,2.5]} zoom={450} />
+}
+
+function expandCameraBounds(displayPanels: Panel[],previewPanels: Panel[],attachmentBoundsPanels: Panel[],props: WorldProps,realisticPreview: boolean|undefined,exploded: boolean) {
+  const bounds=boundsOf([...displayPanels,...previewPanels,...attachmentBoundsPanels])
+  if(props.constructionLayer&&!realisticPreview&&!exploded) {
+    const layer=props.constructionLayer
+    const visibleRoots=layer.objects.roots.filter(id => layer.objects.nodes.find(node => node.id===id)?.visible)
+    const objectBounds=layer.previewBounds??constructionBounds(layer.objects,[...visibleRoots,...(layer.active? layer.selectedIds:[])])
+    if(objectBounds) {
+      if(!displayPanels.length&&!previewPanels.length&&!attachmentBoundsPanels.length) bounds.makeEmpty()
+      bounds.expandByPoint(vector(objectBounds.min)); bounds.expandByPoint(vector(objectBounds.max))
+    }
+  }
+  if(props.spaceConstraint?.enabled&&!exploded&&!realisticPreview) {
+    const space=spaceBounds(props.spaceConstraint)
+    bounds.expandByPoint(vector(space.min))
+    bounds.expandByPoint(vector(space.max))
+  }
+  if(props.designConstraint) {
+    bounds.expandByScalar(0.1)
+    if(props.designConstraint.kind==='floor') bounds.min.y=Math.min(bounds.min.y,0)
+  }
+  return bounds
+}
+
 export default function Scene(props: SceneProps) {
   const attachmentElements = useRef(new Map<string, HTMLDivElement>())
   const [boxPreview, setBoxPreview] = useState<BoxSelectionPreview | null>(null)
-  const boxSelectionLabel = boxPreview ? [
-    boxPreview.objectIds?.length ? `${boxPreview.objectIds.length} object${boxPreview.objectIds.length === 1 ? '' : 's'}` : '',
-    boxPreview.panelIds.length ? `${boxPreview.panelIds.length} panel${boxPreview.panelIds.length === 1 ? '' : 's'}` : '',
-    boxPreview.connectorIds.length ? `${boxPreview.connectorIds.length} connector${boxPreview.connectorIds.length === 1 ? '' : 's'}` : '',
-  ].filter(Boolean).join(' · ') || '0 parts' : ''
+  const boxSelectionLabel = describeBoxSelection(boxPreview)
+  const { controlHeld } = useControlHeld(props)
+    const attachmentHandles = visibleAttachmentHandles(props,controlHeld)
+  return <ViewportBoundary>
+    <div className={`scene-surface${props.boxSelectActive ? ' is-box-selecting' : ''}`} data-preview-furnishings={props.realisticPreview ? props.furnishings?.length ?? 0 : 0}>
+    <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
+      gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
+      style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.boxSelectActive ? 'crosshair' : props.panMode ? 'grab' : undefined }}
+      onPointerMissed={event => { if (event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}
+      fallback={<div style={{ padding: 32 }}>Your browser needs WebGL to display this 3D workspace.</div>}>
+      <World {...props} boxPreview={boxPreview} onBoxPreview={setBoxPreview} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
+    </Canvas>
+    {props.boxSelectActive && boxPreview && <div className="box-selection-rectangle" style={boxPreview.rectangle} aria-hidden="true">
+      <span className="box-selection-count">{boxPreview.additive ? '+ ' : ''}{boxSelectionLabel}</span>
+    </div>}
+    <AttachmentButtons attachmentHandles={attachmentHandles} attachmentElements={attachmentElements} props={props}/>
+    </div>
+  </ViewportBoundary>
+}
+
+function visibleAttachmentHandles(props: SceneProps,controlHeld: boolean) {
+  return !props.boxSelectActive&&!controlHeld&&!props.exploded&&!props.realisticPreview&&!props.dragging&&!props.resizing? props.attachmentHandles??EMPTY_ATTACHMENT_HANDLES:EMPTY_ATTACHMENT_HANDLES
+}
+
+function AttachmentButtons({ attachmentHandles, attachmentElements, props }: { attachmentHandles: AssemblyAttachmentHandle[]; attachmentElements: RefObject<Map<string,HTMLDivElement>>; props: SceneProps })  {
+  return <div className="assembly-attachment-layer">{attachmentHandles.map(handle => <div key={handle.id} className="assembly-attachment-anchor" ref={element => { if(element) attachmentElements.current.set(handle.id,element); else attachmentElements.current.delete(handle.id) } }>
+    <button
+    className={`assembly-attach-handle ${handle.active? 'is-active':''} ${handle.warning? 'has-warning':''}`}
+    aria-label={handle.label}
+    title={handle.label}
+    data-attachment-id={handle.id}
+    onPointerDown={event => event.stopPropagation()}
+    onPointerEnter={() => props.onAttachmentPreview?.(handle.id)}
+    onPointerLeave={event => { if(document.activeElement!==event.currentTarget) props.onAttachmentPreview?.(null) } }
+    onFocus={() => props.onAttachmentPreview?.(handle.id)}
+    onBlur={() => props.onAttachmentPreview?.(null)}
+    onKeyDown={event => { if(event.key!=='Escape'&&!event.ctrlKey&&!event.metaKey) event.stopPropagation() } }
+    onClick={event => { event.stopPropagation(); props.onAttachmentCommit?.(handle.id) } }><Plus size={17} /></button>
+  </div>)}</div>
+}
+
+function describeBoxSelection(boxPreview: BoxSelectionPreview|null) {
+  return boxPreview? [
+    boxPreview.objectIds?.length? `${boxPreview.objectIds.length} object${boxPreview.objectIds.length===1? '':'s'}`:'',
+    boxPreview.panelIds.length? `${boxPreview.panelIds.length} panel${boxPreview.panelIds.length===1? '':'s'}`:'',
+    boxPreview.connectorIds.length? `${boxPreview.connectorIds.length} connector${boxPreview.connectorIds.length===1? '':'s'}`:'',
+  ].filter(Boolean).join(' · ')||'0 parts':''
+}
+
+function useControlHeld(props: import("@/components/Scene").SceneProps) {
   const [controlHeld, setControlHeld] = useState(false)
   const clearAttachmentPreview = useEffectEvent(() => props.onAttachmentPreview?.(null))
   useEffect(() => {
@@ -572,28 +648,5 @@ export default function Scene(props: SceneProps) {
       window.removeEventListener('blur', blur)
     }
   }, [])
-  const attachmentHandles = !props.boxSelectActive && !controlHeld && !props.exploded && !props.realisticPreview && !props.dragging && !props.resizing ? props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES : EMPTY_ATTACHMENT_HANDLES
-  return <ViewportBoundary>
-    <div className={`scene-surface${props.boxSelectActive ? ' is-box-selecting' : ''}`} data-preview-furnishings={props.realisticPreview ? props.furnishings?.length ?? 0 : 0}>
-    <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
-      gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
-      style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.boxSelectActive ? 'crosshair' : props.panMode ? 'grab' : undefined }}
-      onPointerMissed={event => { if (event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}
-      fallback={<div style={{ padding: 32 }}>Your browser needs WebGL to display this 3D workspace.</div>}>
-      <World {...props} boxPreview={boxPreview} onBoxPreview={setBoxPreview} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
-    </Canvas>
-    {props.boxSelectActive && boxPreview && <div className="box-selection-rectangle" style={boxPreview.rectangle} aria-hidden="true">
-      <span className="box-selection-count">{boxPreview.additive ? '+ ' : ''}{boxSelectionLabel}</span>
-    </div>}
-    <div className="assembly-attachment-layer">{attachmentHandles.map(handle=><div key={handle.id} className="assembly-attachment-anchor" ref={element=>{if(element)attachmentElements.current.set(handle.id,element);else attachmentElements.current.delete(handle.id)}}>
-      <button className={`assembly-attach-handle ${handle.active ? 'is-active' : ''} ${handle.warning ? 'has-warning' : ''}`} aria-label={handle.label} title={handle.label} data-attachment-id={handle.id}
-        onPointerDown={event => event.stopPropagation()}
-        onPointerEnter={() => props.onAttachmentPreview?.(handle.id)}
-        onPointerLeave={event => { if (document.activeElement !== event.currentTarget) props.onAttachmentPreview?.(null) }}
-        onFocus={() => props.onAttachmentPreview?.(handle.id)} onBlur={() => props.onAttachmentPreview?.(null)}
-        onKeyDown={event => { if (event.key !== 'Escape' && !event.ctrlKey && !event.metaKey) event.stopPropagation() }}
-        onClick={event => { event.stopPropagation(); props.onAttachmentCommit?.(handle.id) }}><Plus size={17}/></button>
-    </div>)}</div>
-    </div>
-  </ViewportBoundary>
+  return { controlHeld }
 }

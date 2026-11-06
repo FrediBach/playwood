@@ -1,10 +1,10 @@
+import { getColorUsage,getProjectPalette,MAX_CUSTOM_COLORS } from '@/lib/custom-colors'
+import type { PaletteColor,Project } from '@/lib/types'
+import { Pencil,Plus,Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { getColorUsage, getProjectPalette, MAX_CUSTOM_COLORS } from '@/lib/custom-colors'
-import type { PaletteColor, Project } from '@/lib/types'
-import { Button } from './ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import './palette-manager.css'
+import { Button } from './ui/button'
+import { Dialog,DialogContent,DialogDescription,DialogTitle } from './ui/dialog'
 
 type ColorInput = Pick<PaletteColor, 'name' | 'color'>
 export interface PaletteActions {
@@ -70,11 +70,7 @@ function ColorEditor({ project, existing, onSave, onCancel }: { project: Project
   const [hex, setHex] = useState(existing?.color ?? '#6f88a5')
   const [touched, setTouched] = useState(false)
   const [error, setError] = useState('')
-  const normalized = hex.trim().toLowerCase()
-  const validHex = /^#[0-9a-f]{6}$/.test(normalized)
-  const duplicate = getProjectPalette(project).find(color => color.id !== existing?.id && color.color.toLowerCase() === normalized)
-  const atLimit = !existing && (project.customColors?.length ?? 0) >= MAX_CUSTOM_COLORS
-  const validation = !name.trim() ? 'Enter a color name.' : !validHex ? 'Enter a six-digit hex color, such as #123456.' : duplicate ? `This color is already in the palette as “${duplicate.name}”.` : atLimit ? 'Remove a custom color before adding another.' : ''
+  const { validation,normalized,validHex }=validatePaletteColor(hex,project,existing,name)
 
   return <form className="palette-color-editor" noValidate onSubmit={event => {
     event.preventDefault()
@@ -92,6 +88,15 @@ function ColorEditor({ project, existing, onSave, onCancel }: { project: Project
     {(error || touched && validation) && <p className="palette-manager-error" role="alert">{error || validation}</p>}
     <div className="dialog-footer"><Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" disabled={!!validation}>Save color</Button></div>
   </form>
+}
+
+function validatePaletteColor(hex: string,project: Project,existing: PaletteColor|undefined,name: string) {
+  const normalized=hex.trim().toLowerCase()
+  const validHex=/^#[0-9a-f]{6}$/.test(normalized)
+  const duplicate=getProjectPalette(project).find(color => color.id!==existing?.id&&color.color.toLowerCase()===normalized)
+  const atLimit=!existing&&(project.customColors?.length??0)>=MAX_CUSTOM_COLORS
+  const validation=!name.trim()? 'Enter a color name.':!validHex? 'Enter a six-digit hex color, such as #123456.':duplicate? `This color is already in the palette as “${duplicate.name}”.`:atLimit? 'Remove a custom color before adding another.':''
+  return { validation,normalized,validHex }
 }
 
 function RemoveColor({ project, color, onRemove, onCancel }: { project: Project; color: PaletteColor; onRemove: (replacement?: string) => void; onCancel: () => void }) {

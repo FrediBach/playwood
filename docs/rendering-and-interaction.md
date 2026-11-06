@@ -8,7 +8,7 @@ The editor combines a React DOM interface with one React Three Fiber viewport. P
 
 | Area | Entry points | Responsibility |
 | --- | --- | --- |
-| Application composition | [`App.tsx`](../src/App.tsx) | Selects the active inspector, combines previews, decides which interactions are available, and routes callbacks to project operations. |
+| Application composition | [`App.tsx`](../src/App.tsx), [`src/editor/`](../src/editor/) | Selects the active inspector, combines previews, decides which interactions are available, and routes callbacks to project operations. |
 | Workspace chrome | [`AssemblyWorkspace.tsx`](../src/components/AssemblyWorkspace.tsx), [`ViewportControls.tsx`](../src/components/ViewportControls.tsx) | Studio/room mode, snapping controls, camera commands, pan mode, operation status, attachment notices, and optional furnishings. |
 | Three.js scene | [`Scene.tsx`](../src/components/Scene.tsx) | Canvas, cameras, lights, panel meshes, connector meshes, selection highlights, dimensions, guides, and canvas gestures. |
 | Inspectors | [`InspectorSidebar.tsx`](../src/components/InspectorSidebar.tsx), [`SinglePanelInspector.tsx`](../src/components/SinglePanelInspector.tsx), [`MultiPanelInspector.tsx`](../src/components/MultiPanelInspector.tsx), [`ConnectorInspector.tsx`](../src/components/ConnectorInspector.tsx), [`AssemblyInspector.tsx`](../src/components/AssemblyInspector.tsx) | DOM controls for editing the current selection. |
@@ -18,6 +18,8 @@ The editor combines a React DOM interface with one React Three Fiber viewport. P
 [`main.tsx`](../src/main.tsx) mounts the application under `React.StrictMode`. Global layout and theme rules live in [`index.css`](../src/index.css); feature styles are colocated under `src/components/`. Radix-backed dialog, tooltip, and button primitives live in [`components/ui/`](../src/components/ui/). Feature components also use native controls and disclosures. [`InspectorDisclosure`](../src/components/InspectorPrimitives.tsx) remembers expansion in an in-memory map and can defer mounting expensive content until first opened.
 
 An inspector disclosure consumes each new `openRequest` while rendering so lazy content is mounted with the opened section. Its focus effect runs after that commit. Closing and reopening a section retains its form draft and does not repeat an already handled focus request.
+
+Inspector, guide, library, and field sections have small presentation components while their parent retains the existing draft, filter, reading-position, and focus state. `NumberField` keeps its edit tracking and commit behavior separate from `NumberInput`; tabbing through a rounded display must not change the stored measurement. Optional inspector footer content must remain `undefined` when the default attachment controls should appear: an element that renders nothing still counts as a supplied footer.
 
 Panel and connector lists share filter defaults, active-filter counting, and matching helpers from [`list-filters.ts`](../src/lib/list-filters.ts). [`ListFilters.tsx`](../src/components/ListFilters.tsx) owns the non-modal native dialog shown through the Popover API and its filter controls; its runtime exports are React components so edits can use Fast Refresh. Opening the popover focuses Search; Escape and Close filters return focus to the trigger, while outside actions dismiss it without blocking the workspace.
 

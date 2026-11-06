@@ -1,11 +1,20 @@
-import { useMemo, useState } from 'react'
 import {
-  createAssembly, duplicateAssembly, getAssemblyAttachmentTargets, getAssemblyInstance,
-  instantiateAssembly, removeAssembly, disconnectAssembly, makeAssemblyIndependent,
-  updateAssemblyDefinition, updateAssemblyFinish, resetAssemblyFinish, renameAssembly,
-  disassembleAssembly, updateAssemblyParameters, updateAssemblyParameterValues, resetAssemblyParameterValues,
+  AssemblyAttachmentTarget,
+  createAssembly,
+  disassembleAssembly,
+  disconnectAssembly,
+  duplicateAssembly,getAssemblyAttachmentTargets,getAssemblyInstance,
+  instantiateAssembly,
+  makeAssemblyIndependent,
+  removeAssembly,
+  renameAssembly,
+  resetAssemblyFinish,
+  resetAssemblyParameterValues,
+  updateAssemblyDefinition,updateAssemblyFinish,
+  updateAssemblyParameters,updateAssemblyParameterValues,
 } from '@/lib/assemblies'
-import type { AssemblyFinish, AssemblyParameter, Panel, Project } from '@/lib/types'
+import type { AssemblyDefinition,AssemblyFinish,AssemblyInstance,AssemblyParameter,Panel,Project } from '@/lib/types'
+import { useMemo,useState } from 'react'
 
 interface Options {
   project: Project
@@ -29,11 +38,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
   if (placement && (!instanceIds.has(placement.targetId) || placement.sourceId && !instanceIds.has(placement.sourceId))) setPlacement(null)
   const editingInstance = instances.find(instance => instance.id === editingId)
   const editingDefinition = definitions.find(definition => definition.id === editingInstance?.definitionId)
-  const owners = selectedIds.map(id => getAssemblyInstance(project, id))
-  const memberInstance = owners[0] && owners.every(owner => owner?.id === owners[0]?.id) ? owners[0] : undefined
-  const selectedInstance = !editingInstance && memberInstance && Object.values(memberInstance.panelIds).length === selectedIds.length ? memberInstance : undefined
-  const definition = definitions.find(item => item.id === (selectedInstance ?? memberInstance)?.definitionId)
-  const hasMembers = owners.some(Boolean)
+  const { selectedInstance,memberInstance,hasMembers,definition }=getAssemblySelection(selectedIds,project,editingInstance,definitions)
   const targetInstanceId = !editingInstance ? selectedInstance?.id : undefined
   const sourceInstanceId = placement && placement.targetId === targetInstanceId ? placement.sourceId : undefined
   const targets = useMemo(() => {
@@ -41,23 +46,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
     return getAssemblyAttachmentTargets(project, targetInstanceId, sourceInstanceId)
   }, [project, targetInstanceId, sourceInstanceId])
   const target = hover?.project === project ? targets.find(item => item.id === hover.id) : undefined
-  const preview = target?.project
-  const existingIds = useMemo(() => new Set(project.panels.map(panel => panel.id)), [project.panels])
-  const sourceIds = useMemo(() => new Set(Object.values(project.assemblies?.instances.find(instance => instance.id === sourceInstanceId)?.panelIds ?? {})), [project.assemblies, sourceInstanceId])
-  // Rebuilding rotated instances introduces harmless float noise. Only the
-  // placed instance is a ghost; neighbors keep their solid, unchanged panels.
-  const previewPanels = preview?.panels.filter(panel => !existingIds.has(panel.id) || sourceIds.has(panel.id)) ?? []
-  const attachmentBoundsPanels = useMemo(() => targets.flatMap(item => item.project?.panels.filter(panel => !existingIds.has(panel.id) || sourceIds.has(panel.id)) ?? []), [targets, existingIds, sourceIds])
-  const previewIds = new Set(previewPanels.map(panel => panel.id))
-  const connectionsById = useMemo(() => new Map(project.connections.map(connection => [connection.id, connection])), [project.connections])
-  const previewConnectionIds = new Set(preview?.connections.map(connection => connection.id))
-  const previewPanelIds = new Set(preview?.panels.map(panel => panel.id))
-  const previewConnections = preview?.connections.filter(connection => {
-    const old = connectionsById.get(connection.id)
-    return !old || JSON.stringify(old) !== JSON.stringify(connection) || previewIds.has(connection.parentId) || previewIds.has(connection.childId)
-  }) ?? []
-  const suppressedConnectionIds = preview ? project.connections.filter(connection => !previewConnectionIds.has(connection.id)).map(connection => connection.id) : []
-  const suppressedPanelIds = preview ? project.panels.filter(panel => !previewPanelIds.has(panel.id)).map(panel => panel.id) : []
+  const { sourceIds,existingIds,preview,previewPanels,previewConnections,suppressedConnectionIds,suppressedPanelIds,attachmentBoundsPanels }=useAssemblyPreview(target,project,sourceInstanceId,targets)
   const clearPlacement = () => { setPlacement(null); setHover(null) }
   const close = () => { setEditingId(null); clearPlacement() }
   const select = (id: string, next = project) => {
@@ -104,22 +93,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
     const partIds = Object.entries(editingInstance.panelIds).filter(([, id]) => selected.has(id)).map(([id]) => id)
     return run(() => updateAssemblyDefinition(project, editingInstance.id, patch, partIds))
   }
-  const attach = (id: string) => {
-    const candidate = targets.find(item => item.id === id)
-    if (!candidate?.project) { if (candidate?.error) notify(candidate.error); return }
-    const next = candidate.project
-    const placed = sourceInstanceId ? next.assemblies?.instances.find(instance => instance.id === sourceInstanceId)
-      : next.assemblies?.instances.find(instance => !instances.some(previous => previous.id === instance.id))
-    commit(next)
-    if (placed) select(placed.id, next)
-    else {
-      close()
-      setSelectedIds(candidate.panelIds ?? next.panels.filter(panel => sourceIds.has(panel.id) || !existingIds.has(panel.id)).map(panel => panel.id))
-      prepareSelection()
-    }
-    fit()
-    notify(candidate.warning ? `Attached. ${candidate.warning.replace(/^Requires disassembly:/, 'Disassembled:')} Undo is available.` : 'Instance attached. Shared connectors fitted automatically.')
-  }
+  const attach = createAttachmentCommand(targets,notify,sourceInstanceId,instances,commit,select,close,setSelectedIds,sourceIds,existingIds,prepareSelection,fit)
   return {
     instances, definitions, selectedInstance, memberInstance, hasMembers, definition,
     editingInstance, editingDefinition, targets, target, preview, previewPanels, previewConnections, suppressedConnectionIds, suppressedPanelIds, attachmentBoundsPanels,
@@ -156,4 +130,53 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
     sidebarAssemblies: instances.map(instance => ({ id: instance.id, name: instance.name, definitionName: definitions.find(item => item.id === instance.definitionId)?.name ?? 'Assembly', panelIds: Object.values(instance.panelIds) })),
     libraryAssemblies: definitions.map(item => ({ id: item.id, name: item.name, panelCount: item.panels.length, instanceCount: instances.filter(instance => instance.definitionId === item.id).length })),
   }
+}
+
+function createAttachmentCommand(targets: AssemblyAttachmentTarget[],notify: (message: string) => void,sourceInstanceId: string|undefined,instances: AssemblyInstance[],commit: (project: Project) => void,select: (id: string,next?: Project) => void,close: () => void,setSelectedIds: (ids: string[]) => void,sourceIds: Set<string>,existingIds: Set<string>,prepareSelection: () => void,fit: () => void) {
+  return (id: string) => {
+    const candidate=targets.find(item => item.id===id)
+    if(!candidate?.project) { if(candidate?.error) notify(candidate.error); return}
+    const next=candidate.project
+    const placed=sourceInstanceId? next.assemblies?.instances.find(instance => instance.id===sourceInstanceId)
+      :next.assemblies?.instances.find(instance => !instances.some(previous => previous.id===instance.id))
+    commit(next)
+    if(placed) select(placed.id,next)
+    else {
+      close()
+      setSelectedIds(candidate.panelIds??next.panels.filter(panel => sourceIds.has(panel.id)||!existingIds.has(panel.id)).map(panel => panel.id))
+      prepareSelection()
+    }
+    fit()
+    notify(candidate.warning? `Attached. ${candidate.warning.replace(/^Requires disassembly:/,'Disassembled:')} Undo is available.`:'Instance attached. Shared connectors fitted automatically.')
+  }
+}
+
+function useAssemblyPreview(target: AssemblyAttachmentTarget|undefined,project: Project,sourceInstanceId: string|undefined,targets: AssemblyAttachmentTarget[]) {
+  const preview=target?.project
+  const existingIds=useMemo(() => new Set(project.panels.map(panel => panel.id)),[project.panels])
+  const sourceIds=useMemo(() => new Set(Object.values(project.assemblies?.instances.find(instance => instance.id===sourceInstanceId)?.panelIds??{})),[project.assemblies,sourceInstanceId])
+  // Rebuilding rotated instances introduces harmless float noise. Only the
+  // placed instance is a ghost; neighbors keep their solid, unchanged panels.
+  const previewPanels=preview?.panels.filter(panel => !existingIds.has(panel.id)||sourceIds.has(panel.id))??[]
+  const attachmentBoundsPanels=useMemo(() => targets.flatMap(item => item.project?.panels.filter(panel => !existingIds.has(panel.id)||sourceIds.has(panel.id))??[]),[targets,existingIds,sourceIds])
+  const previewIds=new Set(previewPanels.map(panel => panel.id))
+  const connectionsById=useMemo(() => new Map(project.connections.map(connection => [connection.id,connection])),[project.connections])
+  const previewConnectionIds=new Set(preview?.connections.map(connection => connection.id))
+  const previewPanelIds=new Set(preview?.panels.map(panel => panel.id))
+  const previewConnections=preview?.connections.filter(connection => {
+    const old=connectionsById.get(connection.id)
+    return !old||JSON.stringify(old)!==JSON.stringify(connection)||previewIds.has(connection.parentId)||previewIds.has(connection.childId)
+  })??[]
+  const suppressedConnectionIds=preview? project.connections.filter(connection => !previewConnectionIds.has(connection.id)).map(connection => connection.id):[]
+  const suppressedPanelIds=preview? project.panels.filter(panel => !previewPanelIds.has(panel.id)).map(panel => panel.id):[]
+  return { sourceIds,existingIds,preview,previewPanels,previewConnections,suppressedConnectionIds,suppressedPanelIds,attachmentBoundsPanels }
+}
+
+function getAssemblySelection(selectedIds: string[],project: Project,editingInstance: AssemblyInstance|undefined,definitions: AssemblyDefinition[]) {
+  const owners=selectedIds.map(id => getAssemblyInstance(project,id))
+  const memberInstance=owners[0]&&owners.every(owner => owner?.id===owners[0]?.id)? owners[0]:undefined
+  const selectedInstance=!editingInstance&&memberInstance&&Object.values(memberInstance.panelIds).length===selectedIds.length? memberInstance:undefined
+  const definition=definitions.find(item => item.id===(selectedInstance??memberInstance)?.definitionId)
+  const hasMembers=owners.some(Boolean)
+  return { selectedInstance,memberInstance,hasMembers,definition }
 }

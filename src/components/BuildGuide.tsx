@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, Clock3, Keyboard, Lightbulb, Search, X } from 'lucide-react'
+import { GUIDE_CATEGORIES,GuideStep,type BuildGuide as Guide,type GuideId } from '@/lib/build-guide-types'
 import { BUILD_GUIDES } from '@/lib/build-guides'
-import { GUIDE_CATEGORIES, type BuildGuide as Guide, type GuideId } from '@/lib/build-guide-types'
-import { DialogDescription, DialogTitle } from './ui/dialog'
-import { Button } from './ui/button'
+import { ArrowLeft,ArrowRight,BookOpen,Check,ChevronDown,Clock3,Keyboard,Lightbulb,Search,X } from 'lucide-react'
+import { useEffect,useRef,useState } from 'react'
 import { GuidePreview } from './GuidePreview'
 import './build-guide.css'
+import { Button } from './ui/button'
+import { DialogDescription,DialogTitle } from './ui/dialog'
 
 const POSITION_KEY = 'playwood.build-guide.position.v1'
 function rememberedPosition(): { id: GuideId; step: number } {
@@ -64,62 +64,8 @@ export default function BuildGuide() {
       <button aria-pressed={section === 'shortcuts'} onClick={() => setSection('shortcuts')}><Keyboard size={16}/>Keyboard shortcuts</button>
     </div>
     {section === 'guides' ? <div className="guide-layout">
-      <aside className={`guide-sidebar${browseOpen ? ' is-open' : ''}`} aria-label="Guide library">
-        <button className="guide-browse-toggle" aria-expanded={browseOpen} aria-controls="guide-library" onClick={() => setBrowseOpen(value => !value)}>
-          <span>Browse {BUILD_GUIDES.length} techniques</span><ChevronDown size={17}/>
-        </button>
-        <div className="guide-library" id="guide-library">
-          <label className="guide-search"><Search size={16}/><input type="search" aria-label="Search guides" placeholder="Find a technique…" value={query} onChange={event => setQuery(event.target.value)}/>
-            {query && <button aria-label="Clear guide search" onClick={() => setQuery('')}><X size={14}/></button>}
-          </label>
-          <p className="guide-result-count" aria-live="polite">{search ? `${matches.length} ${matches.length === 1 ? 'guide' : 'guides'} found` : 'START HERE. BUILD FROM THERE.'}</p>
-          <nav aria-label="Building techniques">
-            {GUIDE_CATEGORIES.map(category => {
-              const items = matches.filter(item => item.category === category)
-              return items.length > 0 && <div className="guide-category" key={category}><h3>{category}</h3>{items.map(item => <button key={item.id} data-guide-id={item.id} aria-current={item.id === guide.id ? 'page' : undefined} onClick={() => chooseGuide(item.id)}>
-                <span>{item.title}</span><ArrowRight size={14}/>
-              </button>)}</div>
-            })}
-          </nav>
-          {!matches.length && <div className="guide-empty"><p>No matching techniques.</p><p>Try “panel”, “copy”, or “connector”.</p><button onClick={() => setQuery('')}>Show all guides</button></div>}
-        </div>
-      </aside>
-      <article className="guide-article" ref={article} aria-label={guide.title}>
-        <div className="guide-article-heading">
-          <div className="guide-meta"><span>{guide.category}</span><span><Clock3 size={13}/>{guide.duration}</span></div>
-          <h2 ref={guideHeading} tabIndex={-1}>{guide.title}</h2><p>{guide.summary}</p>
-          <div className="guide-start"><strong>Start here</strong><span>{guide.startingPoint}</span></div>
-        </div>
-        <nav className="guide-step-nav" aria-label="Lesson steps">
-          {guide.steps.map((item, index) => <button key={item.title} aria-label={`Step ${index + 1}: ${item.title}`} aria-current={position.step === index ? 'step' : undefined} onClick={() => chooseStep(index)}>
-            <span>{String(index + 1).padStart(2, '0')}</span><span>{item.title}</span>
-          </button>)}
-        </nav>
-        <div className="guide-step-content">
-          <div className="guide-illustration"><GuidePreview guideId={guide.id} step={position.step} caption={step.caption}/>
-            <p className="guide-example-note">Illustrated example · your project stays as it is.</p>
-          </div>
-          <section className="guide-instructions" aria-labelledby="guide-step-title">
-            <span className="guide-eyebrow">STEP {position.step + 1} OF 4</span>
-            <h3 id="guide-step-title" ref={stepHeading} tabIndex={-1}>{step.title}</h3>
-            <p className="guide-action">{step.instruction}</p>
-            {step.controls && <dl className="guide-control-values">{step.controls.map(control => <div key={control.label}><dt>{control.label}</dt><dd>{control.value}</dd></div>)}</dl>}
-            <p className="guide-explanation">{step.explanation}</p>
-            <div className="guide-result"><Check size={16}/><p><strong>What you should see</strong>{step.result}</p></div>
-            {step.tip && <div className="guide-tip"><Lightbulb size={16}/><p>{step.tip}</p></div>}
-          </section>
-        </div>
-        <footer className="guide-lesson-footer">
-          <Button variant="outline" disabled={position.step === 0} onClick={() => chooseStep(position.step - 1)}><ArrowLeft size={16}/>Previous</Button>
-          <span aria-live="polite">Step {position.step + 1} of 4</span>
-          {position.step < 3 ? <Button onClick={() => chooseStep(position.step + 1)}>Next step<ArrowRight size={16}/></Button>
-            : <Button variant="outline" onClick={() => chooseStep(0)}>Read again<ArrowRight size={16}/></Button>}
-        </footer>
-        {position.step === 3 && <div className="guide-related"><span>Keep building</span>{guide.related.map(id => {
-          const related = BUILD_GUIDES.find(item => item.id === id)
-          return related && <button key={id} onClick={() => chooseGuide(id)}>{related.title}<ArrowRight size={14}/></button>
-        })}</div>}
-      </article>
+      <GuideLibrary browseOpen={browseOpen} setBrowseOpen={setBrowseOpen} query={query} setQuery={setQuery} search={search} matches={matches} guide={guide} chooseGuide={chooseGuide}/>
+      <GuideLesson article={article} guide={guide} guideHeading={guideHeading} position={position} chooseStep={chooseStep} step={step} stepHeading={stepHeading} chooseGuide={chooseGuide}/>
     </div> : <ShortcutReference onChooseGuide={chooseGuide}/>}
   </>
 }
@@ -131,6 +77,68 @@ const SHORTCUT_GROUPS = [
   { title: 'Snapping', rows: [['Toggle global grid', 'G'], ['Toggle geometry alignment', 'S'], ['Move with grid enabled', 'Arrows · one grid spacing'], ['Move further with grid enabled', 'Shift + arrows · ten grid spacings']] },
   { title: 'Edit & recover', rows: [['Undo', '⌘ / Ctrl Z'], ['Redo', '⌘ / Ctrl Shift Z'], ['Remove selection', 'Delete / Backspace'], ['Cancel preview / clear selection', 'Esc'], ['Return from Realistic preview', 'Esc'], ['Context menu', 'Right-click / Shift F10']] },
 ]
+
+function GuideLesson({ article, guide, guideHeading, position, chooseStep, step, stepHeading, chooseGuide }: { article: React.RefObject<HTMLElement | null>; guide: Guide; guideHeading: React.RefObject<HTMLHeadingElement | null>; position: { id: GuideId; step: number }; chooseStep: (index: number) => void; step: GuideStep; stepHeading: React.RefObject<HTMLHeadingElement | null>; chooseGuide: (id: GuideId) => void })  {
+  return <article className="guide-article" ref={article} aria-label={guide.title}>
+    <div className="guide-article-heading">
+      <div className="guide-meta"><span>{guide.category}</span><span><Clock3 size={13} />{guide.duration}</span></div>
+      <h2 ref={guideHeading} tabIndex={-1}>{guide.title}</h2><p>{guide.summary}</p>
+      <div className="guide-start"><strong>Start here</strong><span>{guide.startingPoint}</span></div>
+    </div>
+    <nav className="guide-step-nav" aria-label="Lesson steps">
+      {guide.steps.map((item,index) => <button key={item.title} aria-label={`Step ${index+1}: ${item.title}`} aria-current={position.step===index? 'step':undefined} onClick={() => chooseStep(index)}>
+        <span>{String(index+1).padStart(2,'0')}</span><span>{item.title}</span>
+      </button>)}
+    </nav>
+    <div className="guide-step-content">
+      <div className="guide-illustration"><GuidePreview guideId={guide.id} step={position.step} caption={step.caption} />
+        <p className="guide-example-note">Illustrated example · your project stays as it is.</p>
+      </div>
+      <section className="guide-instructions" aria-labelledby="guide-step-title">
+        <span className="guide-eyebrow">STEP {position.step+1} OF 4</span>
+        <h3 id="guide-step-title" ref={stepHeading} tabIndex={-1}>{step.title}</h3>
+        <p className="guide-action">{step.instruction}</p>
+        {step.controls&&<dl className="guide-control-values">{step.controls.map(control => <div key={control.label}><dt>{control.label}</dt><dd>{control.value}</dd></div>)}</dl>}
+        <p className="guide-explanation">{step.explanation}</p>
+        <div className="guide-result"><Check size={16} /><p><strong>What you should see</strong>{step.result}</p></div>
+        {step.tip&&<div className="guide-tip"><Lightbulb size={16} /><p>{step.tip}</p></div>}
+      </section>
+    </div>
+    <footer className="guide-lesson-footer">
+      <Button variant="outline" disabled={position.step===0} onClick={() => chooseStep(position.step-1)}><ArrowLeft size={16} />Previous</Button>
+      <span aria-live="polite">Step {position.step+1} of 4</span>
+      {position.step<3? <Button onClick={() => chooseStep(position.step+1)}>Next step<ArrowRight size={16} /></Button>
+        :<Button variant="outline" onClick={() => chooseStep(0)}>Read again<ArrowRight size={16} /></Button>}
+    </footer>
+    {position.step===3&&<div className="guide-related"><span>Keep building</span>{guide.related.map(id => {
+      const related=BUILD_GUIDES.find(item => item.id===id)
+      return related&&<button key={id} onClick={() => chooseGuide(id)}>{related.title}<ArrowRight size={14} /></button>
+    })}</div>}
+  </article>
+}
+
+function GuideLibrary({ browseOpen, setBrowseOpen, query, setQuery, search, matches, guide, chooseGuide }: { browseOpen: boolean; setBrowseOpen: React.Dispatch<React.SetStateAction<boolean>>; query: string; setQuery: React.Dispatch<React.SetStateAction<string>>; search: string; matches: Guide[]; guide: Guide; chooseGuide: (id: GuideId) => void })  {
+  return <aside className={`guide-sidebar${browseOpen? ' is-open':''}`} aria-label="Guide library">
+    <button className="guide-browse-toggle" aria-expanded={browseOpen} aria-controls="guide-library" onClick={() => setBrowseOpen(value => !value)}>
+      <span>Browse {BUILD_GUIDES.length} techniques</span><ChevronDown size={17} />
+    </button>
+    <div className="guide-library" id="guide-library">
+      <label className="guide-search"><Search size={16} /><input type="search" aria-label="Search guides" placeholder="Find a technique…" value={query} onChange={event => setQuery(event.target.value)} />
+        {query&&<button aria-label="Clear guide search" onClick={() => setQuery('')}><X size={14} /></button>}
+      </label>
+      <p className="guide-result-count" aria-live="polite">{search? `${matches.length} ${matches.length===1? 'guide':'guides'} found`:'START HERE. BUILD FROM THERE.'}</p>
+      <nav aria-label="Building techniques">
+        {GUIDE_CATEGORIES.map(category => {
+          const items=matches.filter(item => item.category===category)
+          return items.length>0&&<div className="guide-category" key={category}><h3>{category}</h3>{items.map(item => <button key={item.id} data-guide-id={item.id} aria-current={item.id===guide.id? 'page':undefined} onClick={() => chooseGuide(item.id)}>
+            <span>{item.title}</span><ArrowRight size={14} />
+          </button>)}</div>
+        })}
+      </nav>
+      {!matches.length&&<div className="guide-empty"><p>No matching techniques.</p><p>Try “panel”, “copy”, or “connector”.</p><button onClick={() => setQuery('')}>Show all guides</button></div>}
+    </div>
+  </aside>
+}
 
 function ShortcutReference({ onChooseGuide }: { onChooseGuide: (id: Guide['id']) => void }) {
   return <div className="guide-reference">

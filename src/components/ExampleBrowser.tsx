@@ -1,13 +1,13 @@
-import { memo, useMemo, useState, type ReactNode } from 'react'
-import { ArrowRight, Plus, Search, Upload } from 'lucide-react'
-import { Button } from './ui/button'
-import { Color, Euler, Vector3 } from 'three'
 import { ASSEMBLY_LIBRARY } from '@/lib/assembly-library'
-import { EXAMPLE_LIBRARY } from '@/lib/example-library'
-import { getConnectionAnchors, resolvePanels } from '@/lib/model'
-import type { Project } from '@/lib/types'
 import { connectorDisplayColor } from '@/lib/connector-options'
+import { EXAMPLE_LIBRARY,ExampleDefinition } from '@/lib/example-library'
+import { getConnectionAnchors,resolvePanels } from '@/lib/model'
+import type { Project } from '@/lib/types'
+import { ArrowRight,Plus,Search,Upload } from 'lucide-react'
+import { memo,useMemo,useState,type ReactNode } from 'react'
+import { Color,Euler,Vector3 } from 'three'
 import './example-browser.css'
+import { Button } from './ui/button'
 
 type Example = (typeof EXAMPLE_LIBRARY)[number]
 type PreviewFace = { points: Vector3[]; color: string; depth: number }
@@ -107,18 +107,22 @@ export function ExampleBrowser({ compact = false, onSelect, onInsertAssembly, my
       </select></label>
     </div>
     <p className="example-count" aria-live="polite">{matches.length} {matches.length === 1 ? 'example' : 'examples'}{search || category !== 'all' ? ' found' : ' to make your own'}</p>
-    <div className={compact ? 'example-list' : 'template-grid'}>
-      {matches.map(example => <button key={example.id} className={compact ? 'library-template' : 'template-card'} data-example-id={example.id}
-        aria-label={compact ? example.name : undefined} onClick={() => (collection === 'assemblies' && onInsertAssembly ? onInsertAssembly : onSelect)(example.id)}>
-        <ExampleArt example={example}/>
-        {compact ? <span className="example-compact-caption"><span>{example.name}<small>{example.category}</small></span><ArrowRight size={16}/></span>
-          : <><strong>{example.name}</strong><span className="example-description">{example.description}<ArrowRight size={16}/></span><small className="example-card-category">{example.category}</small></>}
-      </button>)}
-      {showBlank && <button className={compact ? 'library-template' : 'template-card'} data-example-id="blank" aria-label={compact ? 'A blank canvas' : undefined} onClick={() => onSelect('blank')}>
-        <div className="template-art template-blank" aria-hidden="true"><Plus size={40} strokeWidth={1}/></div>
-        {compact ? <span>A blank canvas<ArrowRight size={16}/></span> : <><strong>A blank canvas</strong><span>Start with a single panel.<ArrowRight size={16}/></span></>}
-      </button>}
-    </div>
+    <ExampleCards compact={compact} matches={matches} collection={collection} onInsertAssembly={onInsertAssembly} onSelect={onSelect} showBlank={showBlank}/>
     {!matches.length && !showBlank && <div className="example-empty"><p>No examples match your search.</p><button onClick={() => { setQuery(''); setCategory('all') }}>Show all examples</button></div>}
+  </div>
+}
+
+function ExampleCards({ compact, matches, collection, onInsertAssembly, onSelect, showBlank }: { compact: boolean; matches: ExampleDefinition[]; collection: "builds" | "assemblies"; onInsertAssembly: ((id: string) => void)|undefined; onSelect: (id: string) => void; showBlank: boolean })  {
+  return <div className={compact? 'example-list':'template-grid'}>
+    {matches.map(example => <button key={example.id} className={compact? 'library-template':'template-card'} data-example-id={example.id}
+      aria-label={compact? example.name:undefined} onClick={() => (collection==='assemblies'&&onInsertAssembly? onInsertAssembly:onSelect)(example.id)}>
+      <ExampleArt example={example} />
+      {compact? <span className="example-compact-caption"><span>{example.name}<small>{example.category}</small></span><ArrowRight size={16} /></span>
+        :<><strong>{example.name}</strong><span className="example-description">{example.description}<ArrowRight size={16} /></span><small className="example-card-category">{example.category}</small></>}
+    </button>)}
+    {showBlank&&<button className={compact? 'library-template':'template-card'} data-example-id="blank" aria-label={compact? 'A blank canvas':undefined} onClick={() => onSelect('blank')}>
+      <div className="template-art template-blank" aria-hidden="true"><Plus size={40} strokeWidth={1} /></div>
+      {compact? <span>A blank canvas<ArrowRight size={16} /></span>:<><strong>A blank canvas</strong><span>Start with a single panel.<ArrowRight size={16} /></span></>}
+    </button>}
   </div>
 }

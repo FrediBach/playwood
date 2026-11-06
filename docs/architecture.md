@@ -51,6 +51,7 @@ This diagram groups responsibilities; it is not a strict module dependency graph
 | Location | Responsibility and useful entry points |
 | --- | --- |
 | [src/App.tsx](../src/App.tsx) | Composition root: selection, inspector modes, dialogs, command routing, import/export, global shortcuts, and feedback |
+| [src/editor/](../src/editor/) | Application-specific state hooks, command adapters, and the inspector, workspace, sidebar, and dialog composition used by `App` |
 | [src/hooks/](../src/hooks/) | React lifecycles around project history, assembly editing, clipboard, attachment previews, drag/resize transactions, and split feasibility |
 | [src/lib/types.ts](../src/lib/types.ts) | Serializable domain contract shared by UI, operations, workers, parsers, and exports |
 | [src/lib/model.ts](../src/lib/model.ts) | Panel creation, attachment transforms, world resolution, joint placement, project validation, parsing, starters, and CSV export |
@@ -71,6 +72,8 @@ The directory split is practical rather than an enforced package boundary. There
 ## Workspace composition
 
 `App` owns the committed project through `useProject` and passes derived data and callbacks to the UI. It resolves world-space panels, computes validation issues and bounds, builds the installed connector list, and determines which selection the inspector displays. Specialized hooks keep gesture and assembly workflows out of the JSX, but `App` remains the central coordinator.
+
+The `src/editor` modules separate application wiring from reusable controls and domain operations. `use-editor-state.ts` holds transient UI state; `use-editor-selection.ts` derives panel and hardware selection details. The selection, attachment, and file command adapters receive explicit dependencies and call the existing domain APIs and `commit`. They are recreated from the current render, preserving functional commits and source-project checks when accepting previews. `editor-keyboard.ts` builds the guarded key handler; `App` owns its subscription. The `EditorInspector`, `EditorWorkspace`, `EditorSidebar`, and `EditorDialogs` components compose the controls in `src/components` without introducing another project store.
 
 Context-menu availability and ordering live in [preview-menu-actions.ts](../src/components/preview-menu-actions.ts), with separate branches for connector selection, shared assembly editing, and panel construction tools. `App` supplies current selection/capabilities and command callbacks; the menu builder does not commit edits or own React state.
 

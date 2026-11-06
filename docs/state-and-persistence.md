@@ -11,7 +11,7 @@ The main entry points are [App.tsx](../src/App.tsx), [use-project.ts](../src/hoo
 | Owner | State and responsibilities | Saved with a project? |
 | --- | --- | --- |
 | `useProject` | Current project, past/future snapshots, repeat-group token, save status, startup repair notice | Current project only |
-| `App` | Panel and connector selections, inspector/list tabs, dialogs, new-panel draft, attachment options, camera-view choice, sidebar visibility, exploded/realistic preview switches, context menu, notifications | No |
+| `App` through `useEditorState` | Panel and connector selections, inspector/list tabs, dialogs, new-panel draft, attachment options, camera-view choice, sidebar visibility, exploded/realistic preview switches, context menu, notifications | No |
 | `useAssemblyEditor` | Which instance is being edited, assembly placement mode, hovered placement target | No |
 | `useCopyPaste` | In-memory copied panels/connectors/assembly, insertion candidates, hovered candidate | No |
 | `usePreviewDrag` / `usePreviewResize` | Gesture source, latest candidate project, transient displayed geometry | No |
@@ -29,7 +29,9 @@ Polygonal hole fillers store their normalized `Panel.customOutline` and optional
 
 Uneven-depth closure proposals carry transient rim-extension descriptions on `PanelHole.alignment`; they are not saved project fields. Selecting a proposal or opening it from the context menu leaves history untouched. **Align edges & close hole** recalculates the constrained fit, then commits all extensions, carried outline fillers, and the new panel in one snapshot. Undo therefore restores the original rim depths and removes the closing panel together. Split-sided rectangles use the same saved outline-edge format as other polygonal fillers.
 
-`App` derives resolved panel transforms with `resolvePanels(project)`, physical hardware with `orderedConnectors(project)`, and warnings/errors with `validateProject(project)`. These are derived views of the project rather than additional persisted stores. There is no Redux/Zustand store or server synchronization layer.
+`App` and its [selection hooks](../src/editor/use-editor-selection.ts) derive resolved panel transforms with `resolvePanels(project)`, physical hardware with `orderedConnectors(project)`, and warnings/errors with `validateProject(project)`. These are derived views of the project rather than additional persisted stores. There is no Redux/Zustand store or server synchronization layer.
+
+The editor composition components receive state and callbacks; changing inspector branches does not relocate application state into those branches. Local form drafts retain their existing keys and lifetimes. [use-displayed-panels.ts](../src/editor/use-displayed-panels.ts) chooses constraint and TROFAST preview geometry without committing it. Selection pruning and notification effects remain separate from history and never add an undo entry.
 
 ## A committed edit
 
