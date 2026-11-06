@@ -104,8 +104,15 @@ export function createProjectFileCommands({
   const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
   const startNewProject=() => { closeContextMenu(); applyTemplate('blank',createExampleProject('blank')); setRealisticPreview(false); setView('perspective'); setAttachTarget('new'); setAttachment(INITIAL_ATTACHMENT); setImportError(''); notify('New project started. Undo to restore your previous project.') }
   const exportProject=() => { download(JSON.stringify(project,null,2),`${exportName}.playwood.json`,'application/json'); notify('Project exported') }
-  const importProject=async (file: File) => { try { if(file.size>2000000) throw new Error('Choose a project file smaller than 2 MB.'); const imported=parseProject(JSON.parse(await file.text())); const shelf=(imported.constraints?.length||imported.spaceConstraint?.enabled)? imported:repairLegacyShelf(imported); const repaired=(imported.constraints?.length||imported.spaceConstraint?.enabled)? shelf:repairLegacyExampleInserts(shelf); setProjectConstraintsOpen(false); constraints.cancel(); commit(repaired,{ replace: true }); assembly.close(); const first=repaired.assemblies?.instances[0]; setSelectedIds(first? Object.values(first.panelIds):repaired.panels.slice(0,1).map(panel => panel.id)); setInspectorTab('panel'); setFitSignal(v => v+1); setImportError(''); setDialog(null); notify(repaired===imported? 'Project imported':repaired!==shelf? 'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}  catch(e) { setImportError(e instanceof Error? e.message:'This project file could not be read.'); setDialog('export')}  }
-  return { loadTemplate,insertModule,insertSavedAssembly,exportAssembly,startNewProject,closeProjectDialog,applyTemplate,exportName,exportProject,importProject,importAssembly }
+  const openProject=(next: Project) => {
+    closeContextMenu(); setProjectConstraintsOpen(false); constraints.cancel(); clipboard.cancel()
+    commit(next,{ replace: true }); assembly.close()
+    const first=next.assemblies?.instances[0]
+    setSelectedIds(first? Object.values(first.panelIds):next.panels.slice(0,1).map(panel => panel.id))
+    setInspectorTab('panel'); setExploded(false); setRealisticPreview(false); setFitSignal(v => v+1); setImportError(''); setDialog(null)
+  }
+  const importProject=async (file: File) => { try { if(file.size>2000000) throw new Error('Choose a project file smaller than 2 MB.'); const imported=parseProject(JSON.parse(await file.text())); const shelf=(imported.constraints?.length||imported.spaceConstraint?.enabled)? imported:repairLegacyShelf(imported); const repaired=(imported.constraints?.length||imported.spaceConstraint?.enabled)? shelf:repairLegacyExampleInserts(shelf); openProject(repaired); notify(repaired===imported? 'Project imported':repaired!==shelf? 'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}  catch(e) { setImportError(e instanceof Error? e.message:'This project file could not be read.'); setDialog('export')}  }
+  return { loadTemplate,insertModule,insertModuleDefinition,insertSavedAssembly,exportAssembly,startNewProject,closeProjectDialog,applyTemplate,exportName,exportProject,importProject,openProject,importAssembly }
 }
 
 export function download(content:string,name:string,type:string) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}

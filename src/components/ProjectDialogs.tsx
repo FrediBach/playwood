@@ -16,7 +16,7 @@ import { getTrofastColor, getTrofastItem, getTrofastProductUrl } from '@/lib/tro
 import { CONNECTORS, CONNECTOR_MATERIALS } from '@/lib/connector-options'
 import type { Panel, Project, ValidationIssue } from '@/lib/types'
 
-export type ProjectDialog = 'buy' | 'new' | 'replace' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | 'move' | 'rescale' | null
+export type ProjectDialog = 'sync' | 'buy' | 'new' | 'replace' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | 'move' | 'rescale' | null
 interface Props {
   dialog: ProjectDialog
   onClose: () => void

@@ -1,0 +1,29 @@
+.app-header .project-heading{min-width:0;flex:0 1 260px;overflow:hidden}
+.app-header .project-name{min-width:0;max-width:100%}
+.app-header .project-name>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-header .project-save-copy{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-header .sync-projects-button{position:relative;overflow:visible}
+.app-header .sync-projects-button[data-sync-status="connected"]{background:#edf3e8;border-color:#a5b78c;color:#426335}
+.app-header .sync-projects-button[data-sync-status="attention"]{background:#fbf1df;border-color:#d1b27c;color:#856022}
+.app-header .sync-status-badge{position:absolute;top:-5px;right:-5px;display:grid;place-items:center;width:17px;height:17px;border:2px solid var(--paper);border-radius:50%;background:#527b3f;color:#fff;pointer-events:none;font-size:11px;font-weight:700;line-height:1}
+.app-header .sync-projects-button[data-sync-status="attention"] .sync-status-badge{background:#a46d1e}
+@media(max-width:1150px){
+  .app-header .header-actions{gap:7px}
+  .app-header .header-actions .button-default{padding-inline:11px}
+}
+@media(max-width:900px){
+  .app-header .header-actions{gap:5px}
+  .app-header .header-actions .button-default{padding-inline:9px}
+  .app-header .header-actions .export-project-button{padding:0}
+}
+@media(max-width:680px){
+  .app-header .header-actions{gap:2px}
+  .app-header .header-actions .sync-projects-button{width:30px;padding:0}
+  .app-header .sync-projects-button>.sync-button-label{display:none}
+  .app-header .header-actions .new-project-button{padding-inline:7px}
+  .app-header .header-actions .guide-open-button,.app-header .header-actions .buy-connectors-button{padding:0}
+}
+@media(max-width:380px){
+  .app-header .brand>span{display:none}
+  .app-shell .app-header{gap:6px}
+}

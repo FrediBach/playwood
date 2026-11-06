@@ -6,7 +6,7 @@
 
 Playwood is a single-page furniture design application. [index.html](../index.html) loads [src/main.tsx](../src/main.tsx), which mounts [App](../src/App.tsx) inside React Strict Mode and imports the base styles. There is one workspace at `/`, with dialogs and editor modes rather than a client-side router.
 
-The runtime is entirely in the browser. The repository has no application server, authentication service, database, or required environment variables. The current project is saved to local storage; portable project and assembly files are browser downloads and uploads. Local saves belong to the browser origin, so another browser, hostname, or port has a separate save. The web manifest supports standalone launch, but there is no service worker or offline-cache implementation.
+The runtime is entirely in the browser. The repository has no application server, authentication service, server database, or required environment variables. The current project is saved to local storage; portable project and assembly files use browser downloads/uploads or an explicitly chosen local folder through the File System Access API. IndexedDB remembers the folder handle, while permission, file selection, and disk autosave remain separate from project data. Local saves and remembered access belong to the browser origin, so another browser, hostname, or port has a separate save. The web manifest supports standalone launch, but there is no service worker or offline-cache implementation.
 
 The main technologies and their roles are declared in [package.json](../package.json):
 
@@ -28,6 +28,10 @@ Use the lockfile for exact installed versions; the package manifest contains ver
 flowchart TD
     Storage[(Browser local storage)] --> History[useProject: project and history]
     Files[Project and assembly JSON] --> Parse[Parsers and compatibility repairs]
+    Folder[User-selected local folder] --> Sync[Directory sync]
+    Sync --> Parse
+    App --> Sync
+    Sync --> Folder
     Parse --> App[App: editing orchestration]
     History --> App
     App --> UI[Sidebars, inspectors, dialogs]
@@ -55,6 +59,7 @@ This diagram groups responsibilities; it is not a strict module dependency graph
 | [src/hooks/](../src/hooks/) | React lifecycles around project history, assembly editing, clipboard, attachment previews, drag/resize transactions, and split feasibility |
 | [src/lib/types.ts](../src/lib/types.ts) | Serializable domain contract shared by UI, operations, workers, parsers, and exports |
 | [src/lib/model.ts](../src/lib/model.ts) | Panel creation, attachment transforms, world resolution, joint placement, project validation, parsing, starters, and CSV export |
+| [src/lib/directory-sync.ts](../src/lib/directory-sync.ts), [src/hooks/use-directory-sync.ts](../src/hooks/use-directory-sync.ts) | Local folder handles and permissions, validated file discovery, conflict-checked writes, active file association, and opt-in disk autosave |
 | [src/lib/assemblies.ts](../src/lib/assemblies.ts) | Reusable definitions, instances, ports, links, materialization, and shared-source changes |
 | [src/lib/structure-edit.ts](../src/lib/structure-edit.ts) | Constraint-preserving panel movement and dimensional edits |
 | [src/lib/construction-objects.ts](../src/lib/construction-objects.ts), [object-geometry.ts](../src/lib/object-geometry.ts), [object-edit.ts](../src/lib/object-edit.ts) | Snapping and edge scaling, saved source-volume forest, immutable object commands, orthogonal transforms, and bounded Boolean surface evaluation |
@@ -87,6 +92,7 @@ The principal UI surfaces are:
 - [AssemblyWorkspace](../src/components/AssemblyWorkspace.tsx): the scene and viewport controls, preview-mode presentation, and editing overlays.
 - [InspectorSidebar](../src/components/InspectorSidebar.tsx) and specialized inspectors: single/multiple panels, physical connectors, attachment options, whole assembly instances, and source parts while editing a shared design.
 - [ProjectDialogs](../src/components/ProjectDialogs.tsx): project creation/replacement, templates, panel creation, export, parts list, whole-creation transforms, and help.
+- [DirectorySyncDialog](../src/components/DirectorySyncDialog.tsx): remembered local folder access, project opening/saving/duplication, folder autosave, and assembly file exchange.
 - [ProjectStatus](../src/components/ProjectStatus.tsx): dimensions, counts, validation feedback, and shortcut/help access.
 
 The workspace fills the viewport, with independently scrolling sidebars and dialogs. Narrow screens use drawers; realistic preview hides the sidebars. Changes to these surfaces must preserve keyboard focus and avoid outer-document scrolling. The browser suite checks desktop, compact, and phone layouts.

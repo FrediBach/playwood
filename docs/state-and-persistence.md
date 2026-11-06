@@ -11,6 +11,7 @@ The main entry points are [App.tsx](../src/App.tsx), [use-project.ts](../src/hoo
 | Owner | State and responsibilities | Saved with a project? |
 | --- | --- | --- |
 | `useProject` | Current project, past/future snapshots, repeat-group token, save status, startup repair notice | Current project only |
+| `useDirectorySync` | Folder access, file listing, active filename and expected disk content, dirty state, disk autosave, and pending open confirmation | No; only the directory handle is remembered separately in IndexedDB |
 | `App` through `useEditorState` | Panel and connector selections, inspector/list tabs, dialogs, new-panel draft, attachment options, camera-view choice, sidebar visibility, exploded/realistic preview switches, context menu, notifications | No |
 | `useAssemblyEditor` | Which instance is being edited, assembly placement mode, hovered placement target | No |
 | `useCopyPaste` | In-memory copied panels/connectors/assembly, insertion candidates, hovered candidate | No |
@@ -52,13 +53,13 @@ In [use-project.ts](../src/hooks/use-project.ts):
 
 1. A `latest` ref holds the newest history synchronously. `changeHistory` evaluates an operation against that ref and updates it before scheduling the React state update. A second command therefore does not solve geometry against a stale render.
 2. `ensureProjectPalette` adopts missing panel finish colors into the custom palette.
-3. A JSON-equal project is a no-op: it creates neither a history entry nor a new present value.
-4. An ordinary commit appends the previous present to `past`, keeping at most 60 past snapshots, and clears `future`.
+3. An ordinary JSON-equal edit is a no-op: it creates neither a history entry nor a new present value. Explicit `{ replace: true }` starts a new document identity even if the file contents match, so identical files cannot inherit each other's disk binding.
+4. An ordinary commit appends the previous project and its transient document identity to `past`, keeping at most 60 past snapshots, and clears `future`.
 5. `{ group, repeat }` can fold successive commits into one undo step when `repeat` is true and the group matches. Panel and connector keyboard movement use separate group names. The first non-repeat event starts a new step.
 
 History stores complete project snapshots, not commands or geometry diffs. Mutating an earlier project object in place would corrupt both undo and preview comparisons; model operations must preserve prior snapshots. Normal `commit` calls use `assertDesignConstraintEdit` as a final guard on user rules. They also use [`assertOutlineConnectionEdit`](../src/lib/outline-connection-edits.ts) to prevent direct outline, placement, thickness, or hardware edits from invalidating fitted polygon supports. Resetting an attached filler to a rectangle is rejected with guidance to resize the frame or detach the filler; the saved shape and history remain unchanged. These guards are not universal geometry validation: domain operations still enforce joints, stock limits, collisions, and insert fit. Exceptions propagate synchronously to the caller, where UI flows generally show a message without replacing the project.
 
-The rule guard preserves existing constraints when a reconstructed candidate omits the property. Explicit rule removal uses an empty array. Starting a new project, replacing a template, and importing use `{ replace: true }`, which bypasses comparison with the old document's rules while preserving ordinary history. Undo and redo restore complete saved snapshots directly.
+The rule guard preserves existing constraints when a reconstructed candidate omits the property. Explicit rule removal uses an empty array. Starting a new project, replacing a template, and importing use `{ replace: true }`, which bypasses comparison with the old document's rules while preserving ordinary history. Undo and redo restore complete snapshots and their document identities directly. `getSnapshot()` reads the latest committed project and identity synchronously for asynchronous file operations; this metadata is never serialized into project files or browser recovery saves.
 
 Undo moves the current project to the front of `future` and restores the last past snapshot. Redo reverses that movement. Both reset the repeat-group token and trigger autosave of the restored project. Selection and camera state are not part of these snapshots; effects remove selections whose IDs no longer exist.
 
@@ -156,6 +157,7 @@ Selecting hardware leaves shared-source editing because connector changes apply 
 | `localStorage` | `playwood-studio-project-v1` | One serialized current `Project`; read at startup, saved 400 ms after the latest present change, and flushed on `pagehide` |
 | `localStorage` | `playwood-snap` | Grid/geometry flags, spacing, and tolerance; read by `readSnapSettings`, written when settings change |
 | `sessionStorage` | `playwood.build-guide.position.v1` | Guide ID and step, validated and restored by [BuildGuide.tsx](../src/components/BuildGuide.tsx) |
+| IndexedDB | Database `playwood-directory-sync-v1`, store `directory`, key `current` | Structured-cloned directory handle; restored without automatic file writes and removed by Forget folder |
 
 Keep the project storage key stable when changing branding or UI wording. It is intentionally older than the displayed app name. Persistence is browser/origin-local; project files are the portable representation. No account, remote database, or history synchronization is involved, and no cross-tab storage-event reconciliation is implemented.
 
@@ -166,6 +168,22 @@ Snap settings are validated on read: grid/geometry require explicit `true`, spac
 [InspectorPrimitives.tsx](../src/components/InspectorPrimitives.tsx) remembers disclosure expansion in a module-level `Map`. It survives component remounts in the current page session, but it is neither browser storage nor project data.
 
 ## Project files and import validation
+
+### Local directory sync
+
+[`directory-sync.ts`](../src/lib/directory-sync.ts) wraps the File System Access API and stores the selected directory handle in IndexedDB. [`use-directory-sync.ts`](../src/hooks/use-directory-sync.ts) coordinates that service with committed project snapshots; [`DirectorySyncDialog.tsx`](../src/components/DirectorySyncDialog.tsx) provides the Sync UI. These are optional browser capabilities and introduce no backend or project-format changes. The original `playwood-studio-project-v1` localStorage recovery save remains active independently of folder access and folder autosave.
+
+Choosing a directory requests read/write access from a user gesture. Startup restores only the handle; **Resync** reconnects it by requesting permission, with a browser prompt when needed. Every file operation checks permission again; background autosave never prompts. The active project filename and folder-autosave choice are session state, so reloading cannot immediately write a recovered browser workspace into a remembered disk file. **Forget folder** removes the remembered handle without deleting directory contents.
+
+Scanning reads only top-level `.json` files, distinguishes projects from assembly envelopes, and validates through `parseProject` or `parseAssemblyFile` with the existing 2,000,000-byte limit. Unrelated files are ignored and invalid Playwood files are reported individually. Opening a project applies the same conservative compatibility repairs and palette normalization as other import paths, then commits one replacement through `useProject`. Opening a different project with unsaved folder changes requires Save and open, Open without saving, or Cancel. Resync refreshes the listing without automatically importing disk changes into the workspace.
+
+Saving a new workspace or duplicating a project creates a uniquely named `.playwood.json`; assembly imports/exports similarly create `.playwood-assembly.json` files. Existing names receive a numeric suffix. Project copies retain their internal stable IDs because each file is an independent complete document. Folder assembly insertion follows the ordinary import/attachment-preview path and creates a fresh reusable definition.
+
+An opened project's binding includes the raw disk content read on open or last successful save. Each overwrite compares current disk content with that expected version before creating and closing a writable stream. External edits, missing files, permission failures, and active-project write failures surface an error and pause disk autosave; the current construction and browser recovery copy remain available. This is conflict detection, not a file watcher or a transactional merge with other applications: an external write racing between the comparison and commit cannot be detected atomically. Duplicate project can preserve a separate copy before reopening the changed disk version. The browser access and handle-storage behavior follows the [File System Access guide](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access).
+
+Folder autosave is opt-in for each opened or saved document and debounced over committed projects; previews never enter it. Document identity is transient history metadata, separate from the version 1 project. New projects, template replacement, ordinary file imports, and Undo/Redo across document boundaries release the active file association. Edits and Undo/Redo within the same document retain the binding. Async operations are tied to their source document and folder so late results cannot bind a different workspace or write a later document to an earlier file.
+
+### Portable downloads and uploads
 
 Project export downloads the current `Project` as indented JSON, named from the project title with a `.playwood.json` suffix. The schema is [Project in types.ts](../src/lib/types.ts):
 

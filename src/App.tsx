@@ -2,6 +2,7 @@ import { PanelPaletteProvider } from '@/components/PanelColorField'
 import { PanelConnectionFitDialog } from '@/components/PanelConnectionFitDialog'
 import { PreviewContextMenu } from '@/components/PreviewContextMenu'
 import { ProjectHeader } from '@/components/ProjectHeader'
+import { DirectorySyncDialog } from '@/components/DirectorySyncDialog'
 import { ProjectStatus } from '@/components/ProjectStatus'
 import { TrofastInspector } from '@/components/TrofastInspector'
 import { NiceValuesContext } from '@/components/nice-values-context'
@@ -30,6 +31,7 @@ import { useDesignConstraints } from '@/hooks/use-design-constraints'
 import { usePreviewDrag } from '@/hooks/use-preview-drag'
 import { usePreviewResize } from '@/hooks/use-preview-resize'
 import { useProject } from '@/hooks/use-project'
+import { useDirectorySync } from '@/hooks/use-directory-sync'
 import { getAssemblyInstance } from '@/lib/assemblies'
 import { findClosingPanelHoles } from '@/lib/close-holes'
 import { resolvePanels } from '@/lib/model'
@@ -40,7 +42,7 @@ import { CheckCheck } from 'lucide-react'
 import { useCallback,useEffect,useMemo,useState } from 'react'
 
 export default function App() {
-  const {project,commit,undo,redo,canUndo,canRedo,saveStatus,repairNotice}=useProject()
+  const {project,documentId,getSnapshot,commit,undo,redo,canUndo,canRedo,saveStatus,repairNotice}=useProject()
   const {
   assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds,
   connectorTypeError, setConnectorTypeError, selectedIds, setPanelSelection,
@@ -128,7 +130,8 @@ export default function App() {
   const {previewResult,previewProject,previewPanels,previewConnections,previewIssues,attachmentErrors}=useAttachmentPreview({project,selected,panels,draft,attachment,inspectorTab,attachTarget})
   const choosePanel=createPanelSelectionCommand({ objectMode, objects, setAssemblyTab, constraintPicker, setPickingConstraint, setRightOpen, constraints, selectedConnectors, setSelectedConnectorIds, setPanelSelection, setSelectedIds, clipboard, project, assembly, setInspectorTab })
   const { startAttach,addPanel,applyAttachment,updateConnection,addDraftPanel }=createPanelInsertionCommands({ objects, setAssemblyTab, clipboard, assembly, setDraft, project, setDialog, draft, notify, inspectingConnectors, selectedIds, commit, setSelectedId, setInspectorTab, setRightOpen, setFitSignal, selected, setAttachment, setAttachTarget, setAttachmentSideHighlight, setRealisticPreview, setExploded, previewProject, attachmentErrors, attachTarget, previewPanels, connection, commitWithInsertChecks })
-  const { loadTemplate,insertModule,insertSavedAssembly,exportAssembly,startNewProject,closeProjectDialog,applyTemplate,exportName,exportProject,importProject,importAssembly }=createProjectFileCommands({ inspectingConnectors, selectedIds, clipboard, project, commit, assembly, setSelectedIds, setInspectorTab, setRightOpen, setExploded, setRealisticPreview, setFitSignal, notify, setAssemblyImportError, setPendingTemplate, dialog, setDialog, setProjectConstraintsOpen, constraints, pendingTemplate, closeContextMenu, setView, setAttachTarget, setAttachment, setImportError })
+  const { loadTemplate,insertModule,insertModuleDefinition,insertSavedAssembly,exportAssembly,startNewProject,closeProjectDialog,applyTemplate,exportName,exportProject,importProject,openProject,importAssembly }=createProjectFileCommands({ inspectingConnectors, selectedIds, clipboard, project, commit, assembly, setSelectedIds, setInspectorTab, setRightOpen, setExploded, setRealisticPreview, setFitSignal, notify, setAssemblyImportError, setPendingTemplate, dialog, setDialog, setProjectConstraintsOpen, constraints, pendingTemplate, closeContextMenu, setView, setAttachTarget, setAttachment, setImportError })
+  const directorySync=useDirectorySync({project,documentId,getSnapshot,replaceProject:openProject,insertAssembly:definition=>{insertModuleDefinition(definition);setDialog(null)},notify})
   const instance=assembly.selectedInstance
   const holes=useMemo(()=>findClosingPanelHoles(project,selectedIds),[project,selectedIds])
   const closeHole=createCloseHoleCommand({ holes, setInspectorTab, setRightOpen, setToolRequest, selectionKey, project, selectedIds, commit, setSelectedIds, notify })
@@ -207,8 +210,9 @@ export default function App() {
   }
   return <NiceValuesContext value={project.niceValues}><PanelPaletteProvider {...paletteActions} project={project}><TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
     {objectConversion&&<EditorObjectConversion objectConversion={objectConversion} project={project} setObjectConversion={setObjectConversion} commit={commit} objects={objects} setSelectedIds={setSelectedIds} setInspectorTab={setInspectorTab} setRightOpen={setRightOpen} setFitSignal={setFitSignal} notify={notify}/>}
-    <ProjectHeader projectName={project.name} saveStatus={saveStatus} canUndo={canUndo} canRedo={canRedo} undo={undo} redo={redo}
-      onNew={()=>setDialog('new')} onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')} onBuy={()=>setDialog('buy')}/>
+    <ProjectHeader projectName={project.name} saveStatus={directorySync.headerStatus??saveStatus} canUndo={canUndo} canRedo={canRedo} undo={undo} redo={redo}
+      syncFolderName={directorySync.directoryName} syncConnected={directorySync.connected} syncNeedsAttention={!!directorySync.error}
+      onNew={()=>setDialog('new')} onSync={()=>{closeContextMenu();setDialog('sync')}} onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')} onBuy={()=>setDialog('buy')}/>
 
     <EditorSidebar {...editorSidebarProps}/>
 
@@ -222,7 +226,15 @@ export default function App() {
     {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
 
     <PanelConnectionFitDialog adjustments={pendingConnectionFit?.fit.adjustments} adjustment={pendingConnectionFit?.fit.adjustment} operations={pendingConnectionFit?.fit.result} onConfirm={acceptConnectionFit} onCancel={()=>setPendingConnectionFit(null)}/>
-    <EditorDialogs {...editorDialogsProps}/>
+    <EditorDialogs {...editorDialogsProps} dialog={dialog==='sync'?null:dialog}/>
+    <DirectorySyncDialog {...directorySync} open={dialog==='sync'} onClose={()=>{directorySync.cancelOpen();setDialog(null)}}
+      assemblyOptions={assembly.instances.map(item=>({id:item.id,name:item.name}))}
+      onChoose={()=>void directorySync.choose()} onResync={()=>void directorySync.resync()} onForget={()=>void directorySync.forget()}
+      onSave={()=>void directorySync.save()} onDuplicate={()=>void directorySync.duplicate()} onAutosave={directorySync.setAutosave}
+      onOpenProject={name=>void directorySync.openProject(name)} onDuplicateProject={name=>void directorySync.duplicate(name)}
+      onConfirmOpen={save=>void directorySync.confirmOpen(save)} onCancelOpen={directorySync.cancelOpen}
+      onInsertAssembly={name=>void directorySync.insertAssembly(name)} onExportAssembly={id=>void directorySync.exportAssembly(id)}
+      onImportAssembly={file=>void directorySync.importAssembly(file)}/>
     <input ref={importRef} type="file" accept=".json,.playwood.json" className="visually-hidden" aria-label="Import project file" onChange={e=>{const file=e.target.files?.[0];if(file)void importProject(file);e.target.value=''}}/>
     <input ref={assemblyImportRef} type="file" accept=".json,.playwood-assembly.json" className="visually-hidden" aria-label="Import assembly file" onChange={e=>{const file=e.target.files?.[0];if(file)void importAssembly(file);e.target.value=''}}/>
   </div></TooltipProvider></PanelPaletteProvider></NiceValuesContext>

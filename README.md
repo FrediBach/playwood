@@ -13,7 +13,21 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. No accounts, API keys, backend, or external fonts are required. Projects autosave in this browser's local storage; export a JSON project to keep a portable copy.
+Open the local URL printed by Vite. No accounts, API keys, backend, or external fonts are required. Projects autosave in this browser's local storage; export a JSON project or use **Sync** to keep editable files in a local folder.
+
+## Sync a local folder
+
+Choose **Sync** next to **New project**, then **Choose folder** and allow read/write access. The folder's project and assembly JSON files appear in the dialog. Folder access requires a browser that supports the File System Access directory picker, such as desktop Chrome or Edge. Browsers without it retain browser autosave and the existing import/download controls.
+
+The **Sync** button shows a green check badge while a folder is connected. An amber **!** means the folder needs attention or reconnection; open Sync for details. Both badges remain visible in the compact header.
+
+- **Save project** saves the current workspace into the folder, or updates its opened file. **Duplicate project** saves a separate copy; each listed project also has a Duplicate action. New copies use unique filenames without replacing existing files.
+- **Open** loads a listed project. If the current workspace has unsaved folder changes, choose **Save and open**, **Open without saving**, or **Cancel**. Opening remains undoable during the session.
+- Enable **Autosave to folder** after opening or saving a project to write accepted edits to that file. Enable it again when you open a different project. The browser recovery save remains automatic even when folder autosave is off. Starting, importing, or replacing a project, or undoing across a project change, releases the file association so another project cannot be autosaved over it.
+- The folder is remembered in this browser. After reloading, choose **Sync → Resync** to reconnect and refresh the list; the browser may ask for permission again. Open a file or save the recovered workspace explicitly before enabling folder autosave again. **Change folder** chooses another location; **Forget folder** removes remembered access without deleting files.
+- Under Assemblies, use **Import assembly into folder** to copy a validated assembly file into the folder. Choose an existing project instance under **Assembly to export**, then **Export assembly to folder**. **Insert** on a listed assembly adds it through the normal assembly insertion or attachment-preview workflow.
+
+Sync reads JSON files directly inside the chosen folder; it does not scan subfolders or watch for external edits. **Resync** refreshes the listing without replacing the workspace. If an opened file changes or disappears outside the app, saving stops and folder autosave pauses. Preserve your edits with **Duplicate project**, then reopen the disk version if needed. Project and assembly files use their existing formats and the 2 MB import limit; no cloud account or server is involved.
 
 ## Design workflow
 

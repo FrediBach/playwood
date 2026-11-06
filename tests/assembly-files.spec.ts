@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { createAssemblyFile } from '../src/lib/assembly-file'
 import { updateAssemblyFinish, updateAssemblyParameterValues } from '../src/lib/assemblies'
 import { createExampleProject } from '../src/lib/example-library'
+import { ensureProjectPalette } from '../src/lib/custom-colors'
 import { parseProject, validateProject } from '../src/lib/model'
 import type { Panel, Project } from '../src/lib/types'
 
@@ -30,7 +31,7 @@ test('export and import preserve configured construction, create independent cop
   let original = createExampleProject('assembly-cube')
   const source = original.assemblies!.instances[0]
   original = updateAssemblyParameterValues(original, source.id, { 'side-length': 450 })
-  original = updateAssemblyFinish(original, source.id, { color: '#123456' })
+  original = ensureProjectPalette(updateAssemblyFinish(original, source.id, { color: '#123456' }))
   await load(page, original)
   await openInspectorSection(page, 'Manage assembly')
   const downloading = page.waitForEvent('download')

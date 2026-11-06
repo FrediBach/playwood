@@ -17,6 +17,8 @@ Use `npm install` when intentionally updating dependencies and review the accomp
 
 Local storage is scoped to the full origin. Development, production, and the browser-test port each have their own project save. Export a `.playwood.json` file when moving work between them.
 
+Directory Sync also remembers its File System Access handle per origin in IndexedDB. It requires a secure context (localhost qualifies) and a browser with `showDirectoryPicker`; the existing upload/download controls remain available elsewhere. Reconnect a remembered folder with Resync after reloading.
+
 ## Commands provided by the repository
 
 | Command | What it does |
@@ -96,6 +98,7 @@ Screenshots are saved on failures, and some specs explicitly write diagnostic im
 | Assemblies and parameters | `src/lib/assemblies.test.ts`, `src/lib/assembly-parameters.test.ts`, `src/lib/assembly-placement.test.ts` | `tests/assemblies.spec.ts`, `tests/assembly-parameters.spec.ts`, `tests/assembly-placement.spec.ts` |
 | Automatic construction tools | `src/lib/auto-connect.test.ts`, `src/lib/close-holes.test.ts`, `src/lib/grid-split.test.ts` | `tests/auto-connect.spec.ts`, `tests/close-holes.spec.ts`, `tests/split-panels.spec.ts` |
 | File compatibility and copy/paste | `src/lib/assembly-file.test.ts`, `src/lib/clipboard.test.ts`, `src/lib/model.test.ts` | `tests/assembly-files.spec.ts`, `tests/copy-paste.spec.ts`, `tests/editor.spec.ts` |
+| Local directory sync | `src/lib/directory-sync.test.ts` | `tests/directory-sync.spec.ts` |
 | Appearance and outlines | `src/lib/custom-colors.test.ts`, `src/lib/finish-coverage.test.ts`, `src/lib/custom-outline.test.ts` | `tests/custom-colors.spec.ts`, `tests/finish-coverage.spec.ts`, `tests/custom-outlines.spec.ts` |
 | List organization and hardware edits | `src/lib/list-groups.test.ts`, `src/lib/connector-selection.test.ts` | `tests/list-groups.spec.ts`, `tests/connector-selection.spec.ts` |
 | Realistic preview | `src/components/room-layout.test.ts`, `src/components/robot-vacuum-navigation.test.ts`, `src/components/robot-vacuum-motion.test.ts`, `src/components/robot-vacuum-recovery.test.ts`, `src/lib/preview-furnishings.test.ts` | `tests/realistic-preview.spec.ts`, `tests/robot-vacuum.spec.ts` |
@@ -103,6 +106,8 @@ Screenshots are saved on failures, and some specs explicitly write diagnostic im
 | Layout, focus, and inspector behavior | Relevant helper tests where applicable | `tests/sidebar-layout.spec.ts`, `tests/inspector-ux.spec.ts`, `tests/editor.spec.ts` |
 
 This is a navigation aid, not an exhaustive test list. Nearby specialized tests often cover important constraints beyond the main feature's filename.
+
+Directory-sync browser tests replace the operating-system picker and permission responses with a fixture directory in the browser's origin-private filesystem. They still exercise real browser directory handles, writable streams, and IndexedDB structured cloning across reloads. This verifies application persistence and conflict handling; native chooser presentation and actual operating-system permission prompts require manual checking in a supported browser.
 
 ## Implementing common changes
 

@@ -1,0 +1,51 @@
+.dialog-content.directory-sync-dialog{width:690px;overflow-x:hidden}
+.directory-sync-dialog .sync-help,.directory-sync-dialog .sync-empty{font-size:11px;color:var(--muted);line-height:1.7}
+.sync-connect{display:flex;flex-direction:column;align-items:flex-start;gap:17px;padding:22px;background:#f0f0e9;border:1px solid var(--line);border-radius:8px}
+.sync-connect p,.sync-notice{font-size:12px;line-height:1.8;color:#62685b}
+.sync-folder-icon{display:grid;place-items:center;width:47px;height:47px;border:1px solid #d7dbc9;border-radius:10px;background:var(--paper);color:#687755}
+.sync-notice{padding:17px;border:1px solid var(--line);border-radius:7px;background:#f0f0e9}
+.sync-connection{padding:16px;background:#f0f0e9;border:1px solid var(--line);border-radius:8px}
+.sync-folder-name{display:flex;align-items:center;gap:11px;margin-bottom:13px;min-width:0;color:#697754}
+.sync-folder-name>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.sync-folder-name strong{font-size:14px;color:#3f4736;overflow-wrap:anywhere}
+.sync-folder-name span{font-size:10px;color:var(--muted)}
+.sync-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sync-connection .sync-help{margin-top:10px}
+.sync-status{margin-top:14px;font-size:11px;line-height:1.6;color:#61744c;overflow-wrap:anywhere}
+.directory-sync-dialog .sync-error{margin:14px 0 0;padding:12px;background:#f8eee5;border:1px solid #ebd1bf;border-radius:5px;line-height:1.6;overflow-wrap:anywhere}
+.sync-section{margin-top:22px;padding-top:20px;border-top:1px solid var(--line);min-width:0}
+.sync-section h3{font-size:13px;font-weight:600;color:#434b39}
+.sync-section-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.sync-section-heading>span{font-size:10px;padding:3px 6px;border-radius:4px;background:#edede6;color:#73786a}
+.sync-current-file{font-size:12px;margin:10px 0 13px;color:#62685b;overflow-wrap:anywhere}
+.sync-current-file>span{display:block;font-size:10px;color:var(--muted);margin-top:4px}
+.sync-section .sync-autosave{margin:17px 0 6px;color:#4d5b40}
+.sync-file-list{list-style:none;margin:0 0 13px;padding:0;max-height:248px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border:1px solid var(--line);border-radius:6px}
+.sync-file-list>li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px}
+.sync-file-list>li+li{border-top:1px solid var(--line)}
+.sync-file-active{background:#eeeee5}
+.sync-file-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
+.sync-file-copy>strong{font-size:12px;font-weight:550;overflow-wrap:anywhere}
+.sync-file-copy>span{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.sync-file-copy>small{font-size:9px;color:#657a4f}
+.sync-row-actions{display:flex;gap:4px;align-items:center;flex-shrink:0}
+.sync-assembly-transfer{display:flex;flex-direction:column;align-items:flex-start;gap:16px;margin:14px 0}
+.sync-export-assembly{display:flex;align-items:flex-end;gap:10px;width:100%;min-width:0}
+.sync-export-assembly .field{flex:1;margin:0;min-width:0}
+.sync-export-assembly .field select{height:33px}
+.sync-confirmation{margin-top:18px;padding:16px;border:1px solid #dcc49a;background:#f7f0e1;border-radius:7px}
+.sync-confirmation>strong{font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.sync-confirmation>p{margin:9px 0 14px;font-size:11px;line-height:1.7;color:#7a6846}
+.sync-scan-errors{margin-top:20px;font-size:11px;color:#90633b;line-height:1.7;overflow-wrap:anywhere}
+.sync-scan-errors summary{cursor:pointer}
+.sync-scan-errors ul{padding-left:18px;margin-bottom:0}
+@media(max-width:680px){
+  .dialog-content.directory-sync-dialog{padding:28px 20px}
+  .sync-export-assembly{flex-direction:column;align-items:stretch}
+  .sync-export-assembly .ui-button{align-self:flex-start}
+  .sync-connection,.sync-confirmation{padding:13px}
+  .sync-file-list>li{padding:11px 9px;gap:8px}
+  .sync-actions{gap:6px}
+  .directory-sync-dialog .button-small{font-size:11px;padding-inline:9px}
+  .sync-confirmation .sync-actions{align-items:stretch}
+}
