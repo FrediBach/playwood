@@ -114,6 +114,10 @@ With the complete connected selection selected, press **Shift + X/Y/Z** to mirro
 
 While editing Objects, amber surface highlights and focusable warning icons identify narrow sections of the evaluated solid. Hover or focus an icon for details. The early check flags continuous solid spans below 91 mm (40 mm minimum panel cut, 16 mm stock, and two measured 17.5 mm connector seats), including Boolean remnants; operand subdivisions alone do not trigger it. It is advisory: fitted-face exceptions may work, and wider sections can still fail hardware clearance. Convert to panels performs the full check for the chosen thickness. Warnings update with drafts and gestures, remain outside saved projects, and disappear outside Objects mode.
 
+## Connector order list
+
+Choose **Buy** next to Export to prepare a downloadable connector order list. It counts installed hardware, including per-piece overrides and hidden parts, and excludes removed pieces. Choose an available shop color for each unsupported design color; these choices do not change the project. Matching order items are combined in the downloaded text list, with product links and a VAT-inclusive Euro estimate. Prices and color options were checked on 6 November 2026 and are not synced live. The estimate uses entry unit prices (including the listed 105°/150° sale price), excludes shipping and volume discounts, and does not apply supplier minimum quantities. Verify quantities and prices at the shop. No checkout or order is placed.
+
 ## Panel cutting SVGs
 
 Choose **Export project → Panel cutting SVGs** to download a separate full-size SVG for each panel with pegboard holes, slots, TROFAST openings, a custom outline, or rounded corners. Each file includes its outer contour and all openings in millimeters, with circular arcs preserved. Panel numbers distinguish repeated names; hidden panels and materialized assembly panels are included. Plain rectangular panels remain in the CSV cutting list.

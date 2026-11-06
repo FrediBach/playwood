@@ -208,7 +208,7 @@ export default function App() {
   return <NiceValuesContext value={project.niceValues}><PanelPaletteProvider {...paletteActions} project={project}><TooltipProvider delayDuration={350}><div className={`app-shell ${leftOpen?'':'left-closed'} ${rightOpen?'':'right-closed'} ${realisticPreview?'room-preview':''}`}>
     {objectConversion&&<EditorObjectConversion objectConversion={objectConversion} project={project} setObjectConversion={setObjectConversion} commit={commit} objects={objects} setSelectedIds={setSelectedIds} setInspectorTab={setInspectorTab} setRightOpen={setRightOpen} setFitSignal={setFitSignal} notify={notify}/>}
     <ProjectHeader projectName={project.name} saveStatus={saveStatus} canUndo={canUndo} canRedo={canRedo} undo={undo} redo={redo}
-      onNew={()=>setDialog('new')} onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')}/>
+      onNew={()=>setDialog('new')} onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')} onBuy={()=>setDialog('buy')}/>
 
     <EditorSidebar {...editorSidebarProps}/>
 

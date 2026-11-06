@@ -1,0 +1,32 @@
+import { test, expect } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
+
+test('buy resolves unavailable colors and downloads a list without changing the design', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible({ timeout: 30000 })
+  const saved = await page.evaluate(() => localStorage.getItem('playwood-studio-project-v1'))
+  await page.getByRole('button', { name: 'Buy connectors', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Buy connectors' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Download order list' })).toBeDisabled()
+  for (const select of await dialog.getByRole('combobox').all()) await select.selectOption({ label: 'Black' })
+  await expect(dialog.getByRole('button', { name: 'Download order list' })).toBeEnabled()
+  await page.screenshot({ path: 'test-results/connector-order-desktop.png', animations: 'disabled' })
+  const pending = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: 'Download order list' }).click()
+  const download = await pending
+  const content = await readFile((await download.path())!, 'utf8')
+  expect(content).toContain('Estimated total: €')
+  expect(content).toContain('not synced in real time')
+  expect(content).toContain('Black')
+  await page.keyboard.press('Escape')
+  await expect(dialog).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Buy connectors', exact: true })).toBeFocused()
+  expect(await page.evaluate(() => localStorage.getItem('playwood-studio-project-v1'))).toBe(saved)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: 'Buy connectors', exact: true }).click()
+  await expect(dialog).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  expect(await dialog.evaluate(element => element.getBoundingClientRect().right <= innerWidth)).toBe(true)
+  await page.screenshot({ path: 'test-results/connector-order-mobile.png', animations: 'disabled' })
+})

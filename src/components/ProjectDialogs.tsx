@@ -1,3 +1,4 @@
+import { ConnectorOrderDialog } from './ConnectorOrderDialog'
 import { needsPanelSvg } from '@/lib/panel-svg'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
 import { lazy, Suspense, useRef, type ComponentProps, type Dispatch, type SetStateAction } from 'react'
@@ -15,7 +16,7 @@ import { getTrofastColor, getTrofastItem, getTrofastProductUrl } from '@/lib/tro
 import { CONNECTORS, CONNECTOR_MATERIALS } from '@/lib/connector-options'
 import type { Panel, Project, ValidationIssue } from '@/lib/types'
 
-export type ProjectDialog = 'new' | 'replace' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | 'move' | 'rescale' | null
+export type ProjectDialog = 'buy' | 'new' | 'replace' | 'add' | 'templates' | 'export' | 'help' | 'parts' | 'rotate' | 'move' | 'rescale' | null
 interface Props {
   dialog: ProjectDialog
   onClose: () => void
@@ -55,6 +56,7 @@ export function ProjectDialogs(props: Props) {
 
 function DialogBody(props: Props) {
   switch (props.dialog) {
+    case 'buy': return <ConnectorOrderDialog project={props.project}/>
     case 'new': return <NewProjectDialog {...props}/>
     case 'replace': return <ReplaceProjectDialog {...props}/>
     case 'move': return <MoveCreation panels={props.panels} onMove={props.onMoveCreation} onCancel={props.onClose}/>
