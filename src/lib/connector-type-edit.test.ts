@@ -1,9 +1,10 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { createAssembly, materializeAssemblies } from './assemblies'
 import { changeConnectorType } from './connector-type-edit'
 import { connectorId, editConnectors, getPhysicalConnectors } from './connector-selection'
-import { attachPanel, createPanel, createStarterProject, parseProject, resolvePanels, validateProject } from './model'
+import { attachPanel, createPanel, createStarterProject, resolvePanels, validateProject } from './model'
 import type { Panel, Project, Side } from './types'
 
 const orientation = (panel: Panel) => new Quaternion().setFromEuler(new Euler(...panel.rotation))
@@ -40,7 +41,7 @@ describe('changing connector joint angles', () => {
     expect(after.map(panel => panel.id)).toEqual(before.map(panel => panel.id))
     expect(getPhysicalConnectors(next).map(piece => piece.type)).toEqual(['150', '150', '90', '90'])
     expect(validateProject(next)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     expect(project).toEqual(snapshot)
   })
 

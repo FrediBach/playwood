@@ -1,7 +1,8 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { closePanelHole, findPanelHoles } from './close-holes'
 import { gridProject } from './example-geometry'
-import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { attachPanel, createPanel, resolvePanels, rotateProject, validateProject } from './model'
 import { ASSEMBLY_LIBRARY } from './assembly-library'
 import { duplicateAssembly, moveAssemblies, updateAssemblyParameterValues } from './assemblies'
 import { connectClosingPanel } from './closure-connectors'
@@ -25,7 +26,7 @@ describe('close holes', () => {
     expect(validateProject(result.project)).toEqual([])
     const closed = closePanelHole(result.project, result.project.panels.map(panel => panel.id), openings(result.project)[0].id)
     expect(openings(closed.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(closed.project))).panels).toHaveLength(6)
+    expect(roundTripProject(closed.project).panels).toHaveLength(6)
     expect(closed.project.panels.every(panel => panel.finishCoverage === 0.6)).toBe(true)
     expect(project.panels).toHaveLength(4)
     expect(() => closePanelHole(result.project, project.panels.map(panel => panel.id), openings(project)[0].id)).toThrow('no longer available')
@@ -72,7 +73,7 @@ describe('close holes', () => {
     expect(validateProject(resized)).toEqual([])
     expect(resized.panels.find(panel => panel.id === result.panelId)!.width).toBeCloseTo(500)
     expect(resized.panels.find(panel => panel.id === result.panelId)!.height).toBeCloseTo(500)
-    const loaded = parseProject(JSON.parse(JSON.stringify(result.project)))
+    const loaded = roundTripProject(result.project)
     expect(loaded.panels).toHaveLength(9)
     const moved = moveAssemblies(loaded, [original.id], [0, 100, 0])
     expect(moved.panels.find(panel => panel.id === result.panelId)!.position[1]).toBeCloseTo(result.project.panels.find(panel => panel.id === result.panelId)!.position[1] + 100)
@@ -92,7 +93,7 @@ describe('close holes', () => {
     const initialT = getPhysicalConnectors(before).filter(connector => connector.type === 't').length
     expect(getPhysicalConnectors(project).filter(connector => connector.type === 't')).toHaveLength(initialT + 8)
     expect(getPhysicalConnectors(project)).toHaveLength(getPhysicalConnectors(before).length + 24)
-    expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project)
+    expect(roundTripProject(project)).toEqual(project)
   })
 
   it('upgrades an occupied T joint to a complete cross joint', () => {

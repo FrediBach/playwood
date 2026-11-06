@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { gridProject } from './example-geometry'
 import { Euler, Vector3 } from 'three'
@@ -111,11 +112,11 @@ describe('reusable assemblies', () => {
     expect(next.assemblies!.definitions).toEqual(project.assemblies!.definitions)
     expect(Object.values(selected.panelIds).every(id => !getAssemblyInstance(next, id))).toBe(true)
     expect(next.panels.filter(panel => Object.values(selected.panelIds).includes(panel.id)).every(panel => panel.color === '#123456' && panel.material === 'oak')).toBe(true)
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     const grown = resizePanels(next, [Object.values(selected.panelIds)[0]], { width: 400 })
     expect(validateProject(grown)).toEqual([])
     expect(grown.assemblies!.instances).toEqual(next.assemblies!.instances)
-    expect(parseProject(JSON.parse(JSON.stringify(grown)))).toEqual(grown)
+    expect(roundTripProject(grown)).toEqual(grown)
   })
 
   it.each([0, 1, 3])('preserves every joint while disassembling Diamond instance %i', index => {
@@ -128,13 +129,13 @@ describe('reusable assemblies', () => {
     expect(count(next, '90')).toBe(16)
     expect(count(next, 'cross')).toBe(8)
     expect(validateProject(next)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     const renamed = renameAssembly(next, next.assemblies!.instances[0].id, 'Still linked')
     const painted = updateAssemblyDefinition(renamed, renamed.assemblies!.instances[0].id, { color: '#123456' })
     const looseIds = new Set(Object.values(selected.panelIds))
     expect(painted.panels.filter(panel => looseIds.has(panel.id))).toEqual(project.panels.filter(panel => looseIds.has(panel.id)))
     expect(painted.panels.filter(panel => !looseIds.has(panel.id)).every(panel => panel.color === '#123456')).toBe(true)
-    expect(parseProject(JSON.parse(JSON.stringify(painted)))).toEqual(painted)
+    expect(roundTripProject(painted)).toEqual(painted)
     expect(validateProject(painted)).toEqual([])
   })
 
@@ -146,10 +147,10 @@ describe('reusable assemblies', () => {
     expect(next.assemblies!.loosePorts).toEqual([])
     expect(next.panels).toBe(project.panels)
     expect(next.connections).toBe(project.connections)
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     const moved = movePanels(next, next.panels.map(panel => panel.id), [100, 20, 0])
     expect(validateProject(moved)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(roundTripProject(moved)).toEqual(moved)
     expect(count(moved, 'cross')).toBe(8)
   })
 
@@ -163,7 +164,7 @@ describe('reusable assemblies', () => {
     for (const next of [removeAssembly(loose, neighborId), disconnectAssembly(loose, neighborId)]) {
       expect(next.connections.find(connection => connection.id === originalCorner.id)).toEqual(originalCorner)
       expect(next.assemblies!.loosePorts!.some(port => port.id === looseEndpoint.portId)).toBe(false)
-      expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+      expect(roundTripProject(next)).toEqual(next)
       expect(validateProject(next)).toEqual([])
     }
   })
@@ -179,17 +180,17 @@ describe('reusable assemblies', () => {
     expect(detached.connections.some(connection => connection.parentId === panelId || connection.childId === panelId)).toBe(false)
     expect(isPanelConnectedToAssembly(detached, panelId)).toBe(false)
     const moved = movePanels(detached, [panelId], [0, 0, 100])
-    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(roundTripProject(moved)).toEqual(moved)
     for (const changed of [detached, removePanel(loose, panelId)]) {
       const rebuilt = renameAssembly(changed, changed.assemblies!.instances[0].id, 'Neighbor')
       expect(validateProject(rebuilt)).toEqual([])
-      expect(parseProject(JSON.parse(JSON.stringify(rebuilt)))).toEqual(rebuilt)
+      expect(roundTripProject(rebuilt)).toEqual(rebuilt)
       expect(rebuilt.connections.some(connection => connection.type === 'cross' && (connection.parentId === panelId || connection.childId === panelId))).toBe(false)
     }
     const looseTarget = createPanel({ position: [2000, 1000, 0] })
     const withTarget = { ...loose, panels: [...loose.panels, looseTarget] }
     const reattached = attachExistingPanel(withTarget, looseTarget.id, panelId, { type: '90', side: 'right', count: 2, color: '#123456', flip: false, offset: 0, inset: 0 })
-    expect(parseProject(JSON.parse(JSON.stringify(reattached)))).toEqual(reattached)
+    expect(roundTripProject(reattached)).toEqual(reattached)
     expect(validateProject(reattached)).toEqual([])
   })
 
@@ -200,7 +201,7 @@ describe('reusable assemblies', () => {
       const removed = removePanel(loose, panelId)
       expect(removed.panels).toHaveLength(15)
       expect(validateProject(removed)).toEqual([])
-      expect(parseProject(JSON.parse(JSON.stringify(removed)))).toEqual(removed)
+      expect(roundTripProject(removed)).toEqual(removed)
       expect(materializeAssemblies(removed).connections).toEqual(removed.connections)
     }
   })
@@ -216,13 +217,13 @@ describe('reusable assemblies', () => {
       panel.position.forEach((number, axis) => expect(number).toBeCloseTo(before.position[axis] + [100, 20, -30][axis]))
     }
     expect(validateProject(moved)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(roundTripProject(moved)).toEqual(moved)
     const separate = createPanel({ position: [3000, 1000, 0] })
     const unrelated = { ...loose, panels: [...loose.panels, separate] }
     const resized = resizePanels(unrelated, [separate.id], { width: 800 })
     expect(resized.panels.find(panel => panel.id === separate.id)!.width).toBe(800)
     expect(resized.panels.filter(panel => panel.id !== separate.id)).toEqual(loose.panels)
-    expect(parseProject(JSON.parse(JSON.stringify(resized)))).toEqual(resized)
+    expect(roundTripProject(resized)).toEqual(resized)
   })
   it('creates linked copies and joins the final box at both matching corners', () => {
     const initial = box()
@@ -235,7 +236,7 @@ describe('reusable assemblies', () => {
     expect(count(project, '90')).toBe(16)
     expect(count(project, 'cross')).toBe(8)
     expect(validateProject(project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project)
+    expect(roundTripProject(project)).toEqual(project)
   })
 
   it('restores ordinary corners when removing or disconnecting a box', () => {
@@ -252,7 +253,7 @@ describe('reusable assemblies', () => {
     expect(count(disconnected, 'cross')).toBe(4)
     expect(validateProject(disconnected)).toEqual([])
     expect(disconnected.assemblies!.instances.at(-1)!.position).not.toEqual(project.assemblies!.instances.at(-1)!.position)
-    expect(parseProject(JSON.parse(JSON.stringify(disconnected)))).toEqual(disconnected)
+    expect(roundTripProject(disconnected)).toEqual(disconnected)
   })
 
   it('updates a shared source and propagates linked placements around the closed loop', () => {
@@ -262,7 +263,7 @@ describe('reusable assemblies', () => {
     expect(resized.assemblies!.links).toEqual(project.assemblies!.links)
     expect(resized.panels.map(panel => panel.id)).toEqual(project.panels.map(panel => panel.id))
     expect(validateProject(resized)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(resized)))).toEqual(resized)
+    expect(roundTripProject(resized)).toEqual(resized)
     expect(() => updateAssemblyDefinition(project, instance.id, { thickness: 16 })).toThrow(/18–19/)
     expect(project.panels.every(panel => panel.width === 350 && panel.thickness === 18)).toBe(true)
   })
@@ -310,7 +311,7 @@ describe('reusable assemblies', () => {
     })
     const rotated = rotateProject(project, 'z', 45)
     expect(getProjectBounds(rotated.panels).min[1]).toBeCloseTo(getProjectBounds(project.panels).min[1])
-    expect(parseProject(JSON.parse(JSON.stringify(rotated)))).toEqual(rotated)
+    expect(roundTripProject(rotated)).toEqual(rotated)
     const rebuilt = materializeAssemblies(rotated)
     rebuilt.panels.forEach((panel, i) => panel.position.forEach((number, axis) => expect(number).toBeCloseTo(rotated.panels[i].position[axis])))
     expect(validateProject(rebuilt)).toEqual([])
@@ -330,11 +331,11 @@ describe('reusable assemblies', () => {
     const removed = removeAssembly(project, instance.id)
     expect(removed.panels).toHaveLength(0)
     expect(removed.assemblies!.definitions).toHaveLength(1)
-    const inserted = instantiateAssembly(parseProject(JSON.parse(JSON.stringify(removed))), instance.definitionId)
+    const inserted = instantiateAssembly(roundTripProject(removed), instance.definitionId)
     expect(inserted.panels).toHaveLength(4)
     expect(getProjectBounds(inserted.panels).min[1]).toBeCloseTo(0)
     expect(validateProject(inserted)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(inserted)))).toEqual(inserted)
+    expect(roundTripProject(inserted)).toEqual(inserted)
   })
 
   it('does not deform instances when editing a touching loose panel', () => {
@@ -348,7 +349,7 @@ describe('reusable assemblies', () => {
     expect(resizePanels(touching, [loose.id], { width: 150 }).panels.slice(0, 4)).toEqual(project.panels)
     expect(() => movePanels(touching, Object.values(instance.panelIds), [10, 0, 0])).toThrow(/assembly source/)
     expect(() => resizePanels(touching, [project.panels[0].id], { width: 400 })).toThrow(/assembly source/)
-    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(roundTripProject(moved)).toEqual(moved)
   })
 
   it('rejects malformed or contradictory metadata instead of flattening away links', () => {

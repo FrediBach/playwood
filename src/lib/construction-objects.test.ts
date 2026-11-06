@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { addConstructionBox, combineConstructionObjects, copyConstructionObjects, duplicateConstructionObjects,
   parseConstructionObjects, pasteConstructionObjects, preserveConstructionObjects, removeConstructionObjects, updateConstructionObject } from './construction-objects'
@@ -17,7 +18,7 @@ describe('saved construction objects', () => {
   it('keeps legacy projects unchanged and round trips an object-only project without fabricating parts', () => {
     const legacy = createStarterProject('blank')
     expect(parseProject(legacy)).not.toHaveProperty('constructionObjects')
-    const original = project(), loaded = parseProject(JSON.parse(JSON.stringify(original)))
+    const original = project(), loaded = roundTripProject(original)
     expect(loaded).toEqual(original)
     expect(loaded.constructionObjects).not.toBe(original.constructionObjects)
     expect(projectToCsv(loaded)).toBe(projectToCsv(legacy))
@@ -67,7 +68,7 @@ describe('saved construction objects', () => {
     const pastedNodes = pasted.project.constructionObjects!.nodes.slice(3)
     expect(pastedNodes[0]).toMatchObject({ position: [100, 400, -50] })
     expect(pastedNodes[2]).toMatchObject({ children: pastedNodes.slice(0, 2).map(node => node.id), visible: false })
-    expect(parseProject(JSON.parse(JSON.stringify(duplicated.project)))).toEqual(duplicated.project)
+    expect(roundTripProject(duplicated.project)).toEqual(duplicated.project)
     clipboard.nodes[0].name = 'Clipboard only'
     expect(source).toEqual(before)
     expect(pasted.project.constructionObjects!.nodes[3].name).toBe('outer')

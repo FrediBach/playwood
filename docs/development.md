@@ -59,6 +59,8 @@ npm test -- src/components/scene-geometry.test.ts
 
 Prefer assertions about the physical result: resolved positions and rotations, joint seats, connector quantities, preserved IDs, rejected constraints, and serialization round trips. For rotations, quaternion equivalence or geometric comparisons often express correctness better than exact Euler tuples. Use tolerances for floating-point geometry. Tests that repeat an implementation's intermediate calculations without checking behavior provide little protection.
 
+Use `roundTripProject` from [`src/test/project-round-trip.ts`](../src/test/project-round-trip.ts) when testing save/reload compatibility. It deliberately stringifies, parses JSON, and validates through `parseProject`; `structuredClone` is appropriate for isolated fixture copies, but does not exercise the saved format. Keep direct parser calls for malformed imports and legacy fixtures, and explicit serialized values when assertions compare against JSON-normalized data. The helper centralizes the intentional JSON operation so React Doctor reports it once rather than flagging every persistence assertion as a cloning optimization.
+
 ### Browser tests
 
 [playwright.config.ts](../playwright.config.ts) points at `tests/`, defaults to `http://127.0.0.1:5174`, and starts Vite with `--strictPort`. It reuses an existing server at that address, so verify that the server belongs to this checkout. `fullyParallel` is disabled; the config does not explicitly set a worker count. The default viewport is 1440 × 1000, and individual specs also exercise smaller sizes.

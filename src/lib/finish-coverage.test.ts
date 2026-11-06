@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createPanel, parseProject, projectToCsv } from './model'
 import { getSharedPanelFields, updateSelectedPanels } from './selection'
@@ -10,7 +11,7 @@ const project = (...panels: Partial<Panel>[]): Project => ({
   version: 1, name: 'Finish study', connections: [],
   panels: panels.map((panel, index) => createPanel({ id: String(index), ...panel })),
 })
-const saved = (value: Project) => parseProject(JSON.parse(JSON.stringify(value)))
+const saved = (value: Project) => roundTripProject(value)
 function box() {
   const base = gridProject('Box', [350], [350], { depth: 350 })
   return createAssembly(base, base.panels.map(panel => panel.id))

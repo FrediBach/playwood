@@ -1,6 +1,7 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { autoConnectNearby } from './auto-connect-nearby'
-import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { attachPanel, createPanel, resolvePanels, rotateProject, validateProject } from './model'
 import type { Project } from './types'
 
 function looseJoint(distance = 75): Project {
@@ -23,7 +24,7 @@ describe('generous explicit auto connect', () => {
     expect(result.project.panels[1].width).toBe(source.panels[1].width)
     expect(result.project.panels[1].height).toBe(source.panels[1].height)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project))).connections).toEqual(result.project.connections)
+    expect(roundTripProject(result.project).connections).toEqual(result.project.connections)
     expect(autoConnectNearby(result.project, ['loose']).joints).toBe(0)
     expect(source).toEqual(before)
   })

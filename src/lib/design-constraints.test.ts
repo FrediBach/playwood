@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { copyDesignConstraints, designConstraintCoordinate, designConstraintLimits, describeDesignConstraintRequirement, evaluateDesignConstraints, measureDesignConstraint } from './design-constraints'
 import { createPanel, duplicatePanel, moveProject, parseProject, removePanel, resolvePanels, rotateProject, validateProject } from './model'
@@ -80,9 +81,9 @@ describe('design rule measurements', () => {
 describe('design rule persistence', () => {
   it('retains legacy projects and round-trips every rule kind without storing measurements', () => {
     const original = project()
-    expect(parseProject(JSON.parse(JSON.stringify(original)))).toEqual(original)
+    expect(roundTripProject(original)).toEqual(original)
     const source = { ...original, constraints: [floor, dimension, equal, gap, { id: 'level', kind: 'level', enabled: false, panelIds: ['a', 'b'], references: ['min', 'max'] } as DesignConstraint] }
-    expect(parseProject(JSON.parse(JSON.stringify(source)))).toEqual(source)
+    expect(roundTripProject(source)).toEqual(source)
     expect(parseProject({ ...original, constraints: [] }).constraints).toEqual([])
   })
 
@@ -108,7 +109,7 @@ describe('design rule persistence', () => {
       { id: 'gap-range', enabled: false, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'range', min: 100, max: 300 },
     ]
     const source = { ...project(), constraints }
-    const parsed = parseProject(JSON.parse(JSON.stringify(source)))
+    const parsed = roundTripProject(source)
     expect(parsed).toEqual(source)
     expect(parsed.constraints![0]).not.toHaveProperty('relation')
     expect(parsed.constraints![1]).not.toHaveProperty('relation')
@@ -150,7 +151,7 @@ describe('design rule lifecycle', () => {
     const next = removePanel(source, 'a')
     expect(next.constraints).toEqual([])
     expect(source).toEqual(before)
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
   })
 
   it('keeps floor references fixed during whole-project moves and rejects unsupported rotations', () => {
@@ -192,7 +193,7 @@ describe('design rule lifecycle', () => {
     expect(candidate).toBeDefined()
     expect(candidate!.constraints).toHaveLength(1)
     expect(candidate!.constraints![0]).toMatchObject({ kind: 'dimension', value: 600, panelId: candidate!.panels.at(-1)!.id })
-    expect(parseProject(JSON.parse(JSON.stringify(candidate)))).toEqual(candidate)
+    expect(roundTripProject(candidate)).toEqual(candidate)
   })
 
   it('preserves rules through assembly independence and disassembly, and removes them on deletion', () => {
@@ -208,7 +209,7 @@ describe('design rule lifecycle', () => {
     const duplicate = duplicateAssembly(source, instance.id)
     expect(duplicate.constraints).toHaveLength(2)
     expect(duplicate.constraints![1]).toMatchObject({ panelId: Object.values(duplicate.assemblies!.instances[1].panelIds)[0] })
-    expect(parseProject(JSON.parse(JSON.stringify(duplicate)))).toEqual(duplicate)
+    expect(roundTripProject(duplicate)).toEqual(duplicate)
     const file = createAssemblyFile(source, instance.id)
     expect(file.definition).not.toHaveProperty('constraints')
     expect(parseAssemblyFile(file)).not.toHaveProperty('constraints')

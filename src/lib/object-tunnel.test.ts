@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { expect, it } from 'vitest'
 import { solveObjectTunnel } from './object-tunnel-solver'
 import { validateProject } from './model'
@@ -10,7 +11,7 @@ it('builds a rectangular tunnel with sixteen panels', () => {
 import { findObjectTunnel, type ObjectTunnel } from './object-tunnel'
 import { evaluateConstructionObjects } from './object-geometry'
 import { convertConstructionObject } from './object-conversion'
-import { createPanel, createStarterProject, getProjectBounds, parseProject, removePanel, resolvePanels } from './model'
+import { createPanel, createStarterProject, getProjectBounds, removePanel, resolvePanels } from './model'
 import { getPhysicalConnectors } from './connector-selection'
 import type { ConstructionObjects, Project, Vec3 } from './types'
 
@@ -50,7 +51,7 @@ for (const axis of [0, 1, 2] as const) for (const thickness of [16, 18, 19]) it(
     expect(joints.every(({ connection: c }) => c.type === '90' && (rimIds.has(c.parentId) || rimIds.has(c.childId)))).toBe(true)
   }
   expect(validateProject(removePanel(result.project, panels[8].id))).toEqual([])
-  expect(parseProject(JSON.parse(JSON.stringify(result.project))).panels).toHaveLength(16)
+  expect(roundTripProject(result.project).panels).toHaveLength(16)
   expect(source).toEqual(before)
 })
 it('does not classify an enclosed cavity or two parallel tunnels as one rectangular tunnel', () => {

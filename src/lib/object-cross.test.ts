@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { expect, it } from 'vitest'
 import fixture from '../../tests/fixtures/cross-object.json'
 import { getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
@@ -36,7 +37,7 @@ it.each([16, 17, 18, 19])('converts the reported five-arm cross at %s mm through
       expect(overlappingConnectorIds(result.project).size).toBe(0)
       const hardware = getPhysicalConnectors(result.project)
       expect(panels.every(p => new Set(hardware.flatMap(h => h.connection.parentId === p.id ? [h.connection.childId] : h.connection.childId === p.id ? [h.connection.parentId] : [])).size >= 2)).toBe(true)
-      expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(JSON.parse(JSON.stringify(result.project)))
+      expect(roundTripProject(result.project)).toEqual(JSON.parse(JSON.stringify(result.project)))
       expect(result.project.constructionObjects!.nodes.find(n => n.id === objects.roots[0])!.visible).toBe(false)
       objects = rotateConstructionSelection(objects, objects.roots, axis)
     }

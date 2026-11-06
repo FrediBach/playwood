@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssembly, materializeAssemblies } from './assemblies'
 import { autoConnect } from './auto-connect'
@@ -5,7 +6,7 @@ import { separateOverlappingConnectors } from './connector-clearance'
 import { installedHardware, overlappingHardware } from './connector-hardware-test-helpers'
 import { getPhysicalConnectors } from './connector-selection'
 import { getConnectorRail } from './connector-movement'
-import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject } from './model'
+import { attachPanel, createPanel, resolvePanels, rotateProject } from './model'
 import { closePanelHole, findPanelHoles } from './close-holes'
 import { gridProject } from './example-geometry'
 import type { Project } from './types'
@@ -32,7 +33,7 @@ describe('connector body clearance', () => {
     expect(next.connections).toEqual(source.connections)
     expect(next.panels).toEqual(source.panels)
     expect(getPhysicalConnectors(next)).toEqual(getPhysicalConnectors(source))
-    expect(overlappingHardware(parseProject(JSON.parse(JSON.stringify(next))))).toEqual([])
+    expect(overlappingHardware(roundTripProject(next))).toEqual([])
     expect(source).toEqual(snapshot)
     expect(separateOverlappingConnectors(next, fixture.ids)).toBe(next)
   })
@@ -58,7 +59,7 @@ describe('connector body clearance', () => {
     expect(overlappingHardware(repaired)).toEqual([])
     expect(repaired.assemblies).toEqual(linked.assemblies)
     expect(materializeAssemblies(repaired)).toEqual(repaired)
-    expect(parseProject(JSON.parse(JSON.stringify(repaired)))).toEqual(repaired)
+    expect(roundTripProject(repaired)).toEqual(repaired)
   })
 
   it('leaves impossible fits intact and ignores removed hardware', () => {

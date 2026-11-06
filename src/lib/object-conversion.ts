@@ -26,7 +26,8 @@ export interface ObjectConversionOptions {
   connectorMaterial: ConnectorMaterial;
 }
 export function objectConversionReason(project: Project, ids: readonly string[]): string | undefined {
-  if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !project.constructionObjects?.roots.includes(id))) return 'Select complete top-level objects to convert.'
+  const roots = new Set(project.constructionObjects?.roots)
+  if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !roots.has(id))) return 'Select complete top-level objects to convert.'
 }
 
 /** Separate roots retain compartment boundaries. Matching cuboid rows and rectangular grids share their dividing walls. */

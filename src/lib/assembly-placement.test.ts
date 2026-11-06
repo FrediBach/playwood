@@ -1,9 +1,10 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAttachmentTargets, materializeAssemblies } from './assemblies'
 import { reconcileAssemblyPlacement, samePanelPlacement } from './assembly-placement'
 import { getPhysicalConnectors } from './connector-selection'
 import { gridProject } from './example-geometry'
-import { attachPanel, createPanel, parseProject, rotateProject, validateProject } from './model'
+import { attachPanel, createPanel, rotateProject, validateProject } from './model'
 import type { Project } from './types'
 
 function boxes(offset: number): Project {
@@ -29,7 +30,7 @@ describe('assembly placements requiring disassembly', () => {
     expect(getPhysicalConnectors(result.project)).toHaveLength(12)
     expect(result.panelIds).toHaveLength(4)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     expect(materializeAssemblies(result.project)).toEqual(result.project)
     expect(project).toEqual(snapshot)
   })
@@ -42,7 +43,7 @@ describe('assembly placements requiring disassembly', () => {
     expect(result.project.assemblies!.instances).toEqual([unrelated])
     expect(result.project.panels.filter(panel => Object.values(unrelated.panelIds).includes(panel.id)))
       .toEqual(project.panels.filter(panel => Object.values(unrelated.panelIds).includes(panel.id)))
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
   })
 
   it('merges a fully duplicated assembly into the existing instance and preserves its finish', () => {
@@ -53,7 +54,7 @@ describe('assembly placements requiring disassembly', () => {
     expect(result.project.assemblies!.instances).toEqual([fixed])
     expect(result.project.panels).toEqual(project.panels.slice(0, 4))
     expect(getPhysicalConnectors(result.project)).toHaveLength(8)
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
   })
 
   it('leaves unrelated preexisting validation errors and duplicate hardware unchanged', () => {
@@ -68,7 +69,7 @@ describe('assembly placements requiring disassembly', () => {
     expect(result.project.connections.filter(connection => connections.some(original => original.id === connection.id))).toEqual(connections)
     expect(result.project.connectorOverrides).toBeUndefined()
     expect(validateProject(result.project).filter(issue => issue.severity === 'error').map(issue => issue.id)).toEqual(connections.map(connection => `${connection.id}-thickness`))
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
   })
 
   it.each([false, true])('reconciles a shared side beside an existing linked corner (mixed loose corner: %s)', mixed => {
@@ -84,7 +85,7 @@ describe('assembly placements requiring disassembly', () => {
     const result = reconcileAssemblyPlacement(project, Object.values(source.panelIds))
     expect(result.project.panels).toHaveLength(10)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     expect(materializeAssemblies(result.project)).toEqual(result.project)
   })
 
@@ -109,7 +110,7 @@ describe('assembly placements requiring disassembly', () => {
     expect(result.project.connections.filter(connection => connection.type === 'cross')).toHaveLength(3)
     expect(result.warning).toMatch(/Requires disassembly/)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     const thin = { ...project, panels: project.panels.map(panel => ({ ...panel, thickness: 16 })), assemblies: { ...project.assemblies!, definitions: project.assemblies!.definitions.map(definition => ({ ...definition, panels: definition.panels.map(panel => ({ ...panel, thickness: 16 })) })) } }
     expect(() => reconcileAssemblyPlacement(thin, movingIds)).toThrow(/compatible shared joint/)
   })

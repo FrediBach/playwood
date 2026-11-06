@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { copySelection, getPasteTargets, getInsertionTargets } from './clipboard'
 import { createAssembly, materializeAssemblies, removeAssembly, updateAssemblyFinish, updateAssemblyParameters, updateAssemblyParameterValues } from './assemblies'
@@ -57,7 +58,7 @@ describe('copy and paste attachments', () => {
     expect(next.assemblies!.links.length).toBeGreaterThan(0)
     const connectedCopy = copySelection(next, Object.values(source.panelIds))
     expect(getPasteTargets(next, Object.values(next.assemblies!.instances[1].panelIds), connectedCopy).some(target => target.project)).toBe(true)
-    expect(parseProject(JSON.parse(JSON.stringify(next))).panels).toHaveLength(8)
+    expect(roundTripProject(next).panels).toHaveLength(8)
   })
 
   it('supports panels onto assemblies and assemblies onto panels, including a deleted source', () => {
@@ -75,7 +76,7 @@ describe('copy and paste attachments', () => {
     expect(validateProject(next!).filter(issue => issue.severity === 'error')).toEqual([])
     const rebuilt = materializeAssemblies(next!)
     expect(rebuilt.panels).toEqual(next!.panels)
-    expect(parseProject(JSON.parse(JSON.stringify(next))).panels).toHaveLength(5)
+    expect(roundTripProject(next).panels).toHaveLength(5)
     const deleted = removeAssembly(next!, next!.assemblies!.instances[0].id)
     expect(deleted.connections).toHaveLength(0)
     expect(deleted.panels).toEqual([panel])
@@ -100,7 +101,7 @@ describe('copy and paste attachments', () => {
       expect(panels.filter(item => item.name.startsWith('Shelf')).every(item => item.width === 900 && item.height === 300)).toBe(true)
       expect(panels.filter(item => item.name.startsWith('Upright')).every(item => item.width === 400 && item.height === 300)).toBe(true)
       expect(validateProject(next!).filter(issue => issue.severity === 'error' || issue.id.startsWith('collision'))).toEqual([])
-      expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+      expect(roundTripProject(next)).toEqual(next)
     }
     expect(project).toEqual(before)
   })
@@ -124,7 +125,7 @@ describe('copy and paste attachments', () => {
       const shelves = next!.panels.filter(item => Object.values(pasted.panelIds).includes(item.id) && item.name.startsWith('Shelf'))
       expect(shelves).toHaveLength(2)
       expect(shelves.every(item => item.width === 700 && item.height === 300)).toBe(true)
-      expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+      expect(roundTripProject(next)).toEqual(next)
     }
   })
 
@@ -183,7 +184,7 @@ describe('library insertion targets', () => {
     expect(next.assemblies!.instances).toHaveLength(0)
     expect(next.assemblies!.definitions).toEqual(project.assemblies!.definitions)
     expect(validateProject(next)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     expect(materializeAssemblies(next)).toEqual(next)
     expect(project).toEqual(before)
   })
@@ -244,7 +245,7 @@ describe('selection clipboard', () => {
       expect(next.constraints).toHaveLength(3)
       expect(next.constraints!.at(-1)!.id).not.toBe('width')
       expect(validateProject(next).filter(issue => issue.severity === 'error')).toEqual([])
-      expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(JSON.parse(JSON.stringify(next)))
+      expect(roundTripProject(next)).toEqual(JSON.parse(JSON.stringify(next)))
     }
     expect(project).toEqual(before)
     project.panels[0].color = '#000000'
@@ -260,7 +261,7 @@ describe('selection clipboard', () => {
     const next = getPasteTargets(project, [project.panels[1].id], copied).find(target => target.project)?.project
     expect(next).toBeDefined()
     expect(validateProject(next!).filter(issue => issue.severity === 'error')).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(JSON.parse(JSON.stringify(next)))
+    expect(roundTripProject(next)).toEqual(JSON.parse(JSON.stringify(next)))
   })
 
   it('preserves disconnected panel spacing and omits external joints', () => {
@@ -312,6 +313,6 @@ it('copies assembly hardware selections as resolved panels with overrides, witho
   const rebuilt = materializeAssemblies(next!)
   expect(rebuilt.panels.map(panel => panel.id).sort()).toEqual(next!.panels.map(panel => panel.id).sort())
   expect(validateProject(rebuilt).filter(issue => issue.severity === 'error')).toEqual([])
-  expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(JSON.parse(JSON.stringify(next)))
+  expect(roundTripProject(next)).toEqual(JSON.parse(JSON.stringify(next)))
   expect(project).toEqual(before)
 })

@@ -1,9 +1,10 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { convertConstructionObject } from './object-conversion'
 import { outlineWorldPoints } from './outline-closures'
 import { describe, expect, it } from 'vitest'
 import { evaluateConstructionObjects, rotateConstructionSelection } from './object-geometry'
 import { solveObjectPrism } from './object-prism-solver'
-import { getProjectBounds, resolvePanels, validateProject, createStarterProject, removePanel, parseProject } from './model'
+import { getProjectBounds, resolvePanels, validateProject, createStarterProject, removePanel } from './model'
 import { getPhysicalConnectors } from './connector-selection'
 import type { ConstructionObjects } from './types'
 const shape: ConstructionObjects = { roots: ['l'], nodes: [
@@ -37,7 +38,7 @@ it.each([0, 1, 2] as const)('converts rotated L shapes about axis %s and retains
   const opened = removePanel(result.project, closures[0].id)
   expect(opened.panels).toHaveLength(7)
   expect(validateProject(opened)).toEqual([])
-  expect(parseProject(JSON.parse(JSON.stringify(opened))).constructionObjects!.nodes).toEqual(JSON.parse(JSON.stringify(objects.nodes.map(n => n.id === 'l' ? { ...n, visible: false } : n))))
+  expect(roundTripProject(opened).constructionObjects!.nodes).toEqual(JSON.parse(JSON.stringify(objects.nodes.map(n => n.id === 'l' ? { ...n, visible: false } : n))))
   expect(source).toEqual(before)
 })
 it('recognizes a mirrored corner subtraction and rejects an infeasibly narrow arm', () => {
@@ -164,7 +165,7 @@ describe.each(['u', 'steps'] as const)('rectangular %s closing faces', kind => {
       const b = points[(i + 1) % points.length]; return area + a.x * b.y - b.x * a.y
     }, 0)) * p.width * p.height / 2, 0)
     expect(Math.abs(pieces.reduce((sum, p) => sum + p.width * p.height, 0) - area)).toBeLessThan(.1)
-    expect(parseProject(JSON.parse(JSON.stringify(project))).panels).toHaveLength(14)
+    expect(roundTripProject(project).panels).toHaveLength(14)
     expect(validateProject(project)).toEqual([])
     if (kind === 'u') {
       const heights = pieces.slice(0, 3).map(p => p.height).sort((a, b) => a - b)

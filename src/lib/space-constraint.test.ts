@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createPanel, parseProject } from './model'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
@@ -9,7 +10,7 @@ const project = (): Project => ({ version: 1, name: 'Space', connections: [], pa
 describe('build space', () => {
   it('round trips and preserves legacy projects without a space', () => {
     const p = project()
-    expect(parseProject(JSON.parse(JSON.stringify(p))).spaceConstraint).toEqual(p.spaceConstraint)
+    expect(roundTripProject(p).spaceConstraint).toEqual(p.spaceConstraint)
     delete p.spaceConstraint
     expect(parseProject(p).spaceConstraint).toBeUndefined()
     for (const width of [0, -1, Infinity, '600']) expect(() => parseProject({ ...p, spaceConstraint: { ...project().spaceConstraint, width } })).toThrow(/build space/)

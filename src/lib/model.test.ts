@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { attachExistingPanel, attachPanel, createPanel, createStarterProject, detachPanel, getConnectionAnchors, getConnectorPlacements, getProjectBounds, parseProject, projectToCsv, removePanel, resolvePanels, validateProject } from './model'
@@ -133,7 +134,7 @@ describe('project safety and feedback', () => {
     expect(issues.filter(issue => issue.id.endsWith('-overlap'))).toHaveLength(1)
     expect(issues[0].id).toContain('-shared-overlap')
     expect(issues[0].panelIds).toHaveLength(3)
-    expect(parseProject(JSON.parse(JSON.stringify(supports)))).toEqual(supports)
+    expect(roundTripProject(supports)).toEqual(supports)
   })
 
   it('detects actual panel intersections, including rotated panels', () => {
@@ -208,7 +209,7 @@ describe('project safety and feedback', () => {
   it('round-trips starter projects and rejects malformed or circular imports', () => {
     for (const template of ['shelf', 'desk', 'display', 'blank'] as const) {
       const p = createStarterProject(template)
-      expect(parseProject(JSON.parse(JSON.stringify(p)))).toEqual(p)
+      expect(roundTripProject(p)).toEqual(p)
     }
     const p = attachPanel(project(), 'parent', createPanel({ id: 'child' }), options)
     expect(() => parseProject({ ...p, panels: [{ ...p.panels[0], width: -1 }] })).toThrow('panel width')
@@ -282,7 +283,7 @@ describe('project safety and feedback', () => {
     expect(p.connections.reduce((sum, c) => sum + c.count, 0)).toBe(12)
     const withoutSupports = { ...p, connections: p.connections.filter(c => c.role !== 'support') }
     expect(resolvePanels(p)).toEqual(resolvePanels(withoutSupports))
-    expect(parseProject(JSON.parse(JSON.stringify(p)))).toEqual(p)
+    expect(roundTripProject(p)).toEqual(p)
     for (const support of supports) {
       const child = p.panels.find(panel => panel.id === support.childId)!
       const detached = detachPanel(p, child.id)

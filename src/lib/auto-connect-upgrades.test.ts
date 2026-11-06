@@ -1,10 +1,11 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { autoConnect } from './auto-connect'
 import { createAssembly, duplicateAssembly, materializeAssemblies, updateAssemblyFinish } from './assemblies'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { connectorId, getPhysicalConnectors } from './connector-selection'
-import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { attachPanel, createPanel, resolvePanels, rotateProject, validateProject } from './model'
 import type { Panel, Project, Vec3 } from './types'
 
 function cornerWithContinuation() {
@@ -42,7 +43,7 @@ function expectCompleteUpgrade(before: Project, after: ReturnType<typeof autoCon
   expect(getPhysicalConnectors(after.project).map(connector => connector.type)).toEqual([type, type])
   expectSamePanels(before, after.project)
   expect(validateProject(after.project)).toEqual([])
-  expect(parseProject(JSON.parse(JSON.stringify(after.project)))).toEqual(after.project)
+  expect(roundTripProject(after.project)).toEqual(after.project)
 }
 
 describe('auto-connect upgrades existing joints', () => {
@@ -140,7 +141,7 @@ describe('auto-connect upgrades existing joints', () => {
     expectSamePanels(before, result.project)
     expect(project).toEqual(before)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
   })
 
   it('upgrades an assembly corner without changing its copied instance or losing the result on reload', () => {
@@ -164,7 +165,7 @@ describe('auto-connect upgrades existing joints', () => {
     for (const connection of copyConnections) expect(result.project.connections).toContainEqual(connection)
     expectSamePanels(before, result.project)
     expect(validateProject(result.project)).toEqual([])
-    const loaded = parseProject(JSON.parse(JSON.stringify(result.project)))
+    const loaded = roundTripProject(result.project)
     expect(loaded).toEqual(result.project)
     const rebuilt = materializeAssemblies(loaded)
     expect(new Map(rebuilt.panels.map(panel => [panel.id, panel]))).toEqual(new Map(result.project.panels.map(panel => [panel.id, panel])))

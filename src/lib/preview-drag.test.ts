@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAttachmentTargets, makeAssemblyIndependent, materializeAssemblies, updateAssemblyDefinition } from './assemblies'
 import { gridProject } from './example-geometry'
@@ -46,7 +47,7 @@ describe('preview dragging', () => {
     expect(result.project.connections).toHaveLength(1)
     expect(result.project.connections[0].type).toBe(type)
     expect(errors(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     const released = movePreviewDrag(session, [60, 0, 60], 20)
     expect(released.snap).toBeNull()
     expect(released.project.connections).toEqual([])
@@ -115,7 +116,7 @@ describe('preview dragging', () => {
     expect(moved.assemblies!.instances[1].id).toBe(source.id)
     for (const panel of original.panels) expectVector(position(moved, panel.id), panel.position.map((value, axis) => value + (selected.includes(panel.id) ? [100, 40, -20][axis] : 0)) as Vec3)
     expect(errors(moved)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(roundTripProject(moved)).toEqual(moved)
     expect(preparePreviewDrag(original, [selected[0]])).toBeNull()
   })
 
@@ -136,13 +137,13 @@ describe('preview dragging', () => {
     expect(snapped.snap!.panelIds).toHaveLength(4)
     expect(snapped.snap!.panelIds.every(id => snapped.project.panels.some(panel => panel.id === id))).toBe(true)
     expect(validateProject(snapped.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(snapped.project)))).toEqual(snapped.project)
+    expect(roundTripProject(snapped.project)).toEqual(snapped.project)
     expect(materializeAssemblies(snapped.project)).toEqual(snapped.project)
     const released = movePreviewDrag(session, [1000, 200, 1000], 20)
     expect(released.snap).toBeNull()
     expect(released.project.panels).toHaveLength(8)
     expect(released.project.assemblies!.instances.map(instance => instance.id)).toEqual(project.assemblies!.instances.map(instance => instance.id))
-    expect(parseProject(JSON.parse(JSON.stringify(released.project)))).toEqual(released.project)
+    expect(roundTripProject(released.project)).toEqual(released.project)
     expect(project).toEqual(before)
   })
 
@@ -160,7 +161,7 @@ describe('preview dragging', () => {
     expect(getPhysicalConnectors(snapped.project)).toHaveLength(getPhysicalConnectors(initial).length)
     expect(snapped.project.assemblies!.definitions).toEqual(initial.assemblies!.definitions)
     expect(validateProject(snapped.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(snapped.project)))).toEqual(snapped.project)
+    expect(roundTripProject(snapped.project)).toEqual(snapped.project)
     expect(materializeAssemblies(snapped.project)).toEqual(snapped.project)
   })
 
@@ -174,13 +175,13 @@ describe('preview dragging', () => {
     expect(errors(session.project)).toEqual([])
     const free = movePreviewDrag(session, [100, 40, 20], 0).project
     expect(free.assemblies!.instances[0]).toEqual(original.assemblies!.instances[0])
-    expect(parseProject(JSON.parse(JSON.stringify(free)))).toEqual(free)
+    expect(roundTripProject(free)).toEqual(free)
     const snapped = movePreviewDrag(session, [5, 0, 4], 20)
     expect(snapped.snap).not.toBeNull()
     expect(snapped.project.assemblies!.links).toHaveLength(original.assemblies!.links.length)
     expectVector(snapped.project.assemblies!.instances[1].position, source.position)
     expect(errors(snapped.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(snapped.project)))).toEqual(snapped.project)
+    expect(roundTripProject(snapped.project)).toEqual(snapped.project)
   })
 
   it('excludes assembly corners whose endpoint panels are hidden', () => {
@@ -217,7 +218,7 @@ describe('preview dragging', () => {
     expect(moved.assemblies!.links).toEqual([])
     expect(moved.assemblies!.loosePorts).toEqual([])
     expect(errors(moved)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(roundTripProject(moved)).toEqual(moved)
   })
 
   it('snaps an assembly to a loose panel while retaining valid source metadata', () => {
@@ -246,7 +247,7 @@ describe('preview dragging', () => {
     expect(moved.assemblies!.links).toEqual(original.assemblies!.links)
     expect(moved.connections).toEqual(original.connections)
     expect(errors(moved)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(roundTripProject(moved)).toEqual(moved)
   })
 
   it('releases a loose panel from an assembly corner without moving its neighbors', () => {
@@ -260,7 +261,7 @@ describe('preview dragging', () => {
     expect(moved.assemblies!.instances).toEqual(original.assemblies!.instances)
     for (const panel of original.panels.filter(panel => panel.id !== selected)) expectVector(position(moved, panel.id), position(original, panel.id))
     expect(errors(moved)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(roundTripProject(moved)).toEqual(moved)
   })
 
   it('rejects non-finite and out-of-range movement atomically', () => {

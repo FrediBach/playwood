@@ -1,6 +1,7 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Box3, Vector3 } from 'three'
-import { createStarterProject, moveProject, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { createStarterProject, moveProject, resolvePanels, rotateProject, validateProject } from './model'
 import { createAssembly, materializeAssemblies } from './assemblies'
 import { getRoomLayout } from '../components/room-layout'
 
@@ -17,7 +18,7 @@ describe('whole creation movement', () => {
     expect(moved.connections).toEqual(project.connections)
     expect(moved.panels[0].visible).toBe(false)
     expect(validateProject(moved)).toEqual(validateProject(project))
-    expect(parseProject(JSON.parse(JSON.stringify(moved)))).toEqual(moved)
+    expect(roundTripProject(moved)).toEqual(moved)
     expect(moveProject(project, [0, 0, 0])).toBe(project)
     expect(() => moveProject(project, [NaN, 0, 0])).toThrow()
   })

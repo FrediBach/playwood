@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAttachmentTargets, makeAssemblyIndependent, materializeAssemblies, moveAssemblies, resetAssemblyParameterValues, updateAssemblyDefinition, updateAssemblyParameters, updateAssemblyParameterValues } from './assemblies'
 import { getAssemblyParameterRange } from './assembly-parameters'
@@ -17,7 +18,7 @@ function box(cube = false): Project {
 }
 function valid(project: Project) {
   expect(validateProject(project)).toEqual([])
-  expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project)
+  expect(roundTripProject(project)).toEqual(project)
 }
 function add(project: Project, label: string): Project {
   const target = getAssemblyAttachmentTargets(project, project.assemblies!.instances.at(-1)!.id).find(item => item.label === label)!

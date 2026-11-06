@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { OrthographicCamera, Vector3 } from 'three'
 import { createPanel, parseProject, resolvePanels } from './model'
@@ -51,7 +52,7 @@ describe('connector keyboard sliding', () => {
     const edited = editConnectors(project, [id], { slide: 10 })
     expect(move(edited)).toEqual({ [id]: 20 })
     expect(resolvePanels(edited)).toEqual(resolvePanels(project))
-    expect(parseProject(JSON.parse(JSON.stringify(edited))).connectorOverrides).toEqual(edited.connectorOverrides)
+    expect(roundTripProject(edited).connectorOverrides).toEqual(edited.connectorOverrides)
     expect(() => parseProject({ ...project, connectorOverrides: { [id]: { slide: 'bad' } } })).toThrow()
   })
   it('clamps to panel overlap and rounded corners, including quarter-turned children', () => {

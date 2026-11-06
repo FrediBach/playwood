@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { OBB } from 'three/examples/jsm/math/OBB.js'
 import { describe, expect, it } from 'vitest'
@@ -8,7 +9,7 @@ import { connectorId, getPhysicalConnectors } from './connector-selection'
 import { CONNECTOR_LOCAL_BOUNDS } from './connector-bounds'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { gridProject } from './example-geometry'
-import { createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { createPanel, resolvePanels, rotateProject, validateProject } from './model'
 import { moveStructureRepeat, prepareStructureRepeat } from './structure-repeat'
 import type { Project, Vec3 } from './types'
 
@@ -86,7 +87,7 @@ describe('structure repeat', () => {
       expect(result.project.connectorOverrides?.[connectorId(connection.id, 1)]).toEqual({ removed: true })
       expect(result.project.connectorOverrides?.[connectorId(connection.id, 2)]).toMatchObject({ color: '#654321', type: '105' })
     }
-    const reloaded = parseProject(JSON.parse(JSON.stringify(result.project)))
+    const reloaded = roundTripProject(result.project)
     expect(overlappingHardware(reloaded)).toEqual([])
     const continued = prepareStructureRepeat(reloaded, result.selectedPanelId, direction)
     const third = moveStructureRepeat(continued, continued.pitch)
@@ -116,7 +117,7 @@ describe('structure repeat', () => {
     const before = resolvePanels(original), after = resolvePanels(result.project)
     expect(after.filter(panel => before.some(old => old.id === panel.id))).toEqual(before)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     expect(moveStructureRepeat(lower, 0)).toMatchObject({ project: original, reusedPanelIds: [] })
     expect(moveStructureRepeat(lower, lower.pitch * 2).project).toBe(result.project)
     expect(original).toEqual(snapshot)
@@ -161,7 +162,7 @@ describe('structure repeat', () => {
     expect(result.project.constraints).toHaveLength(3)
     expect(result.project.constraints!.slice(0, 2)).toEqual(original.constraints)
     expect(validateProject(result.project)).toEqual([])
-    const continued = prepareStructureRepeat(parseProject(JSON.parse(JSON.stringify(result.project))), result.selectedPanelId, [1, 0, 0])
+    const continued = prepareStructureRepeat(roundTripProject(result.project), result.selectedPanelId, [1, 0, 0])
     expect(moveStructureRepeat(continued, continued.pitch).count).toBe(1)
     const constrained: Project = { ...original, constraints: [...original.constraints!,
       { id: 'matching', kind: 'equal-dimension', panelIds: [originalTop.id, selected.id], dimension: 'width', enabled: true }] }
@@ -309,7 +310,7 @@ describe('structure repeat', () => {
     expect(getPhysicalConnectors(result.project).filter(connector => connector.type === 't')).toHaveLength(4)
     expect(getPhysicalConnectors(result.project).every(connector => connector.color === '#222222')).toBe(true)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     expect(original).toEqual(snapshot)
     expect(resolvePanels(result.project).filter(panel => original.panels.some(source => source.id === panel.id)))
       .toEqual(resolvePanels(original))
@@ -370,7 +371,7 @@ describe('structure repeat', () => {
     expect(result.project.connectorOverrides?.[connectorId(untouched.id, 0)]).toEqual(original.connectorOverrides[connectorId(untouched.id, 0)])
     expect(getPhysicalConnectors(result.project)).toHaveLength(11)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     expect(original).toEqual(snapshot)
   })
 
@@ -382,7 +383,7 @@ describe('structure repeat', () => {
     expect(result.count).toBe(2)
     expect(result.project.panels).toHaveLength(10)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
   })
 
   it('repeats vertically when pulling a side panel along the compartment height', () => {
@@ -434,7 +435,7 @@ describe('structure repeat', () => {
     expect(getPhysicalConnectors(second.project)).toHaveLength(40)
     expect(moveStructureRepeat(session, 0).project).toBe(original)
     expect(moveStructureRepeat(session, session.pitch).project).toBe(first.project)
-    const reloaded = parseProject(JSON.parse(JSON.stringify(second.project)))
+    const reloaded = roundTripProject(second.project)
     expect(reloaded).toEqual(second.project)
     const continued = prepareStructureRepeat(reloaded, second.selectedPanelId, [0, 0, sign])
     const third = moveStructureRepeat(continued, continued.pitch)
@@ -457,7 +458,7 @@ describe('structure repeat', () => {
     expect(result.count, result.reason).toBe(2)
     expect(result.project.panels).toHaveLength(local[2] ? 14 : 10)
     expect(validateProject(result.project)).toEqual([])
-    const reloaded = parseProject(JSON.parse(JSON.stringify(result.project)))
+    const reloaded = roundTripProject(result.project)
     const continued = prepareStructureRepeat(reloaded, result.selectedPanelId, direction)
     expect(moveStructureRepeat(continued, continued.pitch).count).toBe(1)
   })
@@ -567,7 +568,7 @@ describe('structure repeat', () => {
     expect(result.project.constraints!.filter(rule => rule.kind === 'floor')).toHaveLength(1)
     expect(result.project.constraints!.slice(0, 4)).toEqual(original.constraints)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
   })
 
   it('does not introduce another violated constraint from an imported source', () => {

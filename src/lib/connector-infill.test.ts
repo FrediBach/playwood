@@ -1,5 +1,6 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
-import { createStarterProject, parseProject, resolvePanels } from './model'
+import { createStarterProject, resolvePanels } from './model'
 import { addConnectorsBetween, connectorInfillReason } from './connector-infill'
 import { connectorId, editConnectors, getPhysicalConnectors } from './connector-selection'
 import { connectorSlide, getConnectorRail } from './connector-movement'
@@ -35,7 +36,7 @@ describe('adding connectors between selected hardware', () => {
       expect(after[piece.id]).toBeCloseTo(before[base.ids[0]] + (before[base.ids[1]] - before[base.ids[0]]) * (index + 1) / 3)
     }
     expect(resolvePanels(next)).toEqual(resolvePanels(project))
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     expect(positions(project)).toEqual(before)
   })
   it('rejects excessive, fractional, empty and overlapping quantities', () => {
@@ -56,7 +57,7 @@ describe('adding connectors between selected hardware', () => {
     const next = addConnectorsBetween(removed, ids, 2)
     expect(next.connectorOverrides?.[added.id]?.removed).toBe(true)
     expect(resolvePanels(next)).toEqual(resolvePanels(rotated))
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
   })
   it('checks endpoint selection, matching finish, and assembly ownership', () => {
     const { project, ids } = fixture()

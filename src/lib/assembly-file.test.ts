@@ -1,10 +1,11 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssemblyFile, parseAssemblyFile } from './assembly-file'
 import { ASSEMBLY_LIBRARY, insertAssemblyDefinition } from './assembly-library'
 import { duplicateAssembly, getAssemblyAttachmentTargets, updateAssemblyFinish, updateAssemblyParameterValues } from './assemblies'
 import { getInsertionTargets } from './clipboard'
 import { createExampleProject } from './example-library'
-import { createStarterProject, getProjectBounds, parseProject, validateProject } from './model'
+import { createStarterProject, getProjectBounds, validateProject } from './model'
 
 describe('assembly files', () => {
   it.each(ASSEMBLY_LIBRARY)('$name round trips into an existing build as an independent design', example => {
@@ -21,7 +22,7 @@ describe('assembly files', () => {
     const again = insertAssemblyDefinition(inserted, parseAssemblyFile(file))
     expect(again.assemblies!.definitions).toHaveLength(2)
     expect(new Set(again.panels.map(panel => panel.id)).size).toBe(again.panels.length)
-    expect(parseProject(JSON.parse(JSON.stringify(again)))).toEqual(again)
+    expect(roundTripProject(again)).toEqual(again)
     expect(validateProject(again)).toEqual([])
     expect(source).toEqual(snapshot)
   })
@@ -40,7 +41,7 @@ describe('assembly files', () => {
     expect(getProjectBounds(imported.panels).min[1]).toBeCloseTo(0)
     const resized = updateAssemblyParameterValues(imported, imported.assemblies!.instances[0].id, { 'side-length': 500 })
     expect(resized.panels.every(panel => panel.width === 500 && panel.height === 500)).toBe(true)
-    expect(parseProject(JSON.parse(JSON.stringify(resized)))).toEqual(resized)
+    expect(roundTripProject(resized)).toEqual(resized)
   })
 
   it('restores standalone corners when exporting an assembly connected to a neighbor', () => {
@@ -54,7 +55,7 @@ describe('assembly files', () => {
     expect(targets.some(target => target.project)).toBe(true)
     const placed = targets.find(target => target.project && !target.warning)!.project!
     expect(placed.assemblies!.definitions).toHaveLength(2)
-    expect(parseProject(JSON.parse(JSON.stringify(placed)))).toEqual(placed)
+    expect(roundTripProject(placed)).toEqual(placed)
   })
 
   it('rejects wrong files, unsupported versions and broken references before insertion', () => {

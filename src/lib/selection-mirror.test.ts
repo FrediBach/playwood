@@ -1,8 +1,9 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Euler, Vector3 } from 'three'
 import { createAssembly, duplicateAssembly, getAssemblyAttachmentTargets, materializeAssemblies } from './assemblies'
 import { gridProject } from './example-geometry'
-import { attachPanel, createPanel, createStarterProject, getConnectorPlacements, getProjectBounds, parseProject, resolvePanels } from './model'
+import { attachPanel, createPanel, createStarterProject, getConnectorPlacements, getProjectBounds, resolvePanels } from './model'
 import { mirrorSelection } from './selection-mirror'
 import type { Project, RotationAxis, Side } from './types'
 
@@ -44,7 +45,7 @@ describe('selection mirroring', () => {
     expectMirror(next, restored, axis)
     resolvePanels(restored).forEach((panel, i) => panel.position.forEach((value, j) => expect(value).toBeCloseTo(resolvePanels(project)[i].position[j], 5)))
     expect(restored.connections).toEqual(project.connections)
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     expect(project).toEqual(snapshot)
   })
 
@@ -79,13 +80,13 @@ describe('selection mirroring', () => {
     expect(next.assemblies!.instances[0].definitionId).not.toBe(selected.definitionId)
     expect(next.assemblies!.instances[1]).toBe(project.assemblies!.instances[1])
     expect(next.assemblies!.definitions[0]).toBe(project.assemblies!.definitions[0])
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     const rebuilt = materializeAssemblies(next)
     rebuilt.panels.forEach(panel => panel.position.forEach((value, j) => expect(value).toBeCloseTo(next.panels.find(p => p.id === panel.id)!.position[j], 5)))
     const linked = getAssemblyAttachmentTargets(original, selected.id).find(target => target.label === 'Top right' && target.project)!.project!
     const mirrored = mirrorSelection(linked, linked.panels.map(p => p.id), 'z')
     expectMirror(linked, mirrored, 'z')
-    expect(parseProject(JSON.parse(JSON.stringify(mirrored)))).toEqual(mirrored)
+    expect(roundTripProject(mirrored)).toEqual(mirrored)
   })
 
   it('mirrors insert faces horizontally and rejects turning an installed box upside down', () => {
@@ -94,7 +95,7 @@ describe('selection mirroring', () => {
     const project: Project = { version: 1, name: 'Insert', panels: [panel], connections: [] }
     const mirrored = mirrorSelection(project, [panel.id], 'x')
     expect(mirrored.panels[0].trofastInserts![0]).toEqual({ ...panel.trofastInserts![0], face: -1 })
-    expect(parseProject(JSON.parse(JSON.stringify(mirrored)))).toEqual(mirrored)
+    expect(roundTripProject(mirrored)).toEqual(mirrored)
     expect(() => mirrorSelection(project, [panel.id], 'y')).toThrow(/upward/)
   })
 

@@ -1,8 +1,9 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { rescaleAssemblies } from './assembly-rescale'
 import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAttachmentTargets, materializeAssemblies, moveAssemblies, updateAssemblyParameterValues } from './assemblies'
 import { gridProject } from './example-geometry'
-import { parseProject, rotateProject, validateProject } from './model'
+import { rotateProject, validateProject } from './model'
 import { resizePanelDimensions } from './structure-edit'
 import { getRescaleValues, rescaleProject } from './project-rescale'
 import type { AssemblyParameter, Panel, Project } from './types'
@@ -30,7 +31,7 @@ const resize = (from: number, to: number) => (project: Project): Project => {
 }
 const valid = (project: Project) => {
   expect(validateProject(project)).toEqual([])
-  expect(() => parseProject(JSON.parse(JSON.stringify(project)))).not.toThrow()
+  expect(() => roundTripProject(project)).not.toThrow()
   const rebuilt = materializeAssemblies(project)
   expect(rebuilt.assemblies).toEqual(project.assemblies)
   expect(rebuilt.connections).toEqual(project.connections)

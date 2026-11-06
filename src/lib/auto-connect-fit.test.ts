@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import extendedCorner from './fixtures/everyday-shelf-extended-corner.json'
 import { describe, expect, it } from 'vitest'
 import { Vector3 } from 'three'
@@ -49,7 +50,7 @@ describe('automatic connector fit proposals', () => {
     const afterPositions = positions(fit.result.project)
     for (const piece of positions(project)) expect(afterPositions.find(item => item.id === piece.id)!.position.distanceTo(piece.position)).toBeLessThan(1e-6)
     expect(validateProject(fit.result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(fit.result.project)))).toEqual(JSON.parse(JSON.stringify(fit.result.project)))
+    expect(roundTripProject(fit.result.project)).toEqual(JSON.parse(JSON.stringify(fit.result.project)))
     expect(project).toEqual(before)
     expect(getAutoConnectFit(fit.result.project, ['small', 'top'])).toBeNull()
   })
@@ -111,7 +112,7 @@ describe('extended corner shelf fitting', () => {
       }
       expect(project).toEqual(before)
       expect(getAutoConnectFit(next, ids)).toBeNull()
-      project = parseProject(JSON.parse(JSON.stringify(next)))
+      project = roundTripProject(next)
     }
   })
 

@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import fixture from '../../tests/fixtures/everyday-shelf-angled-opening.json'
 import { closePanelHole, findPanelHoles } from './close-holes'
@@ -62,7 +63,7 @@ describe('imported split-side rectangular opening', () => {
   it('keeps the split-edge supports fitted when the upper shelf changes width after reload', () => {
     const source = parseProject(fixture)
     const closed = closePanelHole(source, upperIds(source), upperHoles(source)[0].id)
-    const loaded = parseProject(JSON.parse(JSON.stringify(closed.project)))
+    const loaded = roundTripProject(closed.project)
     const top = loaded.panels.find(panel => panel.name === 'Top shelf')!
     const originalFill = loaded.panels.find(panel => panel.id === closed.panelId)!
     const resized = resizePanels(loaded, [top.id], { width: top.width + 80 })

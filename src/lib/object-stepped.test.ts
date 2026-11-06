@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { outlineWorldPoints } from './outline-closures'
 import { expect, it } from 'vitest'
@@ -75,7 +76,7 @@ it.each([fixture, doubleFixture].flatMap(input => [16, 17, 18, 19].map(thickness
         if (next && !reached.has(next)) { reached.add(next); queue.push(next) }
       }
       expect(reached.size).toBe(panels.length)
-      expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(JSON.parse(JSON.stringify(result.project)))
+      expect(roundTripProject(result.project)).toEqual(JSON.parse(JSON.stringify(result.project)))
       expect(result.project.constructionObjects!.nodes.find(n => n.id === objects.roots[0])!.visible).toBe(false)
       source.constructionObjects = rotateConstructionSelection(objects, objects.roots, axis)
     }

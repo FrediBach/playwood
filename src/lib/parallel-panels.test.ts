@@ -1,5 +1,6 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
-import { createPanel, createStarterProject, getProjectBounds, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { createPanel, createStarterProject, getProjectBounds, resolvePanels, rotateProject, validateProject } from './model'
 import { parallelPanelCut, parallelPanelSplitCounts, splitParallelPanels } from './parallel-panels'
 import { gridProject } from './example-geometry'
 import type { Project } from './types'
@@ -19,7 +20,7 @@ describe('split parallel panels', () => {
     expect(result.project.connections.every(c => c.type === 't')).toBe(true)
     expect(validateProject(result.project)).toEqual([])
     expect(getProjectBounds(result.project.panels)).toEqual(getProjectBounds(original.panels))
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     expect(original).toEqual(before)
   })
   it('preserves outer joints and unselected panels in the starter shelf', () => {

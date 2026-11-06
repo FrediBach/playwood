@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three'
 import { createPanel, getConnectorSeam, parseProject, validateProject } from './model'
@@ -51,7 +52,7 @@ describe('outline edge supports', () => {
     expect(project.connections).toHaveLength(5)
     expect(new Set(project.connections.map(connection => connection.outlineEdge))).toEqual(new Set([0, 1, 2, 3, 4]))
     expect(validateProject(project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project)
+    expect(roundTripProject(project)).toEqual(project)
     const joint = project.connections.find(connection => connection.outlineEdge === 2)!
     const parent = project.panels.find(item => item.id === joint.parentId)!
     const seam = getConnectorSeam(joint, parent, panel)

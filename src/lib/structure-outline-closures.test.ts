@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Vector3 } from 'three'
 import { closePanelHole, findPanelHoles } from './close-holes'
@@ -33,7 +34,7 @@ describe('fitted outline constraints', () => {
     const snapshot = structuredClone(project)
     const original = project.panels.find(panel => panel.id === panelId)!
     const top = project.panels.find(panel => panel.id === 'rim-3')!
-    const next = resizePanels(parseProject(JSON.parse(JSON.stringify(project))), [top.id], { width: top.width + 100 })
+    const next = resizePanels(roundTripProject(project), [top.id], { width: top.width + 100 })
     const fill = expectFitted(next, panelId)
     expect(next.panels.find(panel => panel.id === top.id)!.width).toBeCloseTo(top.width + 100, 5)
     expect(fill.customOutline).not.toEqual(original.customOutline)

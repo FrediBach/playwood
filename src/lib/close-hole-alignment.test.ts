@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Vector3 } from 'three'
 import fixture from '../../tests/fixtures/everyday-shelf-angled-opening.json'
@@ -67,7 +68,7 @@ describe('reviewed hole edge alignment', () => {
       expect(outlineConnectionAligned(after.find(panel => panel.id === joint.parentId)!, movedCap, joint)).toBe(true)
     }
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project))).connections).toEqual(result.project.connections)
+    expect(roundTripProject(result.project).connections).toEqual(result.project.connections)
     const polygon = findPanelHoles(after).find(hole => hole.label.startsWith('Front') && hole.panel.customOutline?.length === 5)!
     expect(polygon).toBeDefined()
     const filled = closePanelHole(result.project, after.map(panel => panel.id), polygon.id)

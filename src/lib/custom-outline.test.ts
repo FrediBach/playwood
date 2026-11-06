@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { attachPanel, createPanel, duplicatePanel, parseProject, projectToCsv, resolvePanels, rotateProject, validateProject } from './model'
 import { createAssembly, duplicateAssembly, updateAssemblyDefinition } from './assemblies'
@@ -16,7 +17,7 @@ const project = (): Project => ({ version: 1, name: 'Outline study', connections
 describe('custom outline project data', () => {
   it('round trips outlines without changing legacy panels', () => {
     const original = project()
-    expect(parseProject(JSON.parse(JSON.stringify(original)))).toEqual(original)
+    expect(roundTripProject(original)).toEqual(original)
     const loaded = parseProject(original)
     expect(loaded.panels[0].customOutline).toEqual(outline)
     expect(loaded.panels[0].customOutline).not.toBe(original.panels[0].customOutline)
@@ -80,13 +81,13 @@ describe('custom outline project data', () => {
     const edited = updateAssemblyDefinition(assembled, instance.id, { customOutline: outline }, [definitionPanelId])
     const affected = edited.assemblies!.instances.map(item => item.panelIds[definitionPanelId])
     expect(edited.panels.filter(panel => affected.includes(panel.id)).every(panel => JSON.stringify(panel.customOutline) === JSON.stringify(outline))).toBe(true)
-    expect(parseProject(JSON.parse(JSON.stringify(edited)))).toEqual(edited)
+    expect(roundTripProject(edited)).toEqual(edited)
     const tampered = structuredClone(edited)
     delete tampered.panels.find(panel => panel.id === affected[0])!.customOutline
     expect(() => parseProject(tampered)).toThrow('match their source')
     const removed = updateAssemblyDefinition(edited, instance.id, { customOutline: undefined }, [definitionPanelId])
     expect(removed.panels.every(panel => panel.customOutline === undefined)).toBe(true)
-    expect(parseProject(JSON.parse(JSON.stringify(removed)))).toEqual(removed)
+    expect(roundTripProject(removed)).toEqual(removed)
   })
 
   it('keeps custom shapes intact instead of applying rectangular stock splitting', () => {

@@ -77,6 +77,7 @@ test('finish fades rendered grain to solid color and survives undo, save and exp
 
   await slider.press('End')
   await expect(slider).toHaveValue('100')
+  await expect(slider).toBeFocused()
   await expect.poll(() => faceVariation(page)).toBeLessThan(0.5)
   await page.screenshot({ path: 'test-results/finish-solid.png' })
   const exported = await exportProject(page)
@@ -94,6 +95,25 @@ test('finish fades rendered grain to solid color and survives undo, save and exp
   await expect(page.getByLabel(/^Realistic furniture preview/)).toBeVisible()
   await expect(page.getByRole('alert')).not.toBeVisible()
   expect(errors).toEqual([])
+})
+
+test('canceling a finish drag discards its draft without creating an undo step', async ({ page }) => {
+  await page.goto('/')
+  await importProject(page, { version: 1, name: 'Cancel finish', connections: [], panels: [createPanel({ finishCoverage: 0.25 })] })
+  await openInspectorSection(page, 'Material & finish')
+  const slider = page.getByRole('slider', { name: 'Finish coverage' })
+  await slider.press('End')
+  await expect(slider).toHaveValue('100')
+  await slider.scrollIntoViewIfNeeded()
+  const box = (await slider.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await expect(slider).toHaveValue('50')
+  await slider.dispatchEvent('pointercancel')
+  await page.mouse.up()
+  await expect(slider).toHaveValue('100')
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect(slider).toHaveValue('25')
 })
 
 test('shared finishes update together and painted boards remain solid', async ({ page }) => {

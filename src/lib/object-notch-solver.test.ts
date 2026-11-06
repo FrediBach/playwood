@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { expect, it } from 'vitest'
 import fixture from '../../tests/fixtures/corner-cut-shelf.json'
 import { getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
@@ -40,7 +41,7 @@ it.each([16, 17, 18, 19])('preserves cutouts and envelope at %s mm through quart
       expect(panels.every(p => !p.customOutline && p.thickness === thickness)).toBe(true)
       expect(validateProject(result.project)).toEqual([])
       expect(overlappingConnectorIds(result.project).size).toBe(0)
-      expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(JSON.parse(JSON.stringify(result.project)))
+      expect(roundTripProject(result.project)).toEqual(JSON.parse(JSON.stringify(result.project)))
       const hardware = getPhysicalConnectors(result.project)
       expect(panels.every(p => hardware.filter(h => h.connection.parentId === p.id || h.connection.childId === p.id).length >= 2)).toBe(true)
       expect(result.project.constructionObjects!.nodes.find(n => n.id === objects.roots[0])!.visible).toBe(false)

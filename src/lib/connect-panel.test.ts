@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Vector3 } from 'three'
 import { connectSelectedConnectors, getConnectorPanelFit } from './connect-panel'
@@ -41,7 +42,7 @@ describe('connect selected connectors with a panel', () => {
     expectSamePositions(positions(result.project), positions(project))
     expect(getPhysicalConnectors(result.project).every(piece => piece.type === 't' && piece.color === '#ff0000')).toBe(true)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     expect(getConnectorPanelFit(result.project, getPhysicalConnectors(result.project).map(piece => piece.id)).result).toBeUndefined()
   })
 
@@ -63,7 +64,7 @@ describe('connect selected connectors with a panel', () => {
     const first = connectSelectedConnectors(project, ids)
     expect(Object.hasOwn(first.project.panels.at(-1)!, 'finishCoverage')).toBe(false)
     expect(validateProject(first.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(first.project)))).toEqual(first.project)
+    expect(roundTripProject(first.project)).toEqual(first.project)
     const second = connectSelectedConnectors(first.project, getPhysicalConnectors(first.project).map(piece => piece.id))
     expect(second.project.panels).toHaveLength(4)
     expect(validateProject(second.project)).toEqual([])

@@ -1,6 +1,7 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { convertConstructionObject, objectConversionReason, type ObjectConversionOptions } from './object-conversion'
-import { createPanel, createStarterProject, getProjectBounds, parseProject, removePanel, resolvePanels, validateProject } from './model'
+import { createPanel, createStarterProject, getProjectBounds, removePanel, resolvePanels, validateProject } from './model'
 import { constructionBoxBounds } from './object-geometry'
 import { addConstructionBox, combineConstructionObjects } from './construction-objects'
 import { getPhysicalConnectors } from './connector-selection'
@@ -31,7 +32,7 @@ describe('box conversion transaction', () => {
     expect(project).toEqual(before)
     const opened = removePanel(result.project, result.panelIds[0])
     expect(resolvePanels(opened)).toEqual(resolvePanels(result.project).filter(p => p.id !== result.panelIds[0]))
-    expect(parseProject(JSON.parse(JSON.stringify(opened))).constructionObjects).toEqual(result.project.constructionObjects)
+    expect(roundTripProject(opened).constructionObjects).toEqual(result.project.constructionObjects)
   })
   it('preserves unrelated existing furniture and rejects collisions, including hidden stock', () => {
     const { project, id, box } = source()
@@ -57,6 +58,9 @@ describe('box conversion transaction', () => {
     expect(objectConversionReason(combined.project, [id])).toMatch(/top-level/)
     expect(objectConversionReason(next.project, [id, next.objectId])).toBeUndefined()
     expect(objectConversionReason(next.project, [id, id])).toMatch(/top-level/)
+    expect(objectConversionReason(next.project, [])).toMatch(/top-level/)
+    expect(objectConversionReason(next.project, ['missing'])).toMatch(/top-level/)
+    expect(objectConversionReason(createStarterProject('blank'), [id])).toMatch(/top-level/)
   })
   it('rejects new violations of build space before acceptance', () => {
     const { project, id } = source()
@@ -149,7 +153,7 @@ describe('disconnected Boolean pieces', () => {
     const left = getProjectBounds(resolved.slice(0, 6)), right = getProjectBounds(resolved.slice(6))
     expect(right.min[0] - left.max[0]).toBeCloseTo(operation === 'union' ? 300 : 200, 6)
     expect(validateProject(result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project))).panels).toHaveLength(12)
+    expect(roundTripProject(result.project).panels).toHaveLength(12)
     expect(source).toEqual(before)
   })
   it('rejects a later unbuildable piece without returning the valid first piece', () => {

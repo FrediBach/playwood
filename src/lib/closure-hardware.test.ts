@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import fixture from '../../tests/fixtures/everyday-shelf-angled-opening.json'
 import { closePanelHole, findClosingPanelHoles } from './close-holes'
@@ -38,7 +39,7 @@ describe('closing-panel hardware clearance', () => {
     expectRetainedHardware(source, closed)
     expect(getPhysicalConnectors(closed)).toHaveLength(getPhysicalConnectors(source).length + 8)
     expect(validateProject(closed)).toEqual([])
-    const loaded = parseProject(JSON.parse(JSON.stringify(closed)))
+    const loaded = roundTripProject(closed)
     expect(overlappingHardware(loaded)).toEqual([])
     expect(installedHardware(loaded).map(piece => piece.origin.toArray())).toEqual(installedHardware(closed).map(piece => piece.origin.toArray()))
     expect(source).toEqual(snapshot)
@@ -56,7 +57,7 @@ describe('closing-panel hardware clearance', () => {
       expect(overlappingHardware(project)).toEqual(existingOverlaps)
       expectRetainedHardware(source, project)
     }
-    const loaded = parseProject(JSON.parse(JSON.stringify(project)))
+    const loaded = roundTripProject(project)
     expect(overlappingHardware(loaded)).toEqual(existingOverlaps)
     expectRetainedHardware(source, loaded)
     expect(source).toEqual(snapshot)
@@ -120,6 +121,6 @@ describe('closing-panel hardware clearance', () => {
     expect(overlappingHardware(closed)).toEqual([])
     expectRetainedHardware(source, closed)
     expect(validateProject(closed)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(closed)))).toEqual(closed)
+    expect(roundTripProject(closed)).toEqual(closed)
   })
 })

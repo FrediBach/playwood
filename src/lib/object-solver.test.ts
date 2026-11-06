@@ -1,7 +1,8 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { overlappingConnectorIds } from './connector-clearance'
 import { getPhysicalConnectors } from './connector-selection'
-import { getProjectBounds, parseProject, removePanel, resolvePanels, validateProject } from './model'
+import { getProjectBounds, removePanel, resolvePanels, validateProject } from './model'
 import { solveCuboid } from './object-solver'
 
 describe('cuboid object solver proof', () => {
@@ -17,7 +18,7 @@ describe('cuboid object solver proof', () => {
     expect(getPhysicalConnectors(project)).toHaveLength(24)
     expect(overlappingConnectorIds(project).size).toBe(0)
     expect(validateProject(project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(project))).panels).toEqual(project.panels)
+    expect(roundTripProject(project).panels).toEqual(project.panels)
   })
 
   it('allows removing any face without moving the remaining construction or mutating the source', () => {
@@ -28,7 +29,7 @@ describe('cuboid object solver proof', () => {
       expect(resolvePanels(opened)).toEqual(project.panels.filter(panel => panel.id !== face.id))
       expect(opened.connections).toHaveLength(8)
       expect(validateProject(opened)).toEqual([])
-      expect(parseProject(JSON.parse(JSON.stringify(opened))).panels).toHaveLength(5)
+      expect(roundTripProject(opened).panels).toHaveLength(5)
     }
     expect(project).toEqual(before)
   })

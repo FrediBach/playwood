@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createStarterProject, parseProject, projectToCsv, resolvePanels } from './model'
 import { editConnectors, getPhysicalConnectors } from './connector-selection'
@@ -13,7 +14,7 @@ describe('physical connector edits', () => {
     expect(getPhysicalConnectors(edited).find(connector => connector.id === selected.id)).toMatchObject({ color: '#123456', type: 'cross' })
     expect(getPhysicalConnectors(edited).filter(connector => connector.id !== selected.id)).toEqual(original.filter(connector => connector.id !== selected.id))
     expect(resolvePanels(edited)).toEqual(resolvePanels(project))
-    expect(parseProject(JSON.parse(JSON.stringify(edited)))).toEqual(edited)
+    expect(roundTripProject(edited)).toEqual(edited)
     expect(projectToCsv(edited)).toContain('"Playwood Cross connector","1"')
   })
   it('removes a selection without removing panels or repositioning remaining pieces', () => {
@@ -22,7 +23,7 @@ describe('physical connector edits', () => {
     const removed = editConnectors(project, original.slice(0, 3).map(connector => connector.id), { removed: true })
     expect(getPhysicalConnectors(removed)).toEqual(original.slice(3))
     expect(resolvePanels(removed)).toEqual(resolvePanels(project))
-    expect(getPhysicalConnectors(parseProject(JSON.parse(JSON.stringify(removed))))).toHaveLength(original.length - 3)
+    expect(getPhysicalConnectors(roundTripProject(removed))).toHaveLength(original.length - 3)
     expect(getPhysicalConnectors(project)).toHaveLength(original.length)
   })
   it('retains edits when an assembly is materialized again', () => {
@@ -31,7 +32,7 @@ describe('physical connector edits', () => {
     const selected = getPhysicalConnectors(project).slice(0, 2).map(connector => connector.id)
     const edited = editConnectors(project, selected, { color: '#123456' })
     expect(getPhysicalConnectors(materializeAssemblies(edited))).toEqual(getPhysicalConnectors(edited))
-    expect(parseProject(JSON.parse(JSON.stringify(edited)))).toEqual(edited)
+    expect(roundTripProject(edited)).toEqual(edited)
   })
   it('rejects malformed persisted hardware', () => {
     const project = createStarterProject('shelf')
@@ -44,7 +45,7 @@ describe('physical connector edits', () => {
     const project = createStarterProject('shelf')
     const corners = getPhysicalConnectors(project).filter(piece => piece.type === '90')
     const edited = editConnectors(project, [corners[0].id, corners[1].id], { material: 'metal' })
-    expect(parseProject(JSON.parse(JSON.stringify(edited)))).toEqual(edited)
+    expect(roundTripProject(edited)).toEqual(edited)
     expect(getPhysicalConnectors(edited).filter(piece => piece.material === 'metal')).toHaveLength(2)
     expect(resolvePanels(edited)).toEqual(resolvePanels(project))
     const csv = projectToCsv(edited)
@@ -70,7 +71,7 @@ describe('physical connector edits', () => {
     expect(getPhysicalConnectors(parseProject(project)).every(piece => piece.material === 'plastic')).toBe(true)
     const corner = project.connections.find(connection => connection.type === '90')!
     corner.material = 'metal'
-    const parsed = parseProject(JSON.parse(JSON.stringify(project)))
+    const parsed = roundTripProject(project)
     expect(parsed.connections.find(connection => connection.id === corner.id)?.material).toBe('metal')
     const assembly = createAssembly(parsed, parsed.panels.map(panel => panel.id), 'Metal corners')
     expect(getPhysicalConnectors(parseProject(materializeAssemblies(assembly))).filter(piece => piece.material === 'metal')).toHaveLength(corner.count)

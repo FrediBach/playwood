@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import fixtures from './fixtures/legacy-example-inserts.json'
 import { EXAMPLE_LIBRARY, createExampleProject } from './example-library'
@@ -19,7 +20,7 @@ describe('saved library insert repairs', () => {
     expect(project).toEqual(original)
     expect(shapes(repaired)).toEqual(shapes(createExampleProject(id)))
     expect(repaired.connections).toBe(project.connections)
-    expect(parseProject(JSON.parse(JSON.stringify(repaired)))).toEqual(repaired)
+    expect(roundTripProject(repaired)).toEqual(repaired)
     expect(validateProject(repaired)).toEqual([])
     expect(repairLegacyExampleInserts(repaired)).toBe(repaired)
   })
@@ -72,7 +73,7 @@ describe('saved library insert repairs', () => {
     expect(repaired.panels.find(panel => panel.id === shelf.id)?.width).toBe(355)
     expect(repaired.panels.slice(-2).map(panel => [panel.material, panel.color])).toEqual([['walnut', '#123456'], ['walnut', '#123456']])
     expect(repaired.panels.slice(-2).map(panel => panel.finishCoverage)).toEqual([0.7, 0.7])
-    expect(parseProject(JSON.parse(JSON.stringify(repaired)))).toEqual(repaired)
+    expect(roundTripProject(repaired)).toEqual(repaired)
   })
 
   it.each(['structural size', 'insert size', 'position', 'rotation', 'missing panel', 'extra panel', 'connection'])("leaves custom %s changes alone", change => {

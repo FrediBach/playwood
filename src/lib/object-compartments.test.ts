@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { expect, it } from 'vitest'
 import { solveCuboidCompartments } from './object-compartments'
 import { getPhysicalConnectors } from './connector-selection'
@@ -12,7 +13,7 @@ it.each([0, 1, 2])('fits one shared wall along axis %s', axis => {
 })
 
 import { convertConstructionObject, type ObjectConversionOptions } from './object-conversion'
-import { createStarterProject, getProjectBounds, resolvePanels, validateProject, parseProject, removePanel } from './model'
+import { createStarterProject, getProjectBounds, resolvePanels, validateProject, removePanel } from './model'
 import type { ConstructionObject, Project } from './types'
 const options: ObjectConversionOptions = { thickness: 18, material: 'oak', color: '#123456', finishCoverage: .5, connectorColor: '#654321', connectorMaterial: 'plastic' }
 function sources(positions: number[]): Project {
@@ -28,7 +29,7 @@ it('converts separated roots atomically, hides only selected roots, and preserve
   expect(result.dimensions).toEqual([1800, 600, 400])
   expect(result.compartments.map(c => c.clearDimensions)).toEqual([[564, 564, 364], [564, 564, 364]])
   expect(result.project.constructionObjects!.nodes.map(n => n.visible)).toEqual([false, false, true])
-  expect(parseProject(JSON.parse(JSON.stringify(result.project))).panels).toHaveLength(12)
+  expect(roundTripProject(result.project).panels).toHaveLength(12)
   expect(source).toEqual(before)
 })
 it.each([18, 19])('retains a single divider with %s mm stock, unlike a union shell', thickness => {
@@ -75,7 +76,7 @@ it('normalizes T hardware to plastic and preserves metal right-angle hardware on
   const result = convertConstructionObject(source, source.constructionObjects!.roots, { ...options, connectorMaterial: 'metal' })
   expect(result.project.connections.filter(c => c.type === 't').every(c => c.material === 'plastic')).toBe(true)
   expect(result.project.connections.filter(c => c.type === '90').every(c => c.material === 'metal')).toBe(true)
-  expect(parseProject(JSON.parse(JSON.stringify(result.project))).connections).toEqual(result.project.connections)
+  expect(roundTripProject(result.project).connections).toEqual(result.project.connections)
 })
 
 it.each([0, 1, 2])('fits an unequal three-compartment row along axis %s with two complete dividers', axis => {
@@ -92,7 +93,7 @@ it.each([0, 1, 2])('fits an unequal three-compartment row along axis %s with two
   expect(getPhysicalConnectors(project).filter(p => p.type === 't')).toHaveLength(16)
   expect(project.panels.filter(p => p.name === 'Shared divider').map(p => p.position[axis]).sort((a, b) => a - b)).toEqual([-100, 500])
   expect(validateProject(project)).toEqual([])
-  expect(parseProject(JSON.parse(JSON.stringify(project))).panels).toHaveLength(16)
+  expect(roundTripProject(project).panels).toHaveLength(16)
 })
 it.each([18, 19])('reports the different clear dimensions of middle and end compartments at %s mm', thickness => {
   const source = sources([0, 600, 1200, 3000]), before = structuredClone(source)

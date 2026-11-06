@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { attachPanel, createPanel, getConnectionAnchors, parseProject, projectToCsv, validateProject } from './model'
 import { getOutlineError, panelCornerRadius, panelOutlineCorners, panelOutlineSvgPath } from './panel-shape'
@@ -16,7 +17,7 @@ describe('rounded panels', () => {
     delete p.panels[0].cornerRadius
     expect(parseProject(p).panels[0].cornerRadius).toBe(0)
     p.panels[0].cornerRadius = 60
-    expect(parseProject(JSON.parse(JSON.stringify(p))).panels[0].cornerRadius).toBe(60)
+    expect(roundTripProject(p).panels[0].cornerRadius).toBe(60)
     expect(projectToCsv(p)).toContain('Corner radius (mm)')
     p.panels[0].cornerRadius = -1
     expect(() => parseProject(p)).toThrow('corner radius')

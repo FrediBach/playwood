@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createPanel, duplicatePanel, parseProject, projectToCsv } from './model'
 import { createAssembly, duplicateAssembly, resetAssemblyFinish, updateAssemblyDefinition, updateAssemblyFinish } from './assemblies'
@@ -11,7 +12,7 @@ const project = (material: Material): Project => ({
   version: 1, name: 'Panel material study', connections: [],
   panels: [createPanel({ id: 'source', material, width: 250, height: 250, position: [-1000, 500, 0], finishCoverage: 0.35 })],
 })
-const saved = (value: Project) => parseProject(JSON.parse(JSON.stringify(value)))
+const saved = (value: Project) => roundTripProject(value)
 
 describe.each(['osb', 'nazena'] as const)('%s panels', material => {
   it('uses its catalogue color and round trips natural, tinted, and solid finishes', () => {

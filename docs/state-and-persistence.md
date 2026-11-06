@@ -113,6 +113,8 @@ Several forms intentionally have a narrower transaction boundary than the projec
 - [PaletteManager.tsx](../src/components/PaletteManager.tsx) edits a color locally and calls the project palette callbacks only on Save. Those callbacks can replace uses of that color across panels, definition panels, and instance finish overrides.
 - [fields.tsx](../src/components/fields.tsx) supports fields whose numeric drafts commit on blur/Enter, avoiding partially typed dimensions becoming geometry operations.
 
+`FinishCoverageField` keeps only an active slider draft separate from the committed coverage. Changes to coverage or availability discard the draft during rendering, preserving the input and its keyboard focus. Release, key-up, or blur commits once; pointer cancellation discards the draft without a history entry.
+
 ## Selection and editing modes
 
 Panel selection uses panel IDs. Physical connector selection uses the serialized ID for a connection and placement index, as defined by [connector-selection.ts](../src/lib/connector-selection.ts). A connection can produce several independently selectable pieces of hardware.

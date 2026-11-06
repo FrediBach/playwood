@@ -1,8 +1,9 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { createAssembly, duplicateAssembly, getAssemblyAttachmentTargets, materializeAssemblies, updateAssemblyFinish } from './assemblies'
 import { gridProject } from './example-geometry'
-import { attachPanel, createPanel, createStarterProject, getConnectorPlacements, getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
+import { attachPanel, createPanel, createStarterProject, getConnectorPlacements, getProjectBounds, resolvePanels, validateProject } from './model'
 import { rotateSelection } from './selection-rotation'
 import type { Panel, Project, RotationAxis, Vec3 } from './types'
 
@@ -100,7 +101,7 @@ describe('selection rotation', () => {
     expect(next.assemblies!.definitions).toBe(project.assemblies!.definitions)
     expect(next.connections).toBe(project.connections)
     for (const panel of project.panels.filter(panel => !ids.includes(panel.id))) expect(next.panels.find(item => item.id === panel.id)).toBe(panel)
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     const rebuilt = materializeAssemblies(next)
     next.panels.forEach(panel => {
       const current = rebuilt.panels.find(item => item.id === panel.id)!
@@ -118,7 +119,7 @@ describe('selection rotation', () => {
     const next = rotateSelection(project, project.panels.map(panel => panel.id), 'y')
     expect(next.assemblies!.links).toBe(project.assemblies!.links)
     expect(validateProject(next)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
   })
 
   it('preserves no-op selections and rejects invalid angles or out-of-range placement atomically', () => {

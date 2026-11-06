@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createPanel, createStarterProject, parseProject, resolvePanels } from './model'
 import { createListGroup, moveListItems, orderedConnectors, renameListGroup, ungroupList } from './list-groups'
@@ -39,7 +40,7 @@ describe('list organization', () => {
     let project = createListGroup(original, 'panels', [original.panels[0].id], 'panels')
     project = createListGroup(project, 'connectors', [getPhysicalConnectors(project)[0].id], 'connectors')
     project = renameListGroup(project, 'panels', '  Shelves  ')
-    const parsed = parseProject(JSON.parse(JSON.stringify(project)))
+    const parsed = roundTripProject(project)
     expect(parsed.listGroups).toEqual(project.listGroups)
     expect(parsed.connectorOrder).toEqual(project.connectorOrder)
     expect(parsed.listGroups![0].name).toBe('Shelves')

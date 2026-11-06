@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { connectClosingPanel } from './closure-connectors'
@@ -47,7 +48,7 @@ describe('shared T joints between fitted outlines', () => {
       expect(Math.abs(new Quaternion().setFromEuler(new Euler(...poses[index].rotation)).dot(turn))).toBeCloseTo(1, 7)
     }
     expect(validateProject(project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project)
+    expect(roundTripProject(project)).toEqual(project)
     expect(installedHardware(project)).toHaveLength(2)
   })
 
@@ -80,7 +81,7 @@ describe('shared T joints between fitted outlines', () => {
     expect(project.connections.map(connection => connection.count)).toEqual([1, 0])
     expect(installedHardware(project)).toHaveLength(1)
     expect(validateProject(project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project)
+    expect(roundTripProject(project)).toEqual(project)
   })
 
   it('reshapes both adjoining outlines when their shared rim is resized', () => {
@@ -105,6 +106,6 @@ describe('shared T joints between fitted outlines', () => {
     }
     expect(resized.connections.map(connection => connection.id)).toEqual(project.connections.map(connection => connection.id))
     expect(validateProject(resized)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(resized)))).toEqual(resized)
+    expect(roundTripProject(resized)).toEqual(resized)
   })
 })

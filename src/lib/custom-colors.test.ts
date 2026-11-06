@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { addCustomColor, ensureProjectPalette, getColorUsage, getProjectPalette, MAX_CUSTOM_COLORS, parseCustomColors, removeCustomColor, updateCustomColor } from './custom-colors'
 import { COLORS, MATERIALS } from './materials'
@@ -7,7 +8,7 @@ import { gridProject } from './example-geometry'
 import type { PaletteColor, Project } from './types'
 
 const swatch = (color = '#123456', name = 'Ocean', id = 'ocean'): PaletteColor => ({ id, name, color })
-const saved = (project: Project) => parseProject(JSON.parse(JSON.stringify(project)))
+const saved = (project: Project) => roundTripProject(project)
 const withColor = (): Project => ({ ...createStarterProject('blank'), customColors: [swatch()] })
 
 function coloredAssemblies() {

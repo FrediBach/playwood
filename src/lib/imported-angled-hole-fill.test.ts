@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import fixture from '../../tests/fixtures/everyday-shelf-angled-opening.json'
 import { closePanelHole, findClosingPanelHoles, findPanelHoles } from './close-holes'
@@ -88,7 +89,7 @@ describe('imported angled opening with uneven rim depths', () => {
   it('keeps the aligned outline fitted when its top panel is resized after reload', () => {
     const project = parseProject(fixture), hole = holesFor(project).find(hole => hole.label === 'Front')!
     const closed = closePanelHole(project, idsFor(project, angledNames), hole.id)
-    const loaded = parseProject(JSON.parse(JSON.stringify(closed.project)))
+    const loaded = roundTripProject(closed.project)
     const top = loaded.panels.find(panel => panel.name === 'Panel 8')!
     const originalFill = loaded.panels.find(panel => panel.id === closed.panelId)!
     const resized = resizePanels(loaded, [top.id], { width: top.width + 25 })

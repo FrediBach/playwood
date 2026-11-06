@@ -1,9 +1,10 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Euler, Vector3 } from 'three'
 import { createExampleProject, EXAMPLE_LIBRARY } from './example-library'
-import { getProjectBounds, parseProject, projectToCsv, resolvePanels, validateProject } from './model'
+import { getProjectBounds, projectToCsv, resolvePanels, validateProject } from './model'
 
 describe('resource example library', () => {
   it('offers each distinct connector build once, alongside the original starters', () => {
@@ -20,7 +21,7 @@ describe('resource example library', () => {
     const project = createExampleProject(example.id)
     expect(project.panels.length).toBeGreaterThan(0)
     expect(project.connections.length).toBeGreaterThan(0)
-    expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project)
+    expect(roundTripProject(project)).toEqual(project)
     expect(projectToCsv(project)).toContain('Playwood')
     const panels = resolvePanels(project)
     expect(panels.every(panel => [...panel.position, ...panel.rotation].every(Number.isFinite))).toBe(true)

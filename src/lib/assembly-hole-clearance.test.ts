@@ -1,10 +1,11 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssembly, getAssemblyAttachmentTargets, materializeAssemblies } from './assemblies'
 import { closePanelHole, findPanelHoles } from './close-holes'
 import { installedHardware, overlappingHardware } from './connector-hardware-test-helpers'
 import { connectorId, getPhysicalConnectors } from './connector-selection'
 import { gridProject } from './example-geometry'
-import { parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { resolvePanels, rotateProject, validateProject } from './model'
 
 describe('assembly hole connector clearance', () => {
   it('fits against materialized shared cross joints while retaining the neighboring linked instance', () => {
@@ -20,7 +21,7 @@ describe('assembly hole connector clearance', () => {
     expect(result.project.assemblies!.links).toEqual(original.assemblies!.links)
     expect(result.project.assemblies!.instances[1]).toEqual(original.assemblies!.instances[1])
     expect(overlappingHardware(result.project)).toEqual([])
-    const loaded = parseProject(JSON.parse(JSON.stringify(result.project)))
+    const loaded = roundTripProject(result.project)
     expect(materializeAssemblies(loaded)).toEqual(loaded)
     expect(validateProject(loaded)).toEqual([])
   })
@@ -33,7 +34,7 @@ describe('assembly hole connector clearance', () => {
     const added = result.project.connections.filter(connection => connection.parentId === result.panelId || connection.childId === result.panelId)
     expect(added.some(connection => connection.count === 1)).toBe(true)
     expect(overlappingHardware(result.project)).toEqual([])
-    const loaded = parseProject(JSON.parse(JSON.stringify(result.project)))
+    const loaded = roundTripProject(result.project)
     expect(materializeAssemblies(loaded)).toEqual(loaded)
     expect(validateProject(loaded)).toEqual([])
   })
@@ -65,7 +66,7 @@ describe('assembly hole connector clearance', () => {
       for (const [id, override] of Object.entries(original.connectorOverrides!)) expect(project.connectorOverrides?.[id]).toEqual(override)
       const oldIds = new Set(getPhysicalConnectors(original).map(piece => piece.id))
       expect(getPhysicalConnectors(project).some(piece => !oldIds.has(piece.id) && Math.abs(project.connectorOverrides?.[piece.id]?.slide ?? 0) > 1)).toBe(true)
-      const loaded = parseProject(JSON.parse(JSON.stringify(project)))
+      const loaded = roundTripProject(project)
       expect(loaded).toEqual(project)
       expect(materializeAssemblies(loaded)).toEqual(loaded)
       expect(overlappingHardware(loaded)).toEqual([])

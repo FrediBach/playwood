@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssembly, duplicateAssembly, updateAssemblyParameterValues } from './assemblies'
 import { createAssemblyFile, parseAssemblyFile } from './assembly-file'
@@ -61,6 +62,6 @@ describe('fitted outline lifecycle', () => {
     expect(duplicate.customOutline).toEqual(source.customOutline)
     expect(duplicate.customOutline).not.toBe(source.customOutline)
     expect(duplicated.connections.some(connection => connection.parentId === duplicate.id || connection.childId === duplicate.id)).toBe(false)
-    expect(parseProject(JSON.parse(JSON.stringify(duplicated))).panels.at(-1)!.customOutline).toEqual(source.customOutline)
+    expect(roundTripProject(duplicated).panels.at(-1)!.customOutline).toEqual(source.customOutline)
   })
 })

@@ -1,8 +1,9 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { ASSEMBLY_LIBRARY, insertLibraryAssembly } from './assembly-library'
 import { duplicateAssembly, getAssemblyAttachmentTargets, resetAssemblyParameterValues, updateAssemblyParameterValues } from './assemblies'
 import { createExampleProject } from './example-library'
-import { createStarterProject, getProjectBounds, parseProject, validateProject } from './model'
+import { createStarterProject, getProjectBounds, validateProject } from './model'
 
 describe('reusable assembly collection', () => {
   it.each(ASSEMBLY_LIBRARY)('$name can be opened, inserted, duplicated, and saved', example => {
@@ -21,7 +22,7 @@ describe('reusable assembly collection', () => {
     const duplicated = duplicateAssembly(inserted, instance.id)
     expect(duplicated.assemblies!.definitions).toHaveLength(1)
     expect(duplicated.assemblies!.instances).toHaveLength(2)
-    expect(parseProject(JSON.parse(JSON.stringify(duplicated)))).toEqual(duplicated)
+    expect(roundTripProject(duplicated)).toEqual(duplicated)
     expect(validateProject(duplicated).filter(issue => issue.severity === 'error' || issue.id.startsWith('collision'))).toEqual([])
     expect(getAssemblyAttachmentTargets(template, template.assemblies!.instances[0].id).some(target => target.project)).toBe(hasCorners)
   })
@@ -64,7 +65,7 @@ describe('configurable library modules', () => {
       expect(panel[binding.dimension]).toBeCloseTo(values[parameter.id] * binding.scale + binding.offset)
     }
     expect(validateProject(configured)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(configured)))).toEqual(configured)
+    expect(roundTripProject(configured)).toEqual(configured)
   })
 
   it('changes a cube side with one value while retaining its connectors and floor height', () => {

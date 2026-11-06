@@ -1,7 +1,8 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { expect, it } from 'vitest'
 import { cuboidGridLayout, solveCuboidGrid } from './object-grid'
 import type { ObjectBounds } from './object-geometry'
-import { createStarterProject, getProjectBounds, parseProject, removePanel, resolvePanels, validateProject } from './model'
+import { createStarterProject, getProjectBounds, removePanel, resolvePanels, validateProject } from './model'
 import { getPhysicalConnectors } from './connector-selection'
 
 it('fits a complete two by two grid', () => {
@@ -35,7 +36,7 @@ it.each([0, 1, 2])('fits unequal rows and columns with depth on axis %s', axis =
   expect(project.connections).toHaveLength(70)
   expect(getPhysicalConnectors(project).filter(piece => piece.type === 'cross')).toHaveLength(4)
   expect(validateProject(project)).toEqual([])
-  expect(parseProject(JSON.parse(JSON.stringify(project))).panels).toHaveLength(29)
+  expect(roundTripProject(project).panels).toHaveLength(29)
   const actual = getProjectBounds(resolvePanels(project))
   for (let i = 0; i < 3; i++) {
     expect(actual.min[i]).toBeCloseTo(0, 6)

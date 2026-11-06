@@ -1,7 +1,8 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { EXAMPLE_LIBRARY } from './example-library'
-import { createPanel, createStarterProject, getConnectorPlacements, getProjectBounds, parseProject, projectToCsv, resolvePanels, rotateProject, validateProject } from './model'
+import { createPanel, createStarterProject, getConnectorPlacements, getProjectBounds, projectToCsv, resolvePanels, rotateProject, validateProject } from './model'
 import type { Panel, Project, RotationAxis, Vec3 } from './types'
 
 const axes: RotationAxis[] = ['x', 'y', 'z']
@@ -79,7 +80,7 @@ describe('whole-creation rotation', () => {
     expect(extra.visible).toBe(false)
     expect(extra.position).not.toEqual(original.panels.at(-1)!.position)
     expect(turned.panels.map(p => p.id)).toEqual(original.panels.map(p => p.id))
-    const imported = parseProject(JSON.parse(JSON.stringify(turned)))
+    const imported = roundTripProject(turned)
     expect(resolvePanels(imported)).toEqual(resolvePanels(turned))
     expect(validateProject(imported)).toEqual(validateProject(original))
   })

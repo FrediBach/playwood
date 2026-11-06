@@ -1,8 +1,9 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { Vector3 } from 'three'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { describe, expect, it } from 'vitest'
-import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { attachPanel, createPanel, resolvePanels, rotateProject, validateProject } from './model'
 import { resizePanelEdge } from './structure-edit'
 import { getAutoConnectFit } from './auto-connect-fit'
 import { autoConnect } from './auto-connect'
@@ -44,7 +45,7 @@ describe('coordinated auto-connect fit', () => {
     for (const [id, position] of hardware(project)) expect(afterHardware.get(id)!.distanceTo(position)).toBeLessThan(1e-6)
     expect(fit!.result.connectors).toBe(2)
     expect(validateProject(fit!.result.project)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(fit!.result.project))).connections).toEqual(fit!.result.project.connections)
+    expect(roundTripProject(fit!.result.project).connections).toEqual(fit!.result.project.connections)
     expect(project).toEqual(before)
     expect(getAutoConnectFit(fit!.result.project, ['lower', 'upper'])).toBeNull()
   })

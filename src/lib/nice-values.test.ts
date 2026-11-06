@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssembly, getAssemblyAttachmentTargets, updateAssemblyParameterValues } from './assemblies'
 import { createAssemblyFile, parseAssemblyFile } from './assembly-file'
@@ -156,7 +157,7 @@ describe('nice-value project compatibility', () => {
   it('round-trips enabled and disabled settings without rounding derived geometry on load', () => {
     for (const enabled of [false, true]) {
       const project = { ...singlePanel(), niceValues: { enabled, step: 2.5 } }
-      expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project)
+      expect(roundTripProject(project)).toEqual(project)
     }
   })
 

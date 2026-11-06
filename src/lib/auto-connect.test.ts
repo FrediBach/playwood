@@ -1,6 +1,7 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { autoConnect } from './auto-connect'
-import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { attachPanel, createPanel, resolvePanels, rotateProject, validateProject } from './model'
 import { createExampleProject } from './example-library'
 import { Vector3 } from 'three'
 import { connectorSlide, getConnectorRail } from './connector-movement'
@@ -25,7 +26,7 @@ describe('auto-add connectors', () => {
     expect(loose).toEqual(before)
     expect(validateProject(result.project).filter(issue => issue.severity === 'error')).toEqual([])
     expect(autoConnect(result.project).joints).toBe(0)
-    expect(parseProject(JSON.parse(JSON.stringify(result.project))).panels).toEqual(before.panels)
+    expect(roundTripProject(result.project).panels).toEqual(before.panels)
   })
 
   it('closes all four joints of a box, including globally rotated panels', () => {
@@ -127,7 +128,7 @@ describe('interior T joints', () => {
     expect(right.color).toBe(left.color)
     expect(original).toEqual(before)
     expect(validateProject(result.project).filter(issue => issue.severity === 'error')).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(result.project)))).toEqual(result.project)
+    expect(roundTripProject(result.project)).toEqual(result.project)
     expect(autoConnect(result.project).joints).toBe(0)
   })
 

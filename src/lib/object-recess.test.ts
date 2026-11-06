@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { expect, it } from 'vitest'
 import { solveObjectRecess } from './object-tunnel-solver'
 import { validateProject } from './model'
@@ -10,7 +11,7 @@ it('builds a blind rectangular recess with a back panel', () => {
 import { findObjectRecess, type ObjectRecess } from './object-tunnel'
 import { evaluateConstructionObjects } from './object-geometry'
 import { convertConstructionObject } from './object-conversion'
-import { createPanel, createStarterProject, getProjectBounds, parseProject, removePanel, resolvePanels } from './model'
+import { createPanel, createStarterProject, getProjectBounds, removePanel, resolvePanels } from './model'
 import { getPhysicalConnectors } from './connector-selection'
 import type { ConstructionObjects, Project, Vec3 } from './types'
 const options = { rectangularOnly: true, thickness: 18, material: 'birch' as const, color: '#d9bb87', finishCoverage: 0, connectorColor: '#ff0000', connectorMaterial: 'plastic' as const }
@@ -50,7 +51,7 @@ for (const axis of [0, 1, 2] as const) for (const entry of [0, 1] as const) for 
   for (let i = 0; i < panels.length; i++) for (const { connection: c } of joints) if (visited.has(c.parentId) || visited.has(c.childId)) { visited.add(c.parentId); visited.add(c.childId) }
   expect(visited.size).toBe(14)
   expect(validateProject(removePanel(result.project, back.id))).toEqual([])
-  expect(parseProject(JSON.parse(JSON.stringify(result.project))).panels).toHaveLength(14)
+  expect(roundTripProject(result.project).panels).toHaveLength(14)
   expect(validateProject(result.project)).toEqual([])
   expect(source).toEqual(before)
 })

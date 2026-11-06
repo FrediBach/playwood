@@ -1,10 +1,11 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssembly } from './assemblies'
 import { closePanelHole, findPanelHoles } from './close-holes'
 import { connectorId, editConnectors, getDefaultConnectorColor, getPhysicalConnectors } from './connector-selection'
 import { DEFAULT_CONNECTOR_COLOR } from './connector-options'
 import { gridProject } from './example-geometry'
-import { parseProject, resolvePanels, validateProject } from './model'
+import { resolvePanels, validateProject } from './model'
 import type { Project } from './types'
 
 describe('default connector color', () => {
@@ -56,7 +57,7 @@ describe('default connector color', () => {
     for (const piece of getPhysicalConnectors(original)) {
       expect(closed.connectorOverrides?.[piece.id]).toEqual(original.connectorOverrides?.[piece.id])
     }
-    expect(parseProject(JSON.parse(JSON.stringify(closed)))).toEqual(closed)
+    expect(roundTripProject(closed)).toEqual(closed)
     expect(validateProject(closed)).toEqual([])
     expect(original).toEqual(snapshot)
   })
@@ -75,7 +76,7 @@ describe('default connector color', () => {
     const closed = closePanelHole(project, ids, hole.id).project
     const existing = new Set(project.connections.map(connection => connection.id))
     expect(closed.connections.filter(connection => !existing.has(connection.id)).every(connection => connection.color === '#ffffff')).toBe(true)
-    expect(parseProject(JSON.parse(JSON.stringify(closed)))).toEqual(closed)
+    expect(roundTripProject(closed)).toEqual(closed)
     expect(validateProject(closed)).toEqual([])
   })
 })

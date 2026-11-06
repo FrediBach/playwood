@@ -1,7 +1,8 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createAssembly, duplicateAssembly, getAssemblyAttachmentTargets, materializeAssemblies, updateAssemblyFinish } from './assemblies'
 import { gridProject } from './example-geometry'
-import { attachPanel, createPanel, parseProject, resolvePanels, validateProject } from './model'
+import { attachPanel, createPanel, resolvePanels, validateProject } from './model'
 import { prepareJointUpgrade } from './prepare-joint-upgrade'
 import type { Project } from './types'
 
@@ -52,7 +53,7 @@ describe('preparing assembly hardware upgrades', () => {
     ] }
     expect(resolvePanels(next)).toEqual(resolvePanels(project))
     expect(validateProject(next)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     const rebuilt = materializeAssemblies(next)
     expect(new Map(rebuilt.panels.map(panel => [panel.id, panel]))).toEqual(new Map(next.panels.map(panel => [panel.id, panel])))
     expect(new Map(rebuilt.connections.map(connection => [connection.id, connection]))).toEqual(new Map(next.connections.map(connection => [connection.id, connection])))
@@ -69,7 +70,7 @@ describe('preparing assembly hardware upgrades', () => {
     const prepared = prepareJointUpgrade(project, [project.connections[0]])
     expect(prepared.disassembledNames).toEqual(['Box'])
     expect(prepared.project.assemblies!.instances).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(prepared.project)))).toEqual(prepared.project)
+    expect(roundTripProject(prepared.project)).toEqual(prepared.project)
   })
 
   it('retains the other shared corners and their neighboring instances', () => {
@@ -83,7 +84,7 @@ describe('preparing assembly hardware upgrades', () => {
     expect(prepared.project.assemblies!.instances).toEqual([project.assemblies!.instances[1]])
     expect(prepared.project.assemblies!.links.map(link => link.id)).toEqual(project.assemblies!.links.map(link => link.id))
     expect(prepared.project.assemblies!.loosePorts).toHaveLength(1)
-    expect(parseProject(JSON.parse(JSON.stringify(prepared.project)))).toEqual(prepared.project)
+    expect(roundTripProject(prepared.project)).toEqual(prepared.project)
     expect(validateProject(prepared.project)).toEqual([])
   })
 
@@ -97,7 +98,7 @@ describe('preparing assembly hardware upgrades', () => {
     expect(prepared.project.assemblies!.loosePorts).toEqual([])
     expect(prepared.project.panels).toBe(project.panels)
     expect(prepared.project.connections).toBe(project.connections)
-    expect(parseProject(JSON.parse(JSON.stringify(prepared.project)))).toEqual(prepared.project)
+    expect(roundTripProject(prepared.project)).toEqual(prepared.project)
     expect(materializeAssemblies(prepared.project)).toEqual(prepared.project)
   })
 })

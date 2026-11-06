@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import importedShelf from '../../tests/fixtures/everyday-shelf-distribution.json'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
@@ -94,7 +95,7 @@ describe('parallel panel distribution', () => {
     const previous = new Set(validateProject(project).map(issue => issue.id))
     expect(validateProject(next).filter(issue => !previous.has(issue.id))).toEqual([])
     expect(next.connections.map(connection => connection.id)).toEqual(project.connections.map(connection => connection.id))
-    expect(parseProject(JSON.parse(JSON.stringify(next)))).toEqual(next)
+    expect(roundTripProject(next)).toEqual(next)
     expect(project).toEqual(snapshot)
   })
 

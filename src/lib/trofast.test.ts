@@ -1,3 +1,4 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { createAssembly, duplicateAssembly, updateAssemblyDefinition } from './assemblies'
@@ -114,9 +115,9 @@ describe('TROFAST drop-in placement', () => {
 describe('TROFAST persistence and assemblies', () => {
   it('keeps legacy files unchanged and round-trips all optional insert fields', () => {
     const legacy = fixture()
-    expect(parseProject(JSON.parse(JSON.stringify(legacy)))).toEqual(legacy)
+    expect(roundTripProject(legacy)).toEqual(legacy)
     const project = addTrofastInsert(fixture(), 'top', insert({ quarterTurn: true, colorId: 'red' }))
-    expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project)
+    expect(roundTripProject(project)).toEqual(project)
     const copied = duplicatePanel(project, 'top').panels[1]
     expect(copied.trofastInserts).toEqual(project.panels[0].trofastInserts)
     expect(copied.trofastInserts?.[0]).not.toBe(project.panels[0].trofastInserts?.[0])
@@ -147,7 +148,7 @@ describe('TROFAST persistence and assemblies', () => {
     expect(updated.panels.filter(panel => panel.trofastInserts?.length)).toHaveLength(2)
     expect(updated.panels.filter(panel => panel.trofastInserts?.length).every(panel => panel.trofastInserts![0].colorId === 'lilac')).toBe(true)
     expect(validateTrofastInserts(updated)).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(updated)))).toEqual(updated)
+    expect(roundTripProject(updated)).toEqual(updated)
     const definition = parseAssemblyFile(createAssemblyFile(updated, id))
     expect(definition.panels.find(panel => panel.trofastInserts?.length)?.trofastInserts?.[0].colorId).toBe('lilac')
     const inconsistent: Project = JSON.parse(JSON.stringify(updated))
@@ -177,7 +178,7 @@ describe('TROFAST persistence and assemblies', () => {
     const local: Project = { version: 1, name: 'Source', panels: definition.panels, connections: definition.connections }
     expect(validateTrofastInserts(local).some(issue => issue.id.endsWith('-floor'))).toBe(true)
     expect(validateProject(local, { trofastWorld: false })).toEqual([])
-    expect(parseProject(JSON.parse(JSON.stringify(resized)))).toEqual(resized)
+    expect(roundTripProject(resized)).toEqual(resized)
     expect(resized.panels.find(panel => panel.trofastInserts?.length)!.trofastInserts).toEqual(withBox.panels.find(panel => panel.trofastInserts?.length)!.trofastInserts)
   })
 })

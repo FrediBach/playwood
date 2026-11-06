@@ -1,5 +1,6 @@
+import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
-import { createPanel, createStarterProject, getProjectBounds, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { createPanel, createStarterProject, getProjectBounds, resolvePanels, rotateProject, validateProject } from './model'
 import { getRescaleValues, rescaleProject } from './project-rescale'
 import { workstationProject } from './platform-examples'
 import { createAssembly, getAssemblyAttachmentTargets, updateAssemblyParameterValues } from './assemblies'
@@ -8,7 +9,7 @@ import type { Project } from './types'
 
 const valid = (project: Project) => {
   expect(validateProject(project)).toEqual([])
-  expect(() => parseProject(JSON.parse(JSON.stringify(project)))).not.toThrow()
+  expect(() => roundTripProject(project)).not.toThrow()
 }
 const change = (project: Project, value: number, target: number, kind = 'dimension') => {
   const entry = getRescaleValues(project).find(item => item.kind === kind && item.value === value)!
