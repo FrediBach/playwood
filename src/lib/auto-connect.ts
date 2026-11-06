@@ -103,11 +103,27 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
       const errors = () => validateProject(candidate).filter(issue => issue.severity === 'error' || issue.id.startsWith('collision-'))
       if (errors().length) continue
       const memberIds = new Set(members.map(panel => panel.id))
-      const replaced = groups.filter(old => [...old.members].filter(id => memberIds.has(id)).length >= 2)
+      const origin = new Vector3(...rail.placements[0].position), tangent = new Vector3(...rail.tangent)
+      const replaced = groups.filter(old => {
+        if ([...old.members].filter(id => memberIds.has(id)).length < 2) return false
+        const hardware = old.connections.find(connection => connection.count > 0)
+        const oldRail = hardware && getConnectorRail(hardware, worldPanels, old.connections)
+        if (!oldRail) return true
+        const direction = tangent.dot(new Vector3(...oldRail.tangent))
+        const delta = new Vector3(...oldRail.placements[0].position).sub(origin)
+        const along = delta.dot(tangent)
+        if (Math.abs(direction) < 0.99999 || delta.addScaledVector(tangent, -along).length() > 0.5) return true
+        // Split panels can share the same two continuous neighbors on separate
+        // stretches of a seam. Their disjoint rails are independent joints,
+        // not incomplete upgrades of one another. Clearance is checked below.
+        const start = along + direction * (oldRail.lower - oldRail.along[0])
+        const end = along + direction * (oldRail.upper - oldRail.along[0])
+        return Math.min(start, end) <= rail.upper - rail.along[0] + 0.5
+          && Math.max(start, end) >= rail.lower - rail.along[0] - 0.5
+      })
       // Every occupied slot must be represented, and at the same physical seam.
       // Never delete a partial T/cross joint or an unrelated nearby corner.
       if (replaced.some(old => old.members.size >= memberIds.size || [...old.members].some(id => !memberIds.has(id)))) continue
-      const origin = new Vector3(...rail.placements[0].position), tangent = new Vector3(...rail.tangent)
       if (replaced.some(old => {
         const hardware = old.connections.find(c => c.count > 0)!
         const oldRail = getConnectorRail(hardware, worldPanels, old.connections)

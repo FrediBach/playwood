@@ -1,8 +1,33 @@
 import { openInspectorSection } from './inspector-helpers'
+import hTable from '../src/test/fixtures/h-table-auto-connect.json' with { type: 'json' }
 import { test, expect } from '@playwright/test'
 import { createExampleProject } from '../src/lib/example-library'
 import { attachPanel, createPanel, resolvePanels } from '../src/lib/model'
 import type { Project } from '../src/lib/types'
+
+test('adds a lower table-leg joint beside the existing upper joint and preserves it through undo and reload', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'h-table.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(hTable)) })
+  await page.getByRole('button', { name: 'Right front leg', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Select Right rear leg', exact: true }).check()
+  const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+  await expect.poll(async () => (await saved()).connections.length).toBe(hTable.connections.length)
+  const before = await saved()
+  await openInspectorSection(page, 'Auto-add connectors')
+  await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).last().click()
+  await expect(page.getByText(/connectors added at 1 joint. Panel positions kept/)).toBeVisible()
+  await expect.poll(async () => (await saved()).connections.length).toBe(before.connections.length + 2)
+  const after = await saved()
+  expect(after.panels).toEqual(before.panels)
+  expect(after.connections).toEqual(expect.arrayContaining(before.connections))
+  for (const [id, override] of Object.entries(before.connectorOverrides)) expect(after.connectorOverrides[id]).toEqual(override)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect.poll(saved).toEqual(before)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect.poll(saved).toEqual(after)
+  await page.reload()
+  expect(await saved()).toEqual(after)
+})
 
 test('automatically adds missing box connectors without moving panels, supports undo, and persists', async ({ page }) => {
   const original = createExampleProject('cube')

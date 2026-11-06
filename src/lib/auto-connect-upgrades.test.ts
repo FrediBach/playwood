@@ -1,11 +1,12 @@
 import { roundTripProject } from '../test/project-round-trip'
+import hTable from '../test/fixtures/h-table-auto-connect.json'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { autoConnect } from './auto-connect'
 import { createAssembly, duplicateAssembly, materializeAssemblies, updateAssemblyFinish } from './assemblies'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { connectorId, getPhysicalConnectors } from './connector-selection'
-import { attachPanel, createPanel, resolvePanels, rotateProject, validateProject } from './model'
+import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
 import type { Panel, Project, Vec3 } from './types'
 
 function cornerWithContinuation() {
@@ -47,6 +48,28 @@ function expectCompleteUpgrade(before: Project, after: ReturnType<typeof autoCon
 }
 
 describe('auto-connect upgrades existing joints', () => {
+  it.each(['Left', 'Right'])('adds a lower T beside an existing upper T on the %s table legs', side => {
+    const project = parseProject(hTable)
+    const before = structuredClone(project)
+    const selected = project.panels.filter(panel => [ `${side} front leg`, `${side} rear leg` ].includes(panel.name)).map(panel => panel.id)
+    expect(selected).toHaveLength(2)
+    const result = autoConnect(project, selected)
+    expect(result.joints).toBe(1)
+    expect(result.upgrades).toBe(0)
+    expect(result.connectors).toBeGreaterThan(0)
+    expect(result.project.connections).toHaveLength(project.connections.length + 2)
+    expect(result.project.connections).toEqual(expect.arrayContaining(project.connections))
+    expectSamePanels(project, result.project)
+    for (const [id, override] of Object.entries(project.connectorOverrides ?? {})) {
+      expect(result.project.connectorOverrides?.[id]).toEqual(override)
+    }
+    const previousIssues = new Set(validateProject(project).map(issue => issue.id))
+    expect(validateProject(result.project).filter(issue => !previousIssues.has(issue.id))).toEqual([])
+    expect(roundTripProject(result.project).connections).toEqual(result.project.connections)
+    expect(autoConnect(result.project, selected).joints).toBe(0)
+    expect(project).toEqual(before)
+  })
+
   it('joins two selected coplanar panels through their unselected upright, replacing the corner clamps', () => {
     const { project, selected } = cornerWithContinuation()
     const before = structuredClone(project)
