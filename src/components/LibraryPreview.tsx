@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from 'react'
 import type { LibraryDrawing } from '@/lib/library-preview'
 
 // Built-ins are immutable; retain only their small drawings across Library visits.
@@ -72,7 +72,7 @@ export function LibraryPreview({ id, read, revision }: { id: string; read?: (nam
   const current = result?.id === id && result.read === read && result.revision === revision ? result : null
   return <div ref={container} className="template-art example-art" aria-busy={!current}>
     {current?.drawing ? <svg viewBox="0 0 240 155" aria-hidden="true">
-      {current.drawing.map((face, index) => <polygon key={index} points={face.points} fill={face.color} stroke="#5f503c" strokeOpacity=".45" strokeWidth=".65" strokeLinejoin="round"/>)}
+      {current.drawing.map((face, index) => <Fragment key={index}><polygon points={face.points} fill={face.color}/><path d={face.outline} fill="none" stroke="#5f503c" strokeOpacity=".45" strokeWidth=".65" strokeLinejoin="round"/></Fragment>)}
       {!current.drawing.length && <text x="120" y="80" textAnchor="middle" className="library-preview-empty">No panels to preview</text>}
     </svg> : <span className="library-preview-status" role="status">{current?.error || (read ? 'Loading synced project preview…' : 'Loading preview…')}</span>}
   </div>

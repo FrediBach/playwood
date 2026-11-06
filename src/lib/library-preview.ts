@@ -2,8 +2,8 @@ import { connectorDisplayColor } from './connector-options'
 import { getConnectionAnchors, resolvePanels } from './model'
 import type { Project } from './types'
 import { Color, Euler, Vector3 } from 'three'
+import { orderPreviewFaces, type PreviewFace } from './preview-face-order'
 
-type PreviewFace = { points: Vector3[]; color: string; depth: number }
 const cameraDirection = new Vector3(1, 0.8, 1).normalize()
 const screenRight = new Vector3(1, 0, -1).normalize()
 const screenUp = new Vector3().crossVectors(cameraDirection, screenRight)
@@ -34,7 +34,7 @@ function previewFaces(project: Project): PreviewFace[] {
       const points = side.indices.map(index => corners[index])
       const light = 0.72 + 0.28 * Math.max(0, normal.dot(new Vector3(0.2, 1, 0.5).normalize()))
       faces.push({ points, color: `#${new Color(panel.color).multiplyScalar(light).getHexString()}`,
-        depth: points.reduce((sum, point) => sum + point.dot(cameraDirection), 0) / points.length })
+        normal, edges: points.map(() => true) })
     }
   }
   const byId = new Map(panels.map(panel => [panel.id, panel]))
@@ -42,17 +42,17 @@ function previewFaces(project: Project): PreviewFace[] {
     const parent = byId.get(connection.parentId), child = byId.get(connection.childId)
     if (!parent || !child) continue
     for (const anchor of getConnectionAnchors(connection, parent, child)) {
-      const center = new Vector3(...anchor)
+      const center = new Vector3(...anchor).addScaledVector(cameraDirection, 20)
       // Draw a hardware-sized square in the projection so seams remain legible.
       const points = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => center.clone()
         .addScaledVector(screenRight, x * 16).addScaledVector(screenUp, y * 16))
-      faces.push({ points, color: connectorDisplayColor(connection), depth: center.dot(cameraDirection) + 20 })
+      faces.push({ points, color: connectorDisplayColor(connection), normal: cameraDirection, edges: points.map(() => true) })
     }
   }
-  return faces.sort((a, b) => a.depth - b.depth)
+  return orderPreviewFaces(faces, cameraDirection)
 }
 
-export type LibraryDrawing = { color: string; points: string }[]
+export type LibraryDrawing = { color: string; points: string; outline: string }[]
 
 export function createLibraryDrawing(project: Project): LibraryDrawing {
   const faces = previewFaces(project).map(face => ({ ...face, projected: face.points.map(projectPoint) }))
@@ -63,6 +63,12 @@ export function createLibraryDrawing(project: Project): LibraryDrawing {
     minY = Math.min(minY, y); maxY = Math.max(maxY, y)
   }
   const scale = Math.min(204 / Math.max(1, maxX - minX), 119 / Math.max(1, maxY - minY))
-  return faces.map(face => ({ color: face.color, points: face.projected.map(([x, y]) =>
-    `${120 + (x - (minX + maxX) / 2) * scale},${76 + (y - (minY + maxY) / 2) * scale}`).join(' ') }))
+  return faces.map(face => {
+    const points = face.projected.map(([x, y]) =>
+      `${120 + (x - (minX + maxX) / 2) * scale},${76 + (y - (minY + maxY) / 2) * scale}`)
+    // Only original panel edges get an outline, never the cuts used for ordering.
+    const outline = points.map((point, index) => face.edges[index]
+      ? `M${points[(index + points.length - 1) % points.length]}L${point}` : '').join(' ')
+    return { color: face.color, points: points.join(' '), outline }
+  })
 }
