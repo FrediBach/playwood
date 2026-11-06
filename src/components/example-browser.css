@@ -27,3 +27,16 @@
 .example-collection button{flex:1;padding:9px 10px;border-radius:4px;background:transparent;color:#68745b;font-size:12px;font-weight:600;cursor:pointer}
 .example-collection button[aria-pressed=true]{background:#fffef8;color:#3e4a32;box-shadow:0 1px 3px #38472b20}
 .example-collection button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.synced-project-library{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #d7dccd}
+.synced-project-library h3{display:flex;align-items:center;gap:7px;margin:0 0 7px;font-size:13px;color:#414b37}
+.synced-project-library .example-count{overflow-wrap:anywhere}
+.synced-project-entry{width:100%;margin-top:10px;text-align:left;cursor:pointer}
+.synced-project-entry .example-compact-caption>span{min-width:0;overflow-wrap:anywhere}
+.synced-project-entry strong{font-size:13px}
+.synced-project-entry .example-compact-caption>svg{flex-shrink:0}
+.library-preview-status{display:flex;align-items:center;justify-content:center;padding:16px;min-height:100px;font-size:11px;line-height:1.5;color:#737d68;text-align:center}
+.library-preview-empty{font-size:12px;fill:#737d68}
+.synced-project-entry:hover{background:#eef0e6}
+.synced-project-entry:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.synced-project-entry:disabled{opacity:.5;cursor:default}

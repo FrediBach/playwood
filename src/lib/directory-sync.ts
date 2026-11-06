@@ -126,13 +126,21 @@ export async function scanSyncDirectory(directory: DirectoryHandle): Promise<Dir
 }
 
 export async function readDirectoryProject(directory: DirectoryHandle, name: string): Promise<{ project: Project; content: string }> {
-  const content = await readContent(await directory.getFileHandle(name))
+  const content = await readDirectoryPreviewContent(directory, name)
+  return { project: parseDirectoryProjectContent(content), content }
+}
+
+export async function readDirectoryPreviewContent(directory: DirectoryHandle, name: string): Promise<string> {
+  return readContent(await directory.getFileHandle(name))
+}
+
+export function parseDirectoryProjectContent(content: string): Project {
   const value: unknown = JSON.parse(content)
   if (isAssembly(value)) throw new Error('Choose a project file. Use Import assembly for reusable assemblies.')
   const parsed = parseProject(value)
   const shelf = (parsed.constraints?.length || parsed.spaceConstraint?.enabled) ? parsed : repairLegacyShelf(parsed)
   const repaired = (parsed.constraints?.length || parsed.spaceConstraint?.enabled) ? shelf : repairLegacyExampleInserts(shelf)
-  return { project: ensureProjectPalette(repaired), content }
+  return ensureProjectPalette(repaired)
 }
 
 export async function readDirectoryAssembly(directory: DirectoryHandle, name: string): Promise<AssemblyDefinition> {

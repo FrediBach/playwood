@@ -3,7 +3,7 @@ import type { ProjectSnapshot } from './use-project'
 import { createAssemblyFile, parseAssemblyFile } from '@/lib/assembly-file'
 import {
   directorySyncError, forgetSyncDirectory, isDirectorySyncSupported, overwriteDirectoryProject,
-  pickSyncDirectory, readDirectoryAssembly, readDirectoryProject, rememberSyncDirectory,
+  pickSyncDirectory, readDirectoryPreviewContent, readDirectoryAssembly, readDirectoryProject, rememberSyncDirectory,
   restoreSyncDirectory, scanSyncDirectory, writeNewDirectoryFile,
   type DirectoryHandle, type DirectoryListing,
 } from '@/lib/directory-sync'
@@ -93,6 +93,16 @@ export function useDirectorySync(options: Options) {
     }
     return directory
   }, [])
+
+  // Preview reads never prompt for access, change the workspace, or affect autosave.
+  const previewDirectory = state.directory
+  const previewConnected = state.connected
+  const readPreview = useCallback(async (name: string) => {
+    if (!previewDirectory || !previewConnected || await previewDirectory.queryPermission({ mode: 'readwrite' }) !== 'granted') {
+      throw new Error('Resync the folder to load previews.')
+    }
+    return readDirectoryPreviewContent(previewDirectory, name)
+  }, [previewDirectory, previewConnected])
 
   const refresh = useCallback(async (directory: DirectoryHandle) => {
     const listing = await scanSyncDirectory(directory)
@@ -263,7 +273,7 @@ export function useDirectorySync(options: Options) {
     activeFile: binding?.name ?? null, dirty, autosave: state.autosave && !!binding,
     pendingOpen: state.pendingOpen?.name ?? null,
     headerStatus: state.error && state.directory ? 'Folder sync needs attention' : binding ? state.busy ? 'Syncing folder…' : dirty ? 'Folder has unsaved changes' : 'Saved to folder' : undefined,
-    choose, resync, forget, save, duplicate, openProject, confirmOpen, insertAssembly, exportAssembly, importAssembly,
+    readPreview, choose, resync, forget, save, duplicate, openProject, confirmOpen, insertAssembly, exportAssembly, importAssembly,
     cancelOpen: () => update({ pendingOpen: null }),
     setAutosave: (enabled: boolean) => update({ autosave: enabled && !!binding && state.connected }),
   }

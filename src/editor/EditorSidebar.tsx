@@ -1,3 +1,4 @@
+import type { SyncedProjectLibrary } from '@/components/ExampleBrowser'
 import { ConstructionObjectsList } from '@/components/ConstructionObjectsList'
 import type { ListGroupingProps } from '@/components/GroupedList'
 import type { ProjectDialog } from '@/components/ProjectDialogs'
@@ -15,6 +16,7 @@ import { type SetStateAction } from 'react'
 
 
 interface EditorSidebarProps {
+  syncedProjects?: SyncedProjectLibrary
   objects: ReturnType<typeof useConstructionEditor>
   objectControlsDisabled: boolean
   chooseObject: (id: string|null,additive?: boolean) => void
@@ -60,9 +62,9 @@ export function EditorSidebar({
   selectAll, physicalConnectors, selectedConnectorIds, selectConnectors,
   setDialog, addPanel, loadTemplate, insertModule,
   instance, clipboard, insertSavedAssembly, setAssemblyImportError,
-  assemblyImportRef, assemblyImportError
+  assemblyImportRef, assemblyImportError, syncedProjects
 }: EditorSidebarProps)  {
-  return <ProjectSidebar
+  return <ProjectSidebar syncedProjects={syncedProjects}
     objectsContent={<ConstructionObjectsList objects={objects.objects} selectedIds={objects.selectedIds} disabled={objectControlsDisabled||objects.editing}
     onSelect={chooseObject} onAdd={() => { if(objects.add()) { setRightOpen(true); setFrameSignal(v => v+1); if(window.innerWidth<=900) setLeftOpen(false)}  } }
     onVisibility={node => { try { commit(current => updateConstructionObject(current,node))}  catch(error) { notify(error instanceof Error? error.message:'Could not change object visibility.')}  } } />}

@@ -6,7 +6,7 @@ import { useId,useState,type ComponentProps,type ReactNode } from 'react'
 import './assemblies.css'
 import { ConnectorList } from './ConnectorList'
 import { IconButton } from './editor-controls'
-import { ExampleBrowser } from './ExampleBrowser'
+import { ExampleBrowser, type SyncedProjectLibrary } from './ExampleBrowser'
 import { FilterChoices,FilterResults,ListFilters } from './ListFilters'
 import { PanelList } from './PanelList'
 import { Button } from './ui/button'
@@ -15,6 +15,7 @@ export interface SidebarAssembly { id: string; name: string; definitionName: str
 export interface LibraryAssembly { id: string; name: string; instanceCount: number; panelCount: number }
 
 interface Props {
+  syncedProjects?: SyncedProjectLibrary
   panelListProps: ComponentProps<typeof PanelList>
   connectorListProps: ComponentProps<typeof ConnectorList>
   objectsContent?: ReactNode
@@ -46,7 +47,7 @@ export function ProjectSidebar({
   onSelectAll, onCollapse, onParts, onHelp,
   addPanel, loadTemplate, onInsertLibraryAssembly, assemblies=[],
   selectedAssemblyId, onSelectAssembly, onSelectAssemblyPanel, libraryAssemblies=[],
-  onInsertAssembly, onImportAssembly, assemblyImportError
+  onInsertAssembly, onImportAssembly, assemblyImportError, syncedProjects
 }: Props) {
   const [leftTab,setLeftTab]=useState<'assembly'|'library'>('assembly')
   const tabsId=useId()
@@ -79,7 +80,7 @@ export function ProjectSidebar({
           <div className="sidebar-rule"/><div className="section-label"><span>CONNECTIONS</span><span className="count-badge">{connectorCount.toString().padStart(2,'0')}</span></div>
           <div className="connection-summary"><span className="connector-mini"><Link2 size={20}/></span><div><strong>Playwood connectors</strong><span>{connectorSummary||'Select a panel to connect'}</span></div></div>
           <Button variant="ghost" size="sm" className="full-button" onClick={onParts}><ListChecks size={16}/>View parts list<ChevronRight size={15}/></Button>
-        </>}</div>:<><div className="library-intro"><h2>A place to start.</h2><p>Explore builds and reusable modules.<br/>Choose one and make it yours.</p></div><ExampleBrowser compact onImportAssembly={onImportAssembly} assemblyImportError={assemblyImportError} onSelect={loadTemplate} onInsertAssembly={onInsertLibraryAssembly} myAssemblies={libraryAssemblies.length>0&&<SavedAssemblies libraryAssemblies={libraryAssemblies} onInsertAssembly={onInsertAssembly}/>}/><button className="library-reference" onClick={onHelp}>About the connector system<ArrowRight size={15}/></button></>}
+        </>}</div>:<><div className="library-intro"><h2>A place to start.</h2><p>Explore builds and reusable modules.<br/>Choose one and make it yours.</p></div><ExampleBrowser compact syncedProjects={syncedProjects} onImportAssembly={onImportAssembly} assemblyImportError={assemblyImportError} onSelect={loadTemplate} onInsertAssembly={onInsertLibraryAssembly} myAssemblies={libraryAssemblies.length>0&&<SavedAssemblies libraryAssemblies={libraryAssemblies} onInsertAssembly={onInsertAssembly}/>}/><button className="library-reference" onClick={onHelp}>About the connector system<ArrowRight size={15}/></button></>}
       </div>
     </aside>
 }

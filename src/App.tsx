@@ -171,6 +171,11 @@ export default function App() {
 
   const paletteActions = createPaletteActions(commit,project,setDraft)
   const editorSidebarProps: React.ComponentProps<typeof EditorSidebar> = {
+    syncedProjects: directorySync.connected && directorySync.directoryName ? {
+      directoryName: directorySync.directoryName, projects: directorySync.projects, readPreview: directorySync.readPreview,
+      disabled: directorySync.busy || directorySync.loading || !!directorySync.pendingOpen,
+      onOpen: name => { setDialog('sync'); void directorySync.openProject(name) },
+    } : undefined,
     objects, objectControlsDisabled, chooseObject, setRightOpen, setFrameSignal, setLeftOpen, commit, notify, assemblyTab,
     changeAssemblyTab, listGrouping, panels, selectedIds, issues, choosePanel, selectedPanels, connectorCount,
     connectorSummary, assembly, setPanelSelection, selectAll, physicalConnectors, selectedConnectorIds, selectConnectors,

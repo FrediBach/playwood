@@ -19,6 +19,8 @@ Open the local URL printed by Vite. No accounts, API keys, backend, or external 
 
 Choose **Sync** next to **New project**, then **Choose folder** and allow read/write access. The folder's project and assembly JSON files appear in the dialog. Folder access requires a browser that supports the File System Access directory picker, such as desktop Chrome or Edge. Browsers without it retain browser autosave and the existing import/download controls.
 
+Connected folder projects also appear in **Library → Full builds → Synced folder projects**, labeled **Folder sync** with their filenames and folder name. Search finds them by project name, filename, or folder name. Cards load previews asynchronously as they come into view, with a loading indicator while the file is read. Built-in examples remain available while folder previews load. Previews use the same simplified panel drawing as the example library; projects without panels show “No panels to preview”. Opening one uses the Sync dialog’s existing save/open confirmation. Use **Sync → Resync** to refresh external changes.
+
 The **Sync** button shows a green check badge while a folder is connected. An amber **!** means the folder needs attention or reconnection; open Sync for details. Both badges remain visible in the compact header.
 
 - **Save project** saves the current workspace into the folder, or updates its opened file. **Duplicate project** saves a separate copy; each listed project also has a Duplicate action. New copies use unique filenames without replacing existing files.
