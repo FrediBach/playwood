@@ -224,6 +224,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   const rows: Row[] = []
   const preferences = new Set<Row>()
   const interiorPreferences = new Set<Row>()
+  const oppositePreferences = new Set<Row>()
   const bounds: Row[] = []
   const thicknessChange = (index: number) => edit.kind === 'resize'
     ? (edit.patches?.[frames[index].panel.id]?.thickness ?? frames[index].panel.thickness) - frames[index].panel.thickness : 0
@@ -559,6 +560,11 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
             if (side * (coordinate(frames[index], axis, side) - level) > CONTACT_TOLERANCE) {
               const anchor = preference()
               interiorPreferences.add(anchor)
+              // Only the outermost supports are fallback references. Internal
+              // sections behind the selected shelf may need to follow a gap rule.
+              const hasPanelBehind = group.some(other => coordinate(frames[other], axis, 1)
+                < coordinate(frames[index], axis, -1) - CONTACT_TOLERANCE)
+              if (side === -1 && !hasPanelBehind) oppositePreferences.add(anchor)
               edge(anchor, index, axis, side)
             }
           }
@@ -568,7 +574,11 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         if (touched && !(touchesMin && touchesMax)) continue
         for (const index of group) {
           const item = frames[index]
-          if (!ids.has(item.panel.id) && Math.abs(coordinate(item, axis, side) - boundary) < CONTACT_TOLERANCE) edge(preference(), index, axis, side)
+          if (!ids.has(item.panel.id) && Math.abs(coordinate(item, axis, side) - boundary) < CONTACT_TOLERANCE) {
+            const anchor = preference()
+            if (side === -1) oppositePreferences.add(anchor)
+            edge(anchor, index, axis, side)
+          }
         }
       }
     }
@@ -623,7 +633,15 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       if ((edit.kind === 'move' && edit.scope) || !constraints.length || !preferences.size) throw error
       // Explicit design intent outranks automatic center/exterior anchoring.
       // Joints, supported contacts, gesture targets and local-edit locks remain.
-      changes = solveWithBounds(rows.filter(row => !preferences.has(row)), bounds, weights)
+      try {
+        // A fixed opening ahead of a moving shelf can require the far boundary
+        // to follow it. Retain the supports behind the gesture before allowing
+        // explicit rules to release every automatic placement reference.
+        if (!oppositePreferences.size) throw error
+        changes = solveWithBounds(rows.filter(row => !preferences.has(row) || oppositePreferences.has(row)), bounds, weights)
+      } catch {
+        changes = solveWithBounds(rows.filter(row => !preferences.has(row)), bounds, weights)
+      }
     }
   } catch (error) {
     const panelIds = error instanceof SolverConflict

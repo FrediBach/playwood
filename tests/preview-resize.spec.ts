@@ -1,9 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createPanel, createStarterProject, parseProject, resolvePanels, validateProject } from '../src/lib/model'
+import { createPanel, createStarterProject, getProjectBounds, parseProject, resolvePanels, validateProject } from '../src/lib/model'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { preparePreviewResize } from '../src/lib/preview-resize'
 import { autoConnect } from '../src/lib/auto-connect'
 import endShelves from '../src/test/fixtures/h-table-end-shelves.json' with { type: 'json' }
+import fixedGaps from '../src/test/fixtures/h-table-fixed-gaps.json' with { type: 'json' }
 import hTable from '../src/test/fixtures/h-table-auto-connect.json' with { type: 'json' }
 import type { Project, Vec3 } from '../src/lib/types'
 
@@ -394,4 +395,24 @@ test('the smaller top of a connected corner shelf grows with its wing', async ({
   await expect.poll(() => savedProject(page)).toEqual(resized)
   await page.reload()
   expect(await savedProject(page)).toEqual(resized)
+})
+
+
+test('raising the H-table desktop arrow preserves the feet with fixed shelf gaps', async ({ page }) => {
+  const project = parseProject(fixedGaps)
+  const desktop = project.panels.find(panel => panel.name === 'Desktop')!
+  await openProject(page, project)
+  await page.locator('.panel-list-select').filter({ hasText: /^Desktop$/ }).click()
+  const handle = directionHandle(project, { panelId: desktop.id }, [0, 1, 0])
+  await beginResize(page, handle, 50)
+  await page.mouse.up()
+  await expect.poll(async () => resolvePanels(await savedProject(page)).find(panel => panel.id === desktop.id)!.position[1]).toBeGreaterThan(desktop.position[1] + 20)
+  const after = resolvePanels(await savedProject(page))
+  for (const panel of project.panels.filter(panel => /leg$|spine/i.test(panel.name))) {
+    expect(getProjectBounds([after.find(candidate => candidate.id === panel.id)!]).min[1], panel.name)
+      .toBeCloseTo(getProjectBounds([panel]).min[1], 4)
+  }
+  expectAnglesAndJoints(project, await savedProject(page))
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
 })
