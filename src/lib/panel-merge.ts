@@ -58,8 +58,9 @@ export function mergePanels(project: Project, ids: readonly string[]): Project {
   const overrides = { ...project.connectorOverrides }
   const visibleBefore = before.map(panel => ({ ...panel, visible: true }))
   const visibleAfter = panels.map(panel => ({ ...panel, visible: true }))
+  const connectionsById = new Map(connections.map(connection => [connection.id, connection]))
   for (const piece of getPhysicalConnectors(project)) {
-    const connection = connections.find(item => item.id === piece.connection.id)!
+    const connection = connectionsById.get(piece.connection.id)!
     if (connection === piece.connection) continue
     const oldRail = getConnectorRail(piece.connection, visibleBefore, project.connections)!
     const newRail = getConnectorRail(connection, visibleAfter, connections)!

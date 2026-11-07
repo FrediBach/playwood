@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dial
 export function EqualPanelSizesDialog({ source, ids, onApply, onCancel }: {
   source: Project; ids: string[]; onApply: (candidate: Project) => void; onCancel: () => void
 }) {
-  const panels = source.panels.filter(panel => ids.includes(panel.id))
+  const selectedIds = new Set(ids)
+  const panels = source.panels.filter(panel => selectedIds.has(panel.id))
   const dimension = differingPanelDimension(panels)!
   const [value, setValue] = useState(panels[0][dimension])
   const result = useMemo(() => {

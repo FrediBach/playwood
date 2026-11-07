@@ -22,3 +22,10 @@ it('sets all selected cuts to an existing value without mutating the source', ()
   for (const value of [NaN, Infinity, 0, 4001]) expect(() => equalizePanelSizes(project, ['p0', 'p1'], value)).toThrow()
   expect(() => equalizePanelSizes(project, ['p0', 'missing'], 500)).toThrow('no longer exists')
 })
+it('deduplicates a reordered selection and leaves unselected cuts unchanged', () => {
+  const next = equalizePanelSizes(project, ['p2', 'p0', 'p2'], 515)
+  expect(next.panels.map(panel => [panel.id, panel.width])).toEqual([
+    ['p0', 515], ['p1', 510], ['p2', 515],
+  ])
+  expect(project.panels.map(panel => panel.width)).toEqual([500, 510, 520])
+})

@@ -670,8 +670,9 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     const message = constraints.length
       ? `This edit cannot keep the design rules and joints satisfied. ${constraints.slice(0, 3).map(rule => describeDesignConstraint(rule, frames.map(item => item.panel))).join('; ')}. Edit or pause a rule first.`
       : error instanceof Error ? error.message : CONSTRAINT_MESSAGE
+    const affectedPanelIds = new Set(panelIds)
     throw new StructureEditError(message, panelIds, project.connections.filter(connection =>
-      panelIds.includes(connection.parentId) && panelIds.includes(connection.childId)).map(connection => connection.id),
+      affectedPanelIds.has(connection.parentId) && affectedPanelIds.has(connection.childId)).map(connection => connection.id),
       rows.flatMap(row => row.inferred ? [row.inferred] : []))
   }
   const changedPanels = new Map(frames.map((item, index) => {
@@ -768,6 +769,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     && edit.patches?.[panel.id]?.thickness !== undefined ? { ...panel, thickness: edit.patches[panel.id].thickness! } : panel) }
   next = { ...next, panels: refitOutlineClosures(resolvePanels(next), next.connections.filter(connection => connection.outlineEdge === undefined
     || affectedOutlineClosures.has(connection.childId))) }
+  const refitOutlinePanelIds = new Set(edit.kind === 'resize' ? edit.refitOutlinePanelIds : undefined)
   for (const panel of next.panels) {
     if (!affectedOutlineClosures.has(panel.id)) continue
     const original = panels[indices.get(panel.id)!]
@@ -775,7 +777,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     const poseChanged = position(panel).distanceTo(position(original)) > EPSILON
     const outlineChanged = panel.customOutline?.some((point, index) => Math.abs(point.x - (original.customOutline?.[index]?.x ?? Infinity)) > EPSILON
       || Math.abs(point.y - (original.customOutline?.[index]?.y ?? Infinity)) > EPSILON) ?? false
-    if (edit.kind === 'resize' && edit.local && !wanted.has(panel.id) && !edit.refitOutlinePanelIds?.includes(panel.id) && (sizeChanged || poseChanged || outlineChanged)) {
+    if (edit.kind === 'resize' && edit.local && !wanted.has(panel.id) && !refitOutlinePanelIds.has(panel.id) && (sizeChanged || poseChanged || outlineChanged)) {
       throw new StructureEditError('This resize would reshape a fitted outline panel. Resize the connected structure instead of only this panel edge.', [panel.id])
     }
     if (!wanted.has(panel.id)) continue
@@ -795,7 +797,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
       // A reviewed rim alignment carries the existing fitted cap and its
       // hardware to the new face; ordinary structural hardware stays fixed.
       if (edit.kind === 'resize' && piece.connection.outlineEdge !== undefined
-        && edit.refitOutlinePanelIds?.includes(piece.connection.childId)) continue
+        && refitOutlinePanelIds.has(piece.connection.childId)) continue
       const before = getConnectorRail(piece.connection, panels, project.connections)
       const connection = connectionsById.get(piece.connection.id)!
       const after = getConnectorRail(connection, next.panels, next.connections)
@@ -812,7 +814,10 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   }
   const previousErrors = new Set(validateProject(project, validation).filter(issue => issue.severity === 'error').map(issue => issue.id))
   const newError = validateProject(next, validation).find(issue => issue.severity === 'error' && !previousErrors.has(issue.id))
-  if (newError) throw new StructureEditError(`Cannot keep this edit connected: ${newError.message}`, newError.panelIds, next.connections.filter(connection => newError.panelIds.includes(connection.parentId) && newError.panelIds.includes(connection.childId)).map(connection => connection.id))
+  if (newError) {
+    const affectedPanelIds = new Set(newError.panelIds)
+    throw new StructureEditError(`Cannot keep this edit connected: ${newError.message}`, newError.panelIds, next.connections.filter(connection => affectedPanelIds.has(connection.parentId) && affectedPanelIds.has(connection.childId)).map(connection => connection.id))
+  }
   const affectedRoots = new Set([...wanted].flatMap(id => indices.has(id) ? [root(indices.get(id)!)] : []))
   const violatedRule = evaluateDesignConstraints(next.constraints, next.panels).find(result => result.constraint.enabled && result.violation > 0
     && designConstraintPanelIds(result.constraint).some(id => indices.has(id) && affectedRoots.has(root(indices.get(id)!))))

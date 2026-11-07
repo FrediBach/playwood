@@ -11,13 +11,15 @@ export function differingPanelDimension(panels: readonly Panel[]) {
 }
 
 export function equalizePanelSizes(project: Project, ids: readonly string[], value: number): Project {
-  const panels = [...new Set(ids)].map(id => project.panels.find(panel => panel.id === id))
+  const selectedIds = new Set(ids)
+  const panelsById = new Map(project.panels.map(panel => [panel.id, panel]))
+  const panels = [...selectedIds].map(id => panelsById.get(id))
   if (panels.some(panel => !panel)) throw new Error('A selected panel no longer exists.')
   const selected = panels as Panel[]
   const dimension = differingPanelDimension(selected)
   if (!dimension) throw new Error('Select at least two panels with exactly one differing dimension.')
   if (selected.some(panel => getAssemblyInstance(project, panel.id))) throw new Error('Disassemble these panels before making their sizes equal.')
   const next = resizePanelDimensions(project, Object.fromEntries(selected.map(panel => [panel.id, { [dimension]: value }])))
-  if (next.panels.some(panel => ids.includes(panel.id) && Math.abs(panel[dimension] - value) > 1e-6)) throw new Error('These panels cannot reach the same size while preserving their joints.')
+  if (next.panels.some(panel => selectedIds.has(panel.id) && Math.abs(panel[dimension] - value) > 1e-6)) throw new Error('These panels cannot reach the same size while preserving their joints.')
   return assertNoNewTrofastIssues(project, next)
 }
