@@ -23,7 +23,7 @@ export function designConstraintPanelIds(constraint: DesignConstraint): string[]
 
 /** Inclusive limits in millimeters; missing limits leave that direction free. */
 export function designConstraintLimits(constraint: DesignConstraint): { min?: number; max?: number } {
-  if (constraint.kind === 'equal-dimension' || constraint.kind === 'level') return { min: 0, max: 0 }
+  if (constraint.kind === 'equal-dimension' || constraint.kind === 'level' || constraint.kind === 'opening-ratio') return { min: 0, max: 0 }
   switch (constraint.relation) {
     case 'minimum': return { min: constraint.value }
     case 'maximum': return { max: constraint.value }
@@ -76,14 +76,30 @@ export function measureDesignConstraint(constraint: DesignConstraint, resolvedPa
       : panels.map(panel => designConstraintGeometryIssue(panel!)).find(Boolean)
   if (issue) return { constraint, actual: NaN, target: min ?? max ?? 0, violation: Infinity, issue }
   const [a, b] = panels as Panel[]
+  if (constraint.kind === 'opening-ratio') {
+    const gaps = openingMeasurements(constraint, resolvedPanels)
+    const actual = gaps[1] - constraint.ratio * gaps[0]
+    const error = Math.max(Math.abs(actual), -gaps[0], -gaps[1])
+    return { constraint, actual, target: 0, violation: error <= DESIGN_CONSTRAINT_TOLERANCE ? 0 : error }
+  }
   const actual = constraint.kind === 'floor' ? designConstraintCoordinate(a, constraint.reference)
     : constraint.kind === 'dimension' ? a[constraint.dimension]
-      : constraint.kind === 'equal-dimension' ? b[constraint.dimension] - a[constraint.dimension]
+      : constraint.kind === 'equal-dimension' ? b[constraint.secondDimension ?? constraint.dimension] - a[constraint.dimension]
         : constraint.kind === 'level' ? designConstraintCoordinate(b, constraint.references[1]) - designConstraintCoordinate(a, constraint.references[0])
           : designConstraintCoordinate(b, 'min', constraint.axis) - designConstraintCoordinate(a, 'max', constraint.axis)
   const target = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, actual))
   const error = Math.abs(actual - target)
   return { constraint, actual, target, violation: error <= DESIGN_CONSTRAINT_TOLERANCE ? 0 : error }
+}
+
+/** Ordered stock-boundary clearances, including the thickness of shared dividers. */
+export function openingMeasurements(constraint: Extract<DesignConstraint, { kind: 'opening-ratio' }>, panels: readonly Panel[]): [number, number] {
+  const gap = (index: number) => {
+    const a = panels.find(panel => panel.id === constraint.panelIds[index])!
+    const b = panels.find(panel => panel.id === constraint.panelIds[index + 1])!
+    return designConstraintCoordinate(b, 'min', constraint.axis) - designConstraintCoordinate(a, 'max', constraint.axis)
+  }
+  return [gap(0), gap(2)]
 }
 
 export function evaluateDesignConstraints(constraints: readonly DesignConstraint[] | undefined, resolvedPanels: readonly Panel[]): DesignConstraintEvaluation[] {
@@ -96,7 +112,10 @@ export function describeDesignConstraint(constraint: DesignConstraint, panels: r
   switch (constraint.kind) {
     case 'floor': return `${name(constraint.panelId)} ${reference(constraint.reference)}: ${describeDesignConstraintRequirement(constraint)} above floor`
     case 'dimension': return `${name(constraint.panelId)} ${constraint.dimension}: ${describeDesignConstraintRequirement(constraint)}`
-    case 'equal-dimension': return `${name(constraint.panelIds[0])} and ${name(constraint.panelIds[1])}: equal ${constraint.dimension}`
+    case 'equal-dimension': return constraint.secondDimension && constraint.secondDimension !== constraint.dimension
+      ? `${name(constraint.panelIds[0])} ${constraint.dimension} = ${name(constraint.panelIds[1])} ${constraint.secondDimension}`
+      : `${name(constraint.panelIds[0])} and ${name(constraint.panelIds[1])}: equal ${constraint.dimension}`
+    case 'opening-ratio': return `${name(constraint.panelIds[2])} → ${name(constraint.panelIds[3])}: ${constraint.ratio} × opening ${name(constraint.panelIds[0])} → ${name(constraint.panelIds[1])} along ${constraint.axis.toUpperCase()}`
     case 'level': return `${name(constraint.panelIds[0])} ${reference(constraint.references[0])} level with ${name(constraint.panelIds[1])} ${reference(constraint.references[1])}`
     case 'gap': return `${name(constraint.panelIds[0])} → ${name(constraint.panelIds[1])}: ${describeDesignConstraintRequirement(constraint)} along ${constraint.axis.toUpperCase()}`
   }
@@ -140,7 +159,7 @@ export function parseDesignConstraints(raw: unknown, panels: readonly Panel[]): 
     return value.relation === undefined ? { value: target } : { relation: value.relation, value: target }
   }
   const equality = (value: Record<string, unknown>) => {
-    if (['relation', 'value', 'min', 'max'].some(field => field in value)) throw new Error('Matching panel dimensions and levels use equality, without numeric limits.')
+    if (['relation', 'value', 'min', 'max'].some(field => field in value)) throw new Error('Matching relationships use equality, without numeric limits.')
   }
   return raw.map(value => {
     if (!record(value) || typeof value.id !== 'string' || !value.id.trim() || value.id.length > 200 || ids.has(value.id)) throw new Error('Design rule IDs must be unique and nonempty.')
@@ -152,7 +171,17 @@ export function parseDesignConstraints(raw: unknown, panels: readonly Panel[]): 
       case 'dimension': return { ...base, kind: 'dimension', panelId: panel(value.panelId), dimension: dimension(value.dimension), ...requirement(value, 40, 4000) }
       case 'equal-dimension': {
         equality(value)
-        return { ...base, kind: 'equal-dimension', panelIds: pair(value.panelIds), dimension: dimension(value.dimension) }
+        return { ...base, kind: 'equal-dimension', panelIds: pair(value.panelIds), dimension: dimension(value.dimension),
+          ...(value.secondDimension === undefined ? {} : { secondDimension: dimension(value.secondDimension) }) }
+      }
+      case 'opening-ratio': {
+        equality(value)
+        if (!Array.isArray(value.panelIds) || value.panelIds.length !== 4) throw new Error('An opening relationship needs two pairs of panels.')
+        const first = pair(value.panelIds.slice(0, 2)), second = pair(value.panelIds.slice(2))
+        if (new Set([...first, ...second]).size < 3) throw new Error('Choose two different openings.')
+        if (value.axis !== 'x' && value.axis !== 'y' && value.axis !== 'z') throw new Error('Invalid design rule axis.')
+        if (typeof value.ratio !== 'number' || !Number.isFinite(value.ratio) || value.ratio < .01 || value.ratio > 100) throw new Error('Opening ratio must be between 0.01 and 100.')
+        return { ...base, kind: 'opening-ratio', panelIds: [...first, ...second], axis: value.axis, ratio: value.ratio }
       }
       case 'level': {
         equality(value)
@@ -177,6 +206,6 @@ export function copyDesignConstraints(constraints: readonly DesignConstraint[] |
     if (constraint.kind === 'floor' || designConstraintPanelIds(constraint).some(id => !panelIds.has(id))) return []
     const id = crypto.randomUUID()
     return [{ ...constraint, id, ...('panelId' in constraint ? { panelId: panelIds.get(constraint.panelId)! }
-      : { panelIds: constraint.panelIds.map(panelId => panelIds.get(panelId)!) as [string, string] }) } as DesignConstraint]
+      : { panelIds: constraint.panelIds.map(panelId => panelIds.get(panelId)!) as typeof constraint.panelIds }) } as DesignConstraint]
   })
 }

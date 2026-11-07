@@ -41,7 +41,7 @@ export function assertDesignConstraintEdit(before: Project, candidate: Project):
         geometry(panels.find(panel => panel.id === id)) === geometry(previousPanels.find(panel => panel.id === id)))) continue
     }
     const rule = describeDesignConstraint(row.constraint, panels)
-    const detail = row.issue || `The resulting measurement is ${Number(row.actual.toFixed(2))} mm; ${describeDesignConstraintRequirement(row.constraint)} is required.`
+    const detail = row.issue || (row.constraint.kind === 'opening-ratio' ? 'Both clear openings must be nonnegative and keep the saved proportion.' : `The resulting measurement is ${Number(row.actual.toFixed(2))} mm; ${describeDesignConstraintRequirement(row.constraint)} is required.`)
     throw new Error(`${rule}: ${detail} Edit or disable this constraint to continue.`)
   }
   return next

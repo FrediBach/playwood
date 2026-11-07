@@ -250,9 +250,10 @@ function addCompartment(session: StructureRepeatSession, count: number) {
   for (const rule of rules) {
     if (rule.kind === 'dimension') rule.dimension = dimension(rule.panelId, rule.dimension)
     if (rule.kind === 'equal-dimension') {
-      const dimensions = rule.panelIds.map(id => dimension(id, rule.dimension))
-      if (dimensions[0] !== dimensions[1]) throw new Error('A copied equal-dimension constraint would compare different local axes on an existing panel. Adjust that rule before repeating here.')
-      rule.dimension = dimensions[0]
+      const first = dimension(rule.panelIds[0], rule.dimension)
+      const second = dimension(rule.panelIds[1], rule.secondDimension ?? rule.dimension)
+      rule.dimension = first
+      if (second !== first || rule.secondDimension !== undefined) rule.secondDimension = second
     }
   }
   if ((next.constraints?.length ?? 0) + rules.length > MAX_DESIGN_CONSTRAINTS) throw new Error('This repeat would exceed the project limit for design constraints.')

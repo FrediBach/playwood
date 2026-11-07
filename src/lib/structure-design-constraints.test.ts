@@ -340,3 +340,39 @@ describe('automatic design rules in structural edits', () => {
     satisfied(next)
   })
 })
+
+
+describe('cross-dimension cascades', () => {
+  const rule: DesignConstraint = { id: 'cross', enabled: true, kind: 'equal-dimension', panelIds: ['a', 'b'], dimension: 'width', secondDimension: 'height' }
+  const source = () => project([
+    createPanel({ id: 'a', width: 600, height: 250, position: [-1000, 1200, 0] }),
+    createPanel({ id: 'b', width: 350, height: 400, position: [1000, 1200, 0], rotation: [0, 0, Math.PI / 2] }),
+  ], [rule])
+
+  it.each(['a', 'b'])('reconciles against the selected cut of anchor %s', anchor => {
+    const before = source()
+    const snapshot = JSON.stringify(before)
+    const next = reconcileDesignConstraints(before, anchor, rule.id)
+    expect(byId(next, 'a').width).toBeCloseTo(anchor === 'a' ? 600 : 400)
+    expect(byId(next, 'b').height).toBeCloseTo(anchor === 'a' ? 600 : 400)
+    expect(byId(next, 'a').height).toBe(250)
+    expect(byId(next, 'b').width).toBe(350)
+    satisfied(next)
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it('propagates edits in both directions and leaves unrelated cuts fixed', () => {
+    const before = reconcileDesignConstraints(source(), 'a', rule.id)
+    const wider = resizePanelDimensions(before, { a: { width: 750 } })
+    expect(byId(wider, 'b').height).toBeCloseTo(750)
+    const shorter = resizePanelDimensions(wider, { b: { height: 500 } })
+    expect(byId(shorter, 'a').width).toBeCloseTo(500)
+    expect(byId(shorter, 'a').height).toBe(250)
+    expect(byId(shorter, 'b').width).toBe(350)
+    satisfied(shorter)
+    const protectedProject: Project = { ...shorter, constraints: [...shorter.constraints!, { id: 'max', enabled: true, kind: 'dimension', panelId: 'b', dimension: 'height', relation: 'maximum', value: 550 }] }
+    const snapshot = JSON.stringify(protectedProject)
+    expect(() => resizePanelDimensions(protectedProject, { a: { width: 600 } })).toThrow()
+    expect(JSON.stringify(protectedProject)).toBe(snapshot)
+  })
+})

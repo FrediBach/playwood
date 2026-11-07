@@ -77,7 +77,10 @@ interface DesignConstraintBase { id: string; enabled: boolean }
 export type DesignConstraint = DesignConstraintBase & (
   | ({ kind: 'floor'; panelId: string; reference: ConstraintReference } & ConstraintRequirement)
   | ({ kind: 'dimension'; panelId: string; dimension: 'width' | 'height' } & ConstraintRequirement)
-  | { kind: 'equal-dimension'; panelIds: [string, string]; dimension: 'width' | 'height' }
+  /** Omitted secondDimension matches the first panel's dimension in legacy saves. */
+  | { kind: 'equal-dimension'; panelIds: [string, string]; dimension: 'width' | 'height'; secondDimension?: 'width' | 'height' }
+  /** Two ordered clear gaps; the second equals ratio times the first. Pairs may share a boundary. */
+  | { kind: 'opening-ratio'; panelIds: [string, string, string, string]; axis: 'x' | 'y' | 'z'; ratio: number }
   | { kind: 'level'; panelIds: [string, string]; references: [ConstraintReference, ConstraintReference] }
   /** Ordered from the first panel's maximum to the second panel's minimum. */
   | ({ kind: 'gap'; panelIds: [string, string]; axis: 'x' | 'y' | 'z'; relation: 'exact' | 'minimum' | 'maximum' | 'range' } & ConstraintRequirement)

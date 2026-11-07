@@ -32,7 +32,7 @@ export function designConstraintMeasurements(constraint: DesignConstraint, panel
   const lines: MeasurementLine[] = []
   if (constraint.kind === 'dimension' || constraint.kind === 'equal-dimension') {
     lines.push(cutDimensionLine(a, constraint.dimension))
-    if (constraint.kind === 'equal-dimension' && b) lines.push(cutDimensionLine(b, constraint.dimension))
+    if (constraint.kind === 'equal-dimension' && b) lines.push(cutDimensionLine(b, constraint.secondDimension ?? constraint.dimension))
   } else if (constraint.kind === 'floor') {
     const height = designConstraintCoordinate(a, constraint.reference)
     const anchor: Vec3 = [boundsA.max[0], height, boundsA.max[2]]
@@ -47,6 +47,11 @@ export function designConstraintMeasurements(constraint: DesignConstraint, panel
     const from: Vec3 = [first[0], first[1], z]
     const to: Vec3 = [second[0], second[1], z]
     lines.push({ id: constraint.id, from, to, label: result.violation ? `Level difference · ${format(Math.abs(result.actual))}` : `Same level · ${format(first[1])}`, leaders: [[first, from], [second, to]] })
+  } else if (constraint.kind === 'opening-ratio') {
+    for (const start of [0, 2]) {
+      const measured = designConstraintMeasurements({ id: `${constraint.id}-${start}`, enabled: constraint.enabled, kind: 'gap', panelIds: [constraint.panelIds[start], constraint.panelIds[start + 1]], axis: constraint.axis, relation: 'minimum', value: 0 }, panels)
+      if (measured) lines.push(...measured.lines.map(line => ({ ...line, label: `Opening ${start === 0 ? '1' : '2'} · ${line.label}` })))
+    }
   } else if (constraint.kind === 'gap' && b) {
     const boundsB = getDesignConstraintBounds(b)
     const axis = axes[constraint.axis]

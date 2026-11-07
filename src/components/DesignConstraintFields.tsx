@@ -23,17 +23,24 @@ export function DesignConstraintFields({draft, panels, update, resetMeasurement,
       else update({ ...draft, reference })
     }}>{referenceOptions}</SelectField>}
     {(draft.kind === 'dimension' || draft.kind === 'equal-dimension') && <>
-      <SelectField label="Panel cut dimension" value={draft.dimension} onChange={value => {
+      <SelectField label={draft.kind === 'equal-dimension' ? 'First panel cut dimension' : 'Panel cut dimension'} value={draft.dimension} onChange={value => {
         const dimension = value as 'width' | 'height'
         const panel = panels.find(panel => panel.id === draftIds[0])
         if (draft.kind === 'dimension' && panel) resetMeasurement({ ...draft, dimension }, panel[dimension])
+        else if (draft.kind === 'equal-dimension') update({ ...draft, dimension, secondDimension: draft.secondDimension ?? draft.dimension })
         else update({ ...draft, dimension })
       }}><option value="height">Height</option><option value="width">Width</option></SelectField>
+      {draft.kind === 'equal-dimension' && <SelectField label="Second panel cut dimension" value={draft.secondDimension ?? draft.dimension} onChange={value => update({ ...draft, secondDimension: value as 'width' | 'height' })}><option value="height">Height</option><option value="width">Width</option></SelectField>}
       <p className="field-note">Cut dimensions follow each panel’s face. Use Same level above floor to align their placement.</p>
     </>}
     {draft.kind === 'level' && <>
       <SelectField label="First panel reference" value={draft.references[0]} onChange={value => update({ ...draft, references: [value as ConstraintReference, draft.references[1]] })}>{referenceOptions}</SelectField>
       <SelectField label="Second panel reference" value={draft.references[1]} onChange={value => update({ ...draft, references: [draft.references[0], value as ConstraintReference] })}>{referenceOptions}</SelectField>
+    </>}
+    {draft.kind === 'opening-ratio' && <>
+      <SelectField label="Opening direction" value={draft.axis} onChange={value => update({ ...draft, axis: value as 'x' | 'y' | 'z' })}><option value="y">Vertical · lower to upper (Y)</option><option value="x">Horizontal · left to right (X)</option><option value="z">Depth · back to front (Z)</option></SelectField>
+      <NumberField label="Opening 2 / opening 1" value={draft.ratio} unit="" precision={2} min={.01} max={100} step={.1} commitOnBlur onChange={ratio => update({ ...draft, ratio })}/>
+      <p className="field-note">Use 1 for equal openings, or 2 to keep the second twice as large. Choose each pair in the direction shown; adjacent openings can share a divider. Clearances include stock thickness and must stay nonnegative. Hardware and obstacles are not measured.</p>
     </>}
     {draft.kind === 'gap' && <>
       <SelectField label="Gap direction" value={draft.axis} onChange={value => {

@@ -362,3 +362,75 @@ test('constraint editing fits a narrow inspector and Escape restores focus', asy
   await expect(page.getByRole('group', { name: 'New constraint', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Add constraint', exact: true })).toBeFocused()
 })
+
+
+test('matches different cut axes through preview, cancellation, history and reload', async ({ page }) => {
+  const project: Project = { version: 1, name: 'Different cuts', connections: [], panels: [
+    createPanel({ id: 'left', name: 'Left panel', width: 600, height: 250, position: [-1000, 1200, 0] }),
+    createPanel({ id: 'right', name: 'Right panel', width: 350, height: 400, position: [1000, 1200, 0] }),
+  ] }
+  await importProject(page, project)
+  const original = await exportedProject(page)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Constraints')
+  const start = async () => {
+    await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+    await page.getByLabel('First panel cut dimension', { exact: true }).selectOption('width')
+    await expect(page.getByLabel('Second panel cut dimension', { exact: true })).toHaveValue('height')
+    await page.getByLabel('Second panel cut dimension', { exact: true }).selectOption('width')
+    await page.getByLabel('Second panel cut dimension', { exact: true }).selectOption('height')
+  }
+  await start()
+  await page.keyboard.press('Escape')
+  expect(await exportedProject(page)).toEqual(original)
+  await start()
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  const matched = await exportedProject(page)
+  expect(matched.panels.map(panel => [panel.width, panel.height])).toEqual([[600, 250], [350, 600]])
+  expect(matched.constraints?.[0]).toMatchObject({ kind: 'equal-dimension', dimension: 'width', secondDimension: 'height' })
+  await page.locator('.panel-list-select').first().click()
+  await setValue(page, 'Width', 700)
+  const resized = await exportedProject(page)
+  expect(resized.panels.map(panel => [panel.width, panel.height])).toEqual([[700, 250], [350, 700]])
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(matched)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(resized)
+  await page.reload()
+  expect(await exportedProject(page)).toEqual(resized)
+})
+
+for (const width of [1440, 390]) test(`saved opening proportions preview and persist at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const project: Project = { version: 1, name: 'Three shelves', connections: [], panels: [0, 318, 636].map((y, index) => createPanel({ id: ['a', 'b', 'c'][index], name: `Boundary ${index + 1}`, width: 600, height: 300, thickness: 18, rotation: [-Math.PI / 2, 0, 0], position: [0, 500 + y, 0] })) }
+  await importProject(page, project)
+  await page.getByRole('button', { name: 'All constraints', exact: true }).click()
+  const begin = async () => {
+    await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+    await page.getByLabel('Constraint type', { exact: true }).selectOption('opening-ratio')
+    await expect(page.getByLabel('Opening 1 end panel', { exact: true })).toHaveValue('b')
+    await expect(page.getByLabel('Opening 2 start panel', { exact: true })).toHaveValue('b')
+    await setValue(page, 'Opening 2 / opening 1', 2)
+  }
+  await begin()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect((await exportedProject(page)).constraints ?? []).toEqual([])
+  await begin()
+  await page.getByLabel('Opening 2 end panel', { exact: true }).selectOption('a')
+  await expect(page.locator('.constraint-status.is-blocked')).toContainText('different openings')
+  await page.getByLabel('Opening 2 end panel', { exact: true }).selectOption('c')
+  await page.screenshot({ path: test.info().outputPath('opening-ratio.png') })
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  const saved = await exportedProject(page)
+  expect(saved.constraints?.[0]).toMatchObject({ kind: 'opening-ratio', panelIds: ['a', 'b', 'b', 'c'], axis: 'y', ratio: 2 })
+  const first = saved.panels[1].position[1] - saved.panels[0].position[1] - 18
+  const second = saved.panels[2].position[1] - saved.panels[1].position[1] - 18
+  expect(second).toBeCloseTo(first * 2)
+  expect(first).toBeGreaterThanOrEqual(0)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  expect((await exportedProject(page)).constraints ?? []).toEqual([])
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(saved)
+  await page.reload()
+  expect(await exportedProject(page)).toEqual(saved)
+})

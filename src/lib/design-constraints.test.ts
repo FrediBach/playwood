@@ -238,3 +238,21 @@ describe('design rule lifecycle', () => {
     expect(() => moveAssemblies(grounded, [instance.id], [0, 10, 0])).toThrow('above floor')
   })
 })
+
+
+describe('cross-dimension rules', () => {
+  it('round-trips explicit axes, preserves legacy defaults, and remaps copies', () => {
+    const rule: DesignConstraint = { ...equal, secondDimension: 'width' }
+    const source = { ...project(), constraints: [rule] }
+    expect(roundTripProject(source).constraints).toEqual([rule])
+    expect(roundTripProject({ ...source, constraints: [equal] }).constraints).toEqual([equal])
+    expect(measureDesignConstraint(rule, source.panels)).toMatchObject({ actual: 300, violation: 300 })
+    const copies = copyDesignConstraints([rule], new Map([['a', 'copy-a'], ['b', 'copy-b']]))
+    expect(copies[0]).toMatchObject({ panelIds: ['copy-a', 'copy-b'], dimension: 'height', secondDimension: 'width' })
+    expect(copies[0].id).not.toBe(rule.id)
+  })
+
+  it.each([null, 'depth', 12, {}])('rejects an invalid second dimension: %j', secondDimension => {
+    expect(() => parseProject({ ...project(), constraints: [{ ...equal, secondDimension }] })).toThrow(/dimension/)
+  })
+})

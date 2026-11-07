@@ -35,6 +35,14 @@ describe('design constraint measurement geometry', () => {
     expect(new Set(after.lines.map(line => line.id)).size).toBe(2)
   })
 
+  it('draws each matched cut on its own local axis', () => {
+    const result = designConstraintMeasurements({ id: 'cross', kind: 'equal-dimension', enabled: true, panelIds: [lower.id, upper.id], dimension: 'width', secondDimension: 'height' }, [lower, upper])!
+    const directions = result.lines.map(line => new Vector3(...line.to).sub(new Vector3(...line.from)))
+    expect(directions[0].length()).toBeCloseTo(600)
+    expect(directions[1].length()).toBeCloseTo(300)
+    expect(directions[0].dot(directions[1])).toBeCloseTo(0)
+  })
+
   it('measures a gap between stock boundaries, excluding thickness', () => {
     const result = designConstraintMeasurements({ id: 'gap', kind: 'gap', enabled: true, panelIds: [lower.id, upper.id], axis: 'y', relation: 'exact', value: 282 }, [lower, upper])!
     const line = result.lines[0]

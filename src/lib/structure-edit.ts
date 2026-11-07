@@ -4,7 +4,7 @@ import { resolvePanels, validateProject } from './model'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { isPanelConnectedToAssembly } from './assemblies'
-import { designConstraintLimits, designConstraintPanelIds, describeDesignConstraint, evaluateDesignConstraints } from './design-constraints'
+import { designConstraintLimits, designConstraintCoordinate, designConstraintPanelIds, describeDesignConstraint, evaluateDesignConstraints } from './design-constraints'
 import { refitOutlineClosures } from './outline-closures'
 import { assertNoNewTrofastIssues } from './trofast'
 import type { Connection, ConstraintReference, Panel, Project, Vec3 } from './types'
@@ -263,7 +263,10 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     if (rule.kind === 'equal-dimension' || (rule.kind === 'dimension'
       && ((limits.min !== undefined && limits.min === limits.max)
         || (edit.kind === 'reconcile' && (evaluation.violation > 0 || physicallySupported.has(rule.panelId)))))) {
-      for (const id of designConstraintPanelIds(rule)) controlledDimensions.add(`${id}/${rule.dimension}`)
+      designConstraintPanelIds(rule).forEach((id, index) => {
+        const dimension = rule.kind === 'equal-dimension' && index === 1 ? rule.secondDimension ?? rule.dimension : rule.dimension
+        controlledDimensions.add(`${id}/${dimension}`)
+      })
     }
     // Build the change in the measured quantity once. Edge contributions also
     // subtract prescribed thickness changes from the right-hand side.
@@ -273,8 +276,20 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     } else if (rule.kind === 'dimension') {
       add(target, indices.get(rule.panelId)! * 5 + (rule.dimension === 'width' ? 3 : 4), 1)
     } else if (rule.kind === 'equal-dimension') {
-      add(target, indices.get(rule.panelIds[1])! * 5 + (rule.dimension === 'width' ? 3 : 4), 1)
+      add(target, indices.get(rule.panelIds[1])! * 5 + ((rule.secondDimension ?? rule.dimension) === 'width' ? 3 : 4), 1)
       add(target, indices.get(rule.panelIds[0])! * 5 + (rule.dimension === 'width' ? 3 : 4), -1)
+    } else if (rule.kind === 'opening-ratio') {
+      const axis = worldAxes[['x', 'y', 'z'].indexOf(rule.axis)]
+      for (const [start, factor] of [[0, -rule.ratio], [2, 1]]) {
+        const a = indices.get(rule.panelIds[start])!, b = indices.get(rule.panelIds[start + 1])!
+        edge(target, b, axis, -1, factor)
+        edge(target, a, axis, 1, -factor)
+        const gap = designConstraintCoordinate(frames[b].panel, 'min', rule.axis) - designConstraintCoordinate(frames[a].panel, 'max', rule.axis)
+        const nonnegative = { entries: new Map<number, number>(), value: -gap }
+        edge(nonnegative, b, axis, -1)
+        edge(nonnegative, a, axis, 1, -1)
+        bounds.push(nonnegative)
+      }
     } else if (rule.kind === 'level') {
       edge(target, indices.get(rule.panelIds[1])!, worldAxes[1], referenceSide(rule.references[1]))
       edge(target, indices.get(rule.panelIds[0])!, worldAxes[1], referenceSide(rule.references[0]), -1)
@@ -552,8 +567,9 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       const anchorRow = anchored ? row : preference
       if (rule.kind === 'equal-dimension') {
         const id = rule.panelIds.includes(edit.anchorPanelId ?? '') ? edit.anchorPanelId! : rule.panelIds[0]
-        add(anchorRow(), indices.get(id)! * 5 + (rule.dimension === 'width' ? 3 : 4), 1)
-      } else if (rule.kind === 'level' || rule.kind === 'gap') {
+        const dimension = id === rule.panelIds[1] ? rule.secondDimension ?? rule.dimension : rule.dimension
+        add(anchorRow(), indices.get(id)! * 5 + (dimension === 'width' ? 3 : 4), 1)
+      } else if (rule.kind === 'level' || rule.kind === 'gap' || rule.kind === 'opening-ratio') {
         const id = rule.panelIds.includes(edit.anchorPanelId ?? '') ? edit.anchorPanelId! : rule.panelIds[0]
         worldAxes.forEach(axis => center(anchorRow(), indices.get(id)!, axis))
       } else if (rule.kind === 'floor') {

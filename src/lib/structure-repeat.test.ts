@@ -142,7 +142,7 @@ describe('structure repeat', () => {
     expect(validateProject(extended.project)).toEqual([])
   })
 
-  it('reuses equivalent local axes and existing dimension rules, but rejects an unrepresentable copied equality', () => {
+  it('remaps each matching cut independently when reusing panels with swapped local axes', () => {
     const base = gridProject('Wide source', [200], [450], { depth: 600 })
     const selected = base.panels.find(panel => panel.name === 'Shelf 1.1')!
     const originalTop = resolvePanels(base).find(panel => panel.id === top(base).id)!
@@ -166,9 +166,11 @@ describe('structure repeat', () => {
     expect(moveStructureRepeat(continued, continued.pitch).count).toBe(1)
     const constrained: Project = { ...original, constraints: [...original.constraints!,
       { id: 'matching', kind: 'equal-dimension', panelIds: [originalTop.id, selected.id], dimension: 'width', enabled: true }] }
-    const blocked = prepareStructureRepeat(constrained, selected.id, [1, 0, 0])
-    expect(moveStructureRepeat(blocked, blocked.pitch)).toMatchObject({ project: constrained, count: 0, limited: true,
-      reason: expect.stringContaining('different local axes') })
+    const repeat = prepareStructureRepeat(constrained, selected.id, [1, 0, 0])
+    const matched = moveStructureRepeat(repeat, repeat.pitch)
+    expect(matched.count, matched.reason).toBe(1)
+    expect(matched.project.constraints!.at(-1)).toMatchObject({ kind: 'equal-dimension', dimension: 'height', secondDimension: 'width', panelIds: [ceiling.id, matched.selectedPanelId] })
+    expect(validateProject(roundTripProject(matched.project))).toEqual([])
   })
 
   it.each([0, 37])('reuses matching depth frames and preserves their hardware (%i degree rotation)', angle => {
