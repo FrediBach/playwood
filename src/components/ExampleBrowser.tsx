@@ -16,26 +16,14 @@ export interface SyncedProjectLibrary {
 
 export function ExampleBrowser({ compact = false, onSelect, onInsertAssembly, myAssemblies, onImportAssembly, assemblyImportError, syncedProjects }: { syncedProjects?: SyncedProjectLibrary; compact?: boolean; onSelect: (id: string) => void; onInsertAssembly?: (id: string) => void; myAssemblies?: ReactNode; onImportAssembly?: () => void; assemblyImportError?: string }) {
   const [collection, setCollection] = useState<'builds' | 'assemblies'>('builds')
-  const library = collection === 'builds' ? EXAMPLE_LIBRARY : ASSEMBLY_LIBRARY
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('all')
-  const categories = useMemo(() => [...new Set(library.map(example => example.category))], [library])
-  const search = query.trim().toLocaleLowerCase()
-  const matches = library.filter(example => (category === 'all' || example.category === category)
-    && `${example.name} ${example.description} ${example.category}`.toLocaleLowerCase().includes(search))
-  const showBlank = collection === 'builds' && category === 'all' && (!search || 'a blank canvas start with a single panel'.includes(search))
+  const { categories, search, matches, showBlank } = useExampleMatches(collection, query, category)
   return <LibraryPreviewProvider><div className={`example-browser${compact ? ' example-browser-compact' : ''}`}>
     <div className="example-collection" role="group" aria-label="Library collection">
       {(['builds', 'assemblies'] as const).map(value => <button key={value} aria-pressed={collection === value} onClick={() => { setCollection(value); setCategory('all'); setQuery('') }}>{value === 'builds' ? 'Full builds' : 'Assemblies'}</button>)}
     </div>
-    {collection === 'assemblies' && <>
-      {onImportAssembly && <div className="assembly-file-import">
-        <Button variant="outline" className="full-button" onClick={onImportAssembly}><Upload size={15}/>Import assembly</Button>
-        <p className="assembly-help">Select panels or an assembly to attach it. Clear the selection to place it freely.</p>
-        {assemblyImportError && <p role="alert" className="error-message">{assemblyImportError}</p>}
-      </div>}
-      {myAssemblies}<p className="example-count">{onInsertAssembly ? 'Insert a reusable module into your build, then duplicate or connect it.' : 'Start with a reusable module, then duplicate or connect it.'}</p>
-    </>}
+    {collection === 'assemblies' && <AssemblyLibraryIntro onImport={onImportAssembly} error={assemblyImportError} canInsert={!!onInsertAssembly}>{myAssemblies}</AssemblyLibraryIntro>}
     <div className="example-filters">
       <label className="example-search"><Search size={15} aria-hidden="true"/><span className="visually-hidden">Search examples</span>
         <input type="search" placeholder="Search examples" value={query} onChange={event => setQuery(event.target.value)} />
@@ -49,6 +37,27 @@ export function ExampleBrowser({ compact = false, onSelect, onInsertAssembly, my
     <ExampleCards compact={compact} matches={matches} collection={collection} onInsertAssembly={onInsertAssembly} onSelect={onSelect} showBlank={showBlank}/>
     {!matches.length && !showBlank && <div className="example-empty"><p>No examples match your search.</p><button onClick={() => { setQuery(''); setCategory('all') }}>Show all examples</button></div>}
   </div></LibraryPreviewProvider>
+}
+
+function useExampleMatches(collection: 'builds' | 'assemblies', query: string, category: string) {
+  const library = collection === 'builds' ? EXAMPLE_LIBRARY : ASSEMBLY_LIBRARY
+  const categories = useMemo(() => [...new Set(library.map(example => example.category))], [library])
+  const search = query.trim().toLocaleLowerCase()
+  const matches = library.filter(example => (category === 'all' || example.category === category)
+    && `${example.name} ${example.description} ${example.category}`.toLocaleLowerCase().includes(search))
+  const showBlank = collection === 'builds' && category === 'all' && (!search || 'a blank canvas start with a single panel'.includes(search))
+  return { categories, search, matches, showBlank }
+}
+
+function AssemblyLibraryIntro({ onImport, error, canInsert, children }: { onImport?: () => void; error?: string; canInsert: boolean; children?: ReactNode }) {
+  return <>
+    {onImport && <div className="assembly-file-import">
+      <Button variant="outline" className="full-button" onClick={onImport}><Upload size={15}/>Import assembly</Button>
+      <p className="assembly-help">Select panels or an assembly to attach it. Clear the selection to place it freely.</p>
+      {error && <p role="alert" className="error-message">{error}</p>}
+    </div>}
+    {children}<p className="example-count">{canInsert ? 'Insert a reusable module into your build, then duplicate or connect it.' : 'Start with a reusable module, then duplicate or connect it.'}</p>
+  </>
 }
 
 function ExampleCards({ compact, matches, collection, onInsertAssembly, onSelect, showBlank }: { compact: boolean; matches: ExampleDefinition[]; collection: "builds" | "assemblies"; onInsertAssembly: ((id: string) => void)|undefined; onSelect: (id: string) => void; showBlank: boolean })  {
