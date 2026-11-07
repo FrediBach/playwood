@@ -478,14 +478,20 @@ function SceneOverlays(props: SceneProps & { shownPanels: Panel[] }) {
   const sideGuidePanel = props.attachmentSideGuide && !realisticPreview && !exploded && !props.boxSelectActive
     ? shownPanels.find(panel => panel.id === props.attachmentSideGuide!.panelId) : undefined
   return <>
-    <ConstraintLabels>
-    {!exploded && !realisticPreview && props.spaceConstraint && <SpaceConstraintOverlay space={props.spaceConstraint} panels={panels}/> }
-    {!exploded && !realisticPreview && props.overviewConstraints?.filter(rule => rule.id !== props.designConstraint?.id).map(rule => <DesignConstraintOverlay key={rule.id} constraint={rule} panels={panels} compact/>)}
-    {!exploded && !realisticPreview && props.designConstraint && <DesignConstraintOverlay constraint={props.designConstraint} panels={panels}/>}
-    </ConstraintLabels>
+    <SceneConstraintGuides panels={panels} exploded={exploded} realisticPreview={realisticPreview}
+      spaceConstraint={props.spaceConstraint} overviewConstraints={props.overviewConstraints} designConstraint={props.designConstraint}/>
     {props.dragSnap && <DragSnapNotice snap={props.dragSnap}/>}
     {sideGuidePanel && props.attachmentSideGuide && <AttachmentSideGuide panel={sideGuidePanel} guide={props.attachmentSideGuide}/>}
   </>
+}
+
+function SceneConstraintGuides({ panels, exploded, realisticPreview, spaceConstraint, overviewConstraints, designConstraint }: Pick<SceneProps, 'panels' | 'exploded' | 'realisticPreview' | 'spaceConstraint' | 'overviewConstraints' | 'designConstraint'>) {
+  const visible = !exploded && !realisticPreview
+  return <ConstraintLabels>
+    {visible && spaceConstraint && <SpaceConstraintOverlay space={spaceConstraint} panels={panels}/>}
+    {visible && overviewConstraints?.filter(rule => rule.id !== designConstraint?.id).map(rule => <DesignConstraintOverlay key={rule.id} constraint={rule} panels={panels} compact/>)}
+    {visible && designConstraint && <DesignConstraintOverlay constraint={designConstraint} panels={panels}/>}
+  </ConstraintLabels>
 }
 
 function DragSnapNotice({ snap }: { snap: NonNullable<SceneProps['dragSnap']> })  {
@@ -500,16 +506,33 @@ function SceneMovement(props: SceneProps & { feedback: ReturnType<typeof useScen
   </>
 }
 
-function World(props: WorldProps) {
+/** A blocker inspection belongs to the exact handle set that was inspected. */
+function useResizeBlockerInspection(props: SceneProps) {
   const [inspection, setInspection] = useState<{ id: string; handles: SceneProps['resizeHandles'] } | null>(null)
   const blockers = !props.boxSelectActive && !props.dragging && !props.resizing && !props.exploded && props.movementEnabled
     && inspection?.handles === props.resizeHandles ? props.resizeHandles?.find(handle => handle.id === inspection?.id)?.blocked : undefined
-  const { panels, previewPanels = EMPTY_PANELS, attachmentBoundsPanels = EMPTY_PANELS, showGrid, showDimensions, exploded, realisticPreview } = props
+  const inspectBlockers = (id: string | null) => setInspection(id ? { id, handles: props.resizeHandles } : null)
+  return { blockers, inspectBlockers }
+}
+
+function useDisplayPanels(panels: Panel[], exploded: boolean) {
   const displayPanels = useMemo(() => {
     if (!exploded) return panels
     const center = boundsOf(panels).getCenter(new THREE.Vector3())
     return panels.map(panel => ({ ...panel, position: vector(panel.position).sub(center).multiplyScalar(1.45).add(center).multiplyScalar(1 / MM).toArray() as Vec3 }))
   }, [panels, exploded])
+  return displayPanels
+}
+
+function SceneVacuum({ plan, panels, dragging, resizing, boxSelectActive, designConstraint }: Pick<SceneProps, 'panels' | 'dragging' | 'resizing' | 'boxSelectActive' | 'designConstraint'> & { plan: ReturnType<typeof createVacuumPlan> | null }) {
+  if (!plan) return null
+  return <RobotVacuum plan={plan} projectPanels={panels} controlsEnabled={!dragging && !resizing && !boxSelectActive && !designConstraint}/>
+}
+
+function World(props: WorldProps) {
+  const { blockers, inspectBlockers } = useResizeBlockerInspection(props)
+  const { panels, previewPanels = EMPTY_PANELS, attachmentBoundsPanels = EMPTY_PANELS, showGrid, showDimensions, exploded, realisticPreview } = props
+  const displayPanels = useDisplayPanels(panels, exploded)
   const bounds = useMemo(() => boundsOf(displayPanels), [displayPanels])
   const vacuumPlan = useMemo(() => realisticPreview ? createVacuumPlan(bounds, displayPanels, props.furnishings) : null, [realisticPreview, bounds, displayPanels, props.furnishings])
   const cameraBounds = useMemo(() => {
@@ -525,7 +548,7 @@ function World(props: WorldProps) {
     <SceneMovement {...props} feedback={feedback}/>
     <SceneCamera props={props} realisticPreview={realisticPreview}/>
     <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} snapSettings={props.snapSettings} guides={feedback.guides}/>
-    {vacuumPlan && <RobotVacuum plan={vacuumPlan} projectPanels={displayPanels} controlsEnabled={!props.dragging && !props.resizing && !props.boxSelectActive && !props.designConstraint} />}
+    <SceneVacuum plan={vacuumPlan} panels={displayPanels} dragging={props.dragging} resizing={props.resizing} boxSelectActive={props.boxSelectActive} designConstraint={props.designConstraint}/>
     {displayPanels.filter(panel => !panel.visible && panel.wireframe).map(panel => <PanelWireframe key={panel.id} panel={panel}/>)}
     <SceneParts {...props} shownPanels={shownPanels}
       constraintPanelIds={[...props.constraintPanelIds ?? [], ...blockers?.panelIds ?? []]}
@@ -533,7 +556,7 @@ function World(props: WorldProps) {
     {!realisticPreview && !exploded && props.constructionLayer && <SceneObjects layer={props.constructionLayer} boxSelectActive={props.boxSelectActive} boxPreview={props.boxPreview}/>}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     <SceneOverlays {...props} shownPanels={shownPanels}/>
-    <SceneResizeHandles {...props} feedback={feedback} onInspectBlockers={id => setInspection(id ? { id, handles: props.resizeHandles } : null)}/>
+    <SceneResizeHandles {...props} feedback={feedback} onInspectBlockers={inspectBlockers}/>
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
     <CameraController panMode={props.panMode} bounds={cameraBounds} vacuumDock={vacuumPlan?.dock} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
