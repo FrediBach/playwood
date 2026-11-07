@@ -34,12 +34,14 @@ export function useEditorState(project: Project) {
   const [dialog,setDialog]=useState<ProjectDialog>(null)
   const [pendingConnectionFit,setPendingConnectionFit]=useState<{source:Project;fit:NonNullable<ReturnType<typeof getAutoConnectFit>>}|null>(null)
   const [movementReview,setMovementReview]=useState<MovementReview|null>(null)
+  const [overlapRepair,setOverlapRepair]=useState<{source:Project;panelId:string}|null>(null)
+  if(overlapRepair&&overlapRepair.source!==project) setOverlapRepair(null)
   const [equalSizes,setEqualSizes]=useState<{source:Project;ids:string[]}|null>(null)
   if(equalSizes&&equalSizes.source!==project) setEqualSizes(null)
   const [resizeReview,setResizeReview]=useState<ResizeReview|null>(null)
   const [connectorInfill,setConnectorInfill]=useState<{source:Project;ids:string[]}|null>(null)
   const [objectConversion,setObjectConversion]=useState<{source:Project;ids:string[]}|null>(null)
-  const modalOpen=!!equalSizes||!!movementReview||!!resizeReview||!!dialog||!!pendingConnectionFit||!!connectorInfill||!!objectConversion
+  const modalOpen=!!overlapRepair||!!equalSizes||!!movementReview||!!resizeReview||!!dialog||!!pendingConnectionFit||!!connectorInfill||!!objectConversion
   useEffect(()=>setPendingConnectionFit(current=>current&&current.source!==project?null:current),[project])
   if(movementReview&&movementReview.source!==project) setMovementReview(null)
   if(resizeReview&&resizeReview.source!==project) setResizeReview(null)
@@ -76,7 +78,7 @@ export function useEditorState(project: Project) {
   const importRef=useRef<HTMLInputElement>(null)
   const assemblyImportRef=useRef<HTMLInputElement>(null)
   const [assemblyImportError,setAssemblyImportError]=useState('')
-  return { equalSizes, setEqualSizes, assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds, connectorTypeError, setConnectorTypeError, selectedIds, setPanelSelection, setSelectedIds, setSelectedId, contextMenu, setContextMenu, constraintFooter, setConstraintFooter, projectConstraintsOpen, setProjectConstraintsOpen, constraintPicker, pickingConstraint, setPickingConstraint, panelEditError, setPanelEditError, closeContextMenu, toolRequest, setToolRequest, inspectorTab, setInspectorTab, trofastPreview, previewTrofast, dialog, setDialog, pendingConnectionFit, setPendingConnectionFit, resizeReview, setResizeReview, movementReview, setMovementReview, connectorInfill, setConnectorInfill, objectConversion, setObjectConversion, modalOpen, pendingTemplate, setPendingTemplate, draft, setDraft, attachTarget, setAttachTarget, attachment, setAttachment, attachmentSideHighlight, setAttachmentSideHighlight, view, setView, boxSelectActive, setBoxSelectActive, realisticPreview, setRealisticPreview, showGrid, setShowGrid, showDimensions, setShowDimensions, exploded, setExploded, fitSignal, setFitSignal, zoomSignal, setZoomSignal, frameSignal, setFrameSignal, leftOpen, setLeftOpen, rightOpen, setRightOpen, toast, setToast, importError, setImportError, importRef, assemblyImportRef, assemblyImportError, setAssemblyImportError }
+  return { overlapRepair, setOverlapRepair, equalSizes, setEqualSizes, assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds, connectorTypeError, setConnectorTypeError, selectedIds, setPanelSelection, setSelectedIds, setSelectedId, contextMenu, setContextMenu, constraintFooter, setConstraintFooter, projectConstraintsOpen, setProjectConstraintsOpen, constraintPicker, pickingConstraint, setPickingConstraint, panelEditError, setPanelEditError, closeContextMenu, toolRequest, setToolRequest, inspectorTab, setInspectorTab, trofastPreview, previewTrofast, dialog, setDialog, pendingConnectionFit, setPendingConnectionFit, resizeReview, setResizeReview, movementReview, setMovementReview, connectorInfill, setConnectorInfill, objectConversion, setObjectConversion, modalOpen, pendingTemplate, setPendingTemplate, draft, setDraft, attachTarget, setAttachTarget, attachment, setAttachment, attachmentSideHighlight, setAttachmentSideHighlight, view, setView, boxSelectActive, setBoxSelectActive, realisticPreview, setRealisticPreview, showGrid, setShowGrid, showDimensions, setShowDimensions, exploded, setExploded, fitSignal, setFitSignal, zoomSignal, setZoomSignal, frameSignal, setFrameSignal, leftOpen, setLeftOpen, rightOpen, setRightOpen, toast, setToast, importError, setImportError, importRef, assemblyImportRef, assemblyImportError, setAssemblyImportError }
 }
 
 export function createPaletteActions(commit: ReturnType<typeof useProject>['commit'],project: Project,setDraft: React.Dispatch<React.SetStateAction<Panel>>): Pick<React.ComponentProps<typeof PanelPaletteProvider>, 'onAddColor' | 'onUpdateColor' | 'onRemoveColor'> {

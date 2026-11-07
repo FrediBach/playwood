@@ -67,6 +67,10 @@ Starting a blank project, applying a template, and importing a project also use 
 
 ## Preview and draft transactions
 
+### Panel overlap repair
+
+`useEditorState.overlapRepair` holds the source snapshot and clicked panel ID outside history. `PanelOverlapDialog` uses `panel-overlap-repair.ts` to search a bounded set of joint-preserving moves and local edge trims. Each accepted search step removes an overlap without introducing new validation diagnostics. The review lists all resolved panel changes; failure offers no partial candidate. Apply uses a functional source-identity guard and one history entry. Project changes invalidate the review, modal guards block background edits, and Cancel/Escape returns focus without changing the project. The existing conservative panel overlap checks still apply to shaped panels; this is not fabrication validation.
+
 ### Equal panel sizes
 
 `useEditorState.equalSizes` holds a source snapshot and selection outside history. `EqualPanelSizesDialog` offers existing values and a custom numeric input for the sole differing width, height, or thickness and lists selected sizes plus all resolved candidate changes. `equalizePanelSizes` uses the simultaneous constrained dimension solver and insert checks; linked assembly members are excluded. Apply checks source identity inside a functional commit, producing one history entry. Modal guards block background gestures, project changes invalidate the dialog, and Cancel/Escape discards the draft. No saved fields or persistent equality rules are added.

@@ -9,6 +9,7 @@ interface PanelListProps extends ListGroupingProps {
   selectedIds: string[]
   issues: ValidationIssue[]
   onSelect: (id: string, additive?: boolean) => void
+  onRepair: (id: string) => void
   onRename: (id: string, name: string) => void
   onRemove: (id: string) => void
   onToggleVisibility: (id: string) => void
@@ -37,7 +38,7 @@ function PanelName({ panel, onRename, onDone }: { panel: Panel; onRename: PanelL
     }} />
 }
 
-export function PanelList({ panels, selectedIds, issues, onSelect, onRename, onRemove, onToggleVisibility, ...grouping }: PanelListProps) {
+export function PanelList({ panels, selectedIds, issues, onSelect, onRepair, onRename, onRemove, onToggleVisibility, ...grouping }: PanelListProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const overlaps = useMemo(() => {
@@ -84,7 +85,7 @@ export function PanelList({ panels, selectedIds, issues, onSelect, onRename, onR
                   onKeyDown={event => { if (event.key === 'F2') { event.preventDefault(); setEditingId(panel.id) } }}>
                   <span className="panel-list-name">{panel.name}</span>
                 </button>}
-              {!!overlapNames.length && <Tooltip label={overlapLabel}><button className="panel-overlap-indicator" aria-label={overlapLabel} onClick={() => onSelect(panel.id)}><TriangleAlert size={13} /></button></Tooltip>}
+              {!!overlapNames.length && <Tooltip label={overlapLabel}><button className="panel-overlap-indicator" aria-label={overlapLabel} onClick={() => onRepair(panel.id)}><TriangleAlert size={13} /></button></Tooltip>}
             </div>
             <div className="panel-row-details">
               <button className="panel-dimensions" title={dimensions(panel)} onClick={event => onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey)}>{dimensions(panel)}</button>

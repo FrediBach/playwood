@@ -1,3 +1,4 @@
+import { PanelOverlapDialog } from '@/components/PanelOverlapDialog'
 import { EqualPanelSizesDialog } from '@/components/EqualPanelSizesDialog'
 import { MovementAlternativesDialog } from '@/components/MovementAlternativesDialog'
 import { ResizeAlternativesDialog } from '@/components/ResizeAlternativesDialog'
@@ -48,7 +49,7 @@ import { useCallback,useEffect,useMemo,useState } from 'react'
 export default function App() {
   const {project,documentId,getSnapshot,commit,undo,redo,canUndo,canRedo,saveStatus,repairNotice}=useProject()
   const {
-  equalSizes, setEqualSizes, assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds,
+  overlapRepair, setOverlapRepair, equalSizes, setEqualSizes, assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds,
   connectorTypeError, setConnectorTypeError, selectedIds, setPanelSelection,
   setSelectedIds, setSelectedId, contextMenu, setContextMenu,
   constraintFooter, setConstraintFooter, projectConstraintsOpen, setProjectConstraintsOpen,
@@ -183,6 +184,7 @@ export default function App() {
       onOpen: name => { setDialog('sync'); void directorySync.openProject(name) },
     } : undefined,
     objects, objectControlsDisabled, chooseObject, setRightOpen, setFrameSignal, setLeftOpen, commit, notify, assemblyTab,
+    onRepairPanel: panelId => setOverlapRepair({source:project,panelId}),
     changeAssemblyTab, listGrouping, panels, selectedIds, issues, choosePanel, selectedPanels, connectorCount,
     connectorSummary, assembly, setPanelSelection, selectAll, physicalConnectors, selectedConnectorIds, selectConnectors,
     setDialog, addPanel, loadTemplate, insertModule, instance, clipboard, insertSavedAssembly, setAssemblyImportError,
@@ -237,6 +239,10 @@ export default function App() {
     <ProjectStatus panelCount={project.panels.length} connectorCount={connectorCount} issueCount={issues.length} bounds={bounds} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')}/>
     {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
 
+    {overlapRepair&&overlapRepair.source===project&&<PanelOverlapDialog {...overlapRepair} onCancel={()=>setOverlapRepair(null)} onApply={candidate=>{
+      try { commit(current=>{if(current!==overlapRepair.source)throw new Error('The project changed. Reopen the overlap repair.');return candidate});setOverlapRepair(null);notify('Panel overlaps repaired. Undo is available.') }
+      catch(error) { notify(error instanceof Error?error.message:'Could not repair panel overlaps.') }
+    }}/>}
     {equalSizes&&equalSizes.source===project&&<EqualPanelSizesDialog {...equalSizes} onCancel={()=>setEqualSizes(null)} onApply={candidate=>{
       try { commit(current=>{if(current!==equalSizes.source)throw new Error('The project changed. Reopen Make sizes equal.');return candidate});setEqualSizes(null);notify('Panel sizes updated. Undo is available.') }
       catch(error) { notify(error instanceof Error?error.message:'These sizes could not be applied.') }

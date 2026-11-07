@@ -35,6 +35,8 @@ Sync reads JSON files directly inside the chosen folder; it does not scan subfol
 
 The preview’s **All constraints** button shows a badge counting saved rules (including paused rules) plus enabled Build space. Open it to see compact measurement guides: blue cut dimensions, green floor/level references, purple gaps/opening ratios, and ochre fixed positions/setbacks, each with its own icon. Paused rules use gray dashed lines. Hover or focus an inspector rule for its full measurement; editing isolates the draft. Closing the inspector hides the rule overview. Guides appear in Studio, outside exploded view.
 
+Click an amber overlap icon in the panel list to open **Fix panel overlaps**. Review the proposed size and position changes for every affected panel, then choose **Apply automatic fix**. Cancel or Escape leaves the construction unchanged; Undo restores an accepted repair. Automatic repair tries joint-preserving moves and edge trims. If none fit the existing rules, the dialog explains that manual editing is needed.
+
 ## Design workflow
 
 - Open **Assembly → Objects → Add a box** to sketch with translucent blue volumes and outlines; selected objects appear in magenta. Enter **Box width/height/depth**, center coordinates, and 90° rotations, then **Apply object changes**. **Cancel** or **Escape** discards the draft. Boxes use outside dimensions in millimeters. They appear in Studio and disappear entirely in Realistic preview and exploded view.

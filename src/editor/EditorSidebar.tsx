@@ -16,6 +16,7 @@ import { type SetStateAction } from 'react'
 
 
 interface EditorSidebarProps {
+  onRepairPanel: (id: string) => void
   syncedProjects?: SyncedProjectLibrary
   objects: ReturnType<typeof useConstructionEditor>
   objectControlsDisabled: boolean
@@ -54,7 +55,7 @@ interface EditorSidebarProps {
 }
 
 export function EditorSidebar({
-  objects, objectControlsDisabled, chooseObject, setRightOpen,
+  onRepairPanel, objects, objectControlsDisabled, chooseObject, setRightOpen,
   setFrameSignal, setLeftOpen, commit, notify,
   assemblyTab, changeAssemblyTab, listGrouping, panels,
   selectedIds, issues, choosePanel, selectedPanels,
@@ -75,6 +76,7 @@ export function EditorSidebar({
       selectedIds: selectedIds,
       issues: issues,
       onSelect: choosePanel,
+      onRepair: onRepairPanel,
       onRename: (id,name) => commit(p => ({ ...p,panels: p.panels.map(panel => panel.id===id? { ...panel,name }:panel) })),
       onRemove: id => { commit(p => removePanel(p,id)); notify('Panel removed. Undo to bring it back.') },
       onToggleVisibility: id => commit(p => ({ ...p,panels: p.panels.map(panel => panel.id===id? { ...panel,visible: !panel.visible }:panel) })),
