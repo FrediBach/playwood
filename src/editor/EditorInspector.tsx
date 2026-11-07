@@ -11,6 +11,8 @@ import { InspectorDisclosure } from '@/components/InspectorPrimitives'
 import { InspectorSidebar } from '@/components/InspectorSidebar'
 import { MultiPanelInspector } from '@/components/MultiPanelInspector'
 import { ParallelPanelSplit } from '@/components/ParallelPanelSplit'
+import { SelectionLocation } from '@/components/SelectionLocation'
+import { connectorLocation, objectLocation, panelLocation } from '@/lib/selection-location'
 import { SinglePanelInspector } from '@/components/SinglePanelInspector'
 import { SpaceConstraintInspector } from '@/components/SpaceConstraintInspector'
 import { Button } from '@/components/ui/button'
@@ -152,6 +154,7 @@ export function EditorInspector({
     attachmentStatus={previewResult.error||attachmentErrors[0]?.message||(previewProject? 'Panel thickness is compatible · Ready to attach':undefined)}
     footer={renderInspectorFooter({ constraints, setConstraintFooter, clipboard, attachmentSummary, assembly, attachmentWarning, assemblyHint, managingProjectConstraints, closeProjectConstraints })}>
     <EditorBuildSpace projectConstraintsOpen={projectConstraintsOpen} clipboard={clipboard} assembly={assembly} inspectorTab={inspectorTab} constraints={constraints} project={project} panels={panels} commit={commit} setFitSignal={setFitSignal} notify={notify}/>
+    {!managingProjectConstraints && !assembly.editingInstance && inspectorTab === 'panel' && <SelectionLocation location={objectMode ? objectLocation(objects.objects, objects.selectedIds) : inspectingConnectors ? connectorLocation(project, selectedConnectorIds) : panelLocation(project, selectedIds)}/>}
     {objectMode? <ConstructionObjectInspector editor={objects} disabled={objectControlsDisabled} conversionReason={objectConversionReason(project,objects.selectedIds)} onConvert={() => setObjectConversion({ source: project,ids: [...objects.selectedIds] })} />:inspectingConnectors? <SelectedConnectorInspector
     openConnectorInfill={openConnectorInfill}
     infillReason={infillReason}
