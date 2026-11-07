@@ -508,3 +508,35 @@ test('all constraints badge and typed overview follow the inspector lifecycle', 
   await expect(labels).toHaveCount(0)
   await expect(button.locator('.constraints-toolbar-badge')).toHaveText('4')
 })
+
+test('constraint labels separate coincident measurements after camera and viewport changes', async ({ page }) => {
+  const project = shelfProject()
+  project.constraints = [
+    { id: 'equal', enabled: true, kind: 'equal-dimension', panelIds: ['lower', 'upper'], dimension: 'width' },
+    { id: 'lower-width', enabled: true, kind: 'dimension', panelId: 'lower', dimension: 'width', value: 600 },
+    { id: 'upper-width', enabled: true, kind: 'dimension', panelId: 'upper', dimension: 'width', value: 600 },
+    { id: 'floor', enabled: true, kind: 'floor', panelId: 'lower', reference: 'max', value: 218 },
+    { id: 'gap', enabled: true, kind: 'gap', panelIds: ['lower', 'upper'], axis: 'y', relation: 'exact', value: 382 },
+  ]
+  await importProject(page, project)
+  await page.getByRole('button', { name: 'All constraints', exact: true }).click()
+  const labels = page.locator('[data-constraint-id]')
+  await expect(labels).toHaveCount(6)
+  const checkLayout = async () => {
+    await expect.poll(async () => labels.evaluateAll(elements => {
+      const boxes = elements.map(element => element.getBoundingClientRect())
+      const canvas = document.querySelector('canvas')!.getBoundingClientRect()
+      return boxes.every((box, index) => box.width > 0 && box.left >= canvas.left && box.right <= canvas.right &&
+        box.top >= canvas.top && box.bottom <= canvas.bottom && boxes.slice(index + 1).every(other =>
+          box.right <= other.left || box.left >= other.right || box.bottom <= other.top || box.top >= other.bottom))
+    })).toBe(true)
+  }
+  await checkLayout()
+  await page.screenshot({ path: test.info().outputPath('separated-constraint-labels.png') })
+  await page.getByLabel('Camera view', { exact: true }).selectOption('front')
+  await checkLayout()
+  await page.setViewportSize({ width: 1000, height: 800 })
+  await checkLayout()
+  await page.getByLabel('Camera view', { exact: true }).selectOption('perspective')
+  await checkLayout()
+})

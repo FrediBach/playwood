@@ -20,6 +20,7 @@ import { AttachmentSideGuide,type AttachmentSideGuideState } from './AttachmentS
 import './box-selection.css'
 import { ConnectorMeshes } from './ConnectorMeshes'
 import { ConstructionObjectLayer,type ConstructionLayerProps } from './ConstructionObjectLayer'
+import { ConstraintLabels } from './ConstraintLabels'
 import { DesignConstraintOverlay } from './DesignConstraintOverlay'
 import { createPanelMaterials } from './panel-materials'
 import { PreviewBoxSelection,type BoxSelectionPreview,type BoxSelectionProps } from './PreviewBoxSelection'
@@ -463,9 +464,11 @@ function SceneOverlays(props: SceneProps & { shownPanels: Panel[] }) {
   const sideGuidePanel = props.attachmentSideGuide && !realisticPreview && !exploded && !props.boxSelectActive
     ? shownPanels.find(panel => panel.id === props.attachmentSideGuide!.panelId) : undefined
   return <>
+    <ConstraintLabels>
     {!exploded && !realisticPreview && props.spaceConstraint && <SpaceConstraintOverlay space={props.spaceConstraint} panels={panels}/> }
     {!exploded && !realisticPreview && props.overviewConstraints?.filter(rule => rule.id !== props.designConstraint?.id).map(rule => <DesignConstraintOverlay key={rule.id} constraint={rule} panels={panels} compact/>)}
     {!exploded && !realisticPreview && props.designConstraint && <DesignConstraintOverlay constraint={props.designConstraint} panels={panels}/>}
+    </ConstraintLabels>
     {props.dragSnap && <DragSnapNotice snap={props.dragSnap}/>}
     {sideGuidePanel && props.attachmentSideGuide && <AttachmentSideGuide panel={sideGuidePanel} guide={props.attachmentSideGuide}/>}
   </>

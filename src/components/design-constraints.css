@@ -51,3 +51,7 @@
 .constraint-rule-measurement{display:flex;align-items:center;gap:5px}
 .constraint-rule-measurement svg{flex-shrink:0}
 .constraint-rule-label.is-compact{padding:2px 5px;font-size:10px;background:#fafcf4e8;box-shadow:none}
+
+.constraint-label-position{position:absolute;top:0;left:0;width:max-content;visibility:hidden}
+.constraint-label-leader{position:absolute;top:0;left:0;overflow:visible;pointer-events:none}
+.constraint-rule-label.is-compact{background:#fafcf4}

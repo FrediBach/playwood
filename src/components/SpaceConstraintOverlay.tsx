@@ -1,4 +1,5 @@
-import { Html, Line } from '@react-three/drei'
+import { ConstraintLabel } from './ConstraintLabels'
+import { Line } from '@react-three/drei'
 import { spaceBounds, spaceClearances } from '@/lib/space-constraint'
 import type { Panel, SpaceConstraint, Vec3 } from '@/lib/types'
 
@@ -15,6 +16,6 @@ export function SpaceConstraintOverlay({ space, panels }: { space: SpaceConstrai
       const close = rows.some(row => faces.some(face => row.clearances[face] <= 10))
       return <Line key={`${index}-${axis}`} points={[point, corners[index | (1 << axis)]]} color={close ? '#d18431' : '#6a8750'} lineWidth={close ? 2.5 : 1} transparent opacity={0.8} depthTest={false}/>
     }))}
-    <Html position={[max[0] / 1000, max[1] / 1000, max[2] / 1000]} style={{ pointerEvents: 'none' }}><span className="constraint-overlay-label" role="status">Build space · {space.width} × {space.height} × {space.depth} mm{near.length > 0 && <small>{outside ? 'Outside build space' : 'Space boundary reached'} · {near.map(row => row.panel.name).join(', ')}</small>}</span></Html>
+    <ConstraintLabel id="build-space" color="#6a8750" position={[max[0] / 1000, max[1] / 1000, max[2] / 1000]}><span className="constraint-overlay-label" role="status">Build space · {space.width} × {space.height} × {space.depth} mm{near.length > 0 && <small>{outside ? 'Outside build space' : 'Space boundary reached'} · {near.map(row => row.panel.name).join(', ')}</small>}</span></ConstraintLabel>
   </group>
 }
