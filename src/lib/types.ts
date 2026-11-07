@@ -76,6 +76,9 @@ interface DesignConstraintBase { id: string; enabled: boolean }
 /** User-authored design requirements, distinct from physical connector joints. */
 export type DesignConstraint = DesignConstraintBase & (
   | ({ kind: 'floor'; panelId: string; reference: ConstraintReference } & ConstraintRequirement)
+  | { kind: 'position'; panelId: string; axis: 'x' | 'y' | 'z'; reference: ConstraintReference; value: number }
+  /** Signed second reference minus first reference along the chosen world axis. */
+  | { kind: 'setback'; panelIds: [string, string]; axis: 'x' | 'y' | 'z'; references: [ConstraintReference, ConstraintReference]; value: number }
   | ({ kind: 'dimension'; panelId: string; dimension: 'width' | 'height' } & ConstraintRequirement)
   /** Omitted secondDimension matches the first panel's dimension in legacy saves. */
   | { kind: 'equal-dimension'; panelIds: [string, string]; dimension: 'width' | 'height'; secondDimension?: 'width' | 'height' }

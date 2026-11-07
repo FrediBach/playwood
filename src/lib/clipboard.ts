@@ -18,7 +18,7 @@ export function copySelection(project: Project, ids: string[], connectorIds: str
     if (joints.has(jointKey(connection.id))) { selected.add(connection.parentId); selected.add(connection.childId) }
   }
   ids = [...selected]
-  const constraints = project.constraints?.filter(constraint => constraint.kind !== 'floor' && designConstraintPanelIds(constraint).every(id => selected.has(id)))
+  const constraints = project.constraints?.filter(constraint => constraint.kind !== 'floor' && constraint.kind !== 'position' && designConstraintPanelIds(constraint).every(id => selected.has(id)))
   const rules = constraints?.length ? { constraints } : {}
   const instance = ids.length ? getAssemblyInstance(project, ids[0]) : undefined
   if (!connectorIds.length && instance && ids.length === Object.keys(instance.panelIds).length && Object.values(instance.panelIds).every(id => selected.has(id))) {

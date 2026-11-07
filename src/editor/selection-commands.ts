@@ -169,8 +169,8 @@ export function createSelectionCommands({ assembly, commit, selectedIds, notify,
       const pairRules=project.constraints?.filter(rule => 'panelIds' in rule&&!assemblyPanelIds?.some(ids => rule.panelIds.every(id => ids.has(id))))
       const copiedRules=copyDesignConstraints(pairRules,copiedPanels)
       if(copiedRules.length) next={ ...next,constraints: [...next.constraints??[],...copiedRules] }
-      const omittedRules=project.constraints?.filter(rule => designConstraintPanelIds(rule).some(id => copiedPanels.has(id))&&(rule.kind==='floor'||designConstraintPanelIds(rule).some(id => !copiedPanels.has(id)))).length??0
-      commit(next); assembly.close(); setSelectedIds(copies); if(copied.size) setFrameSignal(v => v+1); notify(`${copied.size? 'Linked instances duplicated':'Panels duplicated'}${omittedRules? `. ${omittedRules} floor or external ${omittedRules===1? 'constraint stays':'constraints stay'} with the originals.`:''}`)
+      const omittedRules=project.constraints?.filter(rule => designConstraintPanelIds(rule).some(id => copiedPanels.has(id))&&(rule.kind==='floor'||rule.kind==='position'||designConstraintPanelIds(rule).some(id => !copiedPanels.has(id)))).length??0
+      commit(next); assembly.close(); setSelectedIds(copies); if(copied.size) setFrameSignal(v => v+1); notify(`${copied.size? 'Linked instances duplicated':'Panels duplicated'}${omittedRules? `. ${omittedRules} absolute-position or external ${omittedRules===1? 'constraint stays':'constraints stay'} with the originals.`:''}`)
     } catch(error) { notify(error instanceof Error? error.message:'This selection could not be duplicated.')}
   }
   return { duplicateSelected,deleteSelected,detachSelection,splitSelection,distributeSelection,moveSelection }

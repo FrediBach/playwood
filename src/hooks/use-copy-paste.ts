@@ -59,8 +59,8 @@ export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commi
         const item = copySelection(project, selectedIds, selectedConnectorIds)
         setClipboard(item); cancel()
         const ids=new Set(item.kind === 'selection' ? item.panels.map(panel => panel.id) : item.kind === 'assembly' ? Object.values(item.instance.panelIds) : [item.panel.id])
-        const omitted=project.constraints?.filter(rule=>designConstraintPanelIds(rule).some(id=>ids.has(id))&&(rule.kind==='floor'||designConstraintPanelIds(rule).some(id=>!ids.has(id)))).length??0
-        notify(`${item.kind === 'panel' ? 'Panel' : item.kind === 'assembly' ? 'Assembly' : 'Selection'} copied.${omitted?` ${omitted} floor or external ${omitted===1?'constraint stays':'constraints stay'} with the original.`:''} Select a target and press Ctrl/Cmd+V.`)
+        const omitted=project.constraints?.filter(rule=>designConstraintPanelIds(rule).some(id=>ids.has(id))&&(rule.kind==='floor'||rule.kind==='position'||designConstraintPanelIds(rule).some(id=>!ids.has(id)))).length??0
+        notify(`${item.kind === 'panel' ? 'Panel' : item.kind === 'assembly' ? 'Assembly' : 'Selection'} copied.${omitted?` ${omitted} absolute-position or external ${omitted===1?'constraint stays':'constraints stay'} with the original.`:''} Select a target and press Ctrl/Cmd+V.`)
       } catch (error) { notify((error as Error).message) }
     },
     paste: () => {

@@ -189,7 +189,11 @@ export function rescaleProject(project: Project, changes: Record<string, number>
     before.min[1] - after.min[1], (before.min[2] + before.max[2] - after.min[2] - after.max[2]) / 2]
   // Default grounding is only an editing preference. An explicit elevation
   // already solved above owns vertical placement, including its chosen surface.
-  if (project.constraints?.some(rule => rule.enabled && rule.kind === 'floor')) shift[1] = 0
+  for (const rule of project.constraints ?? []) {
+    if (!rule.enabled) continue
+    if (rule.kind === 'floor') shift[1] = 0
+    if (rule.kind === 'position') shift[['x', 'y', 'z'].indexOf(rule.axis)] = 0
+  }
   if (shift.some(value => Math.abs(value) > EPSILON)) next = moveProject(next, shift)
   const previousIssues = new Set(validateProject(project).map(issue => issue.id))
   const issue = validateProject(next).find(item => !previousIssues.has(item.id)

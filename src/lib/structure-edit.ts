@@ -271,7 +271,13 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     // Build the change in the measured quantity once. Edge contributions also
     // subtract prescribed thickness changes from the right-hand side.
     const target = row(-evaluation.actual)
-    if (rule.kind === 'floor') {
+    if (rule.kind === 'position') {
+      edge(target, indices.get(rule.panelId)!, worldAxes[['x', 'y', 'z'].indexOf(rule.axis)], referenceSide(rule.reference))
+    } else if (rule.kind === 'setback') {
+      const axis = worldAxes[['x', 'y', 'z'].indexOf(rule.axis)]
+      edge(target, indices.get(rule.panelIds[1])!, axis, referenceSide(rule.references[1]))
+      edge(target, indices.get(rule.panelIds[0])!, axis, referenceSide(rule.references[0]), -1)
+    } else if (rule.kind === 'floor') {
       edge(target, indices.get(rule.panelId)!, worldAxes[1], referenceSide(rule.reference))
     } else if (rule.kind === 'dimension') {
       add(target, indices.get(rule.panelId)! * 5 + (rule.dimension === 'width' ? 3 : 4), 1)
@@ -569,9 +575,11 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         const id = rule.panelIds.includes(edit.anchorPanelId ?? '') ? edit.anchorPanelId! : rule.panelIds[0]
         const dimension = id === rule.panelIds[1] ? rule.secondDimension ?? rule.dimension : rule.dimension
         add(anchorRow(), indices.get(id)! * 5 + (dimension === 'width' ? 3 : 4), 1)
-      } else if (rule.kind === 'level' || rule.kind === 'gap' || rule.kind === 'opening-ratio') {
+      } else if (rule.kind === 'level' || rule.kind === 'gap' || rule.kind === 'opening-ratio' || rule.kind === 'setback') {
         const id = rule.panelIds.includes(edit.anchorPanelId ?? '') ? edit.anchorPanelId! : rule.panelIds[0]
         worldAxes.forEach(axis => center(anchorRow(), indices.get(id)!, axis))
+      } else if (rule.kind === 'position') {
+        worldAxes.forEach((axis, index) => { if (index !== ['x', 'y', 'z'].indexOf(rule.axis)) center(preference(), indices.get(rule.panelId)!, axis) })
       } else if (rule.kind === 'floor') {
         for (const axis of [worldAxes[0], worldAxes[2]]) center(preference(), indices.get(rule.panelId)!, axis)
       }

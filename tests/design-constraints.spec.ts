@@ -434,3 +434,46 @@ for (const width of [1440, 390]) test(`saved opening proportions preview and per
   await page.reload()
   expect(await exportedProject(page)).toEqual(saved)
 })
+
+for (const width of [1440, 390]) test(`fixed references and signed setbacks persist at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
+  const project: Project = { version: 1, name: 'Reference rules', connections: [], panels: [
+    createPanel({ id: 'a', name: 'Reference shelf', width: 600, height: 300, position: [-1000, 1000, 0], rotation: [-Math.PI / 2, 0, 0] }),
+    createPanel({ id: 'b', name: 'Inset shelf', width: 500, height: 200, position: [1000, 1000, -40], rotation: [-Math.PI / 2, 0, 0] }),
+  ] }
+  await importProject(page, project)
+  await page.getByRole('button', { name: 'All constraints', exact: true }).click()
+  const fixed = async () => {
+    await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+    await page.getByLabel('Constraint type', { exact: true }).selectOption('position')
+    await expect(page.getByLabel('Fixed coordinate', { exact: true })).toHaveValue('-1300')
+    await setValue(page, 'Fixed coordinate', -1400)
+  }
+  await fixed()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect((await exportedProject(page)).constraints ?? []).toEqual([])
+  await fixed()
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  const positioned = await exportedProject(page)
+  expect(positioned.panels[0].position[0]).toBeCloseTo(-1100)
+  expect(positioned.constraints?.[0]).toMatchObject({ kind: 'position', axis: 'x', reference: 'min', value: -1400 })
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  await page.getByLabel('Constraint type', { exact: true }).selectOption('setback')
+  await expect(page.getByLabel('Signed setback', { exact: true })).toHaveValue('-90')
+  await page.getByLabel('First panel reference', { exact: true }).selectOption('center')
+  await expect(page.getByLabel('Signed setback', { exact: true })).toHaveValue('60')
+  await page.getByLabel('First panel reference', { exact: true }).selectOption('max')
+  await setValue(page, 'Signed setback', -50)
+  await page.screenshot({ path: test.info().outputPath('setback.png') })
+  await page.getByRole('button', { name: 'Add constraint', exact: true }).click()
+  const saved = await exportedProject(page)
+  expect(saved.constraints?.[1]).toMatchObject({ kind: 'setback', panelIds: ['a', 'b'], axis: 'z', references: ['max', 'max'], value: -50 })
+  expect(saved.panels[1].position[2]).toBeCloseTo(0)
+  expect(saved.panels[0].position[0]).toBeCloseTo(-1100)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(positioned)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(saved)
+  await page.reload()
+  expect(await exportedProject(page)).toEqual(saved)
+})

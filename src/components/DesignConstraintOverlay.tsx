@@ -14,7 +14,7 @@ export function DesignConstraintOverlay({ constraint, panels }: Props) {
   if (!constraint) return null
   const measurement = designConstraintMeasurements(constraint, panels)
   if (!measurement) return null
-  const requirement = constraint.kind === 'floor' || constraint.kind === 'dimension' || constraint.kind === 'gap' ? describeDesignConstraintRequirement(constraint) : undefined
+  const requirement = constraint.kind === 'floor' || constraint.kind === 'dimension' || constraint.kind === 'gap' || constraint.kind === 'position' || constraint.kind === 'setback' ? describeDesignConstraintRequirement(constraint) : undefined
   const color = !constraint.enabled ? '#92988a' : measurement.violation ? '#af753e' : '#6a8750'
   return <group>{measurement.lines.map(line => {
     const from = meters(line.from), to = meters(line.to)

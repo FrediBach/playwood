@@ -33,6 +33,25 @@ export function designConstraintMeasurements(constraint: DesignConstraint, panel
   if (constraint.kind === 'dimension' || constraint.kind === 'equal-dimension') {
     lines.push(cutDimensionLine(a, constraint.dimension))
     if (constraint.kind === 'equal-dimension' && b) lines.push(cutDimensionLine(b, constraint.secondDimension ?? constraint.dimension))
+  } else if (constraint.kind === 'position' || (constraint.kind === 'setback' && b)) {
+    const axis = axes[constraint.axis]
+    const otherBounds = b ? getDesignConstraintBounds(b) : boundsA
+    const from = boundsA.max.map((value, index) => Math.max(value, otherBounds.max[index]) + 65) as Vec3
+    const to: Vec3 = [...from]
+    const first: Vec3 = [...boundsA.max]
+    const second: Vec3 = [...otherBounds.max]
+    if (constraint.kind === 'position') {
+      from[axis] = 0
+      to[axis] = designConstraintCoordinate(a, constraint.reference, constraint.axis)
+      first[axis] = to[axis]
+      lines.push({ id: constraint.id, from, to, label: `${constraint.axis.toUpperCase()} coordinate · ${format(result.actual)}`, leaders: [[first, to]] })
+    } else {
+      from[axis] = designConstraintCoordinate(a, constraint.references[0], constraint.axis)
+      to[axis] = designConstraintCoordinate(b!, constraint.references[1], constraint.axis)
+      first[axis] = from[axis]
+      second[axis] = to[axis]
+      lines.push({ id: constraint.id, from, to, label: `${constraint.axis.toUpperCase()} setback · ${format(result.actual)}`, leaders: [[first, from], [second, to]] })
+    }
   } else if (constraint.kind === 'floor') {
     const height = designConstraintCoordinate(a, constraint.reference)
     const anchor: Vec3 = [boundsA.max[0], height, boundsA.max[2]]

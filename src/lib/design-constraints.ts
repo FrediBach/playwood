@@ -24,6 +24,7 @@ export function designConstraintPanelIds(constraint: DesignConstraint): string[]
 /** Inclusive limits in millimeters; missing limits leave that direction free. */
 export function designConstraintLimits(constraint: DesignConstraint): { min?: number; max?: number } {
   if (constraint.kind === 'equal-dimension' || constraint.kind === 'level' || constraint.kind === 'opening-ratio') return { min: 0, max: 0 }
+  if (constraint.kind === 'position' || constraint.kind === 'setback') return { min: constraint.value, max: constraint.value }
   switch (constraint.relation) {
     case 'minimum': return { min: constraint.value }
     case 'maximum': return { max: constraint.value }
@@ -82,7 +83,9 @@ export function measureDesignConstraint(constraint: DesignConstraint, resolvedPa
     const error = Math.max(Math.abs(actual), -gaps[0], -gaps[1])
     return { constraint, actual, target: 0, violation: error <= DESIGN_CONSTRAINT_TOLERANCE ? 0 : error }
   }
-  const actual = constraint.kind === 'floor' ? designConstraintCoordinate(a, constraint.reference)
+  const actual = constraint.kind === 'position' ? designConstraintCoordinate(a, constraint.reference, constraint.axis)
+    : constraint.kind === 'setback' ? designConstraintCoordinate(b, constraint.references[1], constraint.axis) - designConstraintCoordinate(a, constraint.references[0], constraint.axis)
+    : constraint.kind === 'floor' ? designConstraintCoordinate(a, constraint.reference)
     : constraint.kind === 'dimension' ? a[constraint.dimension]
       : constraint.kind === 'equal-dimension' ? b[constraint.secondDimension ?? constraint.dimension] - a[constraint.dimension]
         : constraint.kind === 'level' ? designConstraintCoordinate(b, constraint.references[1]) - designConstraintCoordinate(a, constraint.references[0])
@@ -111,6 +114,8 @@ export function describeDesignConstraint(constraint: DesignConstraint, panels: r
   const reference = (value: ConstraintReference) => value === 'min' ? 'bottom' : value === 'max' ? 'top' : 'center'
   switch (constraint.kind) {
     case 'floor': return `${name(constraint.panelId)} ${reference(constraint.reference)}: ${describeDesignConstraintRequirement(constraint)} above floor`
+    case 'position': return `${name(constraint.panelId)} ${constraint.reference} reference: ${format(constraint.value)} on world ${constraint.axis.toUpperCase()}`
+    case 'setback': return `${name(constraint.panelIds[1])} ${constraint.references[1]} − ${name(constraint.panelIds[0])} ${constraint.references[0]}: ${format(constraint.value)} along ${constraint.axis.toUpperCase()}`
     case 'dimension': return `${name(constraint.panelId)} ${constraint.dimension}: ${describeDesignConstraintRequirement(constraint)}`
     case 'equal-dimension': return constraint.secondDimension && constraint.secondDimension !== constraint.dimension
       ? `${name(constraint.panelIds[0])} ${constraint.dimension} = ${name(constraint.panelIds[1])} ${constraint.secondDimension}`
@@ -167,6 +172,14 @@ export function parseDesignConstraints(raw: unknown, panels: readonly Panel[]): 
     ids.add(value.id)
     const base = { id: value.id, enabled: value.enabled }
     switch (value.kind) {
+      case 'position':
+      case 'setback': {
+        if (value.axis !== 'x' && value.axis !== 'y' && value.axis !== 'z') throw new Error('Invalid design rule axis.')
+        if (['relation', 'min', 'max'].some(field => field in value)) throw new Error('Position and setback rules require one exact value.')
+        if (value.kind === 'position') return { ...base, kind: 'position', panelId: panel(value.panelId), axis: value.axis, reference: reference(value.reference), value: amount(value.value, -100000, 100000) }
+        if (!Array.isArray(value.references) || value.references.length !== 2) throw new Error('A setback rule needs two measurement references.')
+        return { ...base, kind: 'setback', panelIds: pair(value.panelIds), axis: value.axis, references: [reference(value.references[0]), reference(value.references[1])], value: amount(value.value, -200000, 200000) }
+      }
       case 'floor': return { ...base, kind: 'floor', panelId: panel(value.panelId), reference: reference(value.reference), ...requirement(value, 0, 100000) }
       case 'dimension': return { ...base, kind: 'dimension', panelId: panel(value.panelId), dimension: dimension(value.dimension), ...requirement(value, 40, 4000) }
       case 'equal-dimension': {
@@ -200,10 +213,10 @@ export function parseDesignConstraints(raw: unknown, panels: readonly Panel[]): 
   })
 }
 
-/** Copy self-contained requirements. Absolute floor placement never follows a copy. */
+/** Copy self-contained requirements. Absolute floor/position placement never follows a copy. */
 export function copyDesignConstraints(constraints: readonly DesignConstraint[] | undefined, panelIds: ReadonlyMap<string, string>): DesignConstraint[] {
   return (constraints ?? []).flatMap(constraint => {
-    if (constraint.kind === 'floor' || designConstraintPanelIds(constraint).some(id => !panelIds.has(id))) return []
+    if (constraint.kind === 'floor' || constraint.kind === 'position' || designConstraintPanelIds(constraint).some(id => !panelIds.has(id))) return []
     const id = crypto.randomUUID()
     return [{ ...constraint, id, ...('panelId' in constraint ? { panelId: panelIds.get(constraint.panelId)! }
       : { panelIds: constraint.panelIds.map(panelId => panelIds.get(panelId)!) as typeof constraint.panelIds }) } as DesignConstraint]

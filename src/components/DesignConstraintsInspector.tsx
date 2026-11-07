@@ -35,9 +35,11 @@ type NumericConstraint = Extract<DesignConstraint, { kind: 'floor' | 'dimension'
 type RequirementMode = 'exact' | 'minimum' | 'maximum' | 'range'
 const isNumeric = (rule: DesignConstraint): rule is NumericConstraint => rule.kind === 'floor' || rule.kind === 'dimension' || rule.kind === 'gap'
 const format = (value: number) => `${Number(value.toFixed(1))} mm`
-const isPair = (kind: DesignConstraint['kind']) => kind === 'opening-ratio' || kind === 'equal-dimension' || kind === 'level' || kind === 'gap'
+const isPair = (kind: DesignConstraint['kind']) => kind === 'setback' || kind === 'opening-ratio' || kind === 'equal-dimension' || kind === 'level' || kind === 'gap'
 const referenceLabel = (reference: ConstraintReference) => reference === 'min' ? 'Bottom surface / edge' : reference === 'max' ? 'Top surface / edge' : 'Center'
 const ruleTypes: { value: DesignConstraint['kind']; label: string }[] = [
+  { value: 'position', label: 'Fixed reference position' },
+  { value: 'setback', label: 'Setback between references' },
   { value: 'floor', label: 'Height above floor' },
   { value: 'dimension', label: 'Panel dimension' },
   { value: 'equal-dimension', label: 'Equal panel dimensions' },
@@ -66,6 +68,8 @@ function defaultRule(kind: DesignConstraint['kind'], panels: Panel[], ids: strin
     const candidates = [...panels].sort((a, b) => a.position[1] - b.position[1])
     return { ...base, kind, panelIds: [candidates[0]?.id ?? '', candidates[1]?.id ?? '', candidates[1]?.id ?? '', candidates[2]?.id ?? ''], axis: 'y', ratio: 1 }
   }
+  if (kind === 'position') return { ...base, kind, panelId, axis: 'x', reference: 'min', value: first ? designConstraintCoordinate(first, 'min', 'x') : 0 }
+  if (kind === 'setback') return { ...base, kind, panelIds, axis: 'z', references: ['max', 'max'], value: first && second ? designConstraintCoordinate(second, 'max', 'z') - designConstraintCoordinate(first, 'max', 'z') : 0 }
   if (kind === 'floor') return { ...base, kind, panelId, reference: 'max', value: Math.max(0, first ? designConstraintCoordinate(first, 'max') : 0) }
   if (kind === 'dimension') return { ...base, kind, panelId, dimension: 'height', value: first?.height ?? 600 }
   if (kind === 'equal-dimension') return { ...base, kind, panelIds, dimension: 'height' }

@@ -1,3 +1,4 @@
+import { ReferenceConstraintFields } from './ReferenceConstraintFields'
 import { NumberField, SelectField } from './fields'
 import { designConstraintCoordinate, designConstraintPanelIds, measureDesignConstraint } from '@/lib/design-constraints'
 import type { ConstraintReference, DesignConstraint, Panel } from '@/lib/types'
@@ -16,6 +17,7 @@ export function DesignConstraintFields({draft, panels, update, resetMeasurement,
   const draftIds=designConstraintPanelIds(draft)
   const referenceOptions=<><option value="max">Top surface / edge</option><option value="min">Bottom surface / edge</option><option value="center">Center</option></>
   return <>
+    {(draft.kind === 'position' || draft.kind === 'setback') && <ReferenceConstraintFields draft={draft} panels={panels} update={update}/>}
     {draft.kind === 'floor' && <SelectField label="Measure from" value={draft.reference} onChange={value => {
       const reference = value as ConstraintReference
       const panel = panels.find(panel => panel.id === draft.panelId)

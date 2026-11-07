@@ -558,6 +558,11 @@ function expandCameraBounds(displayPanels: Panel[],previewPanels: Panel[],attach
   if(props.designConstraint) {
     bounds.expandByScalar(0.1)
     if(props.designConstraint.kind==='floor') bounds.min.y=Math.min(bounds.min.y,0)
+    if(props.designConstraint.kind==='position') {
+      const axis=props.designConstraint.axis
+      bounds.min[axis]=Math.min(bounds.min[axis],0)
+      bounds.max[axis]=Math.max(bounds.max[axis],0)
+    }
   }
   return bounds
 }
