@@ -4,6 +4,7 @@ import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { preparePreviewResize } from '../src/lib/preview-resize'
 import { autoConnect } from '../src/lib/auto-connect'
 import endShelves from '../src/test/fixtures/h-table-end-shelves.json' with { type: 'json' }
+import fixedCuts from '../src/test/fixtures/h-table-fixed-cuts.json' with { type: 'json' }
 import fixedGaps from '../src/test/fixtures/h-table-fixed-gaps.json' with { type: 'json' }
 import hTable from '../src/test/fixtures/h-table-auto-connect.json' with { type: 'json' }
 import type { Project, Vec3 } from '../src/lib/types'
@@ -398,15 +399,15 @@ test('the smaller top of a connected corner shelf grows with its wing', async ({
 })
 
 
-test('raising the H-table desktop arrow preserves the feet with fixed shelf gaps', async ({ page }) => {
-  const project = parseProject(fixedGaps)
+for (const distance of [-50, 50]) test(`moving the H-table desktop arrow by ${distance} preserves the feet with fixed shelf gaps`, async ({ page }) => {
+  const project = parseProject(distance < 0 ? fixedCuts : fixedGaps)
   const desktop = project.panels.find(panel => panel.name === 'Desktop')!
   await openProject(page, project)
   await page.locator('.panel-list-select').filter({ hasText: /^Desktop$/ }).click()
-  const handle = directionHandle(project, { panelId: desktop.id }, [0, 1, 0])
-  await beginResize(page, handle, 50)
+  const handle = directionHandle(project, { panelId: desktop.id }, [0, Math.sign(distance), 0])
+  await beginResize(page, handle, Math.abs(distance))
   await page.mouse.up()
-  await expect.poll(async () => resolvePanels(await savedProject(page)).find(panel => panel.id === desktop.id)!.position[1]).toBeGreaterThan(desktop.position[1] + 20)
+  await expect.poll(async () => (resolvePanels(await savedProject(page)).find(panel => panel.id === desktop.id)!.position[1] - desktop.position[1]) * Math.sign(distance)).toBeGreaterThan(20)
   const after = resolvePanels(await savedProject(page))
   for (const panel of project.panels.filter(panel => /leg$|spine/i.test(panel.name))) {
     expect(getProjectBounds([after.find(candidate => candidate.id === panel.id)!]).min[1], panel.name)

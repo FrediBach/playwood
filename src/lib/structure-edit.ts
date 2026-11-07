@@ -224,7 +224,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   const rows: Row[] = []
   const preferences = new Set<Row>()
   const interiorPreferences = new Set<Row>()
-  const oppositePreferences = new Set<Row>()
+  const boundaryPreferences: { rows: Set<Row>; distance: number }[] = []
   const bounds: Row[] = []
   const thicknessChange = (index: number) => edit.kind === 'resize'
     ? (edit.patches?.[frames[index].panel.id]?.thickness ?? frames[index].panel.thickness) - frames[index].panel.thickness : 0
@@ -530,6 +530,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   } else if (edit.kind === 'move') {
     const direction = edit.deltas ? selected.map(item => edit.deltas![item.panel.id]).find(delta => delta?.some(value => Math.abs(value) > EPSILON)) ?? edit.delta : edit.delta
     const axis = new Vector3(...direction).normalize()
+    // Anchor priority describes the construction, not the sign of the gesture.
+    if ((axis.toArray().find(value => Math.abs(value) > EPSILON) ?? 0) < 0) axis.negate()
     const physicalRoots = frames.map((_, index) => index)
     const physicalRoot = (index: number): number => { while (physicalRoots[index] !== index) { physicalRoots[index] = physicalRoots[physicalRoots[index]]; index = physicalRoots[index] } return index }
     for (const connection of connections) physicalRoots[physicalRoot(indices.get(connection.parentId)!)] = physicalRoot(indices.get(connection.childId)!)
@@ -545,6 +547,11 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       if (!moving.length) continue
       const minimum = Math.min(...group.map(index => coordinate(frames[index], axis, -1)))
       const maximum = Math.max(...group.map(index => coordinate(frames[index], axis, 1)))
+      const level = moving.reduce((sum, index) => sum + coordinate(frames[index], axis), 0) / moving.length
+      const ends = new Map([-1, 1].map(side => [side, {
+        rows: new Set<Row>(), distance: Math.abs((side === -1 ? minimum : maximum) - level),
+      }]))
+      boundaryPreferences.push(...ends.values())
       const touchesMin = moving.some(index => Math.abs(coordinate(frames[index], axis, -1) - minimum) < CONTACT_TOLERANCE)
       const touchesMax = moving.some(index => Math.abs(coordinate(frames[index], axis, 1) - maximum) < CONTACT_TOLERANCE)
       if (edit.kind === 'move' && moving.length === 1 && !touchesMin && !touchesMax
@@ -560,11 +567,11 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
             if (side * (coordinate(frames[index], axis, side) - level) > CONTACT_TOLERANCE) {
               const anchor = preference()
               interiorPreferences.add(anchor)
-              // Only the outermost supports are fallback references. Internal
-              // sections behind the selected shelf may need to follow a gap rule.
-              const hasPanelBehind = group.some(other => coordinate(frames[other], axis, 1)
-                < coordinate(frames[index], axis, -1) - CONTACT_TOLERANCE)
-              if (side === -1 && !hasPanelBehind) oppositePreferences.add(anchor)
+              // Include staggered feet/ends, but not internal sections with a
+              // separate panel wholly beyond their far edge.
+              const hasPanelBeyond = group.some(other => side * (coordinate(frames[other], axis, -side)
+                - coordinate(frames[index], axis, side)) > CONTACT_TOLERANCE)
+              if (!hasPanelBeyond) ends.get(side)!.rows.add(anchor)
               edge(anchor, index, axis, side)
             }
           }
@@ -576,7 +583,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
           const item = frames[index]
           if (!ids.has(item.panel.id) && Math.abs(coordinate(item, axis, side) - boundary) < CONTACT_TOLERANCE) {
             const anchor = preference()
-            if (side === -1) oppositePreferences.add(anchor)
+            ends.get(side)!.rows.add(anchor)
             edge(anchor, index, axis, side)
           }
         }
@@ -633,14 +640,25 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       if ((edit.kind === 'move' && edit.scope) || !constraints.length || !preferences.size) throw error
       // Explicit design intent outranks automatic center/exterior anchoring.
       // Joints, supported contacts, gesture targets and local-edit locks remain.
+      const hardRows = rows.filter(row => !preferences.has(row))
+      const groups = boundaryPreferences.filter(group => group.rows.size).sort((a, b) => b.distance - a.distance)
       try {
-        // A fixed opening ahead of a moving shelf can require the far boundary
-        // to follow it. Retain the supports behind the gesture before allowing
-        // explicit rules to release every automatic placement reference.
-        if (!oppositePreferences.size) throw error
-        changes = solveWithBounds(rows.filter(row => !preferences.has(row) || oppositePreferences.has(row)), bounds, weights)
+        if (!groups.length) throw error
+        changes = solveWithBounds([...hardRows, ...groups.flatMap(group => [...group.rows])], bounds, weights)
       } catch {
-        changes = solveWithBounds(rows.filter(row => !preferences.has(row)), bounds, weights)
+        changes = solveWithBounds(hardRows, bounds, weights)
+        // Keep feasible boundary groups, farthest from the selected panels first.
+        // A rule may force one end to follow the selection; that must not release
+        // the other end too. Every trial retains hard rules and stock bounds.
+        const retained = [...hardRows]
+        for (const group of groups) {
+          const candidate = [...retained, ...group.rows]
+          try {
+            const anchored = solveWithBounds(candidate, bounds, weights)
+            retained.push(...group.rows)
+            changes = anchored
+          } catch { /* This boundary must yield to the edit and its hard rules. */ }
+        }
       }
     }
   } catch (error) {
