@@ -1,7 +1,7 @@
 import { connectedExample } from './connected-examples'
 import { ASSEMBLY_LIBRARY } from './assembly-library'
 import { createStarterProject, parseProject } from './model'
-import monitorSpeakerTable from '../../resources/library-3d/user-projects/h-table-monitor-speaker-stand.json'
+import monitorSpeakerTable from '../../resources/library-3d/user-projects/h-table-monitor-speaker-stand.json' with { type: 'json' }
 import { CAD_EXAMPLES } from './cad-examples'
 import { PDF_EXAMPLES } from './pdf-examples'
 import { diamondShelfProject } from './photo-examples'

@@ -34,6 +34,8 @@ Uneven-depth closure proposals carry transient rim-extension descriptions on `Pa
 
 The editor composition components receive state and callbacks; changing inspector branches does not relocate application state into those branches. Local form drafts retain their existing keys and lifetimes. [use-displayed-panels.ts](../src/editor/use-displayed-panels.ts) chooses constraint and TROFAST preview geometry without committing it. Selection pruning and notification effects remain separate from history and never add an undo entry.
 
+`useEditorState` clears a pending connector-fit review when its source project changes, before rendering children, matching the resize and movement reviews. Palette changes also reconcile the attachment draft color before rendering: retain a color still in the palette, otherwise follow its stable palette ID to the replacement color or use the first palette color. These adjustments remain outside project history.
+
 ## A committed edit
 
 ```mermaid

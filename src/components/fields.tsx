@@ -4,7 +4,7 @@ import { panelCornerRadius } from '@/lib/panel-shape'
 import { getSharedPanelFields } from '@/lib/selection'
 import type { Panel,Pattern } from '@/lib/types'
 import { ChevronDown } from 'lucide-react'
-import { useEffect,useId,useRef,useState,type ReactNode } from 'react'
+import { useId,useState,type ReactNode } from 'react'
 import { FinishCoverageField } from './FinishCoverageField'
 import { PanelColorField } from './PanelColorField'
 import { PanelOutlineControl } from './PanelOutlineEditor'
@@ -19,21 +19,28 @@ export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,un
   // Native number spinners use min as their step origin. Align that origin to
   // zero-based nice multiples too (for example width min 80 with 25 mm steps).
   const { displayScale,firstNice,lastNice }=numberInputScale(rounding,min,max,precision)
-  const [text,setText] = useState(String(Math.round(value*displayScale)/displayScale))
+  const [text,setText] = useState(mixed?'':String(Math.round(value*displayScale)/displayScale))
   const [error,setError] = useState('')
-  const edited=useRef(false)
+  const [edited,setEdited]=useState(false)
+  const [source,setSource]=useState({value,mixed,displayScale,rounding})
   const id=useId()
   const unavailable=disabled||mixed
-  useEffect(()=>{setText(mixed?'':String(Math.round(value*displayScale)/displayScale));edited.current=false;setError('')},[value,mixed,displayScale,rounding])
-  const commit=createNumberCommit(unavailable,edited,text,rounding,min,max,onChange,setText,value,displayScale,setError)
+  // Reset before children render, retaining the input node and its focus.
+  if(!Object.is(source.value,value)||source.mixed!==mixed||source.displayScale!==displayScale||source.rounding!==rounding) {
+    setSource({value,mixed,displayScale,rounding})
+    setText(mixed?'':String(Math.round(value*displayScale)/displayScale))
+    setEdited(false)
+    setError('')
+  }
+  const commit=createNumberCommit(unavailable,edited,setEdited,text,rounding,min,max,onChange,setText,value,displayScale,setError)
   return <label className={`field ${unavailable?'field-disabled':''}`} htmlFor={id}>
     <span>{label}</span>
-    <NumberInput id={id} label={label} mixed={mixed} text={text} rounding={rounding} firstNice={firstNice} lastNice={lastNice} min={min} max={max} step={step} unavailable={unavailable} error={error} edited={edited} setText={setText} setError={setError} deferred={deferred} onChange={onChange} value={value} displayScale={displayScale} commit={commit} unit={unit}/>
+    <NumberInput id={id} label={label} mixed={mixed} text={text} rounding={rounding} firstNice={firstNice} lastNice={lastNice} min={min} max={max} step={step} unavailable={unavailable} error={error} setEdited={setEdited} setText={setText} setError={setError} deferred={deferred} onChange={onChange} value={value} displayScale={displayScale} commit={commit} unit={unit}/>
     {error&&<span id={`${id}-error`} className="error-message" role="alert">{error}</span>}
   </label>
 }
 
-function NumberInput({ id, label, mixed, text, rounding, firstNice, lastNice, min, max, step, unavailable, error, edited, setText, setError, deferred, onChange, value, displayScale, commit, unit }: { id: string; label: string; mixed: boolean; text: string; rounding: number|undefined; firstNice: number; lastNice: number; min: number; max: number; step: number; unavailable: boolean; error: string; edited: React.RefObject<boolean>; setText: React.Dispatch<React.SetStateAction<string>>; setError: React.Dispatch<React.SetStateAction<string>>; deferred: boolean; onChange: (v: number) => boolean|void; value: number; displayScale: number; commit: () => void; unit: string })  {
+function NumberInput({ id, label, mixed, text, rounding, firstNice, lastNice, min, max, step, unavailable, error, setEdited, setText, setError, deferred, onChange, value, displayScale, commit, unit }: { id: string; label: string; mixed: boolean; text: string; rounding: number|undefined; firstNice: number; lastNice: number; min: number; max: number; step: number; unavailable: boolean; error: string; setEdited: React.Dispatch<React.SetStateAction<boolean>>; setText: React.Dispatch<React.SetStateAction<string>>; setError: React.Dispatch<React.SetStateAction<string>>; deferred: boolean; onChange: (v: number) => boolean|void; value: number; displayScale: number; commit: () => void; unit: string })  {
   return <div className="number-wrap">
     <input
     id={id}
@@ -48,15 +55,15 @@ function NumberInput({ id, label, mixed, text, rounding, firstNice, lastNice, mi
     disabled={unavailable}
     aria-invalid={!!error}
     aria-describedby={error? `${id}-error`:undefined}
-    onChange={createNumberChange(unavailable,edited,setText,setError,deferred,min,max,onChange,value,displayScale)}
+    onChange={createNumberChange(unavailable,setEdited,setText,setError,deferred,min,max,onChange,value,displayScale)}
     onBlur={commit}
     onKeyDown={e => { if(e.key==='Enter') { e.preventDefault(); e.currentTarget.blur()}  } } />
     {!mixed&&<span className="input-unit">{unit}</span>}
   </div>
 }
 
-function createNumberChange(unavailable: boolean,edited: React.RefObject<boolean>,setText: React.Dispatch<React.SetStateAction<string>>,setError: React.Dispatch<React.SetStateAction<string>>,deferred: boolean,min: number,max: number,onChange: (v: number) => boolean|void,value: number,displayScale: number) {
-  return (e: React.ChangeEvent<HTMLInputElement>) => { if(unavailable) return; const text=e.target.value; edited.current=true; setText(text); setError(''); const n=Number(text); if(!deferred&&text.trim()&&Number.isFinite(n)&&n>=min&&n<=max) { edited.current=false; if(onChange(n)===false) setText(String(Math.round(value*displayScale)/displayScale))}  }
+function createNumberChange(unavailable: boolean,setEdited: React.Dispatch<React.SetStateAction<boolean>>,setText: React.Dispatch<React.SetStateAction<string>>,setError: React.Dispatch<React.SetStateAction<string>>,deferred: boolean,min: number,max: number,onChange: (v: number) => boolean|void,value: number,displayScale: number) {
+  return (e: React.ChangeEvent<HTMLInputElement>) => { if(unavailable) return; const text=e.target.value; setEdited(true); setText(text); setError(''); const n=Number(text); if(!deferred&&text.trim()&&Number.isFinite(n)&&n>=min&&n<=max) { setEdited(false); if(onChange(n)===false) setText(String(Math.round(value*displayScale)/displayScale))}  }
 }
 
 function numberInputScale(rounding: number|undefined,min: number,max: number,precision: number) {
@@ -66,12 +73,12 @@ function numberInputScale(rounding: number|undefined,min: number,max: number,pre
   return { displayScale,firstNice,lastNice }
 }
 
-function createNumberCommit(unavailable: boolean,edited: React.RefObject<boolean>,text: string,rounding: number|undefined,min: number,max: number,onChange: (v: number) => boolean|void,setText: React.Dispatch<React.SetStateAction<string>>,value: number,displayScale: number,setError: React.Dispatch<React.SetStateAction<string>>) {
+function createNumberCommit(unavailable: boolean,edited: boolean,setEdited: React.Dispatch<React.SetStateAction<boolean>>,text: string,rounding: number|undefined,min: number,max: number,onChange: (v: number) => boolean|void,setText: React.Dispatch<React.SetStateAction<string>>,value: number,displayScale: number,setError: React.Dispatch<React.SetStateAction<string>>) {
   return () => {
     // Display precision must not become a model edit just because a user tabs
     // through the field. In particular, rotated coordinates retain their value.
-    if(unavailable||!edited.current) return
-    edited.current=false
+    if(unavailable||!edited) return
+    setEdited(false)
     const n=Number(text)
     if(text.trim()&&Number.isFinite(n)) {
       try {

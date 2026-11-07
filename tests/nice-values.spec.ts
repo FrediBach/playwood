@@ -70,6 +70,39 @@ test('enabling nice values rounds unique measurements in one saved, undoable edi
   await expect(dialog.getByLabel('Nice value step', { exact: true })).toHaveValue('10')
 })
 
+test('untouched rounded fields preserve precise values after undo and redo', async ({ page }) => {
+  const source = panelProject(112.345, 118.765)
+  source.panels[0].position[0] = 123.456
+  await importProject(page, source)
+  const original = await exportedProject(page)
+  const width = page.getByLabel('Width', { exact: true })
+  const position = page.getByLabel('Position X', { exact: true })
+  await expect(width).toHaveValue('112.3')
+  await expect(position).toHaveValue('123.5')
+  await width.focus()
+  await width.press('Tab')
+  await position.focus()
+  await position.press('Tab')
+  expect(await exportedProject(page)).toEqual(original)
+
+  await width.fill('137.625')
+  await expect(width).toBeFocused()
+  await width.press('Enter')
+  await expect(width).toHaveValue('137.6')
+  const changed = await exportedProject(page)
+  expect(changed.panels[0].width).toBeCloseTo(137.625)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  await expect(width).toHaveValue('112.3')
+  await width.focus()
+  await width.press('Tab')
+  expect(await exportedProject(page)).toEqual(original)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  await expect(width).toHaveValue('137.6')
+  await width.focus()
+  await width.press('Tab')
+  expect(await exportedProject(page)).toEqual(changed)
+})
+
 test('fields keep typing local, round on Enter or blur, support custom steps, and stop rounding when disabled', async ({ page }) => {
   const source = { ...panelProject(110, 120), niceValues: { enabled: true, step: 10 } }
   await importProject(page, source)

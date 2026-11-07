@@ -42,23 +42,23 @@ export function useEditorState(project: Project) {
   const [connectorInfill,setConnectorInfill]=useState<{source:Project;ids:string[]}|null>(null)
   const [objectConversion,setObjectConversion]=useState<{source:Project;ids:string[]}|null>(null)
   const modalOpen=!!overlapRepair||!!equalSizes||!!movementReview||!!resizeReview||!!dialog||!!pendingConnectionFit||!!connectorInfill||!!objectConversion
-  useEffect(()=>setPendingConnectionFit(current=>current&&current.source!==project?null:current),[project])
+  if(pendingConnectionFit&&pendingConnectionFit.source!==project) setPendingConnectionFit(null)
   if(movementReview&&movementReview.source!==project) setMovementReview(null)
   if(resizeReview&&resizeReview.source!==project) setResizeReview(null)
   const [pendingTemplate,setPendingTemplate]=useState<{id:string;project:Project;returnTo:ProjectDialog}|null>(null)
   const [draft,setDraft]=useState(()=>createPanel({name:'My panel',width:600,height:360,thickness:18}))
   const projectPalette=useMemo(()=>getProjectPalette({customColors:project.customColors}),[project.customColors])
-  const previousPalette=useRef(projectPalette)
-  useEffect(()=>{
-    const previous=previousPalette.current
-    previousPalette.current=projectPalette
+  const [previousPalette,setPreviousPalette]=useState(projectPalette)
+  if(previousPalette!==projectPalette){
+    const previous=previousPalette
+    setPreviousPalette(projectPalette)
     setDraft(current=>{
       if(projectPalette.some(option=>option.color===current.color.toLowerCase()))return current
       const before=previous.find(option=>option.color===current.color.toLowerCase())
       const replacement=before&&projectPalette.find(option=>option.id===before.id)
       return {...current,color:replacement?.color??projectPalette[0].color}
     })
-  },[projectPalette])
+  }
   const [attachTarget,setAttachTarget]=useState('new')
   const [attachment,setAttachment]=useState<AttachmentOptions>(INITIAL_ATTACHMENT)
   const [attachmentSideHighlight,setAttachmentSideHighlight]=useState<{panelId:string;side:Side}|null>(null)
