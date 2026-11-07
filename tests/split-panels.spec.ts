@@ -90,6 +90,48 @@ test('removes split controls when selection changes or clears', async ({ page })
   expect(keyWarnings).toEqual([])
 })
 
+test('ignores late split worker results after changing selection', async ({ page }) => {
+  await page.addInitScript(() => {
+    const callbacks: (() => void)[] = []
+    Object.assign(window, { deliverOldSplitResults: () => { callbacks.forEach(callback => callback()); return callbacks.length } })
+    const OriginalWorker = window.Worker
+    window.Worker = class extends OriginalWorker {
+      private splitWorker: boolean
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options)
+        this.splitWorker = String(url).includes('parallel-panel-split.worker')
+      }
+      terminate() {
+        if (this.splitWorker && this.onmessage) {
+          const handler = this.onmessage
+          callbacks.push(() => handler.call(this, new MessageEvent('message', { data: { counts: [99], checking: false } })))
+        }
+        super.terminate()
+      }
+    }
+  })
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'shelf.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(createStarterProject())) })
+  const select = (name: string) => page.locator('.panel-list-row').filter({ has: page.getByText(name, { exact: true }) }).locator('.panel-list-select')
+  const counts = page.getByRole('combobox', { name: 'Number of splits' })
+  await select('Top shelf').click()
+  await select('Middle shelf').click({ modifiers: ['Shift'] })
+  await openInspectorSection(page, 'Divide evenly')
+  await expect(counts.locator('option[value="3"]')).toBeAttached()
+  await select('Top shelf').click()
+  await select('Middle shelf').click({ modifiers: ['Shift'] })
+  await openInspectorSection(page, 'Divide evenly')
+  await expect(counts.locator('option[value="3"]')).toBeAttached()
+  const delivered = await page.evaluate(async () => {
+    const count = (window as unknown as { deliverOldSplitResults: () => number }).deliverOldSplitResults()
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    return count
+  })
+  expect(delivered).toBeGreaterThan(0)
+  await expect(counts.locator('option[value="3"]')).toBeAttached()
+  await expect(counts.locator('option[value="99"]')).toHaveCount(0)
+})
+
 test('divides four selected sides into a grid, validates inputs, saves and undoes', async ({ page }) => {
   const { gridProject } = await import('../src/lib/example-geometry')
   const original = gridProject('Grid opening', [900], [600])

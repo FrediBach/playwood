@@ -203,7 +203,7 @@ Two expensive split checks run in module workers created with `new Worker(new UR
 | [`useParallelPanelSplitCounts`](../src/hooks/useParallelPanelSplitCounts.ts) | [`parallel-panel-split.worker.ts`](../src/lib/parallel-panel-split.worker.ts) | Streams supported divider counts, then marks checking complete. Results are associated with the original project and selection identities. |
 | [`GridPanelSplit`](../src/components/GridPanelSplit.tsx) | [`grid-split.worker.ts`](../src/lib/grid-split.worker.ts) | Debounces changes by 120 ms, computes a complete proposed split or error, and enables Apply only for a matching successful result. |
 
-Both callers terminate workers during effect cleanup. The workers run existing domain functions and return ordinary structured-clone data; they do not own project state. Project, selection, and input identity checks prevent older results from being displayed as current.
+Both callers terminate workers during effect cleanup. The parallel split hook also ignores messages and errors from cleaned-up effects, and derives its initial checking state until a result matches the current project and selection. The workers run existing domain functions and return ordinary structured-clone data; they do not own project state. Project, selection, and input identity checks prevent older results from being displayed as current.
 
 Library thumbnails in `LibraryPreview` are worker-generated, cached SVG projections of the same example factories that create editable projects. They use simplified panel box faces and connector markers, avoiding a separate WebGL context for every card. They are previews of the construction rather than fabrication renderings of every custom detail.
 

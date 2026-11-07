@@ -22,12 +22,14 @@ export function AttachmentSideGuide({ panel, guide }: { panel: Panel; guide: Att
   const { camera, gl, size, invalidate } = useThree()
   const portal = useMemo(() => ({ current: gl.domElement.parentElement! }), [gl])
   const elements = useRef(new Map<Side, HTMLDivElement>())
+  const pointsBySide = useRef(new Map<Side, SideLabelPoint>())
   const anchors = useMemo(() => attachmentSideAnchors(panel), [panel])
   const projection = useMemo(() => ({ world: new Vector3(), point: new Vector3(), tip: new Vector3(), towards: new Vector3(), direction: new Vector3() }), [])
   useLayoutEffect(() => { invalidate() }, [anchors, guide.side, guide.highlightedSide, camera, size, invalidate])
   useFrame(() => {
     camera.updateMatrixWorld()
     const points: SideLabelPoint[] = []
+    pointsBySide.current.clear()
     const { world, point, tip, towards, direction } = projection
     for (const anchor of anchors) {
       const element = elements.current.get(anchor.side)
@@ -49,11 +51,13 @@ export function AttachmentSideGuide({ panel, guide }: { panel: Panel; guide: Att
       // above every leader, including when opposite sides overlap in a view.
       element.style.left = `${x}px`
       element.style.top = `${y}px`
-      points.push({ side: anchor.side, x, y, dx: (tip.x - point.x) * size.width / 2, dy: (point.y - tip.y) * size.height / 2 })
+      const labelPoint = { side: anchor.side, x, y, dx: (tip.x - point.x) * size.width / 2, dy: (point.y - tip.y) * size.height / 2 }
+      points.push(labelPoint)
+      pointsBySide.current.set(anchor.side, labelPoint)
     }
     for (const label of layoutAttachmentSideLabels(points, size.width, size.height)) {
       const element = elements.current.get(label.side)!
-      const anchor = points.find(point => point.side === label.side)!
+      const anchor = pointsBySide.current.get(label.side)!
       const dx = label.x - anchor.x, dy = label.y - anchor.y
       element.style.setProperty('--side-label-x', `${dx}px`)
       element.style.setProperty('--side-label-y', `${dy}px`)

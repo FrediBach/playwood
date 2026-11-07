@@ -9,13 +9,13 @@ export function useParallelPanelSplitCounts(project: Project, ids: string[]) {
     const selectedIds = new Set(ids)
     if (!parallelPanelCut(resolvePanels(project).filter(panel => selectedIds.has(panel.id)))) return
     const worker = new Worker(new URL('../lib/parallel-panel-split.worker.ts', import.meta.url), { type: 'module' })
-    setResult({ project, ids, counts: [], checking: true })
+    let active = true
     worker.onmessage = (event: MessageEvent<{ counts: number[]; checking: boolean }>) => {
-      setResult({ project, ids, ...event.data })
+      if (active) setResult({ project, ids, ...event.data })
     }
-    worker.onerror = () => setResult({ project, ids, counts: [], checking: false })
+    worker.onerror = () => { if (active) setResult({ project, ids, counts: [], checking: false }) }
     worker.postMessage({ project, ids })
-    return () => worker.terminate()
+    return () => { active = false; worker.terminate() }
   }, [project, ids])
   return result?.project === project && result.ids === ids ? result : { counts: [] as number[], checking: true }
 }

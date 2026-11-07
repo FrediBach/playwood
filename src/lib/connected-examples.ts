@@ -77,14 +77,14 @@ function connectedWorkstation(source: Project): Project {
   const original = resolvePanels(source)
   const top = original.find(panel => panel.name === 'Worktop')!
   let project: Project = { version: 1, name: source.name, panels: [], connections: [] }
-  const upperIds: string[] = []
+  const upperIds = new Set<string>()
   for (const [label, x] of [['Left', -565], ['Right', 565]] as const) {
     const pedestal = gridProject(`${label} pedestal`, [350, 350], [350, 350], { depth: 350, omitShelves: [[0, 2], [1, 2]] })
     const turn = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2)
     pedestal.panels = resolvePanels(pedestal).map(panel => {
       const e = new Euler().setFromQuaternion(turn.clone().multiply(new Quaternion().setFromEuler(new Euler(...panel.rotation))))
       const position = new Vector3(...panel.position).applyQuaternion(turn).add(new Vector3(x, 17.5, 0)).toArray()
-      if (panel.name.startsWith('Upright') && panel.name.endsWith('.2')) upperIds.push(panel.id)
+      if (panel.name.startsWith('Upright') && panel.name.endsWith('.2')) upperIds.add(panel.id)
       const interior = panel.name === 'Upright 2.1' || panel.name === 'Upright 2.2' || panel.name.startsWith('Shelf') && panel.name.endsWith('.2')
       const appearance = original.find(item => item.name === `${label} ${interior ? 'insert divider' : 'pedestal back'}`)!
       return finish({ ...panel, name: `${label} ${panel.name}`, position, rotation: [e.x, e.y, e.z] }, appearance)
@@ -94,7 +94,7 @@ function connectedWorkstation(source: Project): Project {
   }
   for (const sign of [-1, 1]) {
     const half = { ...top, id: crypto.randomUUID(), name: `${sign < 0 ? 'Front' : 'Back'} worktop`, height: 350, position: [0, top.position[1], sign * 192.5] as Panel['position'] }
-    const boundaries = project.panels.filter(panel => upperIds.includes(panel.id) && sign * panel.position[2] > -1).map(panel => panel.id)
+    const boundaries = project.panels.filter(panel => upperIds.has(panel.id) && sign * panel.position[2] > -1).map(panel => panel.id)
     project = connectClosingPanel(project, half, boundaries)
   }
   return project
