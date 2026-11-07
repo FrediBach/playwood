@@ -15,6 +15,8 @@ npm run dev
 
 Open the local URL printed by Vite. No accounts, API keys, backend, or external fonts are required. Projects autosave in this browser's local storage; export a JSON project or use **Sync** to keep editable files in a local folder.
 
+Choose **Import** beside **Export project** in the header to open a saved `.playwood.json` project without connecting a folder. Import replaces the workspace and supports Undo; export first to keep a separate copy. Invalid files show an error without changing the current build.
+
 ## Sync a local folder
 
 Choose **Sync** next to **New project**, then **Choose folder** and allow read/write access. The folder's project and assembly JSON files appear in the dialog. Folder access requires a browser that supports the File System Access directory picker, such as desktop Chrome or Edge. Browsers without it retain browser autosave and the existing import/download controls.

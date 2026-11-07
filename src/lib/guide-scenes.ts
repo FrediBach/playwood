@@ -400,7 +400,7 @@ function buildScenes(id: GuideId): GuideScene[] {
       return [scene(p, 'Changes autosave in this browser as you work.', { document: { title: 'Saved in this browser', lines: ['Panels and joints', 'Materials and assemblies'] } }),
         scene(p, 'Export project → Project file keeps an editable backup.', { document: { title: 'Project · JSON', lines: ['Editable furniture model', 'Save a separate copy'] } }),
         scene(p, 'Parts & cutting list describes the pieces in your build.', { document: { title: 'Cutting list · CSV', lines: ['Panel · width × height × thickness', 'Connector · type × quantity'] } }),
-        scene(p, 'Import project restores a saved JSON build.', { document: { title: 'Import project', lines: ['Open your JSON file', 'Continue editing the model'] } })]
+        scene(p, 'Import beside Export project in the header restores a saved JSON build.', { document: { title: 'Import project', lines: ['Open your JSON file', 'Continue editing the model'] } })]
     }
   }
 }

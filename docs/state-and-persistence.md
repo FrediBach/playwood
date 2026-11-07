@@ -201,6 +201,8 @@ Folder autosave is opt-in for each opened or saved document and debounced over c
 
 ### Portable downloads and uploads
 
+The header’s Import button beside Export project opens the existing project file input directly. Import also remains available in the export dialog, where validation errors are displayed. Both entry points use the same parsing, replacement commit, and undo behavior.
+
 Project export downloads the current `Project` as indented JSON, named from the project title with a `.playwood.json` suffix. The schema is [Project in types.ts](../src/lib/types.ts):
 
 ```text

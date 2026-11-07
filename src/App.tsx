@@ -222,7 +222,7 @@ export default function App() {
     {objectConversion&&<EditorObjectConversion objectConversion={objectConversion} project={project} setObjectConversion={setObjectConversion} commit={commit} objects={objects} setSelectedIds={setSelectedIds} setInspectorTab={setInspectorTab} setRightOpen={setRightOpen} setFitSignal={setFitSignal} notify={notify}/>}
     <ProjectHeader projectName={project.name} saveStatus={directorySync.headerStatus??saveStatus} canUndo={canUndo} canRedo={canRedo} undo={undo} redo={redo}
       syncFolderName={directorySync.directoryName} syncConnected={directorySync.connected} syncNeedsAttention={!!directorySync.error}
-      onNew={()=>setDialog('new')} onSync={()=>{closeContextMenu();setDialog('sync')}} onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onExport={()=>setDialog('export')} onBuy={()=>setDialog('buy')}/>
+      onNew={()=>setDialog('new')} onSync={()=>{closeContextMenu();setDialog('sync')}} onRename={name=>commit(p=>({...p,name}))} onHelp={()=>setDialog('help')} onTemplates={()=>setDialog('templates')} onImport={()=>{closeContextMenu();setImportError('');importRef.current?.click()}} onExport={()=>setDialog('export')} onBuy={()=>setDialog('buy')}/>
 
     <EditorSidebar {...editorSidebarProps}/>
 

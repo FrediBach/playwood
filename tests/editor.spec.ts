@@ -100,3 +100,31 @@ test('phone layout opens both drawers and keeps the viewport fixed', async ({ pa
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight)).toBe(true)
   await page.screenshot({path:'test-results/studio-mobile.png'})
 })
+
+for (const width of [1440, 1000, 768, 390, 360]) {
+  test(`header imports a project beside export at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/')
+    const originalName = await page.locator('.project-name').innerText()
+    const importButton = page.getByRole('button', { name: 'Import project', exact: true })
+    const exportButton = page.getByRole('button', { name: 'Export project', exact: true })
+    await expect(importButton).toBeInViewport()
+    await expect(exportButton).toBeInViewport()
+    const buyBounds = await page.getByRole('button', { name: 'Buy connectors', exact: true }).boundingBox()
+    expect(buyBounds!.x + buyBounds!.width).toBeLessThanOrEqual(width)
+    const imported = { version: 1, name: 'Imported from header', panels: [], connections: [] }
+    const chooserPromise = page.waitForEvent('filechooser')
+    await importButton.click()
+    await (await chooserPromise).setFiles({ name: 'saved.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(imported)) })
+    await expect(page.locator('.project-name')).toHaveText(imported.name)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+    await expect(page.locator('.project-name')).toHaveText(originalName)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    const invalidChooser = page.waitForEvent('filechooser')
+    await importButton.click()
+    await (await invalidChooser).setFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{}') })
+    await expect(page.getByRole('alert')).toBeVisible()
+    await expect(page.locator('.project-name')).toHaveText(originalName)
+  })
+}
