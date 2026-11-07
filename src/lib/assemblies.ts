@@ -159,6 +159,7 @@ function crossConnections(link: AssemblyLink, data: AssemblyData, panels: Panel[
 }
 
 function rebuild(project: Project, data: AssemblyData, oldData = project.assemblies ?? empty()): Project {
+  const visibility = new Map(project.panels.map(panel => [panel.id, { visible: panel.visible, wireframe: panel.wireframe }]))
   const loose = restoreLoose(project, oldData)
   const panels = [...loose.panels]
   const connections = [...loose.connections]
@@ -172,7 +173,7 @@ function rebuild(project: Project, data: AssemblyData, oldData = project.assembl
   for (const instance of data.instances) {
     const definition = evaluatedFor(data, instance)
     const rotation = q(instance.rotation)
-    for (const panel of resolvePanels(flat(definition))) panels.push({ ...panel, ...instance.finish, id: instance.panelIds[panel.id],
+    for (const panel of resolvePanels(flat(definition))) panels.push({ ...panel, ...instance.finish, ...visibility.get(instance.panelIds[panel.id]), id: instance.panelIds[panel.id],
       position: tuple(v(panel.position).applyQuaternion(rotation).add(v(instance.position))), rotation: angles(rotation.clone().multiply(q(panel.rotation))) })
     const suppressed = new Set(definition.ports.filter(port => occupied.has(endpointKey({ instanceId: instance.id, portId: port.id }))).map(port => jointId(port.connectionId)))
     for (const connection of definition.connections) if (!suppressed.has(jointId(connection.id))) connections.push({ ...connection,

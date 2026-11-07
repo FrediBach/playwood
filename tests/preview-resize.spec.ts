@@ -270,6 +270,7 @@ test('resize handles are limited to one visible selection and disappear during a
   await expect(handles).toHaveCount(0)
   await page.getByRole('button', { name: 'Panel', exact: true }).click()
   await expect(handles.first()).toBeVisible()
+  await page.getByRole('button', { name: 'Show wireframe of Bottom shelf', exact: true }).click()
   await page.getByRole('button', { name: 'Hide Bottom shelf', exact: true }).click()
   await expect(handles).toHaveCount(0)
 })

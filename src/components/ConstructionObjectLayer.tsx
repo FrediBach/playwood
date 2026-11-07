@@ -33,7 +33,7 @@ const noRaycast = () => undefined
 export function ConstructionObjectLayer(props: ConstructionLayerProps) {
   const { objects, surfaces, selectedIds, active, onSelect, gesture, boxSelecting } = props
   const selected = new Set(selectedIds)
-  const boxes = active ? constructionLeaves(objects, selectedIds) : []
+  const boxes = active ? constructionLeaves(objects, selectedIds.filter(id => objects.nodes.some(node => node.id === id && node.visible))).filter(box => box.visible) : []
   return <group name="Construction objects">
     <ObjectKeyboardMovement {...props} movementEnabled={props.movementEnabled && !gesture?.active && !boxSelecting}/>
     {gesture && <>
@@ -44,8 +44,8 @@ export function ConstructionObjectLayer(props: ConstructionLayerProps) {
         onResizeStart={id=>gesture.start(id)} onResizeMove={gesture.update} onResizeEnd={gesture.end}/>
     </>}
     {surfaces?.filter(surface => surface.positions.length).map(surface => <ObjectSurfaceMesh key={surface.id} surface={surface}
-      selected={selected.has(surface.id) && active} active={active} onSelect={onSelect}/>)}
-    {active && surfaces?.filter(surface => surface.warningPositions?.length).map(surface => <ObjectClearanceWarning key={`warning-${surface.id}`}
+      wireframe={!objects.nodes.find(node => node.id === surface.id)?.visible} selected={selected.has(surface.id) && active} active={active} onSelect={onSelect}/>)}
+    {active && surfaces?.filter(surface => surface.warningPositions?.length && objects.nodes.find(node => node.id === surface.id)?.visible).map(surface => <ObjectClearanceWarning key={`warning-${surface.id}`}
       positions={surface.warningPositions!} name={objects.nodes.find(node => node.id === surface.id)?.name ?? 'Object'}/>)}
     {props.highlightedRegions?.map(region => <mesh key={region.id} name={`Affected source region ${region.name}`} raycast={noRaycast}
       position={region.bounds.min.map((value, axis) => (value + region.bounds.max[axis]) / 2000) as Vec3}>
@@ -79,15 +79,17 @@ function ObjectClearanceWarning({ positions, name }: { positions: Float32Array; 
   </group>
 }
 
-function ObjectSurfaceMesh({ surface, selected, active, onSelect }: {
-  surface: ObjectPreviewSurface; selected: boolean; active: boolean; onSelect: ConstructionLayerProps['onSelect'];
+function ObjectSurfaceMesh({ surface, selected, active, wireframe, onSelect }: {
+  wireframe: boolean; surface: ObjectPreviewSurface; selected: boolean; active: boolean; onSelect: ConstructionLayerProps['onSelect'];
 }) {
   const geometry = useMemo(() => new BufferGeometry().setAttribute('position', new BufferAttribute(surface.positions, 3)), [surface.positions])
   useEffect(() => () => geometry.dispose(), [geometry])
+  active = active && !wireframe
+  selected = selected && !wireframe
   // R3F skips undefined props, so explicitly restore raycasting after passive mode.
   return <mesh geometry={geometry} name={`Object ${surface.id}`} userData={active ? { objectId: surface.id } : {}} raycast={active ? Mesh.prototype.raycast : noRaycast}
     onClick={active ? event => { event.stopPropagation(); onSelect(surface.id, event.shiftKey || event.metaKey || event.ctrlKey) } : undefined}>
-    <meshBasicMaterial color={selected ? '#d52cb8' : '#3b91db'} transparent opacity={active ? 0.27 : 0.12} depthWrite={false} side={DoubleSide}/>
+    <meshBasicMaterial visible={!wireframe} color={selected ? '#d52cb8' : '#3b91db'} transparent opacity={active ? 0.27 : 0.12} depthWrite={false} side={DoubleSide}/>
     <Edges geometry={geometry} color={selected ? '#d52cb8' : '#1769aa'} transparent opacity={active ? 0.65 : 0.35} depthWrite={false} depthTest={false} raycast={noRaycast}/>
   </mesh>
 }

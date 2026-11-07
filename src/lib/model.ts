@@ -472,6 +472,10 @@ export function parseProject(input: unknown): Project {
       visible: raw.visible === undefined ? true : raw.visible as boolean,
       holeSize: numberIn(raw.holeSize, 2, 200, 'hole size'), holeSpacing: numberIn(raw.holeSpacing, 10, 500, 'hole spacing'),
     }
+    if (raw.wireframe !== undefined) {
+      if (typeof raw.wireframe !== 'boolean') throw new Error('Invalid panel wireframe visibility.')
+      p.wireframe = raw.wireframe
+    }
     if (raw.finishCoverage !== undefined) p.finishCoverage = numberIn(raw.finishCoverage, 0, 1, 'finish coverage')
     if (raw.customOutline !== undefined) {
       const outlineError = getOutlineError(raw.customOutline)

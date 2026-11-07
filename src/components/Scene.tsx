@@ -144,6 +144,20 @@ export function PanelMesh({ panel, selected, ghost, interactive = true, onSelect
   </group>
 }
 
+function PanelWireframe({ panel }: { panel: Panel }) {
+  const { width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline, trofastInserts } = panel
+  const edges = useMemo(() => {
+    const geometry = makePanelGeometry({ width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline, trofastInserts })
+    const result = new THREE.EdgesGeometry(geometry)
+    geometry.dispose()
+    return result
+  }, [width, height, thickness, pattern, holeSize, holeSpacing, cornerRadius, customOutline, trofastInserts])
+  useEffect(() => () => edges.dispose(), [edges])
+  return <lineSegments name={`Wireframe ${panel.id}`} geometry={edges} position={vector(panel.position)} rotation={panel.rotation} raycast={() => null}>
+    <lineBasicMaterial color="#7d827a" transparent opacity={0.65} depthWrite={false}/>
+  </lineSegments>
+}
+
 function Measure({ from, to, label }: { from: Vec3; to: Vec3; label: string }) {
   const middle: Vec3 = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2]
   return <group>
@@ -512,6 +526,7 @@ function World(props: WorldProps) {
     <SceneCamera props={props} realisticPreview={realisticPreview}/>
     <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} snapSettings={props.snapSettings} guides={feedback.guides}/>
     {vacuumPlan && <RobotVacuum plan={vacuumPlan} projectPanels={displayPanels} controlsEnabled={!props.dragging && !props.resizing && !props.boxSelectActive && !props.designConstraint} />}
+    {displayPanels.filter(panel => !panel.visible && panel.wireframe).map(panel => <PanelWireframe key={panel.id} panel={panel}/>)}
     <SceneParts {...props} shownPanels={shownPanels}
       constraintPanelIds={[...props.constraintPanelIds ?? [], ...blockers?.panelIds ?? []]}
       selectedConnectorIds={[...props.selectedConnectorIds ?? [], ...blockers?.connectorIds ?? []]}/>

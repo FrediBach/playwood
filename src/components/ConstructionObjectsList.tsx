@@ -1,4 +1,5 @@
-import { Box, Eye, EyeOff, Plus } from 'lucide-react'
+import { nextVisibility, visibilityAction } from '@/lib/visibility'
+import { Box, Eye, EyeOff, ScanEye, Plus } from 'lucide-react'
 import { Button } from './ui/button'
 import type { ConstructionObject, ConstructionObjects } from '@/lib/types'
 import './construction-objects.css'
@@ -20,7 +21,7 @@ export function ConstructionObjectsList({ objects, selectedIds, onSelect, onAdd,
         <button className="object-select" disabled={disabled} aria-label={`Select object ${node.name}`} aria-pressed={selectedIds.includes(id)} onClick={event => onSelect(id, event.shiftKey || event.metaKey || event.ctrlKey)}>
           <Box size={16}/><span><strong>{node.name}</strong><small>{index !== undefined ? operation === 'subtract' ? index === 0 ? 'Keep' : 'Subtract' : `Operand ${index + 1}` : node.kind === 'box' ? 'Box' : node.operation}</small></span>
         </button>
-        <button className="visibility-button" disabled={disabled} aria-label={`${node.visible ? 'Hide' : 'Show'} object ${node.name}`} onClick={() => onVisibility({ ...node, visible: !node.visible })}>{node.visible ? <Eye size={14}/> : <EyeOff size={14}/>}</button>
+        <button className="visibility-button" disabled={disabled} aria-label={`${visibilityAction(node)} object ${node.name}`} onClick={() => onVisibility({ ...node, ...nextVisibility(node) })}>{node.visible ? <Eye size={14}/> : node.wireframe ? <ScanEye size={14}/> : <EyeOff size={14}/>}</button>
       </div>
       {node.kind === 'boolean' && <ol className="object-children">{node.children.map((child, index) => row(child, index, node.operation))}</ol>}
     </li>

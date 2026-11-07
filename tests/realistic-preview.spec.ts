@@ -114,6 +114,7 @@ test('room dimensions use the actual visible panels and handle an empty assembly
 
   await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: 'Studio', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Show wireframe of Scale panel', exact: true }).click()
   await page.getByRole('button', { name: 'Hide Scale panel', exact: true }).click()
   await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
   await expect(page.getByLabel('Room scale reference')).toContainText('Add or show a panel in Studio to see it here.')

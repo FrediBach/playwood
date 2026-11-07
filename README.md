@@ -142,6 +142,8 @@ Select one or more ordinary panels and choose **Lock panel size** in the preview
 
 Right-click the preview (or focus the canvas and press **Shift+F10**) for grouped actions: **Selection**, **Build**, **Assembly**, **Organize**, **Remove**, and **Preview**. Only groups relevant to the current selection appear. Use arrow keys to navigate, Home/End to jump to the first/last command, and Escape to close.
 
+The eye button in panel and object lists cycles **visible → wireframe → hidden → visible**. Wireframe items show thin edges and cannot be picked in the preview. They behave like hidden items for selection, bounds, attached hardware, and GLB export. List selection remains available; visibility changes support Undo/Redo and project saves. Object operands still participate in their Boolean parent.
+
 Use **Filter panels** or **Filter connectors** above the corresponding list to combine search with color, material, visibility, and selection filters. Panels also offer surface, thickness, and area filters; hardware offers connector type. Filters affect rows only. **Select all** selects matching rows while filtering; **Reset filters** restores the full list without changing geometry.
 
 With the complete connected selection selected, press **Shift + X/Y/Z** to mirror across that world axis through the selection center. Selected linked assemblies receive an independent mirrored design. Select all connected parts or detach them first; incompatible edits leave the construction unchanged. **Undo** restores the previous design.

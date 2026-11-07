@@ -1,6 +1,7 @@
+import { visibilityAction } from '@/lib/visibility'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { GroupedList, type ListGroupingProps } from './GroupedList'
-import { Eye, EyeOff, GripVertical, Pencil, TriangleAlert, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, ScanEye, GripVertical, Pencil, TriangleAlert, Trash2 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
 import type { Panel, ValidationIssue } from '@/lib/types'
 
@@ -90,9 +91,9 @@ export function PanelList({ panels, selectedIds, issues, onSelect, onRepair, onR
             <div className="panel-row-details">
               <button className="panel-dimensions" title={dimensions(panel)} onClick={event => onSelect(panel.id, event.shiftKey || event.metaKey || event.ctrlKey)}>{dimensions(panel)}</button>
               <div className="panel-row-actions">
-                <Tooltip label="Rename panel · F2"><button className="panel-row-action reveal-action" aria-label={`Rename ${panel.name}`} onClick={() => setEditingId(panel.id)}><Pencil size={12} /></button></Tooltip>
-                <Tooltip label={panel.visible ? 'Hide panel' : 'Show panel'}><button className="panel-row-action visibility-button" aria-label={`${panel.visible ? 'Hide' : 'Show'} ${panel.name}`} onClick={() => onToggleVisibility(panel.id)}>{panel.visible ? <Eye size={13} /> : <EyeOff size={13} />}</button></Tooltip>
                 <Tooltip label="Remove panel · Undo to restore"><button className="panel-row-action panel-remove-action reveal-action" aria-label={`Remove ${panel.name}`} onClick={() => onRemove(panel.id)}><Trash2 size={12} /></button></Tooltip>
+                <Tooltip label="Rename panel · F2"><button className="panel-row-action reveal-action" aria-label={`Rename ${panel.name}`} onClick={() => setEditingId(panel.id)}><Pencil size={12} /></button></Tooltip>
+                <Tooltip label={`${visibilityAction(panel)} panel`}><button className="panel-row-action visibility-button" aria-label={`${visibilityAction(panel)} ${panel.name}`} onClick={() => onToggleVisibility(panel.id)}>{panel.visible ? <Eye size={13} /> : panel.wireframe ? <ScanEye size={13} /> : <EyeOff size={13} />}</button></Tooltip>
               </div>
             </div>
           </div>

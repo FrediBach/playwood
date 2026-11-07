@@ -20,6 +20,8 @@ export interface Panel {
   /** 0 keeps the natural texture; 1 covers it with solid color. Defaults to 0. */
   finishCoverage?: number;
   position: Vec3; rotation: Vec3; visible: boolean;
+  /** Draw noninteractive edges when visible is false. Omitted means false. */
+  wireframe?: boolean;
   holeSize: number; holeSpacing: number; cornerRadius?: number;
   customOutline?: OutlinePoint[];
   trofastInserts?: TrofastInsert[];
@@ -91,7 +93,7 @@ export type DesignConstraint = DesignConstraintBase & (
 export interface SpaceConstraint { enabled: boolean; width: number; height: number; depth: number; centerX: number; centerZ: number }
 
 export type ObjectBooleanOperation = 'union' | 'subtract' | 'intersect'
-interface ConstructionObjectBase { id: string; name: string; visible: boolean }
+interface ConstructionObjectBase { id: string; name: string; visible: boolean; wireframe?: boolean }
 export type ConstructionObject = ConstructionObjectBase & (
   /** Box center and dimensions in world millimeters; Euler radians in 90° steps. */
   | { kind: 'box'; width: number; height: number; depth: number; position: Vec3; rotation: Vec3 }

@@ -152,6 +152,7 @@ test('overlap markers identify both panels and clear when the overlap is resolve
   await expect(row(page, 'Crossing panel').getByRole('button', { name: 'Overlaps with Front panel', exact: true })).toBeVisible()
   await page.screenshot({ path: 'test-results/panel-list-overlaps.png' })
   await row(page, 'Crossing panel').hover()
+  await page.getByRole('button', { name: 'Show wireframe of Crossing panel', exact: true }).click()
   await page.getByRole('button', { name: 'Hide Crossing panel', exact: true }).click()
   await expect(page.locator('.panel-overlap-indicator')).toHaveCount(2)
   await page.getByRole('button', { name: 'Show Crossing panel', exact: true }).click()
@@ -166,6 +167,14 @@ test('overlap markers identify both panels and clear when the overlap is resolve
 test('compact and touch layouts keep row actions available and support touch sorting', async ({ page, browser, baseURL }) => {
   await page.setViewportSize({ width: 1000, height: 760 })
   await page.goto('/')
+  await page.mouse.move(0, 0)
+  const eye = row(page, 'Middle shelf').locator('.visibility-button')
+  const beforeHover = await eye.boundingBox()
+  await eye.hover()
+  expect(await eye.boundingBox()).toEqual(beforeHover)
+  expect(await row(page, 'Middle shelf').locator('.panel-row-action').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))).toEqual([
+    'Remove Middle shelf', 'Rename Middle shelf', 'Show wireframe of Middle shelf',
+  ])
   await row(page, 'Bottom shelf').hover()
   await expect(page.getByRole('button', { name: 'Rename Bottom shelf', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Remove Bottom shelf', exact: true })).toBeVisible()

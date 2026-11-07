@@ -1,3 +1,4 @@
+import { nextVisibility } from '@/lib/visibility'
 import type { SyncedProjectLibrary } from '@/components/ExampleBrowser'
 import { ConstructionObjectsList } from '@/components/ConstructionObjectsList'
 import type { ListGroupingProps } from '@/components/GroupedList'
@@ -79,7 +80,7 @@ export function EditorSidebar({
       onRepair: onRepairPanel,
       onRename: (id,name) => commit(p => ({ ...p,panels: p.panels.map(panel => panel.id===id? { ...panel,name }:panel) })),
       onRemove: id => { commit(p => removePanel(p,id)); notify('Panel removed. Undo to bring it back.') },
-      onToggleVisibility: id => commit(p => ({ ...p,panels: p.panels.map(panel => panel.id===id? { ...panel,visible: !panel.visible }:panel) })),
+      onToggleVisibility: id => commit(p => ({ ...p,panels: p.panels.map(panel => panel.id===id? { ...panel,...nextVisibility(panel) }:panel) })),
     }}
     selectedCount={selectedPanels.length}
     connectorCount={connectorCount}

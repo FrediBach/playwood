@@ -9,7 +9,7 @@ export function reuseObjectPreview(source: ConstructionObjects, current: Constru
   const after = new Map(current.nodes.map(node => [node.id, node]))
   const roots = new Set(current.roots)
   return surfaces.flatMap(surface => {
-    if (!roots.has(surface.id) || !after.get(surface.id)?.visible) return []
+    if (!roots.has(surface.id) || !(after.get(surface.id)?.visible || after.get(surface.id)?.wireframe)) return []
     let delta: Vec3 | undefined
     const matches = (id: string): boolean => {
       const a = before.get(id), b = after.get(id)

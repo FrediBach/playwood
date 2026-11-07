@@ -7,7 +7,7 @@ export function useObjectPreview(objects: ConstructionObjects | undefined, enabl
   const [result, setResult] = useState<{ source: ConstructionObjects; surfaces?: ObjectSurface[]; error?: string }>()
   const reused = useMemo(() => enabled && objects && result?.surfaces && result.source !== objects
     ? reuseObjectPreview(result.source, objects, result.surfaces) : undefined, [enabled, objects, result])
-  const complete = !!reused && reused.length === objects?.roots.filter(id => objects.nodes.find(node => node.id === id)?.visible).length
+  const complete = !!reused && reused.length === objects?.roots.filter(id => objects.nodes.some(node => node.id === id && (node.visible || node.wireframe))).length
   useEffect(() => {
     if (!enabled || !objects?.roots.length || complete) return
     let active = true

@@ -89,6 +89,7 @@ test('box drafts, Boolean operands, keyboard movement and persistence form one u
   await expect.poll(() => savedObjects(page)).toEqual(beforeMove)
   await page.getByRole('button', { name: 'Select object Cutter', exact: true }).click()
   await expect(page.getByLabel('Box width', { exact: true })).toHaveValue('400')
+  await page.getByRole('button', { name: 'Show wireframe of object subtract', exact: true }).click()
   await page.getByRole('button', { name: 'Hide object subtract', exact: true }).click()
   await page.getByRole('button', { name: 'Select object subtract', exact: true }).click()
   await page.getByRole('button', { name: 'Show object subtract', exact: true }).click()

@@ -34,7 +34,8 @@ export function parseConstructionObjects(value: unknown): ConstructionObjects {
   const roots = references(value.roots)
   const nodes = value.nodes.map((raw): ConstructionObject => {
     if (!record(raw) || typeof raw.visible !== 'boolean') throw new Error('Invalid construction object.')
-    const base = { id: text(raw.id), name: text(raw.name), visible: raw.visible }
+    if (raw.wireframe !== undefined && typeof raw.wireframe !== 'boolean') throw new Error('Invalid object wireframe visibility.')
+    const base = { id: text(raw.id), name: text(raw.name), visible: raw.visible, ...(raw.wireframe === undefined ? {} : { wireframe: raw.wireframe as boolean }) }
     if (raw.kind === 'box') return { ...base, kind: 'box', width: number(raw.width, 1, 10000),
       height: number(raw.height, 1, 10000), depth: number(raw.depth, 1, 10000),
       position: vector(raw.position), rotation: vector(raw.rotation, true) }

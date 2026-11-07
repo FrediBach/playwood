@@ -161,11 +161,13 @@ for (const [type, label, branches] of [
     await page.screenshot({ path: `test-results/connector-${type}.png` })
 
     // One physical T/cross connector belongs to the whole joint, not to each branch.
+    await page.getByRole('button', { name: 'Show wireframe of Test panel', exact: true }).click()
     await page.getByRole('button', { name: 'Hide Test panel', exact: true }).click()
     await expect.poll(async () => (await renderedConnectors(page)).length).toBe(0)
     await page.getByRole('button', { name: 'Show Test panel', exact: true }).click()
     await expect.poll(async () => (await renderedConnectors(page)).length).toBe(2)
     if (branches > 1) {
+      await page.getByRole('button', { name: 'Show wireframe of Panel 2 2', exact: true }).click()
       await page.getByRole('button', { name: 'Hide Panel 2 2', exact: true }).click()
       await expect.poll(async () => (await renderedConnectors(page)).length).toBe(0)
       await page.getByRole('button', { name: 'Show Panel 2 2', exact: true }).click()
