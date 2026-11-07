@@ -1,3 +1,5 @@
+import { nextVisibility } from '@/lib/visibility'
+import { createPreviewShortcutHandler } from '@/lib/preview-shortcuts'
 import { PanelOverlapDialog } from '@/components/PanelOverlapDialog'
 import { EqualPanelSizesDialog } from '@/components/EqualPanelSizesDialog'
 import { MovementAlternativesDialog } from '@/components/MovementAlternativesDialog'
@@ -127,8 +129,9 @@ export default function App() {
   const objectControlsDisabled=objectInteractionDisabled||objectGesture.active
   const { chooseObject,changeAssemblyTab }=createObjectSelectionCommands({ objectControlsDisabled, objects, setRightOpen, setLeftOpen, drag, resize, objectGesture, modalOpen, clipboard, assembly, constraints, setProjectConstraintsOpen, setPickingConstraint, constraintPicker, setSelectedIds, setExploded, setAssemblyTab, setInspectorTab, closeContextMenu, selectedPanels, selectedConnectors })
   const canAttachPanel=panelAttachmentAvailable({ selectedPanels, inspectingConnectors, assembly, clipboard, constraints, modalOpen, drag, resize, boxSelectActive, inspectorTab })
+  const [previewShortcutHandler]=useState(createPreviewShortcutHandler)
   useEffect(()=>{
-    const onKey=createEditorKeyHandler({ modalOpen, constraints, pickingConstraint, constraintPicker, setPickingConstraint, setRightOpen, projectConstraintsOpen, closeProjectConstraints, objectMode, realisticPreview, redo, undo, objects, objectControlsDisabled, toggleBoxSelect, boxSelectActive, setSnapSettings, setFitSignal, boxSelectAvailable, canAttachPanel, startAttach, clipboard, inspectingConnectors, movementEnabled, drag, resize, assembly, selectedPanels, commit, selectedIds, notify, setRealisticPreview, selectAll, duplicateSelected, deleteSelected, setInspectorTab, setSelectedId })
+    const onKey=createEditorKeyHandler({ previewShortcut: e => previewShortcutHandler(e,menuActions,closeContextMenu), previewShortcutsEnabled: !objectMode&&!modalOpen&&!constraints.editing&&!drag.active&&!resize.active&&!clipboard.active&&!assembly.target&&!assembly.placementActive&&!boxSelectActive&&inspectorTab!=='attach', modalOpen, constraints, pickingConstraint, constraintPicker, setPickingConstraint, setRightOpen, projectConstraintsOpen, closeProjectConstraints, objectMode, realisticPreview, redo, undo, objects, objectControlsDisabled, toggleBoxSelect, boxSelectActive, setSnapSettings, setFitSignal, boxSelectAvailable, canAttachPanel, startAttach, clipboard, inspectingConnectors, movementEnabled, drag, resize, assembly, selectedPanels, commit, selectedIds, notify, setRealisticPreview, selectAll, duplicateSelected, deleteSelected, setInspectorTab, setSelectedId })
     window.addEventListener('keydown',onKey)
     return()=>window.removeEventListener('keydown',onKey)
   })
@@ -152,6 +155,7 @@ export default function App() {
     canMenuAutoConnect, hasVisiblePanels, canAddConnectorsBetween: !infillReason, canConnectWithPanel: !!connectorPanelFit.result,
     canAttachPanel, canExtendToGround: !!groundPanelFit.result, canAttachCopy: validTargets.length > 0,
     actions: {
+      cyclePanelVisibility: ()=>commit(current=>({...current,panels:current.panels.map(panel=>selectedIdSet.has(panel.id)?{...panel,...nextVisibility(panel)}:panel)})),
       lockPanelSizes: ()=>constraints.lockSizes(selectedIds),
       equalizeSizes: ()=>setEqualSizes({source:project,ids:[...selectedIds]}),
       separateSelectedConnectors, addConnectorsBetween: openConnectorInfill, connectWithPanel, groupSelected, removeSelectedConnectors, openConstraints, startAttach,

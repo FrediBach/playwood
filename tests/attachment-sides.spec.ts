@@ -174,7 +174,7 @@ test('A and the context menu open new-panel attachment without committing until 
   await page.locator('.panel-list-select').first().click()
   await page.locator('canvas').focus()
   await page.keyboard.press('Shift+F10')
-  await page.getByRole('menuitem', { name: 'Attach a panel (A)', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Attach a panel', exact: true }).click()
   await expect(page.getByRole('group', { name: 'Choose a side', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Attach panel', exact: true }).click()
   await expect.poll(async () => (await savedProject(page)).panels.length).toBe(2)

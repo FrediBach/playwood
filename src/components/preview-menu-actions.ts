@@ -1,4 +1,5 @@
-import { ArrowDownToLine, Box, Check, Clipboard, Copy, FolderPlus, Grid2X2, Link2, LockKeyhole, Maximize, Pencil, Plus, Rows3, Scan, Scissors, SlidersHorizontal, Square, Unlink, Ungroup, Trash2, type LucideIcon } from 'lucide-react'
+import { previewShortcut, type PreviewCommandLabel } from '@/lib/preview-shortcuts'
+import { Eye, ArrowDownToLine, Box, Check, Clipboard, Copy, FolderPlus, Grid2X2, Link2, LockKeyhole, Maximize, Pencil, Plus, Rows3, Scan, Scissors, SlidersHorizontal, Square, Unlink, Ungroup, Trash2, type LucideIcon } from 'lucide-react'
 import { differingPanelDimension } from '@/lib/equal-panel-sizes'
 import type { PreviewMenuAction } from './PreviewContextMenu'
 import type { useAssemblyEditor } from '@/hooks/use-assembly-editor'
@@ -30,6 +31,7 @@ interface MenuContext {
   canMenuAutoConnect: boolean
   hasVisiblePanels: boolean
   actions: {
+    cyclePanelVisibility: () => void
     equalizeSizes?: () => void
     inspectConnectors: () => void
     inspectPanels: () => void
@@ -60,7 +62,7 @@ interface MenuContext {
 }
 const MENU_GROUPS = ['Selection', 'Build', 'Assembly', 'Organize', 'Remove', 'Preview'] as const
 type MenuGroup = typeof MENU_GROUPS[number]
-type AddAction = (group: MenuGroup, label: string, icon: LucideIcon, run: () => void, danger?: boolean, disabled?: boolean) => void
+type AddAction = (group: MenuGroup, label: PreviewCommandLabel | `Fill hole · ${string}` | `Review hole fit · ${string}`, icon: LucideIcon, run: () => void, danger?: boolean, disabled?: boolean, shortcut?: string) => void
 
 function addConnectorActions(context: MenuContext, menuAction: AddAction) {
   const {selectedConnectorIds, modalOpen, assembly, canConnectWithPanel, actions}=context
@@ -86,7 +88,7 @@ function addLoosePanelActions(context: MenuContext, menuAction: AddAction) {
   menuAction('Build', 'Add constraint',SlidersHorizontal,()=>openConstraints(true))
   menuAction('Build', 'Lock panel size',LockKeyhole,actions.lockPanelSizes,false,context.modalOpen)
   menuAction('Organize', 'Group selected',FolderPlus,()=>groupSelected('panels',selectedIds),false,selectedPanels.length<2)
-  if (selectedPanels.length===1) menuAction('Build', 'Attach a panel (A)',Link2,startAttach,false,context.canAttachPanel===false)
+  if (selectedPanels.length===1) menuAction('Build', 'Attach a panel',Link2,startAttach,false,context.canAttachPanel===false)
   menuAction('Build', 'Extend to ground',ArrowDownToLine,extendToGround,false,!canExtendToGround)
   if (selectedPanels.length>1) menuAction('Assembly', 'Create assembly',Box,()=>actions.openTool('assembly'),false,!!assemblySelectionError(project,selectedIds))
   if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Remove', 'Disconnect panels',Unlink,detachSelection)
@@ -116,7 +118,7 @@ function addPanelActions(context: MenuContext, menuAction: AddAction) {
     } else if (!assembly.hasMembers) {
       addLoosePanelActions(context, menuAction)
     }
-    if (instance || !assembly.hasMembers) for (const hole of holes) menuAction('Build', `${hole.alignment ? 'Review hole fit' : 'Fill hole'} · ${hole.label}`,Square,()=>closeHole(hole.id))
+    if (instance || !assembly.hasMembers) for (const [index, hole] of holes.entries()) menuAction('Build', `${hole.alignment ? 'Review hole fit' : 'Fill hole'} · ${hole.label}`,Square,()=>closeHole(hole.id),false,false,`h ${String(index + 1).split('').join(' ')} Enter`)
     menuAction('Selection', 'Copy',Clipboard,actions.copy)
     if (!assembly.memberInstance || instance) {
       menuAction('Selection', 'Duplicate',Copy,duplicateSelected)
@@ -130,10 +132,11 @@ export function buildPreviewMenuActions(context: MenuContext): PreviewMenuAction
   const {panels, assembly, selectedIdSet, inspectingConnectors, hasVisiblePanels, actions}=context
   const {selectAll, openConstraints}=actions
   const menuActions: PreviewMenuAction[]=[]
-  const menuAction: AddAction = (group, label, icon, run, danger = false, disabled = false) => menuActions.push({ group, label, icon, run, danger, disabled })
+  const menuAction: AddAction = (group, label, icon, run, danger = false, disabled = false, shortcut = previewShortcut(label)) => menuActions.push({ group, label, icon, run, danger, disabled, shortcut })
   if (inspectingConnectors) addConnectorActions(context, menuAction)
   else if (assembly.editingInstance) addEditingActions(context, menuAction)
   else addPanelActions(context, menuAction)
+  if (!inspectingConnectors && context.selectedPanels.length) menuAction('Preview', 'Cycle panel visibility',Eye,actions.cyclePanelVisibility)
   if(context.selectedConnectorIds.length&&actions.separateSelectedConnectors&&!assembly.editingInstance&&!context.modalOpen)menuAction('Build', 'Separate overlapping connectors',Rows3,actions.separateSelectedConnectors)
   if (panels.length) menuAction('Preview', 'Select all panels',Scan,()=>selectAll(),false,!inspectingConnectors&&(assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):panels.map(panel=>panel.id)).every(id=>selectedIdSet.has(id)))
   if(!assembly.editingInstance)menuAction('Preview', 'All constraints',SlidersHorizontal,()=>openConstraints())

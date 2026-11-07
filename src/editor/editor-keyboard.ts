@@ -12,6 +12,8 @@ import type { Panel } from '@/lib/types'
 
 
 interface CreateEditorKeyHandlerOptions {
+  previewShortcut: (event: KeyboardEvent) => boolean
+  previewShortcutsEnabled: boolean
   modalOpen: boolean
   constraints: ReturnType<typeof useDesignConstraints>
   pickingConstraint: boolean
@@ -52,7 +54,7 @@ interface CreateEditorKeyHandlerOptions {
 }
 
 export function createEditorKeyHandler({
-  modalOpen, constraints, pickingConstraint, constraintPicker,
+  previewShortcut, previewShortcutsEnabled, modalOpen, constraints, pickingConstraint, constraintPicker,
   setPickingConstraint, setRightOpen, projectConstraintsOpen, closeProjectConstraints,
   objectMode, realisticPreview, redo, undo,
   objects, objectControlsDisabled, toggleBoxSelect, boxSelectActive,
@@ -93,14 +95,17 @@ export function createEditorKeyHandler({
       return
     }
     if(boxSelectActive) return
-    if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='a') {
+    // Keep Select All scoped to connectors when that list is active.
+    if(previewShortcutsEnabled && inspectingConnectors && (e.metaKey||e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase()==='a') { e.preventDefault(); if(!e.repeat) selectAll(true); return }
+    if(previewShortcutsEnabled && previewShortcut(e)) return
+    if(!e.shiftKey&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='a') {
       if(canAttachPanel) { e.preventDefault(); if(!e.repeat) startAttach()}
       return
     }
     if((e.metaKey||e.ctrlKey)&&['c','v'].includes(e.key.toLowerCase())) {
       e.preventDefault(); if(!e.repeat) { if(e.key.toLowerCase()==='c') clipboard.copy(); else clipboard.paste()}  return
     }
-    if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&['g','s'].includes(e.key.toLowerCase())) {
+    if(!e.shiftKey&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&['g','s'].includes(e.key.toLowerCase())) {
       e.preventDefault()
       if(!e.repeat) setSnapSettings(value => ({ ...value,[e.key.toLowerCase()==='g'? 'grid':'geometry']: !value[e.key.toLowerCase()==='g'? 'grid':'geometry'] }))
       return
