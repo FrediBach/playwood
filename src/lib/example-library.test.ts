@@ -1,16 +1,17 @@
 import { roundTripProject } from '../test/project-round-trip'
+import monitorSpeakerTable from '../../resources/library-3d/user-projects/h-table-monitor-speaker-stand.json'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Euler, Vector3 } from 'three'
 import { createExampleProject, EXAMPLE_LIBRARY } from './example-library'
-import { getProjectBounds, projectToCsv, resolvePanels, validateProject } from './model'
+import { getProjectBounds, parseProject, projectToCsv, resolvePanels, validateProject } from './model'
 
 describe('resource example library', () => {
   it('offers each distinct connector build once, alongside the original starters', () => {
-    expect(EXAMPLE_LIBRARY).toHaveLength(26)
-    expect(new Set(EXAMPLE_LIBRARY.map(example => example.id)).size).toBe(26)
-    expect(EXAMPLE_LIBRARY.filter(example => example.source)).toHaveLength(22)
+    expect(EXAMPLE_LIBRARY).toHaveLength(27)
+    expect(new Set(EXAMPLE_LIBRARY.map(example => example.id)).size).toBe(27)
+    expect(EXAMPLE_LIBRARY.filter(example => example.source)).toHaveLength(23)
     expect(EXAMPLE_LIBRARY.some(example => /bizu|lean table|nordic|beechwood chair/i.test(example.name))).toBe(false)
     for (const example of EXAMPLE_LIBRARY) if (example.source) {
       expect(existsSync(resolve('resources/library-3d', example.source)), example.source).toBe(true)
@@ -31,7 +32,9 @@ describe('resource example library', () => {
     expect(validateProject(project).filter(issue => issue.id.startsWith('collision')), example.id).toEqual([])
 
     const second = createExampleProject(example.id)
-    expect(second.panels.some(panel => project.panels.some(first => first.id === panel.id))).toBe(false)
+    // Saved examples retain their source identities; each opening still owns its data.
+    if (!example.source?.endsWith('.json')) expect(second.panels.some(panel => project.panels.some(first => first.id === panel.id))).toBe(false)
+    expect(second.panels[0]).not.toBe(project.panels[0])
     project.panels[0].name = 'Changed in the editor'
     expect(second.panels[0].name).not.toBe('Changed in the editor')
   })
@@ -72,6 +75,17 @@ describe('resource example library', () => {
       return [bounds.width, bounds.height, bounds.depth].map(Math.round).join('×')
     })
     expect(new Set(sizes).size).toBe(5)
+  })
+
+  it('preserves the supplied monitor and speaker stand construction and hardware overrides', () => {
+    const project = createExampleProject('h-table-monitor-speaker-stand')
+    expect(project).toEqual({ ...parseProject(monitorSpeakerTable), name: 'H-table with monitor and speaker stand' })
+    expect(project.panels).toHaveLength(16)
+    expect(project.connections).toHaveLength(26)
+    const second = createExampleProject('h-table-monitor-speaker-stand')
+    const override = Object.keys(project.connectorOverrides!)[0]
+    project.connectorOverrides![override].color = '#ffffff'
+    expect(second.connectorOverrides![override].color).toBe('#000000')
   })
 
   it('keeps blank projects available and rejects unknown example IDs', () => {

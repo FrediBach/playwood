@@ -1,6 +1,7 @@
 import { connectedExample } from './connected-examples'
 import { ASSEMBLY_LIBRARY } from './assembly-library'
-import { createStarterProject } from './model'
+import { createStarterProject, parseProject } from './model'
+import monitorSpeakerTable from '../../resources/library-3d/user-projects/h-table-monitor-speaker-stand.json'
 import { CAD_EXAMPLES } from './cad-examples'
 import { PDF_EXAMPLES } from './pdf-examples'
 import { diamondShelfProject } from './photo-examples'
@@ -22,6 +23,7 @@ export const EXAMPLE_LIBRARY: readonly ExampleDefinition[] = [
   { id: 'desk', name: 'Work table', description: 'Room for your next big idea.', category: 'Starter builds', create: () => createStarterProject('desk') },
   { id: 'display', name: 'Creative display', description: 'Put your creativity on display.', category: 'Starter builds', create: () => createStarterProject('display') },
   { id: 'diamond-shelf', name: 'Diamond shelf', description: 'Five diamond compartments, white panels, and black connectors. Rotated 45°.', category: 'Shelving', create: diamondShelfProject },
+  { id: 'h-table-monitor-speaker-stand', name: 'H-table with monitor and speaker stand', description: 'An H-table workstation with raised monitor and speaker stands and black connectors.', category: 'Tables', source: 'user-projects/h-table-monitor-speaker-stand.json', create: () => ({ ...parseProject(structuredClone(monitorSpeakerTable)), name: 'H-table with monitor and speaker stand' }) },
   ...[...CAD_EXAMPLES, ...PDF_EXAMPLES].map(example => ({
     ...example, description: example.description.replace(/doors/gi, 'fixed fronts').replace(/divider inserts/g, 'connected dividers'), create: () => connectedExample(example.id, example.create()),
   })),
