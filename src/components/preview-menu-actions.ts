@@ -48,6 +48,7 @@ interface MenuContext {
     extendToGround: () => void
     detachSelection: () => void
     splitSelection: () => void
+    mergeSelection: () => void
     distributeSelection: () => void
     closeHole: (id: string) => void
     duplicateSelected: () => void
@@ -90,6 +91,7 @@ function addLoosePanelActions(context: MenuContext, menuAction: AddAction) {
   if (selectedPanels.length>1) menuAction('Assembly', 'Create assembly',Box,()=>actions.openTool('assembly'),false,!!assemblySelectionError(project,selectedIds))
   if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Remove', 'Disconnect panels',Unlink,detachSelection)
   if (panelDistribution(selectedPanels)) menuAction('Build', 'Distribute evenly',Rows3,actions.distributeSelection)
+  if (selectedPanels.length===2) menuAction('Build', 'Merge panels',Square,actions.mergeSelection,false,context.modalOpen)
   if (splitCounts.includes(1)) menuAction('Build', 'Split in the middle',Scissors,()=>splitSelection())
   if (canDivideGrid) menuAction('Build', 'Divide into a grid',Grid2X2,()=>actions.openTool('grid'))
   if (parallelPanelCut(selectedPanels)) menuAction('Build', 'Split x times',Rows3,()=>actions.openTool('parallel'),false,checkingSplits||!splitCounts.length)

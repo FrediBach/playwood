@@ -39,6 +39,8 @@ Click an amber overlap icon in the panel list to open **Fix panel overlaps**. Re
 
 ## Design workflow
 
+Select two aligned panels and open **Build tools → Merge panels**, or right-click the preview and choose **Build → Merge panels**, to replace them with one continuous rectangle across the gap. Matching solid rectangular panels must share orientation, thickness, material, finish, and the full edge length across the gap. Their outside edges, surrounding panels, and installed hardware stay fixed. The first selected panel keeps its name and identity. Merging supports Undo/Redo, autosave, and project export. Custom outlines, rounded corners, perforations, inserts, linked assemblies, saved rules on either panel, and joints crossing the gap must be handled first; incompatible joints or obstacles reject the merge without changing the build.
+
 The inspector’s **Scene location** box starts collapsed, with ground clearance always visible at the right of its heading; click the heading to expand it. It shows the selection’s X/Y/Z From, To, and Center coordinates, signed ground clearance, and single-item rotation in degrees. Y is up and ground is Y = 0. Multiple selections show combined bounds. Panel measurements use rectangular stock bounds without accessories; connector measurements use CAD envelopes including slide offsets; objects use source-box bounds (including Boolean cutters). Values are read-only and use millimeters.
 
 

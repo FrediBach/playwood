@@ -15,6 +15,7 @@ import { changeConnectorType } from '@/lib/connector-type-edit'
 import { copyDesignConstraints,designConstraintPanelIds } from '@/lib/design-constraints'
 import { createListGroup,moveListItems,orderedConnectors,renameListGroup,ungroupList } from '@/lib/list-groups'
 import { detachPanel,duplicatePanel,removePanel,resolvePanels } from '@/lib/model'
+import { mergePanels } from '@/lib/panel-merge'
 import { distributePanels } from '@/lib/panel-distribution'
 import { splitParallelPanels } from '@/lib/parallel-panels'
 import { getSharedPanelFields,panelValuesEqual,selectPanelIds,updateSelectedPanels } from '@/lib/selection'
@@ -129,6 +130,11 @@ export function createSelectionCommands({ assembly, commit, selectedIds, notify,
     try { commit(current => distributePanels(current,selectedIds))}
     catch(error) { notify(error instanceof Error? error.message:'These panels cannot be distributed while keeping their joints aligned.')}
   }
+  const mergeSelection=() => {
+    if(assembly.hasMembers||assembly.editingInstance||inspectingConnectors) return
+    try { commit(current => mergePanels(current,selectedIds)); setSelectedIds([selectedIds[0]]); notify('Panels merged. Undo is available.') }
+    catch(error) { notify(error instanceof Error? error.message:'These panels cannot be merged.') }
+  }
   const splitSelection=(count=1) => {
     try {
       const result=splitParallelPanels(project,selectedIds,count)
@@ -173,7 +179,7 @@ export function createSelectionCommands({ assembly, commit, selectedIds, notify,
       commit(next); assembly.close(); setSelectedIds(copies); if(copied.size) setFrameSignal(v => v+1); notify(`${copied.size? 'Linked instances duplicated':'Panels duplicated'}${omittedRules? `. ${omittedRules} absolute-position or external ${omittedRules===1? 'constraint stays':'constraints stay'} with the originals.`:''}`)
     } catch(error) { notify(error instanceof Error? error.message:'This selection could not be duplicated.')}
   }
-  return { duplicateSelected,deleteSelected,detachSelection,splitSelection,distributeSelection,moveSelection }
+  return { duplicateSelected,deleteSelected,detachSelection,mergeSelection,splitSelection,distributeSelection,moveSelection }
 }
 
 interface CreateConnectorEditCommandsOptions {

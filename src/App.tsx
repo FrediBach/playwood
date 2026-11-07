@@ -112,7 +112,7 @@ export default function App() {
   useSelectionPruning(setPanelSelection,project,setSelectedConnectorIds,physicalConnectors)
   const { removeSelectedConnectors,selectConnectors,separateSelectedConnectors,chooseConnector,updateConnectorType }=createConnectorEditCommands({ modalOpen, assembly, commitWithInsertChecks, selectedConnectorIds, notify, commit, setSelectedConnectorIds, setConnectorTypeError, project, constraints, objectMode, objects, setAssemblyTab, clipboard, setPanelSelection, setInspectorTab, setRightOpen, setLeftOpen })
   const { updatePanel,updateMultiplePanels }=createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds, setResizeReview, setMovementReview })
-  const { duplicateSelected,deleteSelected,detachSelection,splitSelection,distributeSelection,moveSelection }=createSelectionCommands({ assembly, commit, selectedIds, notify, project, setSelectedIds, setInspectorTab, inspectingConnectors, removeSelectedConnectors, selectedIdSet, setFrameSignal, setMovementReview })
+  const { duplicateSelected,deleteSelected,detachSelection,mergeSelection,splitSelection,distributeSelection,moveSelection }=createSelectionCommands({ assembly, commit, selectedIds, notify, project, setSelectedIds, setInspectorTab, inspectingConnectors, removeSelectedConnectors, selectedIdSet, setFrameSignal, setMovementReview })
   const { connectWithPanel,extendToGround,addAutoConnectors,acceptConnectionFit }=createConnectionCommands({ commit, clipboard, assembly, setInspectorTab, setExploded, selectedIds, setSelectedIds, notify, modalOpen, project, setPendingConnectionFit, pendingConnectionFit, groundPanelFit, setFitSignal, connectorPanelFit, setSelectedId, setRightOpen, selectedConnectors })
   const movementEnabled=selectionMovementAvailable({ objectMode, constraints, clipboard, modalOpen, assembly, inspectingConnectors, realisticPreview, exploded, inspectorTab })
   const resize=usePreviewResize({project,selectedIds:inspectingConnectors?[]:selectedIds,selectedConnectorIds:inspectingConnectors?selectedConnectorIds:[],snapSettings,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify,select:setSelectedId})
@@ -155,7 +155,7 @@ export default function App() {
       lockPanelSizes: ()=>constraints.lockSizes(selectedIds),
       equalizeSizes: ()=>setEqualSizes({source:project,ids:[...selectedIds]}),
       separateSelectedConnectors, addConnectorsBetween: openConnectorInfill, connectWithPanel, groupSelected, removeSelectedConnectors, openConstraints, startAttach,
-      extendToGround, detachSelection, splitSelection, distributeSelection, closeHole, duplicateSelected, deleteSelected,
+      extendToGround, detachSelection, mergeSelection, splitSelection, distributeSelection, closeHole, duplicateSelected, deleteSelected,
       addPanel, addAutoConnectors, selectAll, copy: clipboard.copy,
       inspectConnectors: ()=>setRightOpen(true),
       inspectPanels: ()=>{setInspectorTab('panel');setRightOpen(true)},
@@ -165,7 +165,7 @@ export default function App() {
     },
   })
 
-  const buildToolsProps: React.ComponentProps<typeof SelectionBuildTools> = { assembly, selectedPanels, selectedIds, gridCut, toolRequest, project, commit, setSelectedIds, notify, splitCounts, checkingSplits, splitSelection, instance, holes, closeHole, addAutoConnectors, panels, modalOpen }
+  const buildToolsProps: React.ComponentProps<typeof SelectionBuildTools> = { assembly, selectedPanels, selectedIds, gridCut, toolRequest, project, commit, setSelectedIds, notify, splitCounts, checkingSplits, splitSelection, mergeSelection, instance, holes, closeHole, addAutoConnectors, panels, modalOpen }
   const buildTools = renderBuildTools(buildToolsProps, clipboard, inspectorTab)
   const fittedConnectorPanel=connectorPanelFit.result?.project.panels.find(panel=>panel.id===connectorPanelFit.result?.panelId)
   const trofastInspector=selected?<TrofastInspector key={`${selected.id}:${JSON.stringify(selected.trofastInserts)}`} project={project} panel={selected} onApply={inserts=>updatePanel({trofastInserts:inserts})} onPreview={previewTrofast}/>:undefined

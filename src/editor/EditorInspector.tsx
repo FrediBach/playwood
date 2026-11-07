@@ -630,6 +630,7 @@ interface SelectionBuildToolsProps {
   splitCounts: number[]
   checkingSplits: boolean
   splitSelection: (count?: number) => void
+  mergeSelection: () => void
   instance: AssemblyInstance|undefined
   holes: ReturnType<typeof findClosingPanelHoles>
   closeHole: (id: string,reviewed?: boolean) => void
@@ -641,7 +642,7 @@ interface SelectionBuildToolsProps {
 export function SelectionBuildTools({
   selectedIds, assembly, gridCut, toolRequest,
   project, commit, setSelectedIds, notify,
-  selectedPanels, splitCounts, checkingSplits, splitSelection,
+  selectedPanels, splitCounts, checkingSplits, splitSelection, mergeSelection,
   instance, holes, closeHole,
   addAutoConnectors, panels, modalOpen
 }: SelectionBuildToolsProps)  {
@@ -649,6 +650,7 @@ export function SelectionBuildTools({
   const openRequest = (tool: NonNullable<typeof toolRequest>['tool']) => request?.tool === tool ? request.token : 0
   return <section className="inspector-section inspector-build-tools" aria-label="Build tools" key={`tools:${selectedIds.join('/')}`}>
     <div className="section-title"><h2>Build tools</h2><Plus size={16} /></div>
+    {selectedIds.length===2&&<InspectorDisclosure title="Merge panels" summary="Fill the gap with one continuous panel" lazy><p className="field-note">Merge two aligned solid rectangles with matching thickness and finish. Outside edges and existing hardware stay fixed.</p><Button variant="outline" size="sm" disabled={modalOpen||assembly.hasMembers} onClick={mergeSelection}>Merge panels</Button></InspectorDisclosure>}
     {!assembly.hasMembers&&gridCut&&<InspectorDisclosure openRequest={openRequest('grid')} focusTarget="#grid-split-X" title="Divide into a grid" summary="Rows & columns" lazy><GridPanelSplit project={project} ids={selectedIds} frame={gridCut} onSplit={(result,x,y) => { commit(result.project); setSelectedIds(result.panelIds); notify(`Created a ${x+1} × ${y+1} grid with ${result.connectors} new connectors. Undo is available.`) } } /></InspectorDisclosure>}
     {!assembly.hasMembers&&parallelPanelCut(selectedPanels)&&<InspectorDisclosure openRequest={openRequest('parallel')} focusTarget="select" title="Divide evenly" summary="Add equally spaced dividers" lazy><ParallelPanelSplit counts={splitCounts} checking={checkingSplits} onSplit={splitSelection} /></InspectorDisclosure>}
     {(instance||!assembly.hasMembers)&&holes.length>0&&<HoleBuildTool openRequest={openRequest} holes={holes} toolRequest={toolRequest} instance={instance} closeHole={closeHole}/>}
