@@ -110,6 +110,44 @@ describe('connected panel movement', () => {
 })
 
 describe('connected panel resizing', () => {
+  it.each([
+    { branchWidth: 80, targetWidth: 200, continuationWidth: 40 },
+    { branchWidth: 3980, targetWidth: 40, continuationWidth: 4000 },
+  ])('finds a stock-bounded T-joint cascade to $continuationWidth mm without a redundant rule', ({ branchWidth, targetWidth, continuationWidth }) => {
+    const parent = createPanel({ name: 'Parent', width: 100, height: 400, position: [0, 500, 0] })
+    const before = attachPanel({ version: 1, name: 'Stock bounds', panels: [parent], connections: [] },
+      parent.id, createPanel({ name: 'Branch', width: branchWidth, height: 400 }), { ...options, type: 't' })
+    expectValid(before)
+    const snapshot = JSON.stringify(before)
+    const next = resizePanels(before, [parent.id], { width: targetWidth })
+    const withRule = resizePanels({ ...before, constraints: [{ id: 'minimum', enabled: true, kind: 'dimension',
+      panelId: parent.id, dimension: 'width', relation: 'minimum', value: 40 }] }, [parent.id], { width: targetWidth })
+    expect(named(next, 'Parent').width).toBe(targetWidth)
+    expect(named(next, 'Branch 2').width).toBeCloseTo(continuationWidth, 5)
+    near(named(next, 'Parent').position, parent.position)
+    expect(next.panels).toEqual(withRule.panels)
+    expect(next.connections).toEqual(before.connections)
+    expectValid(next)
+    expect(JSON.stringify(before)).toBe(snapshot)
+    const reversed = resizePanels(next, [parent.id], { width: 100 })
+    expect(named(reversed, 'Branch 2').width).toBeGreaterThan(40)
+    expect(named(reversed, 'Branch 2').width).toBeLessThan(4000)
+    expectValid(reversed)
+  })
+
+  it.each([
+    { childHeight: 380, targetHeight: 40 },
+    { childHeight: 420, targetHeight: 4000 },
+  ])('rejects a cascade beyond stock limits at depth $targetHeight atomically', ({ childHeight, targetHeight }) => {
+    const parent = createPanel({ width: 300, height: 400, position: [0, 1000, 0] })
+    const before = attachPanel({ version: 1, name: 'Depth limits', panels: [parent], connections: [] },
+      parent.id, createPanel({ width: 300, height: childHeight }), options)
+    expectValid(before)
+    const snapshot = JSON.stringify(before)
+    expect(() => resizePanels(before, [parent.id], { height: targetHeight })).toThrow(/size limits/)
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
   it('propagates shelf width through support joints with the edited panel centered', () => {
     const before = createStarterProject()
     const selected = named(before, 'Middle shelf')

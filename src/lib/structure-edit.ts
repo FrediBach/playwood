@@ -18,12 +18,12 @@ export class StructureEditError extends Error {
   constructor(message: string, public panelIds: string[], public connectionIds: string[] = []) { super(message) }
 }
 class SolverConflict extends Error {
-  constructor(public variables: number[]) { super(CONSTRAINT_MESSAGE) }
+  constructor(public variables: number[], message = CONSTRAINT_MESSAGE) { super(message) }
 }
 
 type Dimensions = Partial<Pick<Panel, 'width' | 'height'>>
 type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
-type Row = { entries: Map<number, number>; value: number }
+type Row = { entries: Map<number, number>; value: number; stockBound?: boolean }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
 type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
@@ -150,7 +150,11 @@ function solveWithBounds(rows: Row[], bounds: Row[], weights: number[]): number[
       if (Math.abs(change) < 1e-8) continue
       let direction = directions.get(index)
       if (!direction) {
-        direction = solve([...homogeneous, { ...bound, value: 1 }], weights)
+        try { direction = solve([...homogeneous, { ...bound, value: 1 }], weights) }
+        catch (error) {
+          if (bound.stockBound && error instanceof SolverConflict) throw new SolverConflict(error.variables, LIMIT_MESSAGE)
+          throw error
+        }
         directions.set(index, direction)
       }
       multipliers[index] = next
@@ -182,7 +186,8 @@ function solveWithBounds(rows: Row[], bounds: Row[], weights: number[]): number[
   throw new SolverConflict([...new Set([
     ...rows.filter(row => Math.abs(rowValue(row, output) - row.value) > 1e-5),
     ...bounds.filter(bound => rowValue(bound, output) < bound.value - 1e-5),
-  ].flatMap(row => [...row.entries.keys()]))])
+  ].flatMap(row => [...row.entries.keys()]))], bounds.some(bound => bound.stockBound && rowValue(bound, output) < bound.value - 1e-5)
+    ? LIMIT_MESSAGE : CONSTRAINT_MESSAGE)
 }
 
 function editComponent(project: Project, frames: Frame[], contacts: Contact[], ids: Set<string>, edit: Edit): Project {
@@ -227,11 +232,21 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   }
   const worldAxes = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)]
   const referenceSide = (reference: ConstraintReference) => reference === 'min' ? -1 : reference === 'max' ? 1 : 0
-  const controlledDimensions = new Set(constraints.flatMap(rule => rule.kind === 'dimension' || rule.kind === 'equal-dimension'
-    ? designConstraintPanelIds(rule).map(id => `${id}/${rule.dimension}`) : []))
+  const physicallySupported = new Set(connections.flatMap(connection => [connection.parentId, connection.childId]))
+  contacts.forEach(contact => { physicallySupported.add(frames[contact.a].panel.id); physicallySupported.add(frames[contact.b].panel.id) })
+  const controlledDimensions = new Set<string>()
   for (const evaluation of evaluateDesignConstraints(constraints, frames.map(item => item.panel))) {
     const rule = evaluation.constraint
     if (evaluation.issue) throw new Error(evaluation.issue)
+    const limits = designConstraintLimits(rule)
+    // A permitted interval alone does not authorize recutting a loose peer.
+    // Exact dimensions and matching cuts do; reconciliation also needs to
+    // repair violated dimension limits and adapt physically supported spans.
+    if (rule.kind === 'equal-dimension' || (rule.kind === 'dimension'
+      && ((limits.min !== undefined && limits.min === limits.max)
+        || (edit.kind === 'reconcile' && (evaluation.violation > 0 || physicallySupported.has(rule.panelId)))))) {
+      for (const id of designConstraintPanelIds(rule)) controlledDimensions.add(`${id}/${rule.dimension}`)
+    }
     // Build the change in the measured quantity once. Edge contributions also
     // subtract prescribed thickness changes from the right-hand side.
     const target = row(-evaluation.actual)
@@ -250,7 +265,6 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       edge(target, indices.get(rule.panelIds[1])!, axis, -1)
       edge(target, indices.get(rule.panelIds[0])!, axis, 1, -1)
     }
-    const limits = designConstraintLimits(rule)
     if (limits.min !== undefined && limits.min === limits.max) target.value += limits.min
     else {
       rows.pop()
@@ -260,19 +274,16 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   }
   // A relation between loose panels should move its peer, not make that panel
   // thinner/shorter merely because resizing has a lower objective weight.
-  const physicallySupported = new Set(connections.flatMap(connection => [connection.parentId, connection.childId]))
   const constrainedPanelIds = new Set(constraints.flatMap(designConstraintPanelIds))
-  contacts.forEach(contact => { physicallySupported.add(frames[contact.a].panel.id); physicallySupported.add(frames[contact.b].panel.id) })
   for (const [index, item] of frames.entries()) {
-    if (!constraints.length) continue
     for (const [dimension, field] of (['width', 'height'] as const).entries()) {
       const preservesOwnSize = edit.kind === 'reconcile' ? constrainedPanelIds.has(item.panel.id)
         : !physicallySupported.has(item.panel.id) && !ids.has(item.panel.id)
-      if (preservesOwnSize && !controlledDimensions.has(`${item.panel.id}/${field}`)) add(row(), index * 5 + 3 + dimension, 1)
+      if (constraints.length && preservesOwnSize && !controlledDimensions.has(`${item.panel.id}/${field}`)) add(row(), index * 5 + 3 + dimension, 1)
       // Bounds belong in the same solve, so another feasible placement can be
       // found instead of rejecting an unconstrained optimum beyond stock limits.
-      bounds.push({ entries: new Map([[index * 5 + 3 + dimension, 1]]), value: 40 - item.panel[field] },
-        { entries: new Map([[index * 5 + 3 + dimension, -1]]), value: item.panel[field] - 4000 })
+      bounds.push({ entries: new Map([[index * 5 + 3 + dimension, 1]]), value: 40 - item.panel[field], stockBound: true },
+        { entries: new Map([[index * 5 + 3 + dimension, -1]]), value: item.panel[field] - 4000, stockBound: true })
     }
   }
 
@@ -519,13 +530,13 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   let changes: number[]
   try {
     try {
-      try { changes = constraints.length ? solveWithBounds(rows, bounds, weights) : solve(rows, weights) }
+      try { changes = solveWithBounds(rows, bounds, weights) }
       catch (error) {
         if (!interiorPreferences.size) throw error
         // Shared grid boundaries may have to move with the selected shelf.
         // Relax only local anchors before the established outer-boundary solve.
         const outerRows = rows.filter(row => !interiorPreferences.has(row))
-        changes = constraints.length ? solveWithBounds(outerRows, bounds, weights) : solve(outerRows, weights)
+        changes = solveWithBounds(outerRows, bounds, weights)
       }
     }
     catch (error) {

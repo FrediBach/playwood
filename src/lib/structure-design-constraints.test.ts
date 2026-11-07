@@ -21,6 +21,65 @@ const boundedMeasurements: { requirement: ConstraintRequirement; initial: number
 ]
 
 describe('automatic design rules in structural edits', () => {
+  it.each(['width', 'height'] as const)('preserves a loose peer’s %s under protective limits during movement and reconciliation', dimension => {
+    const axis = dimension === 'width' ? 0 : 1
+    const a = createPanel({ id: 'a', width: 600, height: 600, position: [0, 1000, 0] })
+    const b = { ...a, id: 'b', position: a.position.map((value, index) => value + (index === axis ? 800 : 0)) as Panel['position'] }
+    const gap: DesignConstraint = { id: 'gap', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: axis === 0 ? 'x' : 'y', relation: 'minimum', value: 200 }
+    const delta = [0, 0, 0] as Panel['position']
+    delta[axis] = 100
+    const baseline = movePanels(project([a, b], [gap]), ['a'], delta)
+    for (const requirement of [
+      { relation: 'minimum', value: 500 },
+      { relation: 'maximum', value: 700 },
+      { relation: 'range', min: 500, max: 700 },
+    ] as const) {
+      const before = project([a, b], [gap, { id: 'cut', enabled: true, kind: 'dimension', panelId: 'b', dimension, ...requirement }])
+      const snapshot = JSON.stringify(before)
+      const next = movePanels(before, ['a'], delta)
+      expect(next.panels).toEqual(baseline.panels)
+      expect(byId(next, 'b')[dimension]).toBe(600)
+      satisfied(next)
+      const toReconcile = { ...before, panels: [{ ...a, position: byId(next, 'a').position }, b] }
+      const reconciled = reconcileDesignConstraints(toReconcile, 'a', 'gap')
+      expect(reconciled.panels).toEqual(baseline.panels)
+      satisfied(reconciled)
+      expect(JSON.stringify(before)).toBe(snapshot)
+    }
+  })
+
+  it('does not shrink a loose peer to bypass a fixed elevation and minimum gap', () => {
+    const a = createPanel({ id: 'a', width: 600, height: 600, position: [0, 1000, 0] })
+    const b = { ...a, id: 'b', position: [0, 1800, 0] as Panel['position'] }
+    const before = project([a, b], [
+      { id: 'gap', enabled: true, kind: 'gap', panelIds: ['a', 'b'], axis: 'y', relation: 'minimum', value: 200 },
+      { id: 'cut', enabled: true, kind: 'dimension', panelId: 'b', dimension: 'height', relation: 'minimum', value: 400 },
+      { id: 'floor', enabled: true, kind: 'floor', panelId: 'b', reference: 'center', value: 1800 },
+    ])
+    const snapshot = JSON.stringify(before)
+    expect(() => movePanels(before, ['a'], [0, 100, 0])).toThrow(/design rules/)
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it('allows physically connected spans with protective limits to resize', () => {
+    const before = createStarterProject()
+    const middle = before.panels.find(panel => panel.name === 'Middle shelf')!
+    const side = before.panels.find(panel => panel.name === 'Left side')!
+    const baseline = movePanels(before, [middle.id], [0, 10, 0])
+    const constrained: Project = { ...before, constraints: [{ id: 'cut', enabled: true, kind: 'dimension', panelId: side.id,
+      dimension: 'width', relation: 'minimum', value: 40 }] }
+    const next = movePanels(constrained, [middle.id], [0, 10, 0])
+    expect(next.panels).toEqual(baseline.panels)
+    expect(byId(next, side.id).width).toBeCloseTo(side.width + 10)
+    satisfied(next)
+    const floor: DesignConstraint = { id: 'floor', enabled: true, kind: 'floor', panelId: middle.id, reference: 'max',
+      value: getDesignConstraintBounds(byId(before, middle.id)).max[1] + 10 }
+    const reconciled = reconcileDesignConstraints({ ...constrained, constraints: [...constrained.constraints!, floor] })
+    const baselineReconciled = reconcileDesignConstraints({ ...before, constraints: [floor] })
+    expect(reconciled.panels).toEqual(baselineReconciled.panels)
+    satisfied(reconciled)
+  })
+
   it.each(boundedMeasurements)('reconciles floor $requirement.relation from $initial to $expected without removing slack', ({ requirement, initial, expected }) => {
     const before = project([shelf('shelf', initial - 9)], [{ id: 'floor', enabled: true, kind: 'floor', panelId: 'shelf', reference: 'max', ...requirement }])
     const next = reconcileDesignConstraints(before)
@@ -163,7 +222,10 @@ describe('automatic design rules in structural edits', () => {
   it('matches disconnected cut dimensions to the reference and follows later resizing', () => {
     const a = createPanel({ id: 'a', width: 400, position: [-1000, 500, 0] })
     const b = createPanel({ id: 'b', width: 600, position: [1000, 500, 0], visible: false })
-    const before = project([a, b], [{ id: 'same', enabled: true, kind: 'equal-dimension', panelIds: ['a', 'b'], dimension: 'width' }])
+    const before = project([a, b], [
+      { id: 'same', enabled: true, kind: 'equal-dimension', panelIds: ['a', 'b'], dimension: 'width' },
+      { id: 'cut', enabled: true, kind: 'dimension', panelId: 'b', dimension: 'width', relation: 'range', min: 300, max: 800 },
+    ])
     const aligned = reconcileDesignConstraints(before, 'a')
     expect(byId(aligned, 'a').width).toBe(400)
     expect(byId(aligned, 'b').width).toBe(400)
