@@ -1,4 +1,5 @@
 import { ArrowDownToLine, Box, Check, Clipboard, Copy, FolderPlus, Grid2X2, Link2, Maximize, Pencil, Plus, Rows3, Scan, Scissors, SlidersHorizontal, Square, Unlink, Ungroup, Trash2, type LucideIcon } from 'lucide-react'
+import { differingPanelDimension } from '@/lib/equal-panel-sizes'
 import type { PreviewMenuAction } from './PreviewContextMenu'
 import type { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { assemblySelectionError } from '@/lib/assemblies'
@@ -29,6 +30,7 @@ interface MenuContext {
   canMenuAutoConnect: boolean
   hasVisiblePanels: boolean
   actions: {
+    equalizeSizes?: () => void
     inspectConnectors: () => void
     inspectPanels: () => void
     attachCopy: () => void
@@ -78,6 +80,7 @@ function addEditingActions(context: MenuContext, menuAction: AddAction) {
 function addLoosePanelActions(context: MenuContext, menuAction: AddAction) {
   const {project, selectedPanels, selectedIds, selectedIdSet, canExtendToGround, splitCounts, checkingSplits, canDivideGrid, actions}=context
   const {groupSelected, openConstraints, startAttach, extendToGround, detachSelection, splitSelection}=actions
+  if (actions.equalizeSizes) menuAction('Build', 'Make sizes equal',Rows3,actions.equalizeSizes,false,context.modalOpen||!differingPanelDimension(selectedPanels))
   menuAction('Build', 'Add constraint',SlidersHorizontal,()=>openConstraints(true))
   menuAction('Organize', 'Group selected',FolderPlus,()=>groupSelected('panels',selectedIds),false,selectedPanels.length<2)
   if (selectedPanels.length===1) menuAction('Build', 'Attach a panel (A)',Link2,startAttach,false,context.canAttachPanel===false)

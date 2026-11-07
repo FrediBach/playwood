@@ -1,3 +1,4 @@
+import { EqualPanelSizesDialog } from '@/components/EqualPanelSizesDialog'
 import { MovementAlternativesDialog } from '@/components/MovementAlternativesDialog'
 import { ResizeAlternativesDialog } from '@/components/ResizeAlternativesDialog'
 import { acceptMovementAlternative,acceptResizeAlternative } from '@/lib/structure-edit'
@@ -47,7 +48,7 @@ import { useCallback,useEffect,useMemo,useState } from 'react'
 export default function App() {
   const {project,documentId,getSnapshot,commit,undo,redo,canUndo,canRedo,saveStatus,repairNotice}=useProject()
   const {
-  assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds,
+  equalSizes, setEqualSizes, assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds,
   connectorTypeError, setConnectorTypeError, selectedIds, setPanelSelection,
   setSelectedIds, setSelectedId, contextMenu, setContextMenu,
   constraintFooter, setConstraintFooter, projectConstraintsOpen, setProjectConstraintsOpen,
@@ -150,6 +151,7 @@ export default function App() {
     canMenuAutoConnect, hasVisiblePanels, canAddConnectorsBetween: !infillReason, canConnectWithPanel: !!connectorPanelFit.result,
     canAttachPanel, canExtendToGround: !!groundPanelFit.result, canAttachCopy: validTargets.length > 0,
     actions: {
+      equalizeSizes: ()=>setEqualSizes({source:project,ids:[...selectedIds]}),
       separateSelectedConnectors, addConnectorsBetween: openConnectorInfill, connectWithPanel, groupSelected, removeSelectedConnectors, openConstraints, startAttach,
       extendToGround, detachSelection, splitSelection, distributeSelection, closeHole, duplicateSelected, deleteSelected,
       addPanel, addAutoConnectors, selectAll, copy: clipboard.copy,
@@ -233,6 +235,10 @@ export default function App() {
     <ProjectStatus panelCount={project.panels.length} connectorCount={connectorCount} issueCount={issues.length} bounds={bounds} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')}/>
     {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
 
+    {equalSizes&&equalSizes.source===project&&<EqualPanelSizesDialog {...equalSizes} onCancel={()=>setEqualSizes(null)} onApply={candidate=>{
+      try { commit(current=>{if(current!==equalSizes.source)throw new Error('The project changed. Reopen Make sizes equal.');return candidate});setEqualSizes(null);notify('Panel sizes updated. Undo is available.') }
+      catch(error) { notify(error instanceof Error?error.message:'These sizes could not be applied.') }
+    }}/> }
     {movementReview&&movementReview.source===project&&<MovementAlternativesDialog review={movementReview} onCancel={()=>setMovementReview(null)} onConfirm={index=>{
       try { commit(current=>acceptMovementAlternative(current,movementReview,index)); setMovementReview(null); setPanelEditError(null); notify('Movement applied. Undo is available.') }
       catch(error) { setMovementReview(null); notify(error instanceof Error?error.message:'This move could not be applied.') }

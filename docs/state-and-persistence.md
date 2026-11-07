@@ -67,6 +67,10 @@ Starting a blank project, applying a template, and importing a project also use 
 
 ## Preview and draft transactions
 
+### Equal panel sizes
+
+`useEditorState.equalSizes` holds a source snapshot and selection outside history. `EqualPanelSizesDialog` offers existing values and a custom numeric input for the sole differing width, height, or thickness and lists selected sizes plus all resolved candidate changes. `equalizePanelSizes` uses the simultaneous constrained dimension solver and insert checks; linked assembly members are excluded. Apply checks source identity inside a functional commit, producing one history entry. Modal guards block background gestures, project changes invalidate the dialog, and Cancel/Escape discards the draft. No saved fields or persistent equality rules are added.
+
 ### Reviewed resize alternatives
 
 Failed numeric Width/Height edits on ordinary panels can open `ResizeAlternativesDialog` through `createPanelEditCommands`. `useEditorState.resizeReview` holds the source project and fully validated candidate alternatives outside project history. Radio choices only change the displayed review table. Cancel/Escape restores focus and leaves the committed project unchanged; Apply uses a functional source-identity check and commits one candidate as one undoable edit. Project changes invalidate the review, and modal guards prevent keyboard and canvas commands from editing behind it. Compound property patches, gesture resizing, and shared assembly editing do not enter this review workflow.
