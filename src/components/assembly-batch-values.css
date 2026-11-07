@@ -1,0 +1,9 @@
+.dialog-content.assembly-batch-values{width:680px}
+.assembly-batch-values fieldset{min-width:0;margin:18px 0;padding:14px;border:1px solid var(--line);border-radius:6px}
+.assembly-batch-values legend{max-width:100%;padding:0 6px;font-size:13px;overflow-wrap:anywhere}
+.assembly-batch-values fieldset>div+div{margin-top:12px}
+.assembly-batch-values .dialog-footer{flex-wrap:wrap}
+.assembly-batch-values li{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.assembly-batch-values table{table-layout:fixed}
+.assembly-batch-values th:first-child{width:45%}
+.assembly-batch-values td{white-space:normal;overflow-wrap:anywhere}

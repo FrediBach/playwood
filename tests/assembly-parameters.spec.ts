@@ -1,3 +1,4 @@
+import { getAssemblyAttachmentTargets } from '../src/lib/assemblies'
 import { openInspectorSection } from './inspector-helpers'
 import { test, expect, type Page } from '@playwright/test'
 import { ASSEMBLY_LIBRARY } from '../src/lib/assembly-library'
@@ -169,4 +170,58 @@ test('shelf width, height and depth are independent and controls fit a mobile in
   await expect(page.getByLabel('Depth', { exact: true })).toBeVisible()
   expect(await page.locator('.right-sidebar .inspector-scroll').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   await page.screenshot({ path: 'test-results/assembly-configurable-mobile.png' })
+})
+
+
+for (const width of [1440, 390]) test(`coordinated values resize a closed loop atomically at ${width}px`, async ({ page }) => {
+  test.setTimeout(90000)
+  await page.setViewportSize({ width, height: 900 })
+  let project = ASSEMBLY_LIBRARY.find(item => item.id === 'assembly-cube')!.create()
+  for (const label of ['Top right', 'Bottom right', 'Bottom left']) {
+    const target = getAssemblyAttachmentTargets(project, project.assemblies!.instances.at(-1)!.id).find(item => item.label === label)!
+    expect(target.error).toBeUndefined()
+    project = target.project!
+  }
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'loop.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  const original = await exportedProject(page)
+  if (width < 680) await page.getByRole('button', { name: 'Open panel list', exact: true }).click()
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  if (width < 680) await page.getByRole('button', { name: 'Collapse panel list', exact: true }).click()
+  const open = page.getByRole('button', { name: 'Edit coordinated values', exact: true })
+  await open.click()
+  const dialog = page.getByRole('dialog')
+  const fields = dialog.locator('input[type="number"]')
+  await expect(fields).toHaveCount(4)
+  await fields.first().fill('500')
+  await fields.first().press('Enter')
+  await dialog.getByRole('button', { name: 'Review coordinated changes', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Apply coordinated values', exact: true })).toHaveCount(0)
+  for (let index = 1; index < 4; index++) { await fields.nth(index).fill('500'); await fields.nth(index).press('Enter') }
+  await page.getByLabel('Fixed reference instance', { exact: true }).selectOption(project.assemblies!.instances[2].id)
+  await dialog.getByRole('button', { name: 'Review coordinated changes', exact: true }).click()
+  await expect(dialog.getByRole('table', { name: 'Coordinated assembly changes' })).toBeVisible()
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+  expect(await dialog.locator('.parts-table-wrap').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await page.screenshot({ path: test.info().outputPath('coordinated-values.png') })
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(original)
+  await open.click()
+  for (let index = 0; index < 4; index++) { await fields.nth(index).fill('500'); await fields.nth(index).press('Enter') }
+  await page.getByLabel('Fixed reference instance', { exact: true }).selectOption(project.assemblies!.instances[2].id)
+  await dialog.getByRole('button', { name: 'Review coordinated changes', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Apply coordinated values', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  const next = await exportedProject(page)
+  expect(next.assemblies!.instances.map(instance => instance.parameterValues)).toEqual(project.assemblies!.instances.map(() => ({ 'side-length': 500 })))
+  expect(next.assemblies!.instances[2].position).toEqual(project.assemblies!.instances[2].position)
+  expect(next.assemblies!.definitions).toEqual(project.assemblies!.definitions)
+  expect(validateProject(next)).toEqual([])
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(original)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  expect(await exportedProject(page)).toEqual(next)
+  await page.reload()
+  expect(await exportedProject(page)).toEqual(next)
 })

@@ -536,9 +536,10 @@ export function resetAssemblyFinish(project: Project, instanceId: string, key?: 
   }) })
 }
 
-function solveInstancePlacements(data: AssemblyData): AssemblyData {
+function solveInstancePlacements(data: AssemblyData, anchorInstanceId?: string): AssemblyData {
   const instances = [...data.instances], visited = new Set<string>()
-  for (const root of instances) {
+  const roots = anchorInstanceId ? [...instances.filter(item => item.id === anchorInstanceId), ...instances.filter(item => item.id !== anchorInstanceId)] : instances
+  for (const root of roots) {
     if (visited.has(root.id)) continue
     visited.add(root.id)
     const queue = [root.id]
@@ -576,22 +577,46 @@ export function updateAssemblyParameters(project: Project, instanceId: string, p
   return ensureValid(rebuild(project, nextData), project)
 }
 
+export type AssemblyParameterChanges = Record<string, Record<string, number | undefined>>
+
+/** Validate all overrides first, then place and materialize the complete candidate once. */
+export function updateAssemblyParameterValuesBatch(project: Project, changes: AssemblyParameterChanges, anchorInstanceId?: string): Project {
+  const ids = Object.keys(changes)
+  if (!ids.length) return project
+  if (anchorInstanceId !== undefined) {
+    instanceFor(project, anchorInstanceId)
+    if (!ids.includes(anchorInstanceId)) throw new Error('Choose a reference instance from the edited assemblies.')
+  }
+  const replacements = new Map<string, AssemblyInstance>()
+  for (const instanceId of ids) {
+    const instance = instanceFor(project, instanceId), definition = definitionFor(project.assemblies!, instance)
+    const parameters = definition.parameters ?? []
+    const parameterValues: Record<string, number> = Object.assign(Object.create(null), instance.parameterValues)
+    for (const [id, value] of Object.entries(changes[instanceId])) {
+      if (!parameters.some(parameter => parameter.id === id)) throw new Error('Choose a configurable value from this assembly source.')
+      if (value === undefined) delete parameterValues[id]
+      else parameterValues[id] = value
+    }
+    const checked = parseAssemblyParameterValues(parameterValues, parameters)
+    if (JSON.stringify(checked) === JSON.stringify(instance.parameterValues ?? {})) continue
+    const { parameterValues: _previous, ...rest } = instance
+    replacements.set(instanceId, Object.keys(checked).length ? { ...rest, parameterValues: checked } : rest)
+  }
+  if (!replacements.size) return project
+  const data = project.assemblies!
+  const nextData = solveInstancePlacements({ ...data, instances: data.instances.map(item => replacements.get(item.id) ?? item) }, anchorInstanceId)
+  return ensureValid(rebuild(project, nextData), project)
+}
+
 /** Change only this instance. An undefined entry restores its source default. */
 export function updateAssemblyParameterValues(project: Project, instanceId: string, values: Record<string, number | undefined>): Project {
-  const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = definitionFor(data, instance)
-  const parameters = definition.parameters ?? []
-  const parameterValues: Record<string, number> = Object.assign(Object.create(null), instance.parameterValues)
-  for (const [id, value] of Object.entries(values)) {
-    if (!parameters.some(parameter => parameter.id === id)) throw new Error('Choose a configurable value from this assembly source.')
-    if (value === undefined) delete parameterValues[id]
-    else parameterValues[id] = value
-  }
-  const checked = parseAssemblyParameterValues(parameterValues, parameters)
-  if (JSON.stringify(checked) === JSON.stringify(instance.parameterValues ?? {})) return project
-  const { parameterValues: _previous, ...rest } = instance
-  const nextInstance = Object.keys(checked).length ? { ...rest, parameterValues: checked } : rest
-  const nextData = solveInstancePlacements({ ...data, instances: data.instances.map(item => item.id === instanceId ? nextInstance : item) })
-  return ensureValid(rebuild(project, nextData), project)
+  return updateAssemblyParameterValuesBatch(project, { [instanceId]: values })
+}
+
+/** Accept a reviewed candidate only while its source snapshot is current. */
+export function acceptAssemblyParameterBatch(current: Project, source: Project, candidate: Project): Project {
+  if (current !== source) throw new Error('The project changed. Reopen coordinated values and review again.')
+  return candidate
 }
 
 export function resetAssemblyParameterValues(project: Project, instanceId: string): Project {

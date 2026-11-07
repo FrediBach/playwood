@@ -1,5 +1,5 @@
 import {
-  AssemblyAttachmentTarget,
+  AssemblyAttachmentTarget, acceptAssemblyParameterBatch,
   createAssembly,
   disassembleAssembly,
   disconnectAssembly,
@@ -20,7 +20,7 @@ interface Options {
   project: Project
   selectedIds: string[]
   setSelectedIds: (ids: string[]) => void
-  commit: (project: Project) => void
+  commit: (project: Project | ((current: Project) => Project)) => void
   notify: (message: string) => void
   prepareSelection: () => void
   fit: () => void
@@ -103,6 +103,14 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
     create: (name: string, parameters: AssemblyParameter[] = []) => run(() => createAssembly(project, selectedIds, name, parameters), 'Reusable assembly created. Use a + to attach a linked copy.', true),
     parameters: (parameters: AssemblyParameter[]) => editingInstance ? run(() => updateAssemblyParameters(project, editingInstance.id, parameters), 'Editable values saved for this assembly.') : false,
     parameter: (id: string, parameterId: string, value: number) => run(() => updateAssemblyParameterValues(project, id, { [parameterId]: value })),
+    applyParameterBatch: (source: Project, candidate: Project) => {
+      try {
+        commit(current => acceptAssemblyParameterBatch(current, source, candidate))
+        clearPlacement()
+        notify('Coordinated assembly values applied.')
+        return true
+      } catch (error) { notify(error instanceof Error ? error.message : 'These values could not be applied.'); return false }
+    },
     resetParameters: (id: string) => run(() => resetAssemblyParameterValues(project, id)),
     insert: (id: string) => run(() => instantiateAssembly(project, id), 'Linked instance added.', true),
     duplicate: (id: string) => run(() => duplicateAssembly(project, id), 'Linked instance duplicated.', true),
@@ -132,7 +140,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
   }
 }
 
-function createAttachmentCommand(targets: AssemblyAttachmentTarget[],notify: (message: string) => void,sourceInstanceId: string|undefined,instances: AssemblyInstance[],commit: (project: Project) => void,select: (id: string,next?: Project) => void,close: () => void,setSelectedIds: (ids: string[]) => void,sourceIds: Set<string>,existingIds: Set<string>,prepareSelection: () => void,fit: () => void) {
+function createAttachmentCommand(targets: AssemblyAttachmentTarget[],notify: (message: string) => void,sourceInstanceId: string|undefined,instances: AssemblyInstance[],commit: (project: Project | ((current: Project) => Project)) => void,select: (id: string,next?: Project) => void,close: () => void,setSelectedIds: (ids: string[]) => void,sourceIds: Set<string>,existingIds: Set<string>,prepareSelection: () => void,fit: () => void) {
   return (id: string) => {
     const candidate=targets.find(item => item.id===id)
     if(!candidate?.project) { if(candidate?.error) notify(candidate.error); return}

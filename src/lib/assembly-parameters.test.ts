@@ -1,6 +1,6 @@
 import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
-import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAttachmentTargets, makeAssemblyIndependent, materializeAssemblies, moveAssemblies, resetAssemblyParameterValues, updateAssemblyDefinition, updateAssemblyParameters, updateAssemblyParameterValues } from './assemblies'
+import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAttachmentTargets, makeAssemblyIndependent, materializeAssemblies, moveAssemblies, resetAssemblyParameterValues, updateAssemblyDefinition, updateAssemblyParameters, updateAssemblyParameterValues, updateAssemblyParameterValuesBatch, acceptAssemblyParameterBatch } from './assemblies'
 import { getAssemblyParameterRange } from './assembly-parameters'
 import { gridProject } from './example-geometry'
 import { createPanel, getProjectBounds, parseProject, rotateProject, validateProject } from './model'
@@ -122,6 +122,71 @@ describe('assembly instance parameters', () => {
     expect(() => updateAssemblyParameterValues(project, project.assemblies!.instances[0].id, { width: 600, height: 600 })).toThrow(/align|corners|overlap/)
     expect(JSON.stringify(project)).toBe(before)
     valid(project)
+  })
+
+  it('resizes a closed four-instance loop atomically with an explicit placement reference', () => {
+    const project = add(add(add(box(), 'Top right'), 'Bottom right'), 'Bottom left')
+    const snapshot = JSON.stringify(project)
+    const anchor = project.assemblies!.instances[2]
+    const changes = Object.fromEntries(project.assemblies!.instances.map(instance => [instance.id, { width: 600, height: 600 }]))
+    const next = updateAssemblyParameterValuesBatch(project, changes, anchor.id)
+    expect(next.assemblies!.instances.find(item => item.id === anchor.id)!.position).toEqual(anchor.position)
+    expect(next.assemblies!.instances.map(item => item.parameterValues)).toEqual(project.assemblies!.instances.map(() => ({ width: 600, height: 600 })))
+    expect(next.assemblies!.definitions).toEqual(project.assemblies!.definitions)
+    expect(next.assemblies!.links).toEqual(project.assemblies!.links)
+    expect(next.assemblies!.instances.map(item => item.panelIds)).toEqual(project.assemblies!.instances.map(item => item.panelIds))
+    expect(JSON.stringify(project)).toBe(snapshot)
+    valid(next)
+    expect(acceptAssemblyParameterBatch(project, project, next)).toBe(next)
+    expect(() => acceptAssemblyParameterBatch({ ...project }, project, next)).toThrow(/project changed/)
+    const reset = updateAssemblyParameterValuesBatch(next, Object.fromEntries(next.assemblies!.instances.map(instance => [instance.id, { width: undefined, height: undefined }])), anchor.id)
+    expect(reset.assemblies!.instances.every(item => !item.parameterValues)).toBe(true)
+    valid(reset)
+  })
+
+  it('rejects invalid batch members and impossible combined edits without partial changes', () => {
+    const project = add(add(add(box(), 'Top right'), 'Bottom right'), 'Bottom left')
+    const [a, b] = project.assemblies!.instances
+    const snapshot = JSON.stringify(project)
+    for (const changes of [
+      { [a.id]: { width: 600 }, [b.id]: { missing: 500 } },
+      { [a.id]: { width: 600 }, [b.id]: { width: NaN } },
+      { [a.id]: { width: 600 }, missing: { width: 600 } },
+      { [a.id]: { width: 600, height: 600 }, [b.id]: { width: 600, height: 600 } },
+    ]) expect(() => updateAssemblyParameterValuesBatch(project, changes)).toThrow()
+    expect(JSON.stringify(project)).toBe(snapshot)
+    expect(updateAssemblyParameterValuesBatch(project, {})).toBe(project)
+    expect(updateAssemblyParameterValuesBatch(project, { [a.id]: {} })).toBe(project)
+  })
+
+  it('supports distinct sources and preserves unedited overrides and unselected instances', () => {
+    let project = box()
+    const first = project.assemblies!.instances[0]
+    project = duplicateAssembly(project, first.id)
+    const second = project.assemblies!.instances[1]
+    project = moveAssemblies(project, [second.id], [1500, 0, 0])
+    project = makeAssemblyIndependent(project, second.id)
+    project = updateAssemblyParameterValues(project, first.id, { depth: 450 })
+    project = duplicateAssembly(project, second.id)
+    const third = project.assemblies!.instances[2]
+    project = moveAssemblies(project, [third.id], [1500, 0, 0])
+    const untouched = project.assemblies!.instances[2]
+    const next = updateAssemblyParameterValuesBatch(project, { [first.id]: { width: 450 }, [second.id]: { height: 500 } }, first.id)
+    expect(next.assemblies!.definitions).toEqual(project.assemblies!.definitions)
+    expect(next.assemblies!.instances[0].parameterValues).toEqual({ depth: 450, width: 450 })
+    expect(next.assemblies!.instances[1].parameterValues).toEqual({ height: 500 })
+    expect(next.assemblies!.instances[2]).toEqual(untouched)
+    valid(next)
+  })
+
+  it('checks the complete batch against build space without accepting any override', () => {
+    const project = add(box(), 'Top right')
+    const bounds = getProjectBounds(project.panels)
+    project.spaceConstraint = { enabled: true, width: bounds.max[0] - bounds.min[0], height: bounds.max[1], depth: bounds.max[2] - bounds.min[2], centerX: (bounds.min[0] + bounds.max[0]) / 2, centerZ: (bounds.min[2] + bounds.max[2]) / 2 }
+    const snapshot = JSON.stringify(project)
+    const changes = Object.fromEntries(project.assemblies!.instances.map(instance => [instance.id, { width: 600, height: 600 }]))
+    expect(() => updateAssemblyParameterValuesBatch(project, changes)).toThrow(/build space/i)
+    expect(JSON.stringify(project)).toBe(snapshot)
   })
 
   it('authors shared defaults while preserving overrides and protects controlled source dimensions', () => {
