@@ -9,8 +9,8 @@ import { getProjectBounds, parseProject, projectToCsv, resolvePanels, validatePr
 
 describe('resource example library', () => {
   it('offers each distinct connector build once, alongside the original starters', () => {
-    expect(EXAMPLE_LIBRARY).toHaveLength(27)
-    expect(new Set(EXAMPLE_LIBRARY.map(example => example.id)).size).toBe(27)
+    expect(EXAMPLE_LIBRARY).toHaveLength(28)
+    expect(new Set(EXAMPLE_LIBRARY.map(example => example.id)).size).toBe(28)
     expect(EXAMPLE_LIBRARY.filter(example => example.source)).toHaveLength(23)
     expect(EXAMPLE_LIBRARY.some(example => /bizu|lean table|nordic|beechwood chair/i.test(example.name))).toBe(false)
     for (const example of EXAMPLE_LIBRARY) if (example.source) {

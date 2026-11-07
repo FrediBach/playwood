@@ -1,3 +1,4 @@
+import { catTowerProject } from './cat-tower'
 import { connectedExample } from './connected-examples'
 import { ASSEMBLY_LIBRARY } from './assembly-library'
 import { createStarterProject, parseProject } from './model'
@@ -22,6 +23,7 @@ export const EXAMPLE_LIBRARY: readonly ExampleDefinition[] = [
   { id: 'shelf', name: 'Everyday shelf', description: 'A little space for everything.', category: 'Starter builds', create: () => createStarterProject('shelf') },
   { id: 'desk', name: 'Work table', description: 'Room for your next big idea.', category: 'Starter builds', create: () => createStarterProject('desk') },
   { id: 'display', name: 'Creative display', description: 'Put your creativity on display.', category: 'Starter builds', create: () => createStarterProject('display') },
+  { id: 'cat-tower', name: 'Cat tower', description: 'Six levels on a 2×2 cube footprint, with rotating climbing openings and corner lookouts. 300×300 and 635×300 mm panels.', category: 'Shelving', create: catTowerProject },
   { id: 'diamond-shelf', name: 'Diamond shelf', description: 'Five diamond compartments, white panels, and black connectors. Rotated 45°.', category: 'Shelving', create: diamondShelfProject },
   { id: 'h-table-monitor-speaker-stand', name: 'H-table with monitor and speaker stand', description: 'An H-table workstation with raised monitor and speaker stands and black connectors.', category: 'Tables', source: 'user-projects/h-table-monitor-speaker-stand.json', create: () => ({ ...parseProject(structuredClone(monitorSpeakerTable)), name: 'H-table with monitor and speaker stand' }) },
   ...[...CAD_EXAMPLES, ...PDF_EXAMPLES].map(example => ({
