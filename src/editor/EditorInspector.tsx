@@ -150,11 +150,11 @@ export function EditorInspector({
     attachmentType={attachment.type}
     contextLabel={inspectorContextLabel(objectMode,managingProjectConstraints,inspectingConnectors,assembly)}
     onDoneEditing={assembly.editingInstance? assembly.done:undefined}
-    contextDetail={assembly.editingDefinition? `${assembly.editingDefinition.name} · affects ${assemblyCount(assembly.editingDefinition.id)} linked ${assemblyCount(assembly.editingDefinition.id)===1? 'instance':'instances'}`:undefined}
-    attachmentStatus={previewResult.error||attachmentErrors[0]?.message||(previewProject? 'Panel thickness is compatible · Ready to attach':undefined)}
+    contextDetail={assemblyEditingDetail(assembly.editingDefinition, assemblyCount)}
+    attachmentStatus={attachmentPreviewStatus(previewResult.error, attachmentErrors, previewProject)}
     footer={renderInspectorFooter({ constraints, setConstraintFooter, clipboard, attachmentSummary, assembly, attachmentWarning, assemblyHint, managingProjectConstraints, closeProjectConstraints })}>
     <EditorBuildSpace projectConstraintsOpen={projectConstraintsOpen} clipboard={clipboard} assembly={assembly} inspectorTab={inspectorTab} constraints={constraints} project={project} panels={panels} commit={commit} setFitSignal={setFitSignal} notify={notify}/>
-    {!managingProjectConstraints && !assembly.editingInstance && inspectorTab === 'panel' && <SelectionLocation location={objectMode ? objectLocation(objects.objects, objects.selectedIds) : inspectingConnectors ? connectorLocation(project, selectedConnectorIds) : panelLocation(project, selectedIds)}/>}
+    <InspectorSelectionLocation managingProjectConstraints={managingProjectConstraints} editingInstance={assembly.editingInstance} inspectorTab={inspectorTab} objectMode={objectMode} objects={objects} inspectingConnectors={inspectingConnectors} project={project} selectedConnectorIds={selectedConnectorIds} selectedIds={selectedIds}/>
     {objectMode? <ConstructionObjectInspector editor={objects} disabled={objectControlsDisabled} conversionReason={objectConversionReason(project,objects.selectedIds)} onConvert={() => setObjectConversion({ source: project,ids: [...objects.selectedIds] })} />:inspectingConnectors? <SelectedConnectorInspector
     openConnectorInfill={openConnectorInfill}
     infillReason={infillReason}
@@ -219,6 +219,23 @@ export function EditorInspector({
       {!clipboard.active&&!assembly.editingInstance&&inspectorTab==='panel'&&(assembly.hasMembers||managingProjectConstraints)&&constraintsInspector}
     </>}
   </InspectorSidebar>
+}
+
+function InspectorSelectionLocation({ managingProjectConstraints, editingInstance, inspectorTab, objectMode, objects, inspectingConnectors, project, selectedConnectorIds, selectedIds }: Pick<EditorInspectorProps, 'managingProjectConstraints' | 'inspectorTab' | 'objectMode' | 'objects' | 'inspectingConnectors' | 'project' | 'selectedConnectorIds' | 'selectedIds'> & { editingInstance: ReturnType<typeof useAssemblyEditor>['editingInstance'] }) {
+  if (managingProjectConstraints || editingInstance || inspectorTab !== 'panel') return null
+  const location = objectMode ? objectLocation(objects.objects, objects.selectedIds)
+    : inspectingConnectors ? connectorLocation(project, selectedConnectorIds) : panelLocation(project, selectedIds)
+  return <SelectionLocation location={location}/>
+}
+
+function assemblyEditingDetail(definition: AssemblyDefinition | undefined, countInstances: (id: string) => number) {
+  if (!definition) return undefined
+  const count = countInstances(definition.id)
+  return `${definition.name} · affects ${count} linked ${count === 1 ? 'instance' : 'instances'}`
+}
+
+function attachmentPreviewStatus(error: string, issues: ValidationIssue[], project: Project | null) {
+  return error || issues[0]?.message || (project ? 'Panel thickness is compatible · Ready to attach' : undefined)
 }
 
 interface EditorBuildSpaceProps {

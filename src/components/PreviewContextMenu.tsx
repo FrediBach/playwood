@@ -5,6 +5,8 @@ import type { LucideIcon } from 'lucide-react'
 import './preview-context-menu.css'
 
 export interface PreviewMenuAction {
+  /** Stable identity for actions whose labels can repeat or change. */
+  id?: string
   shortcut?: string
   label: string
   group?: string
@@ -58,9 +60,9 @@ export function PreviewContextMenu({ x, y, title, actions, onClose, ariaLabel = 
       }
     }}>
     <div className="preview-context-title">{title}</div>
-    {groups.map((group, groupIndex) => <div key={group.label ?? groupIndex} role="group" aria-label={group.label} className={group.label ? 'preview-context-group' : undefined}>
+    {groups.map(group => <div key={group.label ?? 'ungrouped'} role="group" aria-label={group.label} className={group.label ? 'preview-context-group' : undefined}>
       {group.label && <div className="preview-context-group-title" aria-hidden="true">{group.label}</div>}
-      {group.actions.map((action, index) => <button key={`${index}-${action.label}`} role="menuitem" aria-label={action.label} aria-keyshortcuts={action.shortcut ? shortcutAria(action.shortcut) : undefined} aria-disabled={action.disabled || undefined} className={action.danger ? 'is-destructive' : undefined} onClick={() => { if (action.disabled) return; onClose(); action.run() }}>
+      {group.actions.map(action => <button key={action.id ?? action.label} role="menuitem" aria-label={action.label} aria-keyshortcuts={action.shortcut ? shortcutAria(action.shortcut) : undefined} aria-disabled={action.disabled || undefined} className={action.danger ? 'is-destructive' : undefined} onClick={() => { if (action.disabled) return; onClose(); action.run() }}>
       <action.icon size={16} strokeWidth={1.75} aria-hidden="true" focusable="false"/>
       <span>{action.label}</span>
       {action.shortcut && <kbd aria-hidden="true">{shortcutLabel(action.shortcut)}</kbd>}

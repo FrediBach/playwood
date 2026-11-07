@@ -136,7 +136,7 @@ export function GroupedList<T extends { id: string }>({ items, selectedIds, grou
     menuActions.push({ label: 'Rename group', icon: Pencil, run: () => setEditingId(groupId) }, { label: 'Ungroup', icon: Ungroup, run: () => onUngroup(groupId) })
   } else if (menu?.ids.length) {
     menuActions.push({ label: 'Group selected', icon: FolderPlus, disabled: menu.ids.length < 2, run: () => createGroup(menu.ids) })
-    for (const group of groups) menuActions.push({ label: `Move to ${group.name}`, icon: FolderInput, disabled: menu.ids.every(id => membership.get(id) === group.id), run: () => onMove(menu.ids, group.id, null) })
+    for (const group of groups) menuActions.push({ id: `move-to/${group.id}`, label: `Move to ${group.name}`, icon: FolderInput, disabled: menu.ids.every(id => membership.get(id) === group.id), run: () => onMove(menu.ids, group.id, null) })
     if (menu.ids.some(id => membership.has(id))) menuActions.push({ label: 'Remove from group', icon: FolderMinus, run: () => onMove(menu.ids, null, null) })
   }
   if (!menu?.groupId) menuActions.push({ label: 'New group', icon: FolderPlus, run: () => createGroup([]) })

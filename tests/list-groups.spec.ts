@@ -1,4 +1,23 @@
 import { test, expect, type Page, type Locator } from '@playwright/test'
+import { createStarterProject } from '../src/lib/model'
+
+test('same-named groups remain distinct context-menu destinations', async ({ page }) => {
+  const project = createStarterProject()
+  project.listGroups = ['first', 'second'].map(id => ({ id, name: 'Storage', kind: 'panels', itemIds: [] }))
+  const keyWarnings: string[] = []
+  page.on('console', message => { if (message.text().includes('same key')) keyWarnings.push(message.text()) })
+  await page.goto('/')
+  await page.getByLabel('Import project file').setInputFiles({ name: 'groups.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+  await page.locator('.panel-list-select').first().click({ button: 'right' })
+  const destinations = page.getByRole('menuitem', { name: 'Move to Storage', exact: true })
+  await expect(destinations).toHaveCount(2)
+  await destinations.last().click()
+  await expect.poll(() => page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('playwood-studio-project-v1')!)
+    return saved.listGroups.map((group: { id: string; itemIds: string[] }) => ({ id: group.id, count: group.itemIds.length }))
+  })).toEqual([{ id: 'first', count: 0 }, { id: 'second', count: 1 }])
+  expect(keyWarnings).toEqual([])
+})
 
 async function dragTo(page: Page, handle: Locator, target: Locator) {
   await handle.scrollIntoViewIfNeeded()

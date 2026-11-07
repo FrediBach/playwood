@@ -62,7 +62,7 @@ interface MenuContext {
 }
 const MENU_GROUPS = ['Selection', 'Build', 'Assembly', 'Organize', 'Remove', 'Preview'] as const
 type MenuGroup = typeof MENU_GROUPS[number]
-type AddAction = (group: MenuGroup, label: PreviewCommandLabel | `Fill hole · ${string}` | `Review hole fit · ${string}`, icon: LucideIcon, run: () => void, danger?: boolean, disabled?: boolean, shortcut?: string) => void
+type AddAction = (group: MenuGroup, label: PreviewCommandLabel | `Fill hole · ${string}` | `Review hole fit · ${string}`, icon: LucideIcon, run: () => void, danger?: boolean, disabled?: boolean, shortcut?: string, id?: string) => void
 
 function addConnectorActions(context: MenuContext, menuAction: AddAction) {
   const {selectedConnectorIds, modalOpen, assembly, canConnectWithPanel, actions}=context
@@ -118,7 +118,7 @@ function addPanelActions(context: MenuContext, menuAction: AddAction) {
     } else if (!assembly.hasMembers) {
       addLoosePanelActions(context, menuAction)
     }
-    if (instance || !assembly.hasMembers) for (const [index, hole] of holes.entries()) menuAction('Build', `${hole.alignment ? 'Review hole fit' : 'Fill hole'} · ${hole.label}`,Square,()=>closeHole(hole.id),false,false,`h ${String(index + 1).split('').join(' ')} Enter`)
+    if (instance || !assembly.hasMembers) for (const [index, hole] of holes.entries()) menuAction('Build', `${hole.alignment ? 'Review hole fit' : 'Fill hole'} · ${hole.label}`,Square,()=>closeHole(hole.id),false,false,`h ${String(index + 1).split('').join(' ')} Enter`, `hole/${hole.id}`)
     menuAction('Selection', 'Copy',Clipboard,actions.copy)
     if (!assembly.memberInstance || instance) {
       menuAction('Selection', 'Duplicate',Copy,duplicateSelected)
@@ -132,7 +132,7 @@ export function buildPreviewMenuActions(context: MenuContext): PreviewMenuAction
   const {panels, assembly, selectedIdSet, inspectingConnectors, hasVisiblePanels, actions}=context
   const {selectAll, openConstraints}=actions
   const menuActions: PreviewMenuAction[]=[]
-  const menuAction: AddAction = (group, label, icon, run, danger = false, disabled = false, shortcut = previewShortcut(label)) => menuActions.push({ group, label, icon, run, danger, disabled, shortcut })
+  const menuAction: AddAction = (group, label, icon, run, danger = false, disabled = false, shortcut = previewShortcut(label), id = label) => menuActions.push({ id, group, label, icon, run, danger, disabled, shortcut })
   if (inspectingConnectors) addConnectorActions(context, menuAction)
   else if (assembly.editingInstance) addEditingActions(context, menuAction)
   else addPanelActions(context, menuAction)
