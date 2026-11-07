@@ -44,3 +44,10 @@
 
 .space-constraint-toggle{display:flex;align-items:center;gap:8px;margin:16px 0;color:var(--ink);font-size:13px;line-height:1.5}
 .space-constraint-toggle input{margin:0;flex-shrink:0;accent-color:var(--accent)}
+
+.constraints-toolbar-button{position:relative;overflow:visible}
+.constraints-toolbar-button[aria-pressed=true]{background:#e5ebdc;color:#435731}
+.constraints-toolbar-badge{position:absolute;top:-4px;right:-5px;min-width:16px;height:16px;padding:0 4px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#596d45;color:white;border:2px solid var(--paper);font-size:9px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.constraint-rule-measurement{display:flex;align-items:center;gap:5px}
+.constraint-rule-measurement svg{flex-shrink:0}
+.constraint-rule-label.is-compact{padding:2px 5px;font-size:10px;background:#fafcf4e8;box-shadow:none}

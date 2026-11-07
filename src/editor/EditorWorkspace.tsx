@@ -54,6 +54,7 @@ interface EditorWorkspaceProps {
   constraintPreviewProject: Project|undefined
   displayPanels: Panel[]
   openConstraints: (add?: boolean) => void
+  constraintsOverviewOpen: boolean
   pickingConstraint: boolean
   addAutoConnectors: () => void
   panels: Panel[]
@@ -104,7 +105,7 @@ export function EditorWorkspace({
   constraints, modalOpen, clipboard, assembly,
   inspectorTab, realisticPreview, selectedConnectorIds, chooseConnector,
   selectedIds, choosePanel, setContextMenu, constraintPreviewProject,
-  displayPanels, openConstraints, pickingConstraint, addAutoConnectors,
+  displayPanels, openConstraints, pickingConstraint, addAutoConnectors, constraintsOverviewOpen,
   panels, commitWithInsertChecks, moveSelection, movementEnabled,
   previewPanels, previewConnections, view, showGrid,
   showDimensions, exploded, fitSignal, frameSignal,
@@ -143,6 +144,9 @@ export function EditorWorkspace({
     selectedIds={selectedIds}
     hasFloorConstraint={project.constraints?.some(rule => rule.enabled&&rule.kind==='floor')}
     designConstraint={constraints.activeRule}
+    overviewConstraints={constraintsOverviewOpen && !constraints.editing ? project.constraints : undefined}
+    constraintsOverviewOpen={constraintsOverviewOpen}
+    constraintCount={(project.constraints?.length ?? 0) + (project.spaceConstraint?.enabled ? 1 : 0)}
     constraintPanelIds={constraints.highlightedPanelIds}
     onConstraints={() => openConstraints()}
     constraintEditing={constraints.editing}

@@ -33,6 +33,8 @@ The **Sync** button shows a green check badge while a folder is connected. An am
 
 Sync reads JSON files directly inside the chosen folder; it does not scan subfolders or watch for external edits. **Resync** refreshes the listing without replacing the workspace. If an opened file changes or disappears outside the app, saving stops and folder autosave pauses. Preserve your edits with **Duplicate project**, then reopen the disk version if needed. Project and assembly files use their existing formats and the 2 MB import limit; no cloud account or server is involved.
 
+The preview’s **All constraints** button shows a badge counting saved rules (including paused rules) plus enabled Build space. Open it to see compact measurement guides: blue cut dimensions, green floor/level references, purple gaps/opening ratios, and ochre fixed positions/setbacks, each with its own icon. Paused rules use gray dashed lines. Hover or focus an inspector rule for its full measurement; editing isolates the draft. Closing the inspector hides the rule overview. Guides appear in Studio, outside exploded view.
+
 ## Design workflow
 
 - Open **Assembly → Objects → Add a box** to sketch with translucent blue volumes and outlines; selected objects appear in magenta. Enter **Box width/height/depth**, center coordinates, and 90° rotations, then **Apply object changes**. **Cancel** or **Escape** discards the draft. Boxes use outside dimensions in millimeters. They appear in Studio and disappear entirely in Realistic preview and exploded view.

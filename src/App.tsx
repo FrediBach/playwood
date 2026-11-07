@@ -194,6 +194,7 @@ export default function App() {
     resolveBoxPanelIds, resolveBoxConnectorIds, resize, drag, setSnapSettings, constraints, modalOpen, clipboard,
     assembly, inspectorTab, realisticPreview, selectedConnectorIds, chooseConnector, selectedIds, choosePanel,
     setContextMenu, constraintPreviewProject, displayPanels, openConstraints, pickingConstraint, addAutoConnectors,
+    constraintsOverviewOpen: projectConstraintsOpen && rightOpen,
     panels, commitWithInsertChecks, moveSelection, movementEnabled, previewPanels, previewConnections, view, showGrid,
     showDimensions, exploded, fitSignal, frameSignal, zoomSignal, setRealisticPreview, leftOpen, rightOpen, setLeftOpen,
     setRightOpen, setShowDimensions, setShowGrid, setView, setZoomSignal, setFitSignal, setExploded, setDialog, addPanel,

@@ -56,6 +56,7 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   connections: Connection[]
   connectorOverrides?: Project['connectorOverrides']
   designConstraint?: NonNullable<Project['constraints']>[number] | null
+  overviewConstraints?: Project['constraints']
   constraintPanelIds?: readonly string[]
   spaceConstraint?: Project['spaceConstraint']
   hasFloorConstraint?: boolean
@@ -463,6 +464,7 @@ function SceneOverlays(props: SceneProps & { shownPanels: Panel[] }) {
     ? shownPanels.find(panel => panel.id === props.attachmentSideGuide!.panelId) : undefined
   return <>
     {!exploded && !realisticPreview && props.spaceConstraint && <SpaceConstraintOverlay space={props.spaceConstraint} panels={panels}/> }
+    {!exploded && !realisticPreview && props.overviewConstraints?.filter(rule => rule.id !== props.designConstraint?.id).map(rule => <DesignConstraintOverlay key={rule.id} constraint={rule} panels={panels} compact/>)}
     {!exploded && !realisticPreview && props.designConstraint && <DesignConstraintOverlay constraint={props.designConstraint} panels={panels}/>}
     {props.dragSnap && <DragSnapNotice snap={props.dragSnap}/>}
     {sideGuidePanel && props.attachmentSideGuide && <AttachmentSideGuide panel={sideGuidePanel} guide={props.attachmentSideGuide}/>}

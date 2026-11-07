@@ -40,6 +40,8 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
   onRotate: () => void
   onRescale: () => void
   onConstraints: () => void
+  constraintCount?: number
+  constraintsOverviewOpen?: boolean
   constraintEditing?: boolean
   constraintPicking?: boolean
   addPanel: () => void
@@ -69,7 +71,7 @@ export function AssemblyWorkspace({
   onDragStart, onDragMove, onDragEnd, dragging,
   dragSnap, resizeHandles, onResizeStart, onResizeMove,
   onResizeEnd, resizing, resizeDistance, resizeLimited,
-  repeatPreview, hasFloorConstraint, designConstraint, constraintPanelIds,
+  repeatPreview, hasFloorConstraint, designConstraint, constraintPanelIds, overviewConstraints, constraintCount, constraintsOverviewOpen,
   onConstraints, constraintEditing, constraintPicking, previewPanels,
   previewConnections, view, showGrid, showDimensions,
   exploded, realisticPreview, fitSignal, frameSignal,
@@ -94,6 +96,8 @@ export function AssemblyWorkspace({
   const notice = getWorkspaceNotice(boxSelectActive,dragging,dragSnap,realisticPreview,assemblyHint,attachmentSummary,attachmentWarning)
   return <main className="workspace" aria-label="3D assembly workspace">
       <WorkspaceToolbar
+    constraintCount={constraintCount}
+    constraintsOverviewOpen={constraintsOverviewOpen}
     onConstraints={onConstraints}
     constraintEditing={constraintEditing}
     snapSettings={snapSettings}
@@ -121,6 +125,7 @@ export function AssemblyWorkspace({
     spaceConstraint={spaceConstraint}
     hasFloorConstraint={hasFloorConstraint}
     designConstraint={designConstraint}
+    overviewConstraints={overviewConstraints}
     constraintPanelIds={constraintPanelIds}
     boxSelectActive={boxSelectActive}
     selectionKind={selectionKind}
@@ -231,12 +236,12 @@ function getMovementStatus(constraintPicking: boolean|undefined,constraintEditin
 }
 
 function WorkspaceToolbar({
-  onConstraints, constraintEditing, snapSettings, setSnapSettings,
+  onConstraints, constraintEditing, constraintCount, constraintsOverviewOpen, snapSettings, setSnapSettings,
   onAutoConnect, autoConnectDisabled, panels, realisticPreview,
   setRealisticPreview, onMoveCreation, onRotate, onRescale,
   leftOpen, setLeftOpen, rightOpen, setRightOpen,
   showDimensions, setShowDimensions, showGrid, setShowGrid
-}: Pick<Props, 'onConstraints' | 'constraintEditing' | 'snapSettings' | 'setSnapSettings' | 'onAutoConnect' | 'autoConnectDisabled' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onMoveCreation' | 'onRotate' | 'onRescale' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
+}: Pick<Props, 'constraintCount' | 'constraintsOverviewOpen' | 'onConstraints' | 'constraintEditing' | 'snapSettings' | 'setSnapSettings' | 'onAutoConnect' | 'autoConnectDisabled' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onMoveCreation' | 'onRotate' | 'onRescale' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
   return <div className="workspace-top">
         <div className="preview-mode-switch" role="group" aria-label="Preview mode">
           <button aria-pressed={!realisticPreview} onClick={()=>setRealisticPreview(false)}><Box size={15}/>Studio</button>
@@ -254,7 +259,7 @@ function WorkspaceToolbar({
               <p>World-axis grid from the origin. Align panel boundaries, or connector centers when moving connectors. Object edits align source-box and panel boundaries. Both modes can be combined. In Studio, arrows move one grid spacing (Shift: ×10). Show grid displays panel guides. Joint limits take priority for furniture edits.</p>
             </div>
           </details>
-          <IconButton label="All constraints" disabled={constraintEditing} onClick={onConstraints}><SlidersHorizontal size={18}/></IconButton>
+          <IconButton label="All constraints" className="constraints-toolbar-button" aria-pressed={!!constraintsOverviewOpen} aria-description={`${constraintCount ?? 0} saved constraints, including paused rules and enabled build space`} disabled={constraintEditing} onClick={onConstraints}><SlidersHorizontal size={18}/>{!!constraintCount && <span className="constraints-toolbar-badge" aria-hidden="true">{constraintCount}</span>}</IconButton>
           <IconButton label="Auto-add connectors" disabled={autoConnectDisabled} onClick={onAutoConnect}><Link2 size={18}/></IconButton>
           <IconButton label="Move creation" disabled={constraintEditing||!panels.length} onClick={onMoveCreation}><Move size={18}/></IconButton>
           <IconButton label="Rescale creation" disabled={constraintEditing||!panels.length} onClick={onRescale}><Scaling size={18}/></IconButton>

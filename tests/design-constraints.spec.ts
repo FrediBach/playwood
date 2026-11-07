@@ -477,3 +477,34 @@ for (const width of [1440, 390]) test(`fixed references and signed setbacks pers
   await page.reload()
   expect(await exportedProject(page)).toEqual(saved)
 })
+
+test('all constraints badge and typed overview follow the inspector lifecycle', async ({ page }) => {
+  const project = shelfProject()
+  project.constraints = [
+    { id: 'equal', enabled: true, kind: 'equal-dimension', panelIds: ['lower', 'upper'], dimension: 'width' },
+    { id: 'floor', enabled: true, kind: 'floor', panelId: 'lower', reference: 'max', value: 218 },
+    { id: 'gap', enabled: false, kind: 'gap', panelIds: ['lower', 'upper'], axis: 'y', relation: 'exact', value: 382 },
+  ]
+  project.spaceConstraint = { enabled: true, width: 1200, height: 1200, depth: 800, centerX: 0, centerZ: 0 }
+  await importProject(page, project)
+  const button = page.getByRole('button', { name: 'All constraints', exact: true })
+  const labels = page.locator('[data-constraint-id]')
+  await expect(button.locator('.constraints-toolbar-badge')).toHaveText('4')
+  await expect(labels).toHaveCount(0)
+  await button.click()
+  await expect(button).toHaveAttribute('aria-pressed', 'true')
+  await expect(labels).toHaveCount(4)
+  await expect(page.locator('[data-constraint-kind="equal-dimension"]')).toHaveCount(2)
+  await expect(page.locator('[data-constraint-kind="floor"]')).toBeVisible()
+  await expect(page.locator('[data-constraint-kind="gap"]')).toContainText('Paused')
+  await page.screenshot({ path: test.info().outputPath('constraints-overview.png') })
+  await page.locator('canvas').focus()
+  await page.keyboard.press('Escape')
+  await expect(labels).toHaveCount(0)
+  await expect(button).toHaveAttribute('aria-pressed', 'false')
+  await button.click()
+  await expect(labels).toHaveCount(4)
+  await page.getByRole('button', { name: 'Collapse inspector', exact: true }).click()
+  await expect(labels).toHaveCount(0)
+  await expect(button.locator('.constraints-toolbar-badge')).toHaveText('4')
+})
