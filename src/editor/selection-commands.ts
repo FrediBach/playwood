@@ -18,13 +18,14 @@ import { detachPanel,duplicatePanel,removePanel,resolvePanels } from '@/lib/mode
 import { distributePanels } from '@/lib/panel-distribution'
 import { splitParallelPanels } from '@/lib/parallel-panels'
 import { getSharedPanelFields,panelValuesEqual,selectPanelIds,updateSelectedPanels } from '@/lib/selection'
-import { getResizeAlternatives,movePanels,resizePanelDimensions,resizePanels,type ResizeReview } from '@/lib/structure-edit'
+import { getResizeAlternatives,MovementReviewRequired,movePanelsWithReview,movePanels,resizePanelDimensions,resizePanels,type MovementReview,type ResizeReview } from '@/lib/structure-edit'
 import { assertNoNewTrofastIssues } from '@/lib/trofast'
 import type { ConnectorType,ListKind,Panel,Project,Vec3 } from '@/lib/types'
 import { type SetStateAction } from 'react'
 
 
 interface CreatePanelEditCommandsOptions {
+  setMovementReview: (review: MovementReview) => void
   setResizeReview: (review: ResizeReview) => void
   selectedPanels: Panel[]
   project: Project
@@ -37,7 +38,7 @@ interface CreatePanelEditCommandsOptions {
   selectedIds: string[]
 }
 
-export function createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds, setResizeReview }: CreatePanelEditCommandsOptions) {
+export function createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds, setResizeReview, setMovementReview }: CreatePanelEditCommandsOptions) {
   const offerResizeReview=(source: Project, ids: string[], patch: Partial<Panel>) => {
     if(!Object.keys(patch).every(key => key==='width'||key==='height')) return
     const review=getResizeAlternatives(source,ids,patch)
@@ -57,6 +58,10 @@ export function createPanelEditCommands({ selectedPanels, project, selectedId, a
       const { width,height,thickness,position,...rest }=patch
       commit(current => {
         source=current
+        if(patch.position&&Object.keys(patch).length===1) {
+          const before=resolvePanels(current).find(panel=>panel.id===selectedId)!
+          return assertNoNewTrofastIssues(current,movePanelsWithReview(current,[selectedId],patch.position.map((value,axis)=>value-before.position[axis]) as Vec3))
+        }
         if(patch.trofastInserts!==undefined&&current!==project) throw new Error('The project changed. Review the TROFAST placement before saving it.')
         const constrained=current.constraints?.some(rule => rule.enabled)
         const fields=!constrained&&thickness!==undefined? { ...rest,thickness }:rest
@@ -67,7 +72,7 @@ export function createPanelEditCommands({ selectedPanels, project, selectedId, a
       })
       setPanelEditError(null)
       return true
-    } catch(error) { const message=error instanceof Error? error.message:'This panel size cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message); offerResizeReview(source,[selectedId],patch); return false}
+    } catch(error) { if(error instanceof MovementReviewRequired) { setMovementReview(error.review); return false } const message=error instanceof Error? error.message:'This panel size cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message); offerResizeReview(source,[selectedId],patch); return false}
   }
   const updateMultiplePanels=(patch: Partial<Panel>) => {
     if(assembly.hasMembers) return assembly.editingInstance? assembly.updateDefinition(patch):false
@@ -93,6 +98,7 @@ export function createPanelEditCommands({ selectedPanels, project, selectedId, a
 }
 
 interface CreateSelectionCommandsOptions {
+  setMovementReview: (review: MovementReview) => void
   assembly: ReturnType<typeof useAssemblyEditor>
   commit: ReturnType<typeof useProject>['commit']
   selectedIds: string[]
@@ -106,7 +112,7 @@ interface CreateSelectionCommandsOptions {
   setFrameSignal: React.Dispatch<React.SetStateAction<number>>
 }
 
-export function createSelectionCommands({ assembly, commit, selectedIds, notify, project, setSelectedIds, setInspectorTab, inspectingConnectors, removeSelectedConnectors, selectedIdSet, setFrameSignal }: CreateSelectionCommandsOptions) {
+export function createSelectionCommands({ assembly, commit, selectedIds, notify, project, setSelectedIds, setInspectorTab, inspectingConnectors, removeSelectedConnectors, selectedIdSet, setFrameSignal, setMovementReview }: CreateSelectionCommandsOptions) {
   const moveSelection=(delta: Vec3,repeat: boolean) => {
     try {
       if(assembly.editingInstance) return
@@ -115,9 +121,9 @@ export function createSelectionCommands({ assembly, commit, selectedIds, notify,
         const carriedIds=new Set(getAssemblyMovementPanelIds(current,instanceIds))
         const looseIds=selectedIds.filter(id => !getAssemblyInstance(current,id)&&!carriedIds.has(id))
         const next=instanceIds.length? moveAssemblies(current,instanceIds,delta):current
-        return looseIds.length? movePanels(next,looseIds,delta):next
+        return looseIds.length? (instanceIds.length?movePanels(next,looseIds,delta):movePanelsWithReview(next,looseIds,delta)):next
       },{ group: 'panel-move',repeat })
-    } catch(error) { notify(error instanceof Error? error.message:'This move cannot keep the joints aligned.')}
+    } catch(error) { if(error instanceof MovementReviewRequired) { setMovementReview(error.review); return } notify(error instanceof Error? error.message:'This move cannot keep the joints aligned.')}
   }
   const distributeSelection=() => {
     try { commit(current => distributePanels(current,selectedIds))}

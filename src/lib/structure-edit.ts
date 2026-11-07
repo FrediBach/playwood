@@ -34,7 +34,8 @@ type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
 type Row = { entries: Map<number, number>; value: number; stockBound?: boolean; inferred?: InferredRelationship }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean } | { kind: 'resize'; relaxedRelationship?: string; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
+type MovementScope = { panelIds: Set<string>; reference: number; preserveCuts?: Set<string> }
+type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean; scope?: MovementScope } | { kind: 'resize'; relaxedRelationship?: string; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 interface ValidationContext { trofastWorld?: boolean }
 
@@ -473,6 +474,29 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         const constraint = (edit.centerDelta || edit.local ? row : preference)(edit.centerDelta?.[dimension] ?? 0)
         selected.forEach(item => center(constraint, indices.get(item.panel.id)!, axis, 1 / selected.length))
       }
+  } else if (edit.kind === 'move' && edit.scope) {
+    const axis = new Vector3(...edit.delta).normalize()
+    for (const [index, item] of frames.entries()) {
+      if (!edit.scope.panelIds.has(item.panel.id)) {
+        for (let variable = 0; variable < 5; variable++) add(row(), index * 5 + variable, 1)
+        continue
+      }
+      if (ids.has(item.panel.id)) continue
+      // A compartment boundary travels along the requested normal without
+      // recutting. Only spans along that axis may change their length.
+      item.axes.forEach((own, dimension) => {
+        if (Math.abs(own.dot(axis)) < 1 - EPSILON) {
+          add(row(), index * 5 + dimension, 1)
+          if (dimension < 2) add(row(), index * 5 + 3 + dimension, 1)
+        }
+      })
+      if (edit.scope.preserveCuts?.has(item.panel.id)) {
+        for (let dimension = 0; dimension < 2; dimension++) if (Math.abs(item.axes[dimension].dot(axis)) > 1 - EPSILON) add(row(), index * 5 + 3 + dimension, 1)
+      }
+      // The opposite outside face is the deliberate placement reference,
+      // including continuous back/side panels spanning several compartments.
+      if (Math.abs(coordinate(item, axis, -1) - edit.scope.reference) < CONTACT_TOLERANCE) edge(row(), index, axis, -1)
+    }
   } else if (edit.kind === 'move') {
     const direction = edit.deltas ? selected.map(item => edit.deltas![item.panel.id]).find(delta => delta?.some(value => Math.abs(value) > EPSILON)) ?? edit.delta : edit.delta
     const axis = new Vector3(...direction).normalize()
@@ -564,7 +588,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       }
     }
     catch (error) {
-      if (!constraints.length || !preferences.size) throw error
+      if ((edit.kind === 'move' && edit.scope) || !constraints.length || !preferences.size) throw error
       // Explicit design intent outranks automatic center/exterior anchoring.
       // Joints, supported contacts, gesture targets and local-edit locks remain.
       changes = solveWithBounds(rows.filter(row => !preferences.has(row)), bounds, weights)
@@ -583,6 +607,17 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       rows.flatMap(row => row.inferred ? [row.inferred] : []))
   }
   const changedPanels = new Map(frames.map((item, index) => {
+    // Scope locks prescribe exact zero changes. Avoid recutting frozen panels
+    // by a few microns of iterative-solver residual; final joint checks remain.
+    if (edit.kind === 'move' && edit.scope && !edit.scope.panelIds.has(item.panel.id)) return [item.panel.id, item.panel] as const
+    if (edit.kind === 'move' && edit.scope) {
+      const axis = new Vector3(...edit.delta).normalize()
+      item.axes.forEach((own, dimension) => {
+        if (ids.has(item.panel.id)) changes[index * 5 + dimension] = own.dot(new Vector3(...edit.delta))
+        else if (Math.abs(own.dot(axis)) < 1 - EPSILON) changes[index * 5 + dimension] = 0
+        if (dimension < 2 && (ids.has(item.panel.id) || Math.abs(own.dot(axis)) < 1 - EPSILON || edit.scope!.preserveCuts?.has(item.panel.id))) changes[index * 5 + 3 + dimension] = 0
+      })
+    }
     const moved = position(item.panel)
     item.axes.forEach((axis, dimension) => moved.addScaledVector(axis, changes[index * 5 + dimension]))
     const width = item.panel.width + changes[index * 5 + 3], height = item.panel.height + changes[index * 5 + 4]
@@ -748,6 +783,127 @@ export function movePanels(project: Project, ids: readonly string[], delta: Vec3
   if (delta.some(value => !Number.isFinite(value))) throw new Error('Panel movement must be a finite distance.')
   if (delta.every(value => Math.abs(value) < EPSILON)) return project
   return editStructure(project, ids, { kind: 'move', delta, releaseContacts: options.releaseContacts })
+}
+
+export interface MovementAlternative {
+  label: string
+  project: Project
+  changes: { before: Panel; after: Panel }[]
+  outsideSize: { before: number; after: number }
+}
+export interface MovementReview { source: Project; delta: Vec3; alternatives: MovementAlternative[] }
+export class MovementReviewRequired extends Error {
+  constructor(public review: MovementReview) { super('This move needs changes beyond the adjacent spans. Review the affected construction first.') }
+}
+
+/** Interactive interior-panel movement: enlarge the affected region only after
+ * review. Other operations retain movePanels' established solver policy.
+ */
+export function movePanelsWithReview(project: Project, ids: readonly string[], delta: Vec3): Project {
+  if (ids.length !== 1 || delta.some(value => !Number.isFinite(value)) || Math.hypot(...delta) < EPSILON) return movePanels(project, ids, delta)
+  const frames = resolvePanels(project).map(frame)
+  const frameById = new Map(frames.map(item => [item.panel.id, item]))
+  const selected = frameById.get(ids[0])
+  const axis = new Vector3(...delta).normalize()
+  if (!selected || Math.abs(selected.axes[2].dot(axis)) < 1 - EPSILON) return movePanels(project, ids, delta)
+  const neighbors = new Map(frames.map(item => [item.panel.id, new Set<string>()]))
+  const join = (a: string, b: string) => { neighbors.get(a)?.add(b); neighbors.get(b)?.add(a) }
+  const joints = new Map<string, Set<string>>()
+  for (const connection of project.connections) {
+    const key = jointId(connection), members = joints.get(key) ?? new Set<string>()
+    members.add(connection.parentId); members.add(connection.childId); joints.set(key, members)
+  }
+  for (const members of joints.values()) for (const a of members) for (const b of members) if (a !== b) join(a, b)
+  for (const contact of findContacts(frames)) join(frames[contact.a].panel.id, frames[contact.b].panel.id)
+  const connected = new Set(ids)
+  for (const id of connected) for (const neighbor of neighbors.get(id) ?? []) connected.add(neighbor)
+  const component = frames.filter(item => connected.has(item.panel.id))
+  // Do not infer compartment stages across oblique cuts, fitted outlines,
+  // managed assemblies, or authored relationships to another construction.
+  if (component.some(item => item.panel.customOutline || isPanelConnectedToAssembly(project, item.panel.id)
+    || !item.axes.every(own => selected.axes.some(other => Math.abs(own.dot(other)) > 1 - EPSILON)))
+    || project.constraints?.some(rule => rule.enabled && designConstraintPanelIds(rule).some(id => connected.has(id))
+      && designConstraintPanelIds(rule).some(id => !connected.has(id)))) return movePanels(project, ids, delta)
+  const reference = Math.min(...component.map(item => coordinate(item, axis, -1)))
+  const outside = Math.max(...component.map(item => coordinate(item, axis, 1)))
+  const level = coordinate(selected, axis)
+  if (coordinate(selected, axis, -1) <= reference + CONTACT_TOLERANCE
+    || coordinate(selected, axis, 1) >= outside - CONTACT_TOLERANCE) return movePanels(project, ids, delta)
+  const crossesLevel = (item: Frame) => coordinate(item, axis, -1) < level - CONTACT_TOLERANCE && coordinate(item, axis, 1) > level + CONTACT_TOLERANCE
+  const allowed = new Set([ids[0], ...neighbors.get(ids[0]) ?? []])
+  for (const item of component) if (item !== selected && crossesLevel(item)) allowed.delete(item.panel.id)
+  const previousCollisions = new Set(validateProject(project).filter(issue => issue.id.startsWith('collision-')).map(issue => issue.id))
+  const attempt = (panelIds: Set<string>, preserveCuts?: Set<string>) => {
+    const next = assertNoNewTrofastIssues(project, editStructure(project, ids, { kind: 'move', delta, scope: { panelIds, reference, preserveCuts } }))
+    const collision = validateProject(next).find(issue => issue.id.startsWith('collision-') && !previousCollisions.has(issue.id))
+    if (collision) throw new StructureEditError(`This move would introduce an overlap: ${collision.message}`, collision.panelIds)
+    const resolved = resolvePanels(next)
+    const actual = resolved.find(panel => panel.id === selected.panel.id)!
+    if (position(actual).distanceTo(position(selected.panel).add(new Vector3(...delta))) > CONTACT_TOLERANCE) {
+      throw new Error('This construction cannot reach the requested movement while retaining its joints.')
+    }
+    const actualReference = Math.min(...resolved.filter(panel => connected.has(panel.id)).map(panel => coordinate(frame(panel), axis, -1)))
+    if (Math.abs(actualReference - reference) > CONTACT_TOLERANCE) throw new Error('This move would shift the opposite outside face.')
+    // Refitted geometry must respect scope too, not just the linear variables.
+    for (const panel of resolved) {
+      if (panelIds.has(panel.id)) continue
+      const before = frameById.get(panel.id)!.panel
+      if (Math.abs(before.width - panel.width) > EPSILON || Math.abs(before.height - panel.height) > EPSILON
+        || position(before).distanceTo(position(panel)) > EPSILON) throw new Error('This move would change a panel outside the reviewed region.')
+    }
+    return next
+  }
+  let localError: unknown
+  try { return attempt(allowed) } catch (error) { localError = error }
+  const boundaries = component.filter(item => item !== selected && Math.abs(item.axes[2].dot(axis)) > 1 - EPSILON
+    && coordinate(item, axis) >= level - CONTACT_TOLERANCE).sort((a, b) => coordinate(a, axis) - coordinate(b, axis))
+  const layers: Frame[][] = []
+  for (const item of boundaries) {
+    const last = layers.at(-1)
+    if (last && Math.abs(coordinate(last[0], axis) - coordinate(item, axis)) < CONTACT_TOLERANCE) last.push(item)
+    else layers.push([item])
+  }
+  const alternatives: MovementAlternative[] = []
+  const addAlternative = (next: Project, label: string) => {
+    const resolved = resolvePanels(next)
+    const changes = resolved.flatMap(after => {
+      const before = frameById.get(after.id)!.panel
+      return Math.abs(before.width - after.width) > EPSILON || Math.abs(before.height - after.height) > EPSILON
+        || position(before).distanceTo(position(after)) > EPSILON ? [{ before, after }] : []
+    })
+    const afterOutside = Math.max(...resolved.filter(panel => connected.has(panel.id)).map(panel => coordinate(frame(panel), axis, 1)))
+    if (alternatives.some(option => JSON.stringify(option.project.panels) === JSON.stringify(next.panels))) return
+    alternatives.push({ project: next, label, changes, outsideSize: { before: outside - reference, after: afterOutside - reference } })
+  }
+  // Stop at the nearest feasible compartment expansion. A separate final
+  // option can release the outer boundary while retaining the opposite face.
+  for (const layer of layers.slice(0, 8)) {
+    if (layer.some(item => coordinate(item, axis, 1) >= outside - CONTACT_TOLERANCE)) break
+    for (const item of layer) {
+      allowed.add(item.panel.id)
+      for (const neighbor of neighbors.get(item.panel.id) ?? []) {
+        const other = frameById.get(neighbor)!
+        if (!crossesLevel(other) && coordinate(other, axis) >= level - CONTACT_TOLERANCE) allowed.add(neighbor)
+      }
+    }
+    try { addAlternative(attempt(allowed), `Include neighboring boundary: ${layer.map(item => item.panel.name).join(', ')}`); break }
+    catch { /* Try the next parallel boundary, keeping more distant panels fixed. */ }
+  }
+  const expanded = new Set(component.filter(item => coordinate(item, axis) >= level - CONTACT_TOLERANCE || crossesLevel(item)).map(item => item.panel.id))
+  for (const id of neighbors.get(ids[0]) ?? []) expanded.add(id)
+  try {
+    const next = attempt(expanded, new Set(component.filter(item => coordinate(item, axis, -1) > level + CONTACT_TOLERANCE).map(item => item.panel.id)))
+    addAlternative(next, 'Move the outer boundary; preserve cuts ahead of the selected panel')
+  } catch { /* Authored requirements, stock, contacts and build space remain hard. */ }
+  if (!alternatives.length) throw localError
+  throw new MovementReviewRequired({ source: project, delta, alternatives })
+}
+
+export function acceptMovementAlternative(current: Project, review: MovementReview, index: number): Project {
+  if (current !== review.source) throw new Error('The project changed. Try the move again to review current alternatives.')
+  const alternative = review.alternatives[index]
+  if (!alternative) throw new Error('Choose a movement alternative.')
+  return alternative.project
 }
 
 /** Solve independent center targets together, preserving selected cut dimensions. */

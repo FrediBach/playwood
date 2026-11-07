@@ -148,7 +148,7 @@ test('editing a connected shelf width resizes the remaining shelves in one histo
   await expect.poll(() => savedProject(page)).toEqual(project)
 })
 
-test('a move beyond the size limit is rejected atomically and does not add an undo step', async ({ page }) => {
+test('a move beyond adjacent stock limits requires review and cancellation adds no undo step', async ({ page }) => {
   const project = createStarterProject('shelf')
   const middle = resolvePanels(project).find(panel => panel.name === 'Middle shelf')!
   await openProject(page, project)
@@ -164,8 +164,10 @@ test('a move beyond the size limit is rejected atomically and does not add an un
   const lastValid = await savedProject(page)
   expect(lastValid.panels.find(panel => panel.name === 'Left upper side')!.width).toBeCloseTo(55, 3)
   await page.keyboard.press('Shift+ArrowUp')
-  await expect(page.getByText(/This move would exceed the panel size limits/)).toBeVisible()
+  const review=page.getByRole('dialog', { name: 'Review wider movement' })
+  await expect(review).toBeVisible()
   expect(await savedProject(page)).toEqual(lastValid)
+  await review.getByRole('button', { name: 'Cancel', exact: true }).click()
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(preceding)
 })

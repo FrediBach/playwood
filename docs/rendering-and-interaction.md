@@ -25,6 +25,8 @@ Panel and connector lists share filter defaults, active-filter counting, and mat
 
 `ResizeAlternativesDialog` presents source-bound alternatives for blocked numeric cut edits. Each choice names one inferred relationship and shows all cut and center changes in a scrollable table. It uses the existing modal focus trap, Escape cancellation, and focus restoration; the main scene remains committed while the table is reviewed. At narrow widths the dialog and table scroll within the viewport. Acceptance applies one complete candidate through project history.
 
+`MovementAlternativesDialog` reviews a wider staged movement with the same `PanelChangeTable` used by resize review. Radio choices update only the review, which also shows outside-size changes along the requested movement. The committed main scene stays unchanged. Existing modal keyboard guards, focus restoration, and scroll containment apply on desktop and narrow drawers.
+
 ## From project data to a frame
 
 ### Construction objects

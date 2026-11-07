@@ -1,5 +1,6 @@
+import { MovementAlternativesDialog } from '@/components/MovementAlternativesDialog'
 import { ResizeAlternativesDialog } from '@/components/ResizeAlternativesDialog'
-import { acceptResizeAlternative } from '@/lib/structure-edit'
+import { acceptMovementAlternative,acceptResizeAlternative } from '@/lib/structure-edit'
 import { PanelPaletteProvider } from '@/components/PanelColorField'
 import { PanelConnectionFitDialog } from '@/components/PanelConnectionFitDialog'
 import { PreviewContextMenu } from '@/components/PreviewContextMenu'
@@ -53,7 +54,7 @@ export default function App() {
   constraintPicker, pickingConstraint, setPickingConstraint, panelEditError,
   setPanelEditError, closeContextMenu, toolRequest, setToolRequest,
   inspectorTab, setInspectorTab, trofastPreview, previewTrofast,
-  dialog, setDialog, pendingConnectionFit, setPendingConnectionFit, resizeReview, setResizeReview,
+  dialog, setDialog, pendingConnectionFit, setPendingConnectionFit, resizeReview, setResizeReview, movementReview, setMovementReview,
   connectorInfill, setConnectorInfill, objectConversion, setObjectConversion,
   modalOpen, pendingTemplate, setPendingTemplate, draft,
   setDraft, attachTarget, setAttachTarget, attachment,
@@ -108,8 +109,8 @@ export default function App() {
   useEditorNotifications(repairNotice,notify,toast,setToast)
   useSelectionPruning(setPanelSelection,project,setSelectedConnectorIds,physicalConnectors)
   const { removeSelectedConnectors,selectConnectors,separateSelectedConnectors,chooseConnector,updateConnectorType }=createConnectorEditCommands({ modalOpen, assembly, commitWithInsertChecks, selectedConnectorIds, notify, commit, setSelectedConnectorIds, setConnectorTypeError, project, constraints, objectMode, objects, setAssemblyTab, clipboard, setPanelSelection, setInspectorTab, setRightOpen, setLeftOpen })
-  const { updatePanel,updateMultiplePanels }=createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds, setResizeReview })
-  const { duplicateSelected,deleteSelected,detachSelection,splitSelection,distributeSelection,moveSelection }=createSelectionCommands({ assembly, commit, selectedIds, notify, project, setSelectedIds, setInspectorTab, inspectingConnectors, removeSelectedConnectors, selectedIdSet, setFrameSignal })
+  const { updatePanel,updateMultiplePanels }=createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds, setResizeReview, setMovementReview })
+  const { duplicateSelected,deleteSelected,detachSelection,splitSelection,distributeSelection,moveSelection }=createSelectionCommands({ assembly, commit, selectedIds, notify, project, setSelectedIds, setInspectorTab, inspectingConnectors, removeSelectedConnectors, selectedIdSet, setFrameSignal, setMovementReview })
   const { connectWithPanel,extendToGround,addAutoConnectors,acceptConnectionFit }=createConnectionCommands({ commit, clipboard, assembly, setInspectorTab, setExploded, selectedIds, setSelectedIds, notify, modalOpen, project, setPendingConnectionFit, pendingConnectionFit, groundPanelFit, setFitSignal, connectorPanelFit, setSelectedId, setRightOpen, selectedConnectors })
   const movementEnabled=selectionMovementAvailable({ objectMode, constraints, clipboard, modalOpen, assembly, inspectingConnectors, realisticPreview, exploded, inspectorTab })
   const resize=usePreviewResize({project,selectedIds:inspectingConnectors?[]:selectedIds,selectedConnectorIds:inspectingConnectors?selectedConnectorIds:[],snapSettings,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify,select:setSelectedId})
@@ -232,6 +233,10 @@ export default function App() {
     <ProjectStatus panelCount={project.panels.length} connectorCount={connectorCount} issueCount={issues.length} bounds={bounds} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')}/>
     {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
 
+    {movementReview&&movementReview.source===project&&<MovementAlternativesDialog review={movementReview} onCancel={()=>setMovementReview(null)} onConfirm={index=>{
+      try { commit(current=>acceptMovementAlternative(current,movementReview,index)); setMovementReview(null); setPanelEditError(null); notify('Movement applied. Undo is available.') }
+      catch(error) { setMovementReview(null); notify(error instanceof Error?error.message:'This move could not be applied.') }
+    }}/>}
     {resizeReview&&resizeReview.source===project&&<ResizeAlternativesDialog review={resizeReview} onCancel={()=>setResizeReview(null)} onConfirm={index=>{
       try { commit(current=>acceptResizeAlternative(current,resizeReview,index)); setResizeReview(null); setPanelEditError(null); notify('Resize applied. Undo is available.') }
       catch(error) { setResizeReview(null); notify(error instanceof Error?error.message:'This resize could not be applied.') }

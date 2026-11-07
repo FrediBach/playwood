@@ -71,6 +71,10 @@ Starting a blank project, applying a template, and importing a project also use 
 
 Failed numeric Width/Height edits on ordinary panels can open `ResizeAlternativesDialog` through `createPanelEditCommands`. `useEditorState.resizeReview` holds the source project and fully validated candidate alternatives outside project history. Radio choices only change the displayed review table. Cancel/Escape restores focus and leaves the committed project unchanged; Apply uses a functional source-identity check and commits one candidate as one undoable edit. Project changes invalidate the review, and modal guards prevent keyboard and canvas commands from editing behind it. Compound property patches, gesture resizing, and shared assembly editing do not enter this review workflow.
 
+### Reviewed movement stages
+
+`MovementReviewRequired` interrupts a scoped movement before any history update when only wider candidates are feasible. `useEditorState.movementReview` retains the source snapshot and candidate alternatives. `MovementAlternativesDialog` shares the panel-change table with resize review, adds outside-size consequences, and returns focus on close. Cancel/Escape changes nothing. Apply uses `acceptMovementAlternative` inside a functional commit, checks source identity, and creates one separate undo step; ordinary accepted movement keeps existing repeated-key grouping. Project changes discard stale reviews, and the modal blocks further keyboard/viewport movement. Candidate descriptions, scopes, and approval state are transient and never serialized.
+
 ### Auto-connect fitting
 
 Auto-connect size proposals remain source-bound in `App.pendingConnectionFit`. Coordinated angled fits include a list of both panel dimension changes for `PanelConnectionFitDialog`; no project data changes while reviewing. Cancel/Escape discards the candidate. Acceptance checks source identity and commits all prior exact/snapped fits, coordinated resizing, and new hardware together as one history entry.
