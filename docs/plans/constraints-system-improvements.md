@@ -4,7 +4,8 @@
 
 - Step 1 implemented: stock bounds participate in every structural solve and its local-anchor retry, independently of saved design rules. Regression coverage checks both cut limits, release after reversing a resize, equivalence with a redundant rule, and atomic rejection of impossible cascades. Existing placement fallback policy is retained.
 - Step 2 implemented: protective dimension intervals no longer authorize recutting loose peers during movement or gap reconciliation. Exact/equal dimensions, repair of violated limits, and physically connected cascades remain supported. Cut-preservation locks survive placement fallback; a conflicting gap/position edit rejects atomically.
-- Steps 3–6 and the broader feedback/overlap work remain planned.
+- Step 3 implemented for numeric cut edits: inferred setbacks, alignments, and compartment fits have distinct provenance. Blocked edits can offer individually validated single-relationship alternatives, with affected cuts/positions, explicit acceptance, cancellation, stale-source protection, and new-overlap rejection. Protective defaults and the overlap threshold remain unchanged; gestures and assembly parameters do not offer alternatives yet. The bounded search does not combine releases.
+- Steps 4–6 and broader gesture feedback/overlap work remain planned.
 
 ## Original analysis
 

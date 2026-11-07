@@ -200,6 +200,10 @@ Each panel contributes three translation variables and two size variables. Thick
 
 Stock bounds can activate and release as neighboring cuts adapt, allowing a feasible cascade when the unconstrained optimum would exceed a cut limit. They do not authorize releasing all automatic placement preferences; that fallback still requires enabled design rules. Impossible stock-bounded edits remain atomic and report size-limit diagnostics. Whole-component rigid translations retain their fast path because they do not change cuts.
 
+Inferred joint-end setbacks, flush insert alignments, and compartment fits carry transient provenance distinct from physical contact and authored design-rule rows. They remain enforced by default, including the existing overlap threshold. After a failed numeric cut resize, `getResizeAlternatives` tries releasing one identified inference at a time (up to 16 attempts, prioritizing selected panels, returning at most four candidates). Each candidate passes the normal joint, stock, authored-rule, build-space, and support checks plus TROFAST checks and rejection of new rectangular-bound panel overlaps. Physical contacts and authored rules are never candidates for release. This is a bounded search, not a guarantee that every feasible alternative is found; it does not combine releases. Gesture resizing and assembly parameter edits retain their protective defaults.
+
+The review lists the particular inferred relationship being released and all resulting cut, center-position, and outline changes. Edge labels use the panel’s local cut axes, avoiding assumptions about world front/back after rotation. `acceptResizeAlternative` requires the original project identity. The relaxation is transient: accepted geometry becomes the baseline for subsequent inferred fits, without adding a saved field or changing user rules.
+
 Behavior depends on the operation:
 
 - Moving every panel in a component without user rules translates it rigidly. Moving a subset can resize neighboring spans while retaining joints and outer boundaries. Enabled rules add their own conditions and may require adapting other related panels or rejecting the edit.

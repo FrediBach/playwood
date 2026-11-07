@@ -1,3 +1,5 @@
+import { ResizeAlternativesDialog } from '@/components/ResizeAlternativesDialog'
+import { acceptResizeAlternative } from '@/lib/structure-edit'
 import { PanelPaletteProvider } from '@/components/PanelColorField'
 import { PanelConnectionFitDialog } from '@/components/PanelConnectionFitDialog'
 import { PreviewContextMenu } from '@/components/PreviewContextMenu'
@@ -51,7 +53,7 @@ export default function App() {
   constraintPicker, pickingConstraint, setPickingConstraint, panelEditError,
   setPanelEditError, closeContextMenu, toolRequest, setToolRequest,
   inspectorTab, setInspectorTab, trofastPreview, previewTrofast,
-  dialog, setDialog, pendingConnectionFit, setPendingConnectionFit,
+  dialog, setDialog, pendingConnectionFit, setPendingConnectionFit, resizeReview, setResizeReview,
   connectorInfill, setConnectorInfill, objectConversion, setObjectConversion,
   modalOpen, pendingTemplate, setPendingTemplate, draft,
   setDraft, attachTarget, setAttachTarget, attachment,
@@ -106,7 +108,7 @@ export default function App() {
   useEditorNotifications(repairNotice,notify,toast,setToast)
   useSelectionPruning(setPanelSelection,project,setSelectedConnectorIds,physicalConnectors)
   const { removeSelectedConnectors,selectConnectors,separateSelectedConnectors,chooseConnector,updateConnectorType }=createConnectorEditCommands({ modalOpen, assembly, commitWithInsertChecks, selectedConnectorIds, notify, commit, setSelectedConnectorIds, setConnectorTypeError, project, constraints, objectMode, objects, setAssemblyTab, clipboard, setPanelSelection, setInspectorTab, setRightOpen, setLeftOpen })
-  const { updatePanel,updateMultiplePanels }=createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds })
+  const { updatePanel,updateMultiplePanels }=createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds, setResizeReview })
   const { duplicateSelected,deleteSelected,detachSelection,splitSelection,distributeSelection,moveSelection }=createSelectionCommands({ assembly, commit, selectedIds, notify, project, setSelectedIds, setInspectorTab, inspectingConnectors, removeSelectedConnectors, selectedIdSet, setFrameSignal })
   const { connectWithPanel,extendToGround,addAutoConnectors,acceptConnectionFit }=createConnectionCommands({ commit, clipboard, assembly, setInspectorTab, setExploded, selectedIds, setSelectedIds, notify, modalOpen, project, setPendingConnectionFit, pendingConnectionFit, groundPanelFit, setFitSignal, connectorPanelFit, setSelectedId, setRightOpen, selectedConnectors })
   const movementEnabled=selectionMovementAvailable({ objectMode, constraints, clipboard, modalOpen, assembly, inspectingConnectors, realisticPreview, exploded, inspectorTab })
@@ -230,6 +232,10 @@ export default function App() {
     <ProjectStatus panelCount={project.panels.length} connectorCount={connectorCount} issueCount={issues.length} bounds={bounds} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')}/>
     {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
 
+    {resizeReview&&resizeReview.source===project&&<ResizeAlternativesDialog review={resizeReview} onCancel={()=>setResizeReview(null)} onConfirm={index=>{
+      try { commit(current=>acceptResizeAlternative(current,resizeReview,index)); setResizeReview(null); setPanelEditError(null); notify('Resize applied. Undo is available.') }
+      catch(error) { setResizeReview(null); notify(error instanceof Error?error.message:'This resize could not be applied.') }
+    }}/>}
     <PanelConnectionFitDialog adjustments={pendingConnectionFit?.fit.adjustments} adjustment={pendingConnectionFit?.fit.adjustment} operations={pendingConnectionFit?.fit.result} onConfirm={acceptConnectionFit} onCancel={()=>setPendingConnectionFit(null)}/>
     <EditorDialogs {...editorDialogsProps} dialog={dialog==='sync'?null:dialog}/>
     <DirectorySyncDialog {...directorySync} open={dialog==='sync'} onClose={()=>{directorySync.cancelOpen();setDialog(null)}}

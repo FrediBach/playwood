@@ -6,6 +6,7 @@ import { getPhysicalConnectors } from './connector-selection'
 import { isPanelConnectedToAssembly } from './assemblies'
 import { designConstraintLimits, designConstraintPanelIds, describeDesignConstraint, evaluateDesignConstraints } from './design-constraints'
 import { refitOutlineClosures } from './outline-closures'
+import { assertNoNewTrofastIssues } from './trofast'
 import type { Connection, ConstraintReference, Panel, Project, Vec3 } from './types'
 
 const EPSILON = 1e-6
@@ -13,9 +14,16 @@ const CONTACT_TOLERANCE = 1e-4
 const LIMIT_MESSAGE = 'This move would exceed the panel size limits (40–4,000 mm). Try a smaller step.'
 const CONSTRAINT_MESSAGE = 'These panels cannot move in that direction while keeping their joints connected. Try another direction or select the whole assembly.'
 
+export interface InferredRelationship {
+  id: string
+  kind: 'setback' | 'alignment' | 'compartment-fit'
+  description: string
+  panelIds: string[]
+}
+
 /** Transient diagnostics for rejected edits; never part of a saved project. */
 export class StructureEditError extends Error {
-  constructor(message: string, public panelIds: string[], public connectionIds: string[] = []) { super(message) }
+  constructor(message: string, public panelIds: string[], public connectionIds: string[] = [], public inferredRelationships: InferredRelationship[] = []) { super(message) }
 }
 class SolverConflict extends Error {
   constructor(public variables: number[], message = CONSTRAINT_MESSAGE) { super(message) }
@@ -23,10 +31,10 @@ class SolverConflict extends Error {
 
 type Dimensions = Partial<Pick<Panel, 'width' | 'height'>>
 type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
-type Row = { entries: Map<number, number>; value: number; stockBound?: boolean }
+type Row = { entries: Map<number, number>; value: number; stockBound?: boolean; inferred?: InferredRelationship }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
-type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean } | { kind: 'resize'; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
+type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean } | { kind: 'resize'; relaxedRelationship?: string; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 interface ValidationContext { trofastWorld?: boolean }
 
@@ -219,6 +227,15 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   const thicknessChange = (index: number) => edit.kind === 'resize'
     ? (edit.patches?.[frames[index].panel.id]?.thickness ?? frames[index].panel.thickness) - frames[index].panel.thickness : 0
   const row = (value = 0): Row => { const next = { entries: new Map<number, number>(), value }; rows.push(next); return next }
+  const inferred = (kind: InferredRelationship['kind'], key: unknown[], a: number, b: number, detail: string): Row => {
+    const first = frames[a].panel, second = frames[b].panel
+    const relationship: InferredRelationship = { id: JSON.stringify([kind, first.id, second.id, ...key]), kind,
+      description: `${first.name} / ${second.name}: ${detail}`, panelIds: [first.id, second.id] }
+    const next: Row = { entries: new Map(), value: 0, inferred: relationship }
+    if (edit.kind !== 'resize' || edit.relaxedRelationship !== relationship.id) rows.push(next)
+    return next
+  }
+  const edgeName = (dimension: number, side: number) => dimension === 2 ? `${side < 0 ? 'negative' : 'positive'} thickness face` : `${dimension === 0 ? (side < 0 ? 'left' : 'right') : (side < 0 ? 'bottom' : 'top')} cut edge`
   const preference = (value = 0): Row => { const next = row(value); preferences.add(next); return next }
   const add = (target: Row, index: number, value: number) => target.entries.set(index, (target.entries.get(index) ?? 0) + value)
   const center = (target: Row, index: number, axis: Vector3, scale = 1) => {
@@ -331,7 +348,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       // independent, retaining only ends that were already flush.
       const spansJoint = overlap > Math.max(parentLength, childLength) / 2 + CONTACT_TOLERANCE
       for (const side of [-1, 1]) if (spansJoint || Math.abs(side * parentLength / 2 - connection.offset - side * childLength / 2) < CONTACT_TOLERANCE) {
-        const constraint = row()
+        const constraint = inferred('setback', [connection.id, side], parentIndex, childIndex,
+          `preserve setback at the parent’s ${edgeName(dimension, side)}`)
         add(constraint, parentIndex * 5 + 3 + dimension, side / 2)
         add(constraint, childIndex * 5 + 3 + childDimension, -side / 2)
         add(constraint, offsetVariables.get(offsetKey(connection))!, -1)
@@ -349,7 +367,9 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       for (const axis of frames[contact.a].axes.filter(axis => Math.abs(axis.dot(contact.normal)) < EPSILON)) {
         if (!frames[contact.b].axes.some(other => Math.abs(other.dot(axis)) > 1 - EPSILON)) continue
         for (const side of [-1, 1]) if (Math.abs(coordinate(frames[contact.a], axis, side) - coordinate(frames[contact.b], axis, side)) < CONTACT_TOLERANCE) {
-          const flush = row()
+          const dimension = frames[contact.a].axes.indexOf(axis)
+          const flush = inferred('alignment', [dimension, side], contact.a, contact.b,
+            `keep the ${edgeName(dimension, side)} aligned`)
           edge(flush, contact.a, axis, side)
           edge(flush, contact.b, axis, side, -1)
         }
@@ -380,7 +400,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         const opening = upper.coordinate - lower.coordinate
         if (dimension < 2 && (maximum - minimum) / opening > 0.8) {
           for (const [side, boundary] of [[-1, lower], [1, upper]] as const) {
-            const constraint = row()
+            const constraint = inferred('compartment-fit', [dimension, side], index, boundary.index,
+              `preserve clearance at the ${edgeName(dimension, side)}`)
             edge(constraint, index, axis, side)
             edge(constraint, boundary.index, axis, -side, -1)
           }
@@ -390,7 +411,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
           // small clearance. Other placements are already determined by the
           // insert's own contacts (several boxes may share one compartment).
           if (Math.abs(centerAt - (lower.coordinate + upper.coordinate) / 2) < CONTACT_TOLERANCE) {
-            const constraint = row()
+            const constraint = inferred('compartment-fit', [dimension, 'center', upper.index], index, lower.index,
+              `keep centered between ${frames[lower.index].panel.name} and ${frames[upper.index].panel.name}`)
             center(constraint, index, axis)
             edge(constraint, lower.index, axis, 1, -0.5)
             edge(constraint, upper.index, axis, -1, -0.5)
@@ -398,7 +420,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
             const clearance = Math.max(item.panel.thickness, 10)
             for (const [side, boundary, gap] of [[-1, lower, minimum - lower.coordinate], [1, upper, upper.coordinate - maximum]] as const) {
               if (gap > clearance || gap > opening * 0.1) continue
-              const constraint = row()
+              const constraint = inferred('compartment-fit', [dimension, side], index, boundary.index,
+                `preserve clearance at the ${side < 0 ? 'negative' : 'positive'} thickness face`)
               edge(constraint, index, axis, side)
               edge(constraint, boundary.index, axis, -side, -1)
             }
@@ -420,7 +443,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
             && (maximum - minimum) / size > 0.8
         }).sort((a, b) => extent(frames[a.index], axis) - extent(frames[b.index], axis))
       if (supports.length) for (const side of [-1, 1]) {
-        const constraint = row()
+        const constraint = inferred('compartment-fit', [dimension, side, 'support'], index, supports[0].index,
+          `preserve margin at the ${edgeName(dimension, side)}`)
         edge(constraint, index, axis, side)
         edge(constraint, supports[0].index, axis, side, -1)
       }
@@ -555,7 +579,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       ? `This edit cannot keep the design rules and joints satisfied. ${constraints.slice(0, 3).map(rule => describeDesignConstraint(rule, frames.map(item => item.panel))).join('; ')}. Edit or pause a rule first.`
       : error instanceof Error ? error.message : CONSTRAINT_MESSAGE
     throw new StructureEditError(message, panelIds, project.connections.filter(connection =>
-      panelIds.includes(connection.parentId) && panelIds.includes(connection.childId)).map(connection => connection.id))
+      panelIds.includes(connection.parentId) && panelIds.includes(connection.childId)).map(connection => connection.id),
+      rows.flatMap(row => row.inferred ? [row.inferred] : []))
   }
   const changedPanels = new Map(frames.map((item, index) => {
     const moved = position(item.panel)
@@ -759,6 +784,54 @@ export function resizePanels(project: Project, ids: readonly string[], patch: Di
   const wanted = new Set(ids)
   if (!project.panels.some(panel => wanted.has(panel.id) && (['width', 'height'] as const).some(field => patch[field] !== undefined && Math.abs(panel[field] - patch[field]!) > EPSILON))) return project
   return editStructure(project, ids, { kind: 'resize', patch }, validation)
+}
+
+export interface ResizeAlternative {
+  relaxed: InferredRelationship
+  project: Project
+  changes: { before: Panel; after: Panel }[]
+}
+export interface ResizeReview { source: Project; requestedDimensions: Dimensions; alternatives: ResizeAlternative[] }
+
+/** Explicit review only: ordinary resizing never silently drops an inferred fit.
+ * Search a bounded set of single-relationship alternatives after a failed solve.
+ */
+export function getResizeAlternatives(project: Project, ids: readonly string[], patch: Dimensions): ResizeReview | null {
+  let relationships: InferredRelationship[]
+  try { resizePanels(project, ids, patch); return null }
+  catch (error) {
+    if (!(error instanceof StructureEditError) || !error.inferredRelationships.length) return null
+    relationships = error.inferredRelationships
+  }
+  const previous = new Map(resolvePanels(project).map(panel => [panel.id, panel]))
+  const collisions = new Set(validateProject(project).filter(issue => issue.id.startsWith('collision-')).map(issue => issue.id))
+  const alternatives: ResizeAlternative[] = []
+  // Prefer relationships incident to the requested cut. Never loosen several
+  // relationships together, or offer unvalidated partial solver output.
+  const requestedIds = new Set(ids)
+  const ordered = [...relationships].sort((a, b) => Number(b.panelIds.some(id => requestedIds.has(id))) - Number(a.panelIds.some(id => requestedIds.has(id))))
+  for (const relaxed of ordered.slice(0, 16)) {
+    try {
+      const next = assertNoNewTrofastIssues(project, editStructure(project, ids, { kind: 'resize', patch, relaxedRelationship: relaxed.id }))
+      if (validateProject(next).some(issue => issue.id.startsWith('collision-') && !collisions.has(issue.id))) continue
+      const changes = resolvePanels(next).flatMap(after => {
+        const before = previous.get(after.id)!
+        return Math.abs(before.width - after.width) > EPSILON || Math.abs(before.height - after.height) > EPSILON
+          || position(before).distanceTo(position(after)) > EPSILON || JSON.stringify(before.customOutline) !== JSON.stringify(after.customOutline)
+          ? [{ before, after }] : []
+      })
+      alternatives.push({ relaxed, project: next, changes })
+      if (alternatives.length === 4) break
+    } catch { /* A released inference cannot override physical or authored requirements. */ }
+  }
+  return alternatives.length ? { source: project, requestedDimensions: { ...patch }, alternatives } : null
+}
+
+export function acceptResizeAlternative(current: Project, review: ResizeReview, index: number): Project {
+  if (current !== review.source) throw new Error('The project changed. Try the resize again to review current alternatives.')
+  const alternative = review.alternatives[index]
+  if (!alternative) throw new Error('Choose a resize alternative.')
+  return alternative.project
 }
 
 /** Pull one panel edge, anchoring its opposite edge. Local edits also fix other panels and hardware. */

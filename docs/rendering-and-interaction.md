@@ -23,6 +23,8 @@ Inspector, guide, library, and field sections have small presentation components
 
 Panel and connector lists share filter defaults, active-filter counting, and matching helpers from [`list-filters.ts`](../src/lib/list-filters.ts). [`ListFilters.tsx`](../src/components/ListFilters.tsx) owns the non-modal native dialog shown through the Popover API and its filter controls; its runtime exports are React components so edits can use Fast Refresh. Opening the popover focuses Search; Escape and Close filters return focus to the trigger, while outside actions dismiss it without blocking the workspace.
 
+`ResizeAlternativesDialog` presents source-bound alternatives for blocked numeric cut edits. Each choice names one inferred relationship and shows all cut and center changes in a scrollable table. It uses the existing modal focus trap, Escape cancellation, and focus restoration; the main scene remains committed while the table is reviewed. At narrow widths the dialog and table scroll within the viewport. Acceptance applies one complete candidate through project history.
+
 ## From project data to a frame
 
 ### Construction objects
