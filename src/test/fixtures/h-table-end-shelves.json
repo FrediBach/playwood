@@ -1,0 +1,1226 @@
+{
+  "version": 1,
+  "name": "H-table 180",
+  "panels": [
+    {
+      "id": "5c292d58-0989-43e7-bb6d-cf15e78db503",
+      "name": "Left front leg",
+      "width": 382.5,
+      "height": 920.5,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -961.5,
+        464.5,
+        -208.75
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "249bd042-11c9-4a77-8ef8-074153c7fc80",
+      "name": "Central spine",
+      "width": 1363.84489998,
+      "height": 929,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -262.07755001,
+        464.5,
+        2.2737367544323206e-13
+      ],
+      "rotation": [
+        -3.141592653589793,
+        4.440892098500626e-16,
+        -3.141592653589793
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "4fef51ed-399a-435d-bb0d-705a3e148b96",
+      "name": "Left rear leg",
+      "width": 573.5,
+      "height": 736.75,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -961.5,
+        372.625,
+        304.25
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "26cebab7-7372-46f8-95e7-8b3e2cfa134c",
+      "name": "Right front leg",
+      "width": 382.5,
+      "height": 920.5,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        437.34489998,
+        464.5,
+        -208.75
+      ],
+      "rotation": [
+        0,
+        -1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "c9bde662-47f4-4a58-9e8d-896fc58cb332",
+      "name": "Right rear leg",
+      "width": 573.5,
+      "height": 736.75,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        437.34489998,
+        372.625,
+        304.25
+      ],
+      "rotation": [
+        0,
+        -1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "7d47cfc5-9678-46ce-9479-b95b1961938c",
+      "name": "Desktop",
+      "width": 991,
+      "height": 1363.84489998,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -262.07755002,
+        942.25,
+        95.5
+      ],
+      "rotation": [
+        1.5707963267948966,
+        2.220446049250313e-16,
+        -1.5707963267948963
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "3314a44e-e58c-41c0-a12e-35eccccd4343",
+      "name": "Shelf 1.1",
+      "width": 349.99999892,
+      "height": 254,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -1106,
+        942.25,
+        -208.75000000000003
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        5.551115123125783e-17,
+        1.5707963057214722
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "787dcb6a-b977-4fc2-aef8-d2c222190353",
+      "name": "Upright 1.1",
+      "width": 133,
+      "height": 254,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -1106.00000406,
+        1026.25,
+        -16.25000114
+      ],
+      "rotation": [
+        -3.1415926535897927,
+        2.107342429469932e-8,
+        1.5707963267948966
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "d0d342c7-e04c-437c-a259-fd14fb4ec35b",
+      "name": "Upright 2.1",
+      "width": 142,
+      "height": 254,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -1105.99999594,
+        1030.75,
+        -401.24999889
+      ],
+      "rotation": [
+        3.9252307486597235e-17,
+        -2.1073424216194703e-8,
+        1.5707963267948963
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "31062960-10f3-4b50-953f-24685e85ad0e",
+      "name": "Shelf 1.1",
+      "width": 350,
+      "height": 340.48843336,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        625.08911665,
+        942.25,
+        -208.75000000000003
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -5.551115123125783e-17,
+        -1.5707963057214722
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "84410ac2-a1a4-408f-8f84-8a479479a512",
+      "name": "Shelf 1.2",
+      "width": 350,
+      "height": 2028.33332946,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -218.8333314,
+        1110.25,
+        -208.74998294
+      ],
+      "rotation": [
+        1.5707963267948963,
+        0,
+        -1.5707963478683205
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "c24e1dbb-c9e5-484f-b284-f0145eaf5b94",
+      "name": "Upright 1.1",
+      "width": 133,
+      "height": 340.48843336,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        625.08911261,
+        1026.25,
+        -401.25
+      ],
+      "rotation": [
+        3.9252307486597235e-17,
+        2.1073424216194703e-8,
+        -1.5707963267948963
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "2bcb6bcf-60ac-48ab-bfb0-9f7869564596",
+      "name": "Upright 2.1",
+      "width": 133,
+      "height": 340.48843336,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        625.08912072,
+        1026.25,
+        -16.25
+      ],
+      "rotation": [
+        -3.1415926535897927,
+        -2.107342429469932e-8,
+        -1.5707963267948966
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "68af878b-9bc2-4f3f-befd-d6d24871cf46",
+      "name": "Center divider",
+      "width": 573.5,
+      "height": 1363.84489998,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -262.07755001,
+        758.5,
+        304.25
+      ],
+      "rotation": [
+        1.5707963267948966,
+        2.220446049250313e-16,
+        -1.5707963267948963
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "d1a1105c-694a-4297-91c8-d4c884e7e3cd",
+      "name": "Left rear leg (section)",
+      "width": 573.5,
+      "height": 148.75,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -961.5,
+        850.375,
+        304.25
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "4839ad61-917a-48de-b81a-289a55191568",
+      "name": "Right rear leg (section)",
+      "width": 573.5,
+      "height": 148.75,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        437.34489998,
+        850.375,
+        304.25
+      ],
+      "rotation": [
+        0,
+        -1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    }
+  ],
+  "connections": [
+    {
+      "id": "f0076578-dd94-4f01-a971-005b6949552f:0",
+      "parentId": "5c292d58-0989-43e7-bb6d-cf15e78db503",
+      "childId": "249bd042-11c9-4a77-8ef8-074153c7fc80",
+      "type": "t",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "f0076578-dd94-4f01-a971-005b6949552f:1",
+      "parentId": "5c292d58-0989-43e7-bb6d-cf15e78db503",
+      "childId": "d1a1105c-694a-4297-91c8-d4c884e7e3cd",
+      "type": "t",
+      "side": "left",
+      "offset": 385.875,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "376d0519-5fe9-4f0c-86ca-dd292f96adc1:0",
+      "parentId": "26cebab7-7372-46f8-95e7-8b3e2cfa134c",
+      "childId": "249bd042-11c9-4a77-8ef8-074153c7fc80",
+      "type": "t",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "376d0519-5fe9-4f0c-86ca-dd292f96adc1:1",
+      "parentId": "26cebab7-7372-46f8-95e7-8b3e2cfa134c",
+      "childId": "4839ad61-917a-48de-b81a-289a55191568",
+      "type": "t",
+      "side": "right",
+      "offset": 385.875,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "7e96d050-ca21-48b2-a54d-1ac55a8810d8:0",
+      "parentId": "d1a1105c-694a-4297-91c8-d4c884e7e3cd",
+      "childId": "7d47cfc5-9678-46ce-9479-b95b1961938c",
+      "type": "90",
+      "side": "top",
+      "offset": 208.75,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "63a14bfe-1cf5-4442-983d-ee55f1e5988e:0",
+      "parentId": "4839ad61-917a-48de-b81a-289a55191568",
+      "childId": "7d47cfc5-9678-46ce-9479-b95b1961938c",
+      "type": "90",
+      "side": "top",
+      "offset": -208.75,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "bfd7bef3-4469-4f06-9282-64434c9db334:0",
+      "parentId": "3314a44e-e58c-41c0-a12e-35eccccd4343",
+      "childId": "787dcb6a-b977-4fc2-aef8-d2c222190353",
+      "type": "90",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "2a079094-63a0-44a0-a998-f60d3b39e9b0:0",
+      "parentId": "3314a44e-e58c-41c0-a12e-35eccccd4343",
+      "childId": "d0d342c7-e04c-437c-a259-fd14fb4ec35b",
+      "type": "90",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "c8d2d8f3-329a-4efc-88c1-a790c27f0b4d:0",
+      "parentId": "7d47cfc5-9678-46ce-9479-b95b1961938c",
+      "childId": "5c292d58-0989-43e7-bb6d-cf15e78db503",
+      "type": "t",
+      "side": "bottom",
+      "offset": 304.25,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "c8d2d8f3-329a-4efc-88c1-a790c27f0b4d:1",
+      "parentId": "7d47cfc5-9678-46ce-9479-b95b1961938c",
+      "childId": "3314a44e-e58c-41c0-a12e-35eccccd4343",
+      "type": "t",
+      "side": "bottom",
+      "offset": 304.25,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "9fc9a91b-83f5-4c6b-98e3-d9ff198f84eb:0",
+      "parentId": "31062960-10f3-4b50-953f-24685e85ad0e",
+      "childId": "c24e1dbb-c9e5-484f-b284-f0145eaf5b94",
+      "type": "90",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "c8878504-cce6-4a64-9f1a-f1953bc405ef:0",
+      "parentId": "31062960-10f3-4b50-953f-24685e85ad0e",
+      "childId": "2bcb6bcf-60ac-48ab-bfb0-9f7869564596",
+      "type": "90",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "bd312e85-10d0-477f-86aa-681579101467:0",
+      "parentId": "84410ac2-a1a4-408f-8f84-8a479479a512",
+      "childId": "c24e1dbb-c9e5-484f-b284-f0145eaf5b94",
+      "type": "90",
+      "side": "right",
+      "offset": 843.92244805,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "d8671353-b181-4dce-8fc2-5b18ac70d8c0:0",
+      "parentId": "84410ac2-a1a4-408f-8f84-8a479479a512",
+      "childId": "2bcb6bcf-60ac-48ab-bfb0-9f7869564596",
+      "type": "90",
+      "side": "left",
+      "offset": 843.92244805,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "3c743ded-e67a-447e-8b39-780f33eef263:0",
+      "parentId": "7d47cfc5-9678-46ce-9479-b95b1961938c",
+      "childId": "26cebab7-7372-46f8-95e7-8b3e2cfa134c",
+      "type": "t",
+      "side": "top",
+      "offset": 304.25,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "3c743ded-e67a-447e-8b39-780f33eef263:1",
+      "parentId": "7d47cfc5-9678-46ce-9479-b95b1961938c",
+      "childId": "31062960-10f3-4b50-953f-24685e85ad0e",
+      "type": "t",
+      "side": "top",
+      "offset": 304.25,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "1cc0ac24-d5b3-49c8-ac50-9ad932c6c013:0",
+      "parentId": "787dcb6a-b977-4fc2-aef8-d2c222190353",
+      "childId": "84410ac2-a1a4-408f-8f84-8a479479a512",
+      "type": "90",
+      "side": "left",
+      "offset": -887.1666686,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "05d59e5b-a9aa-411b-90dd-82a7d06e1552:0",
+      "parentId": "4fef51ed-399a-435d-bb0d-705a3e148b96",
+      "childId": "68af878b-9bc2-4f3f-befd-d6d24871cf46",
+      "type": "t",
+      "side": "top",
+      "offset": 1.1368683772161603e-13,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "05d59e5b-a9aa-411b-90dd-82a7d06e1552:1",
+      "parentId": "4fef51ed-399a-435d-bb0d-705a3e148b96",
+      "childId": "d1a1105c-694a-4297-91c8-d4c884e7e3cd",
+      "type": "t",
+      "side": "top",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "00f86a4a-abf0-4d75-81d2-7d76d587b5e7:0",
+      "parentId": "c9bde662-47f4-4a58-9e8d-896fc58cb332",
+      "childId": "68af878b-9bc2-4f3f-befd-d6d24871cf46",
+      "type": "t",
+      "side": "top",
+      "offset": -1.1368683772161603e-13,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "00f86a4a-abf0-4d75-81d2-7d76d587b5e7:1",
+      "parentId": "c9bde662-47f4-4a58-9e8d-896fc58cb332",
+      "childId": "4839ad61-917a-48de-b81a-289a55191568",
+      "type": "t",
+      "side": "top",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "5f3f2927-7614-4647-94ee-765725146083:0",
+      "parentId": "26cebab7-7372-46f8-95e7-8b3e2cfa134c",
+      "childId": "249bd042-11c9-4a77-8ef8-074153c7fc80",
+      "type": "t",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "5f3f2927-7614-4647-94ee-765725146083:1",
+      "parentId": "26cebab7-7372-46f8-95e7-8b3e2cfa134c",
+      "childId": "c9bde662-47f4-4a58-9e8d-896fc58cb332",
+      "type": "t",
+      "side": "right",
+      "offset": -91.875,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "b89c19c9-28c7-44c1-937d-2d01db71e7bd:0",
+      "parentId": "5c292d58-0989-43e7-bb6d-cf15e78db503",
+      "childId": "249bd042-11c9-4a77-8ef8-074153c7fc80",
+      "type": "t",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "b89c19c9-28c7-44c1-937d-2d01db71e7bd:1",
+      "parentId": "5c292d58-0989-43e7-bb6d-cf15e78db503",
+      "childId": "4fef51ed-399a-435d-bb0d-705a3e148b96",
+      "type": "t",
+      "side": "left",
+      "offset": -91.875,
+      "inset": 0,
+      "flip": false,
+      "color": "#e75a35",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    }
+  ],
+  "assemblies": {
+    "definitions": [
+      {
+        "id": "ecdc778d-0ec6-4b9d-a0f2-d8be94187e20",
+        "name": "Cube module",
+        "panels": [
+          {
+            "id": "4307f98e-cfd2-4591-bb86-e0f92d0f9aeb",
+            "name": "Shelf 1.1",
+            "width": 350,
+            "height": 350,
+            "thickness": 18,
+            "material": "painted",
+            "color": "#e8e7df",
+            "pattern": "solid",
+            "position": [
+              0,
+              -192.5,
+              -1.4210854715202004e-14
+            ],
+            "rotation": [
+              -1.5707963267948963,
+              0,
+              0
+            ],
+            "cornerRadius": 0,
+            "visible": true,
+            "holeSize": 12,
+            "holeSpacing": 48
+          },
+          {
+            "id": "4ca6186d-8afc-4b93-9ec6-1ca9f9b937c7",
+            "name": "Shelf 1.2",
+            "width": 350,
+            "height": 350,
+            "thickness": 18,
+            "material": "painted",
+            "color": "#e8e7df",
+            "pattern": "solid",
+            "position": [
+              0,
+              192.5,
+              -1.4210854715202004e-14
+            ],
+            "rotation": [
+              1.5707963267948968,
+              1.2246467991473532e-16,
+              -3.141592653589793
+            ],
+            "cornerRadius": 0,
+            "visible": true,
+            "holeSize": 12,
+            "holeSpacing": 48
+          },
+          {
+            "id": "fc66a4b6-d526-4548-b429-817a71ed7449",
+            "name": "Upright 1.1",
+            "width": 350,
+            "height": 350,
+            "thickness": 18,
+            "material": "painted",
+            "color": "#e8e7df",
+            "pattern": "solid",
+            "position": [
+              -192.50000000000006,
+              0,
+              1.4210854715202004e-14
+            ],
+            "rotation": [
+              -1.5707963267948963,
+              1.5707963267948966,
+              0
+            ],
+            "cornerRadius": 0,
+            "visible": true,
+            "holeSize": 12,
+            "holeSpacing": 48
+          },
+          {
+            "id": "e71dc00e-2ae1-4ab5-860b-8ab3f9806789",
+            "name": "Upright 2.1",
+            "width": 350,
+            "height": 350,
+            "thickness": 18,
+            "material": "painted",
+            "color": "#e8e7df",
+            "pattern": "solid",
+            "position": [
+              192.50000000000006,
+              0,
+              1.4210854715202004e-14
+            ],
+            "rotation": [
+              -1.5707963267948963,
+              -1.5707963267948966,
+              0
+            ],
+            "cornerRadius": 0,
+            "visible": true,
+            "holeSize": 12,
+            "holeSpacing": 48
+          }
+        ],
+        "connections": [
+          {
+            "id": "07d91864-cb14-4f72-b362-541175a34530:0",
+            "parentId": "4307f98e-cfd2-4591-bb86-e0f92d0f9aeb",
+            "childId": "fc66a4b6-d526-4548-b429-817a71ed7449",
+            "type": "90",
+            "side": "left",
+            "offset": 0,
+            "inset": 0,
+            "flip": false,
+            "color": "#e75a35",
+            "count": 2
+          },
+          {
+            "id": "e52963cc-a9dc-446e-ae2d-c6e54ac0df58:0",
+            "parentId": "4307f98e-cfd2-4591-bb86-e0f92d0f9aeb",
+            "childId": "e71dc00e-2ae1-4ab5-860b-8ab3f9806789",
+            "type": "90",
+            "side": "right",
+            "offset": 0,
+            "inset": 0,
+            "flip": false,
+            "color": "#e75a35",
+            "count": 2
+          },
+          {
+            "id": "c52a4c91-18d0-47a3-b3fd-fb409b67354a:0",
+            "parentId": "4ca6186d-8afc-4b93-9ec6-1ca9f9b937c7",
+            "childId": "fc66a4b6-d526-4548-b429-817a71ed7449",
+            "type": "90",
+            "side": "right",
+            "offset": 0,
+            "inset": 0,
+            "flip": false,
+            "color": "#e75a35",
+            "count": 2,
+            "role": "support"
+          },
+          {
+            "id": "8db32f8f-331f-41ee-af18-f9359699e0b8:0",
+            "parentId": "4ca6186d-8afc-4b93-9ec6-1ca9f9b937c7",
+            "childId": "e71dc00e-2ae1-4ab5-860b-8ab3f9806789",
+            "type": "90",
+            "side": "left",
+            "offset": 0,
+            "inset": 0,
+            "flip": false,
+            "color": "#e75a35",
+            "count": 2,
+            "role": "support"
+          }
+        ],
+        "ports": [
+          {
+            "id": "07d91864-cb14-4f72-b362-541175a34530",
+            "connectionId": "07d91864-cb14-4f72-b362-541175a34530:0",
+            "label": "Bottom left"
+          },
+          {
+            "id": "e52963cc-a9dc-446e-ae2d-c6e54ac0df58",
+            "connectionId": "e52963cc-a9dc-446e-ae2d-c6e54ac0df58:0",
+            "label": "Bottom right"
+          },
+          {
+            "id": "c52a4c91-18d0-47a3-b3fd-fb409b67354a",
+            "connectionId": "c52a4c91-18d0-47a3-b3fd-fb409b67354a:0",
+            "label": "Top left"
+          },
+          {
+            "id": "8db32f8f-331f-41ee-af18-f9359699e0b8",
+            "connectionId": "8db32f8f-331f-41ee-af18-f9359699e0b8:0",
+            "label": "Top right"
+          }
+        ],
+        "parameters": [
+          {
+            "id": "side-length",
+            "name": "Side length",
+            "defaultValue": 350,
+            "bindings": [
+              {
+                "panelId": "4307f98e-cfd2-4591-bb86-e0f92d0f9aeb",
+                "dimension": "width",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "4307f98e-cfd2-4591-bb86-e0f92d0f9aeb",
+                "dimension": "height",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "4ca6186d-8afc-4b93-9ec6-1ca9f9b937c7",
+                "dimension": "width",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "4ca6186d-8afc-4b93-9ec6-1ca9f9b937c7",
+                "dimension": "height",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "fc66a4b6-d526-4548-b429-817a71ed7449",
+                "dimension": "width",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "fc66a4b6-d526-4548-b429-817a71ed7449",
+                "dimension": "height",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "e71dc00e-2ae1-4ab5-860b-8ab3f9806789",
+                "dimension": "width",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "e71dc00e-2ae1-4ab5-860b-8ab3f9806789",
+                "dimension": "height",
+                "scale": 1,
+                "offset": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "f5597fc5-e4ae-4f1c-8ab7-db1d6e2f8f4f",
+        "name": "Cube module",
+        "panels": [
+          {
+            "id": "e3fa3a51-0d43-4a3e-97f5-2e6fd2999e70",
+            "name": "Shelf 1.1",
+            "width": 350,
+            "height": 350,
+            "thickness": 18,
+            "material": "painted",
+            "color": "#e8e7df",
+            "pattern": "solid",
+            "position": [
+              0,
+              -192.5,
+              -1.4210854715202004e-14
+            ],
+            "rotation": [
+              -1.5707963267948963,
+              0,
+              0
+            ],
+            "cornerRadius": 0,
+            "visible": true,
+            "holeSize": 12,
+            "holeSpacing": 48
+          },
+          {
+            "id": "f3402b58-dbb2-4541-9bd0-9a1c0ba4d55e",
+            "name": "Shelf 1.2",
+            "width": 350,
+            "height": 350,
+            "thickness": 18,
+            "material": "painted",
+            "color": "#e8e7df",
+            "pattern": "solid",
+            "position": [
+              0,
+              192.5,
+              -1.4210854715202004e-14
+            ],
+            "rotation": [
+              1.5707963267948968,
+              1.2246467991473532e-16,
+              -3.141592653589793
+            ],
+            "cornerRadius": 0,
+            "visible": true,
+            "holeSize": 12,
+            "holeSpacing": 48
+          },
+          {
+            "id": "e9d17072-8828-4166-8903-003cc39c9d12",
+            "name": "Upright 1.1",
+            "width": 350,
+            "height": 350,
+            "thickness": 18,
+            "material": "painted",
+            "color": "#e8e7df",
+            "pattern": "solid",
+            "position": [
+              -192.50000000000006,
+              0,
+              1.4210854715202004e-14
+            ],
+            "rotation": [
+              -1.5707963267948963,
+              1.5707963267948966,
+              0
+            ],
+            "cornerRadius": 0,
+            "visible": true,
+            "holeSize": 12,
+            "holeSpacing": 48
+          },
+          {
+            "id": "c7938e0f-222c-4d84-97fa-4a2fc7e31c3a",
+            "name": "Upright 2.1",
+            "width": 350,
+            "height": 350,
+            "thickness": 18,
+            "material": "painted",
+            "color": "#e8e7df",
+            "pattern": "solid",
+            "position": [
+              192.50000000000006,
+              0,
+              1.4210854715202004e-14
+            ],
+            "rotation": [
+              -1.5707963267948963,
+              -1.5707963267948966,
+              0
+            ],
+            "cornerRadius": 0,
+            "visible": true,
+            "holeSize": 12,
+            "holeSpacing": 48
+          }
+        ],
+        "connections": [
+          {
+            "id": "d5a5805e-83f3-4783-8c82-c79d876d511d:0",
+            "parentId": "e3fa3a51-0d43-4a3e-97f5-2e6fd2999e70",
+            "childId": "e9d17072-8828-4166-8903-003cc39c9d12",
+            "type": "90",
+            "side": "left",
+            "offset": 0,
+            "inset": 0,
+            "flip": false,
+            "color": "#e75a35",
+            "count": 2
+          },
+          {
+            "id": "95abd6f4-f6c8-417b-aaee-33b700ff77db:0",
+            "parentId": "e3fa3a51-0d43-4a3e-97f5-2e6fd2999e70",
+            "childId": "c7938e0f-222c-4d84-97fa-4a2fc7e31c3a",
+            "type": "90",
+            "side": "right",
+            "offset": 0,
+            "inset": 0,
+            "flip": false,
+            "color": "#e75a35",
+            "count": 2
+          },
+          {
+            "id": "39d030d4-255f-40b2-b088-16136bc806da:0",
+            "parentId": "f3402b58-dbb2-4541-9bd0-9a1c0ba4d55e",
+            "childId": "e9d17072-8828-4166-8903-003cc39c9d12",
+            "type": "90",
+            "side": "right",
+            "offset": 0,
+            "inset": 0,
+            "flip": false,
+            "color": "#e75a35",
+            "count": 2,
+            "role": "support"
+          },
+          {
+            "id": "e453e7a1-32b8-405e-9c24-7623776f64f3:0",
+            "parentId": "f3402b58-dbb2-4541-9bd0-9a1c0ba4d55e",
+            "childId": "c7938e0f-222c-4d84-97fa-4a2fc7e31c3a",
+            "type": "90",
+            "side": "left",
+            "offset": 0,
+            "inset": 0,
+            "flip": false,
+            "color": "#e75a35",
+            "count": 2,
+            "role": "support"
+          }
+        ],
+        "ports": [
+          {
+            "id": "d5a5805e-83f3-4783-8c82-c79d876d511d",
+            "connectionId": "d5a5805e-83f3-4783-8c82-c79d876d511d:0",
+            "label": "Bottom left"
+          },
+          {
+            "id": "95abd6f4-f6c8-417b-aaee-33b700ff77db",
+            "connectionId": "95abd6f4-f6c8-417b-aaee-33b700ff77db:0",
+            "label": "Bottom right"
+          },
+          {
+            "id": "39d030d4-255f-40b2-b088-16136bc806da",
+            "connectionId": "39d030d4-255f-40b2-b088-16136bc806da:0",
+            "label": "Top left"
+          },
+          {
+            "id": "e453e7a1-32b8-405e-9c24-7623776f64f3",
+            "connectionId": "e453e7a1-32b8-405e-9c24-7623776f64f3:0",
+            "label": "Top right"
+          }
+        ],
+        "parameters": [
+          {
+            "id": "side-length",
+            "name": "Side length",
+            "defaultValue": 350,
+            "bindings": [
+              {
+                "panelId": "e3fa3a51-0d43-4a3e-97f5-2e6fd2999e70",
+                "dimension": "width",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "e3fa3a51-0d43-4a3e-97f5-2e6fd2999e70",
+                "dimension": "height",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "f3402b58-dbb2-4541-9bd0-9a1c0ba4d55e",
+                "dimension": "width",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "f3402b58-dbb2-4541-9bd0-9a1c0ba4d55e",
+                "dimension": "height",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "e9d17072-8828-4166-8903-003cc39c9d12",
+                "dimension": "width",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "e9d17072-8828-4166-8903-003cc39c9d12",
+                "dimension": "height",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "c7938e0f-222c-4d84-97fa-4a2fc7e31c3a",
+                "dimension": "width",
+                "scale": 1,
+                "offset": 0
+              },
+              {
+                "panelId": "c7938e0f-222c-4d84-97fa-4a2fc7e31c3a",
+                "dimension": "height",
+                "scale": 1,
+                "offset": 0
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "instances": [],
+    "links": [],
+    "loosePorts": []
+  },
+  "connectorOverrides": {
+    "[\"c8d2d8f3-329a-4efc-88c1-a790c27f0b4d:0\",0]": {
+      "slide": 36.008623064576426
+    },
+    "[\"c8d2d8f3-329a-4efc-88c1-a790c27f0b4d:0\",1]": {
+      "slide": -36.00862968784917
+    },
+    "[\"3c743ded-e67a-447e-8b39-780f33eef263:0\",0]": {
+      "slide": 36.00862306457625
+    },
+    "[\"3c743ded-e67a-447e-8b39-780f33eef263:0\",1]": {
+      "slide": -36.008629687849414
+    },
+    "[\"05d59e5b-a9aa-411b-90dd-82a7d06e1552:0\",1]": {
+      "slide": -35.804957
+    },
+    "[\"00f86a4a-abf0-4d75-81d2-7d76d587b5e7:0\",0]": {
+      "slide": 35.80495700000001
+    },
+    "[\"376d0519-5fe9-4f0c-86ca-dd292f96adc1:0\",0]": {
+      "slide": 100
+    },
+    "[\"f0076578-dd94-4f01-a971-005b6949552f:0\",0]": {
+      "slide": 100
+    },
+    "[\"5f3f2927-7614-4647-94ee-765725146083:0\",1]": {
+      "slide": -100
+    },
+    "[\"b89c19c9-28c7-44c1-937d-2d01db71e7bd:0\",1]": {
+      "slide": -100
+    }
+  }
+}

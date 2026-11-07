@@ -3,6 +3,7 @@ import { createPanel, createStarterProject, parseProject, resolvePanels, validat
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { preparePreviewResize } from '../src/lib/preview-resize'
 import { autoConnect } from '../src/lib/auto-connect'
+import endShelves from '../src/test/fixtures/h-table-end-shelves.json' with { type: 'json' }
 import hTable from '../src/test/fixtures/h-table-auto-connect.json' with { type: 'json' }
 import type { Project, Vec3 } from '../src/lib/types'
 
@@ -32,6 +33,31 @@ test('raising the table middle shelf keeps the back panels and desktop fixed thr
     const split = /^(Left|Right) rear leg/.test(original.name)
     expect(current.position[1], original.name).toBeCloseTo(original.position[1] + (original.id === shelf.id ? distance : split ? distance / 2 : 0), 4)
     expect(current.height, original.name).toBeCloseTo(original.height + (split ? original.name.endsWith('(section)') ? -distance : distance : 0), 4)
+  }
+  expectAnglesAndJoints(before, after)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect.poll(() => savedProject(page)).toEqual(before)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect.poll(() => savedProject(page)).toEqual(after)
+  await page.reload()
+  expect(await savedProject(page)).toEqual(after)
+})
+
+test('leg resize keeps the H-table end shelf cuts aligned through undo and reload', async ({ page }) => {
+  const project = parseProject(endShelves)
+  await openProject(page, project)
+  await page.getByRole('button', { name: 'Left rear leg', exact: true }).click()
+  const before = await savedProject(page)
+  const leg = before.panels.find(panel => panel.name === 'Left rear leg')!
+  await beginResize(page, directionHandle(before, { panelId: leg.id }, [1, 0, 0]), 100)
+  await page.mouse.up()
+  await expect.poll(async () => (await savedProject(page)).panels.find(panel => panel.id === leg.id)!.position[0]).toBeGreaterThan(leg.position[0] + 50)
+  const after = await savedProject(page)
+  const distance = after.panels.find(panel => panel.id === leg.id)!.position[0] - leg.position[0]
+  for (const original of before.panels.filter(panel => panel.position[0] < -1000)) {
+    const current = after.panels.find(panel => panel.id === original.id)!
+    expect(current.height, original.name).toBeCloseTo(original.height + distance, 4)
+    expect(current.position[0], original.name).toBeCloseTo(original.position[0] + distance / 2, 4)
   }
   expectAnglesAndJoints(before, after)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()

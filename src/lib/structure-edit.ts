@@ -326,6 +326,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     }
   }
 
+  const movementAxis = edit.kind === 'move' && !edit.deltas && !edit.scope && selected.length === 1
+    ? new Vector3(...edit.delta).normalize() : undefined
   for (const connection of connections) {
     const parentIndex = indices.get(connection.parentId)!, childIndex = indices.get(connection.childId)!
     const parent = frames[parentIndex].panel, child = frames[childIndex].panel
@@ -352,7 +354,13 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       add(constraint, childIndex * 5 + 4, -changes[3].dot(axis))
       add(constraint, offsetVariables.get(offsetKey(connection))!, -changes[4].dot(axis))
     })
-    if (edit.kind === 'resize' && !edit.local) {
+    // Moving a boundary with a connected-resize arrow also changes spans
+    // along its normal. Keep their joint-end alignments just as for a cut
+    // resize; otherwise each support can slide and acquire a different cut.
+    const seamDimension = ['top', 'bottom', 'front', 'back'].includes(connection.side) ? 0 : 1
+    const movingSpan = movementAxis && Math.abs(selected[0].axes[2].dot(movementAxis)) > 1 - EPSILON
+      && Math.abs(frames[parentIndex].axes[seamDimension].dot(movementAxis)) > 1 - EPSILON
+    if ((edit.kind === 'resize' && !edit.local) || movingSpan) {
       const horizontal = ['top', 'bottom', 'front', 'back'].includes(connection.side)
       const dimension = horizontal ? 0 : 1
       const childDimension = connection.quarterTurn ? 1 - dimension : dimension
