@@ -13,6 +13,14 @@ const CONTACT_TOLERANCE = 1e-4
 const LIMIT_MESSAGE = 'This move would exceed the panel size limits (40–4,000 mm). Try a smaller step.'
 const CONSTRAINT_MESSAGE = 'These panels cannot move in that direction while keeping their joints connected. Try another direction or select the whole assembly.'
 
+/** Transient diagnostics for rejected edits; never part of a saved project. */
+export class StructureEditError extends Error {
+  constructor(message: string, public panelIds: string[], public connectionIds: string[] = []) { super(message) }
+}
+class SolverConflict extends Error {
+  constructor(public variables: number[]) { super(CONSTRAINT_MESSAGE) }
+}
+
 type Dimensions = Partial<Pick<Panel, 'width' | 'height'>>
 type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
 type Row = { entries: Map<number, number>; value: number }
@@ -64,7 +72,7 @@ function solve(rows: Row[], weights: number[], dual?: number[]): number[] {
       .map(([index, value]) => [index, value * inverseScale[index]] as const)
     const norm = Math.hypot(...entries.map(([, value]) => value))
     if (norm < 1e-10) {
-      if (Math.abs(row.value) > EPSILON) throw new Error(CONSTRAINT_MESSAGE)
+      if (Math.abs(row.value) > EPSILON) throw new SolverConflict([...row.entries.keys()])
       return { entries: [], value: 0, sourceIndex, norm: 1 }
     }
     return { entries: entries.map(([index, value]) => [index, value / norm] as const), value: row.value / norm, sourceIndex, norm }
@@ -111,7 +119,8 @@ function solve(rows: Row[], weights: number[], dual?: number[]): number[] {
     solution.set(bestSolution)
     output = result()
     // The fallback must satisfy the same original equations and tolerance.
-    if (!valid(output)) throw new Error(CONSTRAINT_MESSAGE)
+    if (!valid(output)) throw new SolverConflict([...new Set(rows.filter(row =>
+      Math.abs(rowValue(row, output) - row.value) > 1e-5).flatMap(row => [...row.entries.keys()]))])
   }
   if (dual) {
     dual.length = rows.length
@@ -170,7 +179,10 @@ function solveWithBounds(rows: Row[], bounds: Row[], weights: number[]): number[
       && rows.every(row => Math.abs(rowValue(row, output) - row.value) <= 1e-5)
       && bounds.every(bound => rowValue(bound, output) >= bound.value - 1e-5)) return output
   }
-  throw new Error(CONSTRAINT_MESSAGE)
+  throw new SolverConflict([...new Set([
+    ...rows.filter(row => Math.abs(rowValue(row, output) - row.value) > 1e-5),
+    ...bounds.filter(bound => rowValue(bound, output) < bound.value - 1e-5),
+  ].flatMap(row => [...row.entries.keys()]))])
 }
 
 function editComponent(project: Project, frames: Frame[], contacts: Contact[], ids: Set<string>, edit: Edit): Project {
@@ -523,14 +535,22 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       changes = solveWithBounds(rows.filter(row => !preferences.has(row)), bounds, weights)
     }
   } catch (error) {
-    if (!constraints.length) throw error
-    throw new Error(`This edit cannot keep the design rules and joints satisfied. ${constraints.slice(0, 3).map(rule => describeDesignConstraint(rule, frames.map(item => item.panel))).join('; ')}. Edit or pause a rule first.`)
+    const panelIds = error instanceof SolverConflict
+      ? [...new Set(error.variables.flatMap(variable => frames[Math.floor(variable / 5)]
+        ? [frames[Math.floor(variable / 5)].panel.id]
+        : connections.filter(connection => offsetVariables.get(offsetKey(connection)) === variable).flatMap(connection => [connection.parentId, connection.childId])))]
+      : [...new Set(constraints.flatMap(designConstraintPanelIds))]
+    const message = constraints.length
+      ? `This edit cannot keep the design rules and joints satisfied. ${constraints.slice(0, 3).map(rule => describeDesignConstraint(rule, frames.map(item => item.panel))).join('; ')}. Edit or pause a rule first.`
+      : error instanceof Error ? error.message : CONSTRAINT_MESSAGE
+    throw new StructureEditError(message, panelIds, project.connections.filter(connection =>
+      panelIds.includes(connection.parentId) && panelIds.includes(connection.childId)).map(connection => connection.id))
   }
   const changedPanels = new Map(frames.map((item, index) => {
     const moved = position(item.panel)
     item.axes.forEach((axis, dimension) => moved.addScaledVector(axis, changes[index * 5 + dimension]))
     const width = item.panel.width + changes[index * 5 + 3], height = item.panel.height + changes[index * 5 + 4]
-    if (width < 40 - EPSILON || width > 4000 + EPSILON || height < 40 - EPSILON || height > 4000 + EPSILON) throw new Error(LIMIT_MESSAGE)
+    if (width < 40 - EPSILON || width > 4000 + EPSILON || height < 40 - EPSILON || height > 4000 + EPSILON) throw new StructureEditError(LIMIT_MESSAGE, [item.panel.id])
     const clean = (value: number, previous: number) => Math.abs(value - previous) < EPSILON ? previous : Math.round(value * 1e8) / 1e8
     return [item.panel.id, { ...item.panel, thickness: item.panel.thickness + thicknessChange(index), width: clean(Math.min(4000, Math.max(40, width)), item.panel.width), height: clean(Math.min(4000, Math.max(40, height)), item.panel.height),
       position: moved.toArray().map((value, axis) => clean(value, item.panel.position[axis])) as Vec3 }] as const
@@ -548,8 +568,8 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   const wanted = new Set(ids)
   if (project.assemblies?.instances.length) {
     const managed = new Set(project.assemblies.instances.flatMap(instance => Object.values(instance.panelIds)))
-    if ([...wanted].some(id => managed.has(id))) throw new Error('Edit the assembly source to change its panels, or move the assembly as a whole.')
-    if ([...wanted].some(id => isPanelConnectedToAssembly(project, id))) throw new Error('Disconnect this panel from neighboring assemblies before changing its dimensions or position.')
+    if ([...wanted].some(id => managed.has(id))) throw new StructureEditError('Edit the assembly source to change its panels, or move the assembly as a whole.', [...wanted])
+    if ([...wanted].some(id => isPanelConnectedToAssembly(project, id))) throw new StructureEditError('Disconnect this panel from neighboring assemblies before changing its dimensions or position.', [...wanted], project.connections.filter(connection => wanted.has(connection.parentId) || wanted.has(connection.childId)).map(connection => connection.id))
     // Instances are rigid objects. Incidental surface contacts must never let
     // the loose-panel solver deform their materialized, linked source panels.
     const looseConnections = project.connections.filter(connection => !managed.has(connection.parentId) && !managed.has(connection.childId))
@@ -617,7 +637,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     const outlineChanged = panel.customOutline?.some((point, index) => Math.abs(point.x - (original.customOutline?.[index]?.x ?? Infinity)) > EPSILON
       || Math.abs(point.y - (original.customOutline?.[index]?.y ?? Infinity)) > EPSILON) ?? false
     if (edit.kind === 'resize' && edit.local && !wanted.has(panel.id) && !edit.refitOutlinePanelIds?.includes(panel.id) && (sizeChanged || poseChanged || outlineChanged)) {
-      throw new Error('This resize would reshape a fitted outline panel. Resize the connected structure instead of only this panel edge.')
+      throw new StructureEditError('This resize would reshape a fitted outline panel. Resize the connected structure instead of only this panel edge.', [panel.id])
     }
     if (!wanted.has(panel.id)) continue
     const patch: PanelDimensions | undefined = edit.kind === 'resize' ? edit.patches?.[panel.id] ?? edit.patch : undefined
@@ -625,7 +645,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
       || position(panel).distanceTo(position(original).add(new Vector3(...(edit.deltas?.[panel.id] ?? edit.delta)))) > EPSILON)
     const missesResize = patch && (['width', 'height', 'thickness'] as const).some(dimension => patch[dimension] !== undefined
       && Math.abs(panel[dimension] - patch[dimension]!) > EPSILON)
-    if (missesMove || missesResize) throw new Error('This fitted outline follows its surrounding panels. Edit those panels together, or detach the outline panel first.')
+    if (missesMove || missesResize) throw new StructureEditError('This fitted outline follows its surrounding panels. Edit those panels together, or detach the outline panel first.', [panel.id])
   }
   if (next.panels.some(panel => panel.position.some(value => !Number.isFinite(value) || Math.abs(value) > 100000))
     || next.connections.some(connection => !Number.isFinite(connection.offset) || Math.abs(connection.offset) > 10000)) throw new Error('This move would exceed the project placement limits. Try a smaller step.')
@@ -653,18 +673,18 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
   }
   const previousErrors = new Set(validateProject(project, validation).filter(issue => issue.severity === 'error').map(issue => issue.id))
   const newError = validateProject(next, validation).find(issue => issue.severity === 'error' && !previousErrors.has(issue.id))
-  if (newError) throw new Error(`Cannot keep this edit connected: ${newError.message}`)
+  if (newError) throw new StructureEditError(`Cannot keep this edit connected: ${newError.message}`, newError.panelIds, next.connections.filter(connection => newError.panelIds.includes(connection.parentId) && newError.panelIds.includes(connection.childId)).map(connection => connection.id))
   const affectedRoots = new Set([...wanted].flatMap(id => indices.has(id) ? [root(indices.get(id)!)] : []))
   const violatedRule = evaluateDesignConstraints(next.constraints, next.panels).find(result => result.constraint.enabled && result.violation > 0
     && designConstraintPanelIds(result.constraint).some(id => indices.has(id) && affectedRoots.has(root(indices.get(id)!))))
-  if (violatedRule) throw new Error(`Cannot satisfy this design rule: ${describeDesignConstraint(violatedRule.constraint, next.panels)}.`)
+  if (violatedRule) throw new StructureEditError(`Cannot satisfy this design rule: ${describeDesignConstraint(violatedRule.constraint, next.panels)}.`, designConstraintPanelIds(violatedRule.constraint))
   const nextFrames = next.panels.map(frame)
   for (const contact of contacts) {
     const first = nextFrames[contact.a], second = nextFrames[contact.b]
     if (Math.abs(coordinate(second, contact.normal, -contact.sign) - coordinate(first, contact.normal, contact.sign)) > CONTACT_TOLERANCE
       || [...first.axes, ...second.axes].filter(axis => Math.abs(axis.dot(contact.normal)) < EPSILON).some(axis => Math.min(coordinate(first, axis, 1), coordinate(second, axis, 1))
         - Math.max(coordinate(first, axis, -1), coordinate(second, axis, -1)) <= CONTACT_TOLERANCE)) {
-      throw new Error('This move would leave an insert unsupported. Try a smaller step or move its supporting panels together.')
+      throw new StructureEditError('This move would leave an insert unsupported. Try a smaller step or move its supporting panels together.', [first.panel.id, second.panel.id])
     }
   }
   return assertDesignConstraintEdit(project, next)
@@ -737,7 +757,7 @@ export function resizePanelEdge(project: Project, id: string, dimension: 'width'
   const panel = resolvePanels(project).find(panel => panel.id === id)
   if (!panel) return project
   const size = panel[dimension] + distance
-  if (size < 40 || size > 4000) throw new Error(LIMIT_MESSAGE)
+  if (size < 40 || size > 4000) throw new StructureEditError(LIMIT_MESSAGE, [panel.id])
   const axis = frame(panel).axes[dimension === 'width' ? 0 : 1]
   return editStructure(project, [id], { kind: 'resize', patch: { [dimension]: size }, local,
     centerDelta: axis.multiplyScalar(side * distance / 2).toArray() as Vec3 })

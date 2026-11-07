@@ -11,6 +11,7 @@ export type { PreviewResizeHandle } from '@/lib/preview-resize'
 
 export interface PreviewResizeProps {
   handles: readonly PreviewResizeHandle[]
+  onInspectBlockers?: (id: string | null) => void
   enabled?: boolean
   distance?: number
   limited?: boolean
@@ -41,7 +42,7 @@ const MM = 0.001
 const ARM = 48
 
 /** Screen-sized handles whose drag plane contains the selected structural axis. */
-export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 10, distance, limited, onResizeStart, onResizeMove, onResizeEnd }: PreviewResizeProps) {
+export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 10, distance, limited, onInspectBlockers, onResizeStart, onResizeMove, onResizeEnd }: PreviewResizeProps) {
   const { camera, gl, controls, size, invalidate } = useThree()
   // Drei's implicit target changes when R3F connects its event manager during
   // startup, which can unmount the HTML root while React is rendering it.
@@ -53,6 +54,8 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
   const [raycaster] = useState(() => new Raycaster())
   const [activeId, setActiveId] = useState<string | null>(null)
   const [requestedDistance, setRequestedDistance] = useState(0)
+  const clearInspection = useEffectEvent(() => onInspectBlockers?.(null))
+  useEffect(() => () => clearInspection(), [handles, enabled])
   const pointAt = (x: number, y: number, plane: Plane) => {
     const rect = gl.domElement.getBoundingClientRect()
     raycaster.setFromCamera(new Vector2((x - rect.left) / rect.width * 2 - 1, 1 - (y - rect.top) / rect.height * 2), camera)
@@ -78,6 +81,8 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     event.stopPropagation()
     event.nativeEvent.stopImmediatePropagation()
     if (!enabled || gesture.current || event.button !== 0 || event.metaKey || event.altKey) return
+    if (handle.blocked && !event.ctrlKey && !(event.shiftKey && handle.panelEdge)) return
+    onInspectBlockers?.(null)
     camera.updateMatrixWorld()
     const axis = new Vector3(...handle.direction).normalize()
     const rootPosition = new Vector3(...handle.position).multiplyScalar(MM)
@@ -143,7 +148,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     if (!sign) return
     event.preventDefault()
     event.stopPropagation()
-    if (enabled && onResizeStart(handle.id, event.ctrlKey ? 'repeat' : 'connected')) {
+    if (enabled && (!handle.blocked || event.ctrlKey) && onResizeStart(handle.id, event.ctrlKey ? 'repeat' : 'connected')) {
       onResizeMove(sign * keyboardStep * (event.shiftKey ? 10 : 1), true)
       if (event.ctrlKey) repeatFocus.current = { direction: handle.direction, target: event.currentTarget }
       onResizeEnd(false)
@@ -243,14 +248,16 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     calculatePosition={(_object, _camera, viewport) => [viewport.width / 2, viewport.height / 2]}
     style={{ pointerEvents: 'none' }}>
     <div className="preview-resize-layer" aria-label="Resize selection">
-      {handles.map(handle => <div key={handle.id} className={`preview-resize-anchor${activeId === handle.id ? ' is-active' : ''}`}
+      {handles.map(handle => <div key={handle.id} className={`preview-resize-anchor${activeId === handle.id ? ' is-active' : ''}${handle.blocked ? ' is-blocked' : ''}`}
         ref={element => { if (element) { elements.current.set(handle.id, element); invalidate() } else elements.current.delete(handle.id) }}>
         <span className="preview-resize-root" aria-hidden="true" />
         <span className="preview-resize-stem" aria-hidden="true" />
-        <button type="button" className="preview-resize-handle" aria-label={`Resize · ${handle.label}`} data-resize-handle={handle.id}
-          aria-keyshortcuts={`ArrowUp ArrowDown ArrowLeft ArrowRight${handle.panelHandle ? ' Control+ArrowUp Control+ArrowRight Control+Plus' : ''}`} title={`${handle.label} · drag to pull or push.${handle.panelEdge ? ' Shift-drag: resize only this panel edge, keeping connectors fixed.' : ''}${handle.panelHandle ? ' Control-drag: repeat a rectangular compartment along this arrow.' : ''} Arrow keys: ${keyboardStep} mm; Shift: ${keyboardStep * 10} mm.${handle.panelHandle ? ' Control + Up/Right/+: add one bay.' : ''}`}
+        <button type="button" className="preview-resize-handle" aria-label={`Resize · ${handle.label}`} data-resize-handle={handle.id} aria-disabled={!!handle.blocked} aria-description={handle.blocked?.reason}
+          aria-keyshortcuts={`ArrowUp ArrowDown ArrowLeft ArrowRight${handle.panelHandle ? ' Control+ArrowUp Control+ArrowRight Control+Plus' : ''}`} title={handle.blocked ? undefined : `${handle.label} · drag to pull or push.${handle.panelEdge ? ' Shift-drag: resize only this panel edge, keeping connectors fixed.' : ''}${handle.panelHandle ? ' Control-drag: repeat a rectangular compartment along this arrow.' : ''} Arrow keys: ${keyboardStep} mm; Shift: ${keyboardStep * 10} mm.${handle.panelHandle ? ' Control + Up/Right/+: add one bay.' : ''}`}
           onPointerDown={event => down(event, handle)} onKeyDown={event => step(event, handle)}
-          onPointerEnter={() => invalidate()} onFocus={() => invalidate()}
+          onPointerEnter={() => { onInspectBlockers?.(handle.blocked ? handle.id : null); invalidate() }}
+          onPointerLeave={() => onInspectBlockers?.(null)} onBlur={() => onInspectBlockers?.(null)}
+          onFocus={() => { onInspectBlockers?.(handle.blocked ? handle.id : null); invalidate() }}
           onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onContextMenu={event => event.preventDefault()}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h11M10 4l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
@@ -259,7 +266,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
             {!!handle.repeat?.reused && <span className="preview-resize-size">{handle.repeat.reused} existing {handle.repeat.reused === 1 ? 'panel' : 'panels'} reused</span>}
             {handle.sizes?.map((size, index) => <span className="preview-resize-size" key={index}>{size.label} = {Math.round(size.value * 100) / 100} mm</span>)}
             {handle.repeat && <span className="preview-resize-size">{handle.repeat.reason ?? `${Math.round(handle.repeat.pitch * 100) / 100} mm per bay`}</span>}
-            <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.label}{handle.repeatOnly && <small>{handle.panelEdge ? 'Shift-pull: panel edge · Control-pull: repeat' : 'Fixed size · Control-pull to repeat'}</small>}</>}
+            <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.label}{handle.blocked && <span className="preview-resize-size">{handle.blocked.reason}</span>}{handle.repeatOnly && <small>{handle.panelEdge ? 'Shift-pull: panel edge · Control-pull: repeat' : 'Fixed size · Control-pull to repeat'}</small>}</>}
         </span>
       </div>)}
     </div>

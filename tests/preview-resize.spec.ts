@@ -271,6 +271,41 @@ test('Shift-drag resizes only a shelf edge and can be undone', async ({ page }) 
 })
 
 
+test('blocked arrows show blockers on hover and keyboard focus without editing the project', async ({ page }) => {
+  const project = parseProject(cornerShelf)
+  const neighbor = project.panels.find(panel => panel.name === 'Left side copy')!
+  project.constraints = [{ id: 'fixed-neighbor', kind: 'dimension', enabled: true, panelId: neighbor.id, dimension: 'height', value: neighbor.height }]
+  const selected = project.panels.find(panel => panel.name === 'Right side copy')!
+  const handle = directionHandle(project, { panelId: selected.id }, [-1, 0, 0])
+  await openProject(page, project)
+  await page.locator('.panel-list-select').filter({ hasText: /^Right side copy$/ }).click()
+  const button = page.locator(`[data-resize-handle="${handle.id}"]`)
+  await expect(button).toBeVisible()
+  await expect(button).toHaveAttribute('aria-disabled', 'true')
+  await expect(button).toHaveCSS('color', 'rgb(133, 129, 123)')
+  const highlights = () => page.locator('canvas').evaluate(async (canvas, neighborId) => {
+    const url = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/@react-three_fiber.js'))!
+    const { _roots } = await import(url)
+    const result = { panel: false, connectors: [] as string[] }
+    _roots.get(canvas).store.getState().scene.traverse((object: any) => {
+      if (object.userData.panelId === neighborId) result.panel = object.parent.children.some((child: any) => child.isLineSegments)
+      if (object.userData.connectorId && object.userData.selected) result.connectors.push(object.userData.connectorId)
+    })
+    return result
+  }, neighbor.id)
+  await button.hover()
+  await expect.poll(highlights).toEqual({ panel: true, connectors: expect.arrayContaining(handle.blocked!.connectorIds) })
+  await page.screenshot({ path: 'test-results/resize-blockers-hover.png' })
+  await page.mouse.move(5, 5)
+  await expect.poll(highlights).toEqual({ panel: false, connectors: [] })
+  await button.focus()
+  await expect.poll(highlights).toEqual({ panel: true, connectors: expect.arrayContaining(handle.blocked!.connectorIds) })
+  await button.press('ArrowRight')
+  expect(await savedProject(page)).toEqual(project)
+  await page.getByRole('combobox', { name: 'Camera view' }).focus()
+  await expect.poll(highlights).toEqual({ panel: false, connectors: [] })
+})
+
 test('Shift-drag extends a corner shelf edge when connected resizing is blocked', async ({ page }) => {
   const project = parseProject(cornerShelf)
   const neighbor = project.panels.find(panel => panel.name === 'Left side copy')!

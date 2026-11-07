@@ -24,6 +24,22 @@ const piecePosition = (project: Project, index = 0) => {
 }
 
 describe('preview structural resize handles', () => {
+  it('retains a blocked edge and identifies its fixed panel without unrelated furniture', () => {
+    const panel = createPanel({ width: 400, height: 300, position: [0, 500, 0] })
+    const unrelated = createPanel({ position: [3000, 500, 0] })
+    const project: Project = { version: 1, name: 'Fixed width', panels: [panel, unrelated], connections: [],
+      constraints: [{ id: 'fixed', kind: 'dimension', enabled: true, panelId: panel.id, dimension: 'width', value: 400 }] }
+    const session = preparePreviewResize(project, { panelId: panel.id })!
+    for (const id of ['panel-width-positive', 'panel-width-negative']) {
+      const handle = session.handles.find(handle => handle.id === id)!
+      expect(handle.blocked?.panelIds).toEqual([panel.id])
+      expect(handle.blocked?.connectorIds).toEqual([])
+      expect(movePreviewResize(session, id, 10).project).toBe(project)
+      expect(movePreviewResize(session, id, -10).project).toBe(project)
+    }
+    expect(session.handles.find(handle => handle.id === 'panel-height-positive')?.blocked).toBeUndefined()
+  })
+
   it('extends the corner shelf independently with every installed connector fixed', () => {
     const project = parseProject(cornerShelf)
     // Keep connected growth genuinely blocked now that imported-loop roundoff
@@ -34,6 +50,9 @@ describe('preview structural resize handles', () => {
     const session = preparePreviewResize(project, { panelId: panel.id })!
     const handle = along(session, [-1, 0, 0])
     expect(handle.repeatOnly).toBe(true)
+    expect(handle.blocked?.panelIds).toContain(neighbor.id)
+    expect(handle.blocked?.connectorIds.length).toBeGreaterThan(0)
+    expect(movePreviewResize(session, handle.id, 100).project).toBe(project)
     const result = movePreviewResize(session, handle.id, 100, true)
     expect(result.limited).toBe(false)
     expect(named(result.project, panel.name).height).toBeCloseTo(panel.height + 100)
@@ -152,7 +171,8 @@ describe('preview structural resize handles', () => {
     const panel = createPanel({ width: 400, height: 300, position: [120, 500, 10], rotation: [0.2, 0.3, 0.4] })
     const project: Project = { version: 1, name: 'Panel', panels: [panel], connections: [] }
     const session = preparePreviewResize(project, { panelId: panel.id })!
-    expect(session.handles).toHaveLength(4)
+    expect(session.handles.filter(handle => !handle.blocked)).toHaveLength(4)
+    expect(session.handles.filter(handle => handle.blocked)).toHaveLength(2)
     const handle = session.handles.find(handle => handle.id === 'panel-width-positive')!
     const result = movePreviewResize(session, handle.id, 100)
     expect(result.limited).toBe(false)
@@ -205,7 +225,7 @@ describe('preview structural resize handles', () => {
     const session = preparePreviewResize(project, { connectorId: id })!
     expect(session.handles.length).toBeGreaterThanOrEqual(4)
     const before = piecePosition(project)
-    for (const handle of session.handles) for (const distance of [-30, 30]) {
+    for (const handle of session.handles.filter(handle => !handle.blocked)) for (const distance of [-30, 30]) {
       const result = movePreviewResize(session, handle.id, distance)
       expect(result.limited, handle.id).toBe(false)
       near(piecePosition(result.project).toArray(), before.clone().addScaledVector(new Vector3(...handle.direction), distance).toArray(), 4)
@@ -257,7 +277,7 @@ describe('preview structural resize handles', () => {
     expect(() => movePreviewResize(session, handle.id, NaN)).toThrow(/finite/)
   })
 
-  it('omits handles for missing, hidden, removed and assembly-managed selections', () => {
+  it('omits handles for missing, hidden and removed selections, and grays assembly-managed directions', () => {
     const project = createStarterProject()
     const panel = project.panels[0]
     expect(preparePreviewResize(project, {})).toBeNull()
@@ -267,8 +287,8 @@ describe('preview structural resize handles', () => {
     const id = connectorId(project.connections[0].id, 0)
     expect(preparePreviewResize({ ...project, connectorOverrides: { [id]: { removed: true } } }, { connectorId: id })).toBeNull()
     const assembly = createAssembly(project, project.panels.map(panel => panel.id), 'Shelf')
-    expect(preparePreviewResize(assembly, { panelId: panel.id })).toBeNull()
-    expect(preparePreviewResize(assembly, { connectorId: id })).toBeNull()
+    expect(preparePreviewResize(assembly, { panelId: panel.id })!.handles.every(handle => !!handle.blocked)).toBe(true)
+    expect(preparePreviewResize(assembly, { connectorId: id })!.handles.every(handle => !!handle.blocked)).toBe(true)
   })
 })
 

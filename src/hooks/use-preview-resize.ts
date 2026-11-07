@@ -72,7 +72,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
       const handle = prepared?.handles.find(handle => handle.id === handleId)
       if (!prepared || !handle) return false
       try {
-        if (handle.repeatOnly && mode !== 'repeat' && !(mode === 'panel' && handle.panelEdge)) throw new Error(handle.panelEdge
+        if (handle.blocked && mode !== 'repeat' && !(mode === 'panel' && handle.panelEdge)) throw new Error(handle.panelEdge
           ? 'Connected resizing is fixed in this direction. Hold Shift to resize only this panel edge, or Control to repeat its compartment.'
           : 'This direction is fixed. Hold Control while pulling to repeat its compartment.')
         let repeat: StructureRepeatSession | undefined

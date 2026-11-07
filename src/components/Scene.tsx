@@ -423,10 +423,10 @@ function PreviewContextGesture({ onOpen, realisticPreview }: Pick<SceneProps, 'r
   return null
 }
 
-function SceneResizeHandles(props: SceneProps & { feedback: ReturnType<typeof useSceneSnapFeedback> }) {
+function SceneResizeHandles(props: SceneProps & { feedback: ReturnType<typeof useSceneSnapFeedback>; onInspectBlockers: (id: string | null) => void }) {
   if (props.boxSelectActive || !props.resizeHandles?.length || !props.onResizeStart || !props.onResizeMove || !props.onResizeEnd) return null
   return <PreviewResizeHandles
-    handles={props.resizeHandles} keyboardStep={props.niceValueStep ?? (props.snapSettings?.grid ? props.snapSettings.spacing : 10)} enabled={props.movementEnabled && !props.dragging && !props.exploded}
+    onInspectBlockers={props.onInspectBlockers} handles={props.resizeHandles} keyboardStep={props.niceValueStep ?? (props.snapSettings?.grid ? props.snapSettings.spacing : 10)} enabled={props.movementEnabled && !props.dragging && !props.exploded}
     onResizeStart={props.feedback.onResizeStart} onResizeMove={props.feedback.onResizeMove} onResizeEnd={props.onResizeEnd}
     distance={props.resizeDistance} limited={props.resizeLimited}/>
 }
@@ -482,6 +482,9 @@ function SceneMovement(props: SceneProps & { feedback: ReturnType<typeof useScen
 }
 
 function World(props: WorldProps) {
+  const [inspection, setInspection] = useState<{ id: string; handles: SceneProps['resizeHandles'] } | null>(null)
+  const blockers = !props.boxSelectActive && !props.dragging && !props.resizing && !props.exploded && props.movementEnabled
+    && inspection?.handles === props.resizeHandles ? props.resizeHandles?.find(handle => handle.id === inspection?.id)?.blocked : undefined
   const { panels, previewPanels = EMPTY_PANELS, attachmentBoundsPanels = EMPTY_PANELS, showGrid, showDimensions, exploded, realisticPreview } = props
   const displayPanels = useMemo(() => {
     if (!exploded) return panels
@@ -504,11 +507,13 @@ function World(props: WorldProps) {
     <SceneCamera props={props} realisticPreview={realisticPreview}/>
     <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} snapSettings={props.snapSettings} guides={feedback.guides}/>
     {vacuumPlan && <RobotVacuum plan={vacuumPlan} projectPanels={displayPanels} controlsEnabled={!props.dragging && !props.resizing && !props.boxSelectActive && !props.designConstraint} />}
-    <SceneParts {...props} shownPanels={shownPanels}/>
+    <SceneParts {...props} shownPanels={shownPanels}
+      constraintPanelIds={[...props.constraintPanelIds ?? [], ...blockers?.panelIds ?? []]}
+      selectedConnectorIds={[...props.selectedConnectorIds ?? [], ...blockers?.connectorIds ?? []]}/>
     {!realisticPreview && !exploded && props.constructionLayer && <SceneObjects layer={props.constructionLayer} boxSelectActive={props.boxSelectActive} boxPreview={props.boxPreview}/>}
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     <SceneOverlays {...props} shownPanels={shownPanels}/>
-    <SceneResizeHandles {...props} feedback={feedback}/>
+    <SceneResizeHandles {...props} feedback={feedback} onInspectBlockers={id => setInspection(id ? { id, handles: props.resizeHandles } : null)}/>
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
     <CameraController panMode={props.panMode} bounds={cameraBounds} vacuumDock={vacuumPlan?.dock} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>

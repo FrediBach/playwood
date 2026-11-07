@@ -3,7 +3,7 @@ import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { resolvePanels } from './model'
 import { roundNiceValue } from './nice-values'
-import { movePanels, resizePanelEdge } from './structure-edit'
+import { movePanels, resizePanelEdge, StructureEditError } from './structure-edit'
 import { prepareStructureRepeat } from './structure-repeat'
 import type { Panel, Project, Vec3 } from './types'
 
@@ -14,6 +14,7 @@ export interface PreviewResizeHandle {
   label: string
   sizes?: { label: string; value: number }[]
   repeat?: { count: number; pitch: number; reused: number; reason?: string }
+  blocked?: { reason: string; panelIds: string[]; connectorIds: string[] }
   repeatOnly?: boolean
   panelEdge?: boolean
   panelHandle?: boolean
@@ -66,13 +67,14 @@ function connectorPosition(project: Project, id: string): Vec3 | null {
     connectorSlide(rail, piece.index, project.connectorOverrides?.[id]?.slide)).toArray() as Vec3
 }
 
-/** Probe structural edits once when selection changes. A handle must change cuts,
+/** Probe structural edits once when selection changes. An enabled handle must change cuts,
  * preserve joints and angles, and move its root along one exact direction. */
 export function preparePreviewResize(project: Project, selection: PreviewResizeSelection): PreviewResizeSession | null {
   if (!!selection.panelId === !!selection.connectorId) return null
   const panels = resolvePanels(project)
   const session: PreviewResizeSession = { original: project, handles: [], selection, drivers: new Map() }
   const add = (id: string, position: Vec3, operation: Operation, direction: Vector3, label: string) => {
+    const failures: unknown[] = []
     // A limit may prevent outward growth while an inward push remains possible.
     for (const probe of [1, -1]) {
       try {
@@ -87,21 +89,31 @@ export function preparePreviewResize(project: Project, selection: PreviewResizeS
           scale = delta.length()
           if (scale < 1e-5) continue
           actualDirection = delta.normalize()
-          if (session.handles.some(handle => vector(handle.direction).dot(actualDirection) > 1 - 1e-6)) return
+          if (session.handles.some(handle => !handle.blocked && vector(handle.direction).dot(actualDirection) > 1 - 1e-6)) return
+          session.handles = session.handles.filter(handle => !handle.blocked || vector(handle.direction).dot(actualDirection) <= 1 - 1e-6)
         }
         session.handles.push({ id, position, direction: actualDirection.toArray() as Vec3, label, panelHandle: !!selection.panelId, panelEdge: !!selection.panelId && operation.kind === 'edge' })
         session.drivers.set(id, { operation, scale })
         return
-      } catch { /* A constrained direction simply has no handle. */ }
+      } catch (error) { failures.push(error) }
     }
-    // Fixed cuts can still grow through new bays without resizing the source.
+    if (selection.connectorId && session.handles.some(handle => vector(handle.direction).dot(direction) > 1 - 1e-6)) return
+    const diagnostics = failures.filter((error): error is StructureEditError => error instanceof StructureEditError)
+    const connectionIds = new Set(diagnostics.flatMap(error => error.connectionIds))
+    const blocked = {
+      reason: failures[0] instanceof Error ? failures[0].message : 'This direction does not change any panel dimensions.',
+      panelIds: [...new Set(diagnostics.flatMap(error => error.panelIds))],
+      connectorIds: getPhysicalConnectors(project).filter(piece => connectionIds.has(piece.connection.id)).map(piece => piece.id),
+    }
+    // Retain fixed handles for inspection and for independent/repeat gestures.
+    let repeatOnly = false
     if (selection.panelId) {
-      try {
-        prepareStructureRepeat(project, selection.panelId, direction.toArray() as Vec3)
-        session.handles.push({ id, position, direction: direction.toArray() as Vec3, label, repeatOnly: true, panelHandle: true, panelEdge: operation.kind === 'edge' })
-        session.drivers.set(id, { operation, scale: 1 })
-      } catch { /* Neither resizing nor repeating is available on this edge. */ }
+      try { prepareStructureRepeat(project, selection.panelId, direction.toArray() as Vec3); repeatOnly = true }
+      catch { /* Repetition is separate from connected resize availability. */ }
     }
+    session.handles.push({ id, position, direction: direction.toArray() as Vec3, label, blocked, repeatOnly,
+      panelHandle: !!selection.panelId, panelEdge: !!selection.panelId && operation.kind === 'edge' })
+    session.drivers.set(id, { operation, scale: 1 })
   }
 
   if (selection.panelId) {
@@ -155,7 +167,7 @@ export function movePreviewResize(session: PreviewResizeSession, handleId: strin
   if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
   const handle = session.handles.find(item => item.id === handleId)
   const driver = session.drivers.get(handleId)
-  if (!handle || !driver || Math.abs(distance) < 1e-6) return { project: session.original, distance: 0, limited: false }
+  if (!handle || !driver || (handle.blocked && !local) || Math.abs(distance) < 1e-6) return { project: session.original, distance: 0, limited: false }
   const attempt = (amount: number) => {
     if (local && (!session.selection.panelId || driver.operation.kind !== 'edge')) throw new Error('Only panel edges can resize independently.')
     const next = local && driver.operation.kind === 'edge'
