@@ -222,3 +222,12 @@ export function copyDesignConstraints(constraints: readonly DesignConstraint[] |
       : { panelIds: constraint.panelIds.map(panelId => panelIds.get(panelId)!) as typeof constraint.panelIds }) } as DesignConstraint]
   })
 }
+
+/** Exact cut rules also serve as size locks; no separate saved flag is needed. */
+export function isPanelDimensionLocked(constraints: readonly DesignConstraint[] | undefined, panelId: string, dimension: 'width' | 'height'): boolean {
+  return !!constraints?.some(rule => {
+    if (!rule.enabled || rule.kind !== 'dimension' || rule.panelId !== panelId || rule.dimension !== dimension) return false
+    const { min, max } = designConstraintLimits(rule)
+    return min !== undefined && min === max
+  })
+}

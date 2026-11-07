@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { setDesignConstraint } from '@/lib/design-constraint-commands'
+import { lockPanelSizes, setDesignConstraint } from '@/lib/design-constraint-commands'
 import { designConstraintPanelIds } from '@/lib/design-constraints'
 import { resolvePanels } from '@/lib/model'
 import type { DesignConstraint, Project } from '@/lib/types'
@@ -64,6 +64,12 @@ export function useDesignConstraints({ project, commit, notify }: {
   }
   const activeRule = current?.rule ?? (highlight && project.constraints?.find(rule => rule.id === highlight.id)) ?? null
   return {
+    lockSizes: (panelIds: readonly string[]) => {
+      try {
+        commit(current => lockPanelSizes(current, panelIds))
+        notify('Panel size locked. Disable or remove the width and height rules in Constraints to unlock.')
+      } catch (error) { notify(error instanceof Error ? error.message : 'Panel sizes could not be locked.') }
+    },
     editing, openRequest, manageRequest, cancelRequest, onEditingChange, onPreview, onApply,
     previewProject: current?.project,
     previewError: stale ? 'The project changed. Cancel this preview and reopen the constraint before applying it.' : actionError || current?.error,

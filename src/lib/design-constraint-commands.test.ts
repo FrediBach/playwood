@@ -1,6 +1,9 @@
+import { roundTripProject } from '../test/project-round-trip'
+import { preparePreviewResize, movePreviewResize } from './preview-resize'
+import { resizePanels } from './structure-edit'
 import { describe, expect, it } from 'vitest'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
-import { setDesignConstraint } from './design-constraint-commands'
+import { lockPanelSizes, setDesignConstraint } from './design-constraint-commands'
 import { evaluateDesignConstraints } from './design-constraints'
 import { createPanel, createStarterProject, resolvePanels } from './model'
 import type { DesignConstraint, Project } from './types'
@@ -100,5 +103,33 @@ describe('design rule command transactions', () => {
     const snapshot = JSON.stringify(before)
     expect(() => setDesignConstraint(before, level, 'side')).toThrow(/design rules/)
     expect(JSON.stringify(before)).toBe(snapshot)
+  })
+})
+
+describe('panel size locks', () => {
+  it('locks multiple panels atomically, round-trips, and avoids duplicate rules', () => {
+    const project = emptyWithPanel()
+    project.panels.push(createPanel({ id: 'other', position: [1000, 500, 0] }))
+    const locked = lockPanelSizes(project, ['side', 'other', 'side'])
+    expect(locked.constraints).toHaveLength(4)
+    expect(project.constraints).toBeUndefined()
+    expect(locked.panels).toEqual(project.panels)
+    expect(lockPanelSizes(locked, ['side', 'other'])).toBe(locked)
+    expect(roundTripProject(locked).constraints).toEqual(locked.constraints)
+  })
+
+  it('blocks numeric and independent edge resizing and marks the arrows as locked', () => {
+    const locked = lockPanelSizes(emptyWithPanel(), ['side'])
+    const session = preparePreviewResize(locked, { panelId: 'side' })!
+    const edges = session.handles.filter(handle => handle.panelEdge)
+    expect(edges).toHaveLength(4)
+    expect(edges.every(handle => handle.sizeLocked && handle.blocked)).toBe(true)
+    for (const edge of edges) {
+      expect(movePreviewResize(session, edge.id, 50).project).toBe(locked)
+      expect(movePreviewResize(session, edge.id, 50, true).project).toBe(locked)
+    }
+    expect(() => resizePanels(locked, ['side'], { width: 500 })).toThrow()
+    const unlocked = { ...locked, constraints: locked.constraints!.map(rule => ({ ...rule, enabled: false })) }
+    expect(preparePreviewResize(unlocked, { panelId: 'side' })!.handles.filter(handle => handle.panelEdge).every(handle => !handle.sizeLocked && !handle.blocked)).toBe(true)
   })
 })

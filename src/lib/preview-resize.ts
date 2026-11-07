@@ -1,4 +1,5 @@
 import { Euler, Quaternion, Vector3 } from 'three'
+import { isPanelDimensionLocked } from './design-constraints'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { resolvePanels } from './model'
@@ -15,6 +16,7 @@ export interface PreviewResizeHandle {
   sizes?: { label: string; value: number }[]
   repeat?: { count: number; pitch: number; reused: number; reason?: string }
   blocked?: { reason: string; panelIds: string[]; connectorIds: string[] }
+  sizeLocked?: boolean
   repeatOnly?: boolean
   panelEdge?: boolean
   panelHandle?: boolean
@@ -74,6 +76,18 @@ export function preparePreviewResize(project: Project, selection: PreviewResizeS
   const panels = resolvePanels(project)
   const session: PreviewResizeSession = { original: project, handles: [], selection, drivers: new Map() }
   const add = (id: string, position: Vec3, operation: Operation, direction: Vector3, label: string) => {
+    if (operation.kind === 'edge' && isPanelDimensionLocked(project.constraints, operation.panelId, operation.dimension)) {
+      let repeatOnly = false
+      if (selection.panelId) {
+        try { prepareStructureRepeat(project, selection.panelId, direction.toArray() as Vec3); repeatOnly = true }
+        catch { /* A size lock does not prevent adding a separate compartment. */ }
+      }
+      session.handles.push({ id, position, direction: direction.toArray() as Vec3, label, sizeLocked: true, repeatOnly,
+        panelHandle: !!selection.panelId, panelEdge: !!selection.panelId,
+        blocked: { reason: 'Size locked by a dimension constraint. Disable or remove it in Constraints to resize.', panelIds: [operation.panelId], connectorIds: [] } })
+      session.drivers.set(id, { operation, scale: 1 })
+      return
+    }
     const failures: unknown[] = []
     // A limit may prevent outward growth while an inward push remains possible.
     for (const probe of [1, -1]) {
@@ -167,7 +181,7 @@ export function movePreviewResize(session: PreviewResizeSession, handleId: strin
   if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
   const handle = session.handles.find(item => item.id === handleId)
   const driver = session.drivers.get(handleId)
-  if (!handle || !driver || (handle.blocked && !local) || Math.abs(distance) < 1e-6) return { project: session.original, distance: 0, limited: false }
+  if (!handle || !driver || (handle.sizeLocked || (handle.blocked && !local)) || Math.abs(distance) < 1e-6) return { project: session.original, distance: 0, limited: false }
   const attempt = (amount: number) => {
     if (local && (!session.selection.panelId || driver.operation.kind !== 'edge')) throw new Error('Only panel edges can resize independently.')
     const next = local && driver.operation.kind === 'edge'

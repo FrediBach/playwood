@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { LockKeyhole } from 'lucide-react'
 import { Html } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrthographicCamera, Plane, Raycaster, Vector2, Vector3 } from 'three'
@@ -81,6 +82,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     event.stopPropagation()
     event.nativeEvent.stopImmediatePropagation()
     if (!enabled || gesture.current || event.button !== 0 || event.metaKey || event.altKey) return
+    if (handle.sizeLocked && !event.ctrlKey) return
     if (handle.blocked && !event.ctrlKey && !(event.shiftKey && handle.panelEdge)) return
     onInspectBlockers?.(null)
     camera.updateMatrixWorld()
@@ -266,7 +268,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
             {!!handle.repeat?.reused && <span className="preview-resize-size">{handle.repeat.reused} existing {handle.repeat.reused === 1 ? 'panel' : 'panels'} reused</span>}
             {handle.sizes?.map((size, index) => <span className="preview-resize-size" key={index}>{size.label} = {Math.round(size.value * 100) / 100} mm</span>)}
             {handle.repeat && <span className="preview-resize-size">{handle.repeat.reason ?? `${Math.round(handle.repeat.pitch * 100) / 100} mm per bay`}</span>}
-            <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.label}{handle.blocked && <span className="preview-resize-size">{handle.blocked.reason}</span>}{handle.repeatOnly && <small>{handle.panelEdge ? 'Shift-pull: panel edge · Control-pull: repeat' : 'Fixed size · Control-pull to repeat'}</small>}</>}
+            <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.sizeLocked && <LockKeyhole size={13} aria-label="Size locked" />}{handle.label}{handle.blocked && <span className="preview-resize-size">{handle.blocked.reason}</span>}{handle.repeatOnly && <small>{handle.panelEdge && !handle.sizeLocked ? 'Shift-pull: panel edge · Control-pull: repeat' : 'Fixed size · Control-pull to repeat'}</small>}</>}
         </span>
       </div>)}
     </div>

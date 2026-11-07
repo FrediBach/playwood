@@ -1,6 +1,6 @@
 import { getAssemblyInstance, isPanelConnectedToAssembly } from './assemblies'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
-import { DESIGN_CONSTRAINT_TOLERANCE, designConstraintPanelIds, evaluateDesignConstraints, parseDesignConstraints } from './design-constraints'
+import { DESIGN_CONSTRAINT_TOLERANCE, designConstraintPanelIds, evaluateDesignConstraints, isPanelDimensionLocked, parseDesignConstraints } from './design-constraints'
 import { resolvePanels } from './model'
 import { reconcileDesignConstraints } from './structure-edit'
 import { assertNoNewTrofastIssues } from './trofast'
@@ -22,4 +22,22 @@ export function setDesignConstraint(project: Project, rule: DesignConstraint, an
   if (changed.issue) throw new Error(changed.issue)
   if (changed.violation > DESIGN_CONSTRAINT_TOLERANCE) next = reconcileDesignConstraints(next, anchorPanelId, rule.id)
   return assertDesignConstraintEdit(project, assertNoNewTrofastIssues(project, next))
+}
+
+/** Freeze each selected cut at its current size in one immutable transaction. */
+export function lockPanelSizes(project: Project, panelIds: readonly string[]): Project {
+  let next = project
+  const panels = new Map(project.panels.map(panel => [panel.id, panel]))
+  for (const id of new Set(panelIds)) {
+    const panel = panels.get(id)
+    if (!panel) throw new Error('The selected panel no longer exists.')
+    for (const dimension of ['width', 'height'] as const) {
+      if (isPanelDimensionLocked(next.constraints, id, dimension)) continue
+      next = setDesignConstraint(next, {
+        id: crypto.randomUUID(), enabled: true, kind: 'dimension', panelId: id,
+        dimension, relation: 'exact', value: panel[dimension],
+      })
+    }
+  }
+  return next
 }

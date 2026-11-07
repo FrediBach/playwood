@@ -151,6 +151,7 @@ export default function App() {
     canMenuAutoConnect, hasVisiblePanels, canAddConnectorsBetween: !infillReason, canConnectWithPanel: !!connectorPanelFit.result,
     canAttachPanel, canExtendToGround: !!groundPanelFit.result, canAttachCopy: validTargets.length > 0,
     actions: {
+      lockPanelSizes: ()=>constraints.lockSizes(selectedIds),
       equalizeSizes: ()=>setEqualSizes({source:project,ids:[...selectedIds]}),
       separateSelectedConnectors, addConnectorsBetween: openConnectorInfill, connectWithPanel, groupSelected, removeSelectedConnectors, openConstraints, startAttach,
       extendToGround, detachSelection, splitSelection, distributeSelection, closeHole, duplicateSelected, deleteSelected,

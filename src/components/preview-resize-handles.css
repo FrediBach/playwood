@@ -17,3 +17,5 @@
 .preview-resize-anchor.is-blocked .preview-resize-root,.preview-resize-anchor.is-blocked .preview-resize-stem{background:#96938e}
 .preview-resize-anchor.is-blocked .preview-resize-handle{border-color:#96938e;color:#85817b;background:#eeeae4;cursor:not-allowed}
 .preview-resize-anchor.is-blocked .preview-resize-handle:hover,.preview-resize-anchor.is-blocked .preview-resize-handle:focus-visible{color:#5f5c57;background:#dedad4;box-shadow:0 2px 11px #625e5833;outline-color:#96938e}
+
+.preview-resize-caption>svg{display:inline-block;margin-right:4px;vertical-align:-2px}

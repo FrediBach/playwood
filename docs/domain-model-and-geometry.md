@@ -152,6 +152,8 @@ The structural linear solver retains its best iterate when floating-point rotati
 
 ## User-defined design constraints
 
+`lockPanelSizes` adds exact width and height rules at the selected panels’ current cuts in one transaction, reusing existing enabled exact rules without duplication. It uses the ordinary constraint command and its assembly ownership checks. No new field or constraint kind is stored. Resize preparation marks exact constrained cuts with `sizeLocked`, retains gray inspection handles, and prevents both connected and independent edge gestures; Control-pull remains a separate repetition operation. The tooltip includes a lock icon and directs users to disable or remove the rules in Constraints.
+
 `Project.constraints` is an optional array of `DesignConstraint` values. These rules express design intent without adding physical joints or changing the driving attachment graph. Each has a stable ID and an `enabled` flag. [`design-constraints.ts`](../src/lib/design-constraints.ts) parses and evaluates the rules without importing the model resolver; callers supply resolved panels. Derived measurements, numerical residuals, and unsupported-geometry messages are not persisted. Evaluation uses a 0.1 mm tolerance.
 
 | Kind | Measurement |
