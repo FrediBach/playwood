@@ -1,3 +1,4 @@
+import { restoreRemovedConnectors } from './restore-connectors'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { autoConnect } from './auto-connect'
 import { isPanelConnectedToAssembly } from './assemblies'
@@ -14,7 +15,10 @@ const rotation = (panel: Panel) => new Quaternion().setFromEuler(new Euler(...pa
 /** Explicit auto-connect may translate loose panels. Internal geometry callers
  * keep using autoConnect, which never moves panels to find a joint. */
 export function autoConnectNearby(source: Project, selectedIds: readonly string[] = []) {
-  let result = { ...autoConnect(source, selectedIds), movedPanelIds: [] as string[] }
+  const restored = restoreRemovedConnectors(source, selectedIds)
+  let result = { ...autoConnect(restored.project, selectedIds), movedPanelIds: [] as string[] }
+  result.connectors += restored.connectors
+  result.joints += restored.joints
   const selected = new Set(selectedIds)
   for (;;) {
     const project = result.project

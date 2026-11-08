@@ -1,3 +1,4 @@
+import { equalOpeningSelection } from '@/lib/equal-opening-selection'
 import { DESIGN_CONSTRAINT_TOLERANCE,DesignConstraintEvaluation,describeDesignConstraint,designConstraintCoordinate,designConstraintPanelIds,evaluateDesignConstraints,measureDesignConstraint,openingMeasurements } from '@/lib/design-constraints'
 import type { ConstraintReference,DesignConstraint,Panel } from '@/lib/types'
 import { ArrowLeftRight,Check,CircleAlert,LocateFixed,MousePointer2,Pencil,Plus,Ruler,Trash2 } from 'lucide-react'
@@ -65,6 +66,8 @@ function defaultRule(kind: DesignConstraint['kind'], panels: Panel[], ids: strin
   const panelId = first?.id ?? ''
   const panelIds: [string, string] = [panelId, second?.id ?? '']
   if (kind === 'opening-ratio') {
+    const selectedOpenings = equalOpeningSelection(panels, ids, id)
+    if (selectedOpenings) return selectedOpenings
     const candidates = [...panels].sort((a, b) => a.position[1] - b.position[1])
     return { ...base, kind, panelIds: [candidates[0]?.id ?? '', candidates[1]?.id ?? '', candidates[1]?.id ?? '', candidates[2]?.id ?? ''], axis: 'y', ratio: 1 }
   }
@@ -161,7 +164,7 @@ export function DesignConstraintsInspector({
   const footer = draft && <ConstraintFooter statusId={statusId} error={error} previewSummary={previewSummary} onApply={onApply} draft={draft} anchor={anchor} close={close} existing={existing}/>
 
   return <InspectorDisclosure title="Constraints" badge={visibleConstraints.length ? { label: String(visibleConstraints.length), description: `${visibleConstraints.length} saved constraints, ${visibleConstraints.filter(rule => !rule.enabled).length} disabled` } : undefined} summary={`${visibleConstraints.filter(rule => rule.enabled).length} active`} preferenceKey="design-constraints" openRequest={reveal || openRequest} className="design-constraints">
-    <p className="field-note">Keep dimensions and distances as you edit. Connected panels adapt while their joints stay intact.</p>
+    <p className="field-note">Keep dimensions and distances as you edit. Select three parallel boundary panels, then Add constraint to keep the two openings equal. Connected panels adapt while their joints stay intact.</p>
     {selectedIds.length > 0 && constraints.length > 0 && <div className="constraint-scope" role="group" aria-label="Constraints shown">
       <button type="button" aria-pressed={!showAll} onClick={() => setShowAll(false)}>Selection ({applicable.length})</button>
       <button type="button" aria-pressed={showAll} onClick={() => setShowAll(true)}>All ({constraints.length})</button>
@@ -183,7 +186,8 @@ function createConstraintStart(returnFocus: React.RefObject<HTMLElement | null>,
   return (rule?: DesignConstraint) => {
     returnFocus.current=document.activeElement instanceof HTMLElement? document.activeElement:null
     const initialIds=selectedIds.filter(id => !unavailable.has(id))
-    const next=rule??defaultRule(initialIds.length===2? 'equal-dimension':'floor',panels.filter(panel => !unavailable.has(panel.id)),initialIds)
+    const eligible=panels.filter(panel => !unavailable.has(panel.id))
+    const next=rule??equalOpeningSelection(eligible,initialIds)??defaultRule(initialIds.length===2? 'equal-dimension':'floor',eligible,initialIds)
     previousRange.current=isNumeric(next)&&next.relation==='range'? { min: next.min,max: next.max }:null
     setDraft(next)
     setAnchor('panelIds' in next? next.panelIds[0]:undefined)

@@ -1,3 +1,4 @@
+import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { openInspectorSection } from './inspector-helpers'
 import hTable from '../src/test/fixtures/h-table-auto-connect.json' with { type: 'json' }
 import { test, expect } from '@playwright/test'
@@ -184,4 +185,37 @@ test('auto-add fills exposed storage corners beside existing T joints and persis
   await expect.poll(saved).toEqual(after)
   await page.reload()
   expect(await saved()).toEqual(after)
+})
+
+
+test('Auto-add restores a front corner removed through the connector inspector', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Library', exact: true }).click()
+  await page.locator('[data-example-id="synth-shelf-storage"]').click()
+  await page.getByRole('dialog', { name: 'Replace current project?' }).getByRole('button', { name: 'Replace project', exact: true }).click()
+  const saved = (): Promise<Project> => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+  await expect(page.locator('.project-name')).toHaveText('Synth shelf with 2×2 storage')
+  await expect.poll(async () => (await saved())?.name, { timeout: 15000 }).toBe('Synth shelf with 2×2 storage')
+  const before = await saved()
+  const piece = getPhysicalConnectors(before).find(piece => piece.connection.type === '90' && piece.connection.role === 'support'
+    && [piece.connection.parentId, piece.connection.childId].every(id => before.panels.find(panel => panel.id === id)!.name.startsWith('Storage ')))!
+  await page.getByRole('button', { name: 'Assembly', exact: true }).click()
+  await page.getByRole('tab', { name: 'Connectors', exact: true }).click()
+  await page.locator(`[data-connector-id=${JSON.stringify(piece.id)}] .connector-list-select`).click()
+  await page.getByRole('button', { name: 'Remove connector', exact: true }).click()
+  await expect.poll(async () => (await saved()).connectorOverrides?.[piece.id]?.removed).toBe(true)
+  const removed = await saved()
+  await page.getByRole('tab', { name: 'Panels', exact: true }).click()
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Auto-add connectors')
+  await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).last().click()
+  await expect.poll(saved).toEqual(before)
+  await page.getByRole('button', { name: 'Auto-add connectors', exact: true }).last().click()
+  expect(await saved()).toEqual(before)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect.poll(saved).toEqual(removed)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect.poll(saved).toEqual(before)
+  await page.reload()
+  expect(await saved()).toEqual(before)
 })

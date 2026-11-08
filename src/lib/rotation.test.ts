@@ -36,7 +36,9 @@ describe('whole-creation rotation', () => {
   })
 
   it.each(EXAMPLE_LIBRARY.map(example => [example.name, example.create] as const))('keeps every panel and CAD connector rigidly aligned in %s', (_name, create) => {
-    const project = create()
+    // Exercise rigid geometry independently of saved world-axis rules, which
+    // intentionally reject rotations that invalidate their measurements.
+    const project = { ...create(), constraints: [] }
     const before = resolvePanels(project)
     const snapshot = JSON.stringify(project)
     for (const axis of axes) for (const angle of [-180, -90, 45, 90, 180]) {
