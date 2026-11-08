@@ -1,6 +1,7 @@
 import { ArrowDownToLine, ArrowLeftRight, Equal, LockKeyhole, MoveHorizontal, Ratio, Ruler, AlignVerticalJustifyCenter } from 'lucide-react'
-import { ConstraintLabel } from './ConstraintLabels'
-import { Line } from '@react-three/drei'
+import { useId } from 'react'
+import { ConstraintLabel, useConstraintInspection } from './ConstraintLabels'
+import { ConstraintMeasurementLine } from './ConstraintMeasurementLine'
 import { describeDesignConstraintRequirement } from '@/lib/design-constraints'
 import { designConstraintMeasurements } from '@/lib/design-constraint-measurements'
 import type { DesignConstraint, Panel, Vec3 } from '@/lib/types'
@@ -11,6 +12,10 @@ interface Props {
   compact?: boolean
 }
 const meters = (point: Vec3): Vec3 => point.map(value => value * 0.001) as Vec3
+const midpoint = (from: Vec3, to: Vec3): Vec3 => from.map((value, axis) => (value + to[axis]) / 2) as Vec3
+type ConstraintMeasurement = NonNullable<ReturnType<typeof designConstraintMeasurements>>
+const requirementFor = (constraint: DesignConstraint) => constraint.kind === 'floor' || constraint.kind === 'dimension' || constraint.kind === 'gap' || constraint.kind === 'position' || constraint.kind === 'setback'
+  ? describeDesignConstraintRequirement(constraint) : undefined
 
 const styles = {
   dimension: { icon: Ruler, color: '#536c8b', label: 'Panel dimension' },
@@ -23,22 +28,68 @@ const styles = {
   setback: { icon: MoveHorizontal, color: '#887044', label: 'Setback' },
 }
 
-/** Rule measurements; measurements use resolved geometry before display/exploded transforms. */
+/** Rule measurements use resolved geometry before display/exploded transforms. */
 export function DesignConstraintOverlay({ constraint, panels, compact = false }: Props) {
   if (!constraint) return null
   const measurement = designConstraintMeasurements(constraint, panels)
   if (!measurement) return null
-  const requirement = constraint.kind === 'floor' || constraint.kind === 'dimension' || constraint.kind === 'gap' || constraint.kind === 'position' || constraint.kind === 'setback' ? describeDesignConstraintRequirement(constraint) : undefined
+  return <MeasuredConstraint key={constraint.id} constraint={constraint} panels={panels} measurement={measurement} compact={compact}/>
+}
+
+function MeasuredConstraint({ constraint, panels, measurement, compact }: {
+  constraint: DesignConstraint; panels: Panel[]
+  measurement: ConstraintMeasurement; compact: boolean
+}) {
+  const { inspected, active, inspect } = useConstraintInspection(constraint.id)
+  const tooltipId = useId()
+  const inspectedLine = measurement.lines.find(line => line.id === inspected?.lineId) ?? measurement.lines[0]
+  const requirement = requirementFor(constraint)
   const { icon: Icon, color: typeColor, label } = styles[constraint.kind]
   const color = !constraint.enabled ? '#92988a' : measurement.violation ? '#af753e' : typeColor
-  return <group>{measurement.lines.map(line => {
+  return <group>{measurement.lines.map((line, index) => {
     const from = meters(line.from), to = meters(line.to)
-    const midpoint: Vec3 = from.map((coordinate, axis) => (coordinate + to[axis]) / 2) as Vec3
+    const position = midpoint(from, to)
     return <group key={line.id}>
-      <Line points={[from, to]} color={color} lineWidth={compact ? 2.5 : 3} dashed={!constraint.enabled || constraint.kind === 'level'} dashSize={0.012} gapSize={0.008} depthTest={false}/>
-      {line.leaders?.map((points, leader) => <Line key={leader} points={points.map(meters)} color={color} lineWidth={1.5} transparent opacity={0.85} depthTest={false}/>)}
-      {[from, to].map((point, endpoint) => <mesh key={endpoint} position={point}><sphereGeometry args={[0.003, 8, 8]}/><meshBasicMaterial color={color} depthTest={false}/></mesh>)}
-      <ConstraintLabel id={`rule-${constraint.id}-${line.id}`} position={midpoint} color={color}><span className={`constraint-overlay-label constraint-rule-label ${compact ? 'is-compact' : ''}`} style={{ borderColor: color, color }} data-constraint-id={constraint.id} data-constraint-kind={constraint.kind} aria-label={`${label}: ${line.label}${!constraint.enabled ? ' · Paused' : ''}`}><span className="constraint-rule-measurement"><Icon size={12}/>{line.label}{!constraint.enabled && ' · Paused'}{measurement.violation > 0 && ' · !'}</span>{!compact && requirement && <small>{requirement}</small>}{constraint.kind === 'opening-ratio' && <small>Ratio 1 : {constraint.ratio}</small>}</span></ConstraintLabel>
+      <ConstraintMeasurementLine id={constraint.id} from={from} to={to} leaders={line.leaders?.map(([a, b]) => [meters(a), meters(b)])}
+        kind={constraint.kind} color={color} paused={!constraint.enabled} active={active || !compact}
+        onPointerEnter={() => inspect('hovered', line.id, true)} onPointerLeave={() => inspect('hovered', line.id, false)}/>
+      <ConstraintLabel id={`rule-${constraint.id}-${line.id}`} position={position} color={color}>
+        {compact ? <button type="button" className="constraint-guide-marker" style={{ color }}
+          data-constraint-id={constraint.id} data-constraint-kind={constraint.kind} data-active={active} data-paused={!constraint.enabled}
+          aria-label={`${label}: ${line.label}${!constraint.enabled ? ' · Paused' : ''}`}
+          aria-describedby={active ? tooltipId : undefined}
+          onPointerEnter={() => inspect('hovered', line.id, true)} onPointerLeave={() => inspect('hovered', line.id, false)}
+          onFocus={() => inspect('focused', line.id, true)} onBlur={() => inspect('focused', line.id, false)}
+          onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); event.currentTarget.focus() }}>
+          <Icon size={13} aria-hidden="true"/>
+          {constraint.kind === 'opening-ratio' && <span aria-hidden="true">{index === 0 ? '1' : constraint.ratio}</span>}
+          {measurement.violation > 0 && <span className="constraint-guide-warning" aria-hidden="true">!</span>}
+        </button> : <span className="constraint-overlay-label constraint-rule-label" style={{ borderColor: color, color }}>
+          <span className="constraint-rule-measurement"><Icon size={12}/>{line.label}{!constraint.enabled && ' · Paused'}{measurement.violation > 0 && ' · !'}</span>
+          {requirement && <small>{requirement}</small>}
+          {constraint.kind === 'opening-ratio' && <small>Ratio 1 : {constraint.ratio}</small>}
+        </span>}
+      </ConstraintLabel>
     </group>
-  })}</group>
+  })}
+    {compact && active && <ConstraintLabel id={`tooltip-${constraint.id}`} position={meters(midpoint(inspectedLine.from, inspectedLine.to))} color={color}>
+      <ConstraintTooltip id={tooltipId} constraint={constraint} measurement={measurement} panels={panels} color={color}/>
+    </ConstraintLabel>}
+  </group>
+}
+
+function ConstraintTooltip({ id, constraint, measurement, panels, color }: {
+  id: string; constraint: DesignConstraint; measurement: ConstraintMeasurement; panels: Panel[]; color: string
+}) {
+  const { icon: Icon, label } = styles[constraint.kind]
+  const requirement = requirementFor(constraint)
+  const panelNames = [...new Set('panelId' in constraint ? [constraint.panelId] : constraint.panelIds)]
+    .map(panelId => panels.find(panel => panel.id === panelId)?.name).filter(Boolean).join(' · ')
+  return <span id={id} role="tooltip" className="constraint-overlay-label constraint-guide-tooltip" style={{ borderColor: color, color }} data-constraint-tooltip={constraint.id}>
+    <strong className="constraint-rule-measurement"><Icon size={13}/>{label}{!constraint.enabled && ' · Paused'}{measurement.violation > 0 && ' · Needs attention'}</strong>
+    {measurement.lines.map(line => <span className="constraint-guide-value" key={line.id}>{line.label}</span>)}
+    {requirement && <small>{requirement}</small>}
+    {constraint.kind === 'opening-ratio' && <small>Ratio 1 : {constraint.ratio}</small>}
+    <small className="constraint-guide-panels">{panelNames}</small>
+  </span>
 }

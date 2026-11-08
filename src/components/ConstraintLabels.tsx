@@ -1,9 +1,10 @@
 import { Html } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { createContext, useContext, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { Vector3 } from 'three'
 import { layoutConstraintLabels } from '@/lib/constraint-label-layout'
 import type { Vec3 } from '@/lib/types'
+import { ConstraintLineInteractions } from './ConstraintMeasurementLine'
 
 interface LabelEntry {
   position: Vec3
@@ -11,10 +12,35 @@ interface LabelEntry {
   leader: SVGLineElement
 }
 const LabelContext = createContext<Map<string, LabelEntry> | null>(null)
+interface InspectedMeasurement { ruleId: string; lineId: string }
+interface InspectionState { hovered: InspectedMeasurement | null; focused: InspectedMeasurement | null }
+const InspectionContext = createContext<{
+  inspection: InspectionState
+  setInspection: Dispatch<SetStateAction<InspectionState>>
+} | null>(null)
+
+export function useConstraintInspection(ruleId: string) {
+  const { inspection, setInspection } = useContext(InspectionContext)!
+  const inspected = inspection.hovered ?? inspection.focused
+  const inspect = (source: 'hovered' | 'focused', lineId: string, entering: boolean) => {
+    setInspection(current => entering
+      ? { ...current, [source]: { ruleId, lineId } }
+      : current[source]?.ruleId === ruleId && current[source]?.lineId === lineId ? { ...current, [source]: null } : current)
+  }
+  useEffect(() => () => {
+    setInspection(current => ({
+      hovered: current.hovered?.ruleId === ruleId ? null : current.hovered,
+      focused: current.focused?.ruleId === ruleId ? null : current.focused,
+    }))
+  }, [ruleId, setInspection])
+  return { inspected, active: inspected?.ruleId === ruleId, inspect }
+}
 
 /** One screen-space collision pass per requested frame, shared by all constraint labels. */
 export function ConstraintLabels({ children }: { children: ReactNode }) {
   const entries = useMemo(() => new Map<string, LabelEntry>(), [])
+  const [inspection, setInspection] = useState<InspectionState>({ hovered: null, focused: null })
+  const inspectionContext = useMemo(() => ({ inspection, setInspection }), [inspection])
   const point = useMemo(() => new Vector3(), [])
   const anchors = useMemo(() => new Map<string, { x: number; y: number }>(), [])
   useFrame(({ camera, size }) => {
@@ -43,7 +69,7 @@ export function ConstraintLabels({ children }: { children: ReactNode }) {
       entry.leader.setAttribute('y2', String(Math.max(y, Math.min(0, y + box.height))))
     }
   })
-  return <LabelContext value={entries}>{children}</LabelContext>
+  return <LabelContext value={entries}><InspectionContext value={inspectionContext}><ConstraintLineInteractions>{children}</ConstraintLineInteractions></InspectionContext></LabelContext>
 }
 
 export function ConstraintLabel({ id, position, color, children }: {

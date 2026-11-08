@@ -50,8 +50,15 @@
 .constraints-toolbar-badge{position:absolute;top:-4px;right:-5px;min-width:16px;height:16px;padding:0 4px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#596d45;color:white;border:2px solid var(--paper);font-size:9px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
 .constraint-rule-measurement{display:flex;align-items:center;gap:5px}
 .constraint-rule-measurement svg{flex-shrink:0}
-.constraint-rule-label.is-compact{padding:2px 5px;font-size:10px;background:#fafcf4e8;box-shadow:none}
+.constraint-guide-marker{pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:3px;min-width:24px;height:24px;padding:0 5px;border:1px solid currentColor;border-radius:5px;background:#fafcf4;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;box-shadow:0 1px 3px #0001;cursor:help}
+.constraint-guide-marker[data-paused=true]{border-style:dashed}
+.constraint-guide-marker[data-active=true]{background:#fff;box-shadow:0 0 0 2px currentColor}
+.constraint-guide-marker:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.constraint-guide-warning{color:#af753e}
+.constraint-guide-tooltip{max-width:260px;white-space:normal;padding:7px 9px;line-height:1.45;background:#fafcf4}
+.constraint-guide-tooltip strong{font-size:11px;font-weight:600;margin-bottom:3px}
+.constraint-guide-value{display:block;font-size:11px}
+.constraint-guide-tooltip .constraint-guide-panels{margin-top:5px;padding-top:4px;border-top:1px solid #dce1d2;overflow-wrap:anywhere}
 
 .constraint-label-position{position:absolute;top:0;left:0;width:max-content;visibility:hidden}
 .constraint-label-leader{position:absolute;top:0;left:0;overflow:visible;pointer-events:none}
-.constraint-rule-label.is-compact{background:#fafcf4}

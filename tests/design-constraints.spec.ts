@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { createPanel, getProjectBounds, resolvePanels } from '../src/lib/model'
+import { synthStorageShelfProject } from '../src/lib/synth-storage-shelf'
 import type { Project } from '../src/lib/types'
 import { openInspectorSection } from './inspector-helpers'
 
@@ -478,7 +479,7 @@ for (const width of [1440, 390]) test(`fixed references and signed setbacks pers
   expect(await exportedProject(page)).toEqual(saved)
 })
 
-test('all constraints badge and typed overview follow the inspector lifecycle', async ({ page }) => {
+test('all constraints shows details only on hover or focus and follows the inspector lifecycle', async ({ page }) => {
   const project = shelfProject()
   project.constraints = [
     { id: 'equal', enabled: true, kind: 'equal-dimension', panelIds: ['lower', 'upper'], dimension: 'width' },
@@ -488,59 +489,129 @@ test('all constraints badge and typed overview follow the inspector lifecycle', 
   project.spaceConstraint = { enabled: true, width: 1200, height: 1200, depth: 800, centerX: 0, centerZ: 0 }
   await importProject(page, project)
   const button = page.getByRole('button', { name: 'All constraints', exact: true })
-  const labels = page.locator('[data-constraint-id]')
+  const markers = page.locator('button[data-constraint-id][data-constraint-kind]')
+  const tooltips = page.locator('[role="tooltip"][data-constraint-tooltip]')
   await expect(button.locator('.constraints-toolbar-badge')).toHaveText('4')
-  await expect(labels).toHaveCount(0)
+  await expect(markers).toHaveCount(0)
   await button.click()
   await expect(button).toHaveAttribute('aria-pressed', 'true')
-  await expect(labels).toHaveCount(4)
-  await expect(page.locator('[data-constraint-kind="equal-dimension"]')).toHaveCount(2)
-  await expect(page.locator('[data-constraint-kind="floor"]')).toBeVisible()
-  await expect(page.locator('[data-constraint-kind="gap"]')).toContainText('Paused')
+  await expect(markers).toHaveCount(4)
+  await expect(tooltips).toHaveCount(0)
+  await expect(markers.filter({ has: page.locator('svg') })).toHaveCount(4)
+  const equal = markers.and(page.locator('[data-constraint-kind="equal-dimension"]'))
+  await expect(equal).toHaveCount(2)
+  const floor = markers.and(page.locator('[data-constraint-kind="floor"]'))
+  await expect(floor).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('constraints-overview.png') })
+  const gap = markers.and(page.locator('[data-constraint-kind="gap"]'))
+  await gap.hover()
+  await expect(tooltips).toHaveCount(1)
+  await expect(tooltips).toContainText('Paused')
+  await expect(tooltips).toContainText('382 mm')
+  await button.hover()
+  await expect(tooltips).toHaveCount(0)
+  await floor.focus()
+  await expect(tooltips).toHaveCount(1)
+  await expect(tooltips).toContainText('Floor height')
+  await expect(tooltips).toContainText('218 mm')
+  await expect(tooltips).toHaveAttribute('id', /\S+/)
+  await expect(floor).toHaveAttribute('aria-describedby', await tooltips.getAttribute('id') ?? '')
+  await page.locator('canvas').focus()
+  await expect(tooltips).toHaveCount(0)
   await page.getByRole('button', { name: 'Exploded view', exact: true }).click()
-  await expect(labels).toHaveCount(0)
+  await expect(markers).toHaveCount(0)
   await page.getByRole('button', { name: 'Exploded view', exact: true }).click()
-  await expect(labels).toHaveCount(4)
+  await expect(markers).toHaveCount(4)
   await page.locator('canvas').focus()
   await page.keyboard.press('Escape')
-  await expect(labels).toHaveCount(0)
+  await expect(markers).toHaveCount(0)
+  await expect(tooltips).toHaveCount(0)
   await expect(button).toHaveAttribute('aria-pressed', 'false')
   await button.click()
-  await expect(labels).toHaveCount(4)
+  await expect(markers).toHaveCount(4)
   await page.getByRole('button', { name: 'Collapse inspector', exact: true }).click()
-  await expect(labels).toHaveCount(0)
+  await expect(markers).toHaveCount(0)
   await expect(button.locator('.constraints-toolbar-badge')).toHaveText('4')
 })
 
-test('constraint labels separate coincident measurements after camera and viewport changes', async ({ page }) => {
-  const project = shelfProject()
-  project.constraints = [
-    { id: 'equal', enabled: true, kind: 'equal-dimension', panelIds: ['lower', 'upper'], dimension: 'width' },
-    { id: 'lower-width', enabled: true, kind: 'dimension', panelId: 'lower', dimension: 'width', value: 600 },
-    { id: 'upper-width', enabled: true, kind: 'dimension', panelId: 'upper', dimension: 'width', value: 600 },
-    { id: 'floor', enabled: true, kind: 'floor', panelId: 'lower', reference: 'max', value: 218 },
-    { id: 'gap', enabled: true, kind: 'gap', panelIds: ['lower', 'upper'], axis: 'y', relation: 'exact', value: 382 },
-  ]
-  await importProject(page, project)
+test('synth compartment constraint markers separate coincident measurements and keep details within the viewport', async ({ page }) => {
+  await importProject(page, synthStorageShelfProject())
   await page.getByRole('button', { name: 'All constraints', exact: true }).click()
-  const labels = page.locator('[data-constraint-id]')
-  await expect(labels).toHaveCount(6)
+  const markers = page.locator('button[data-constraint-id][data-constraint-kind]')
+  const tooltips = page.locator('[role="tooltip"][data-constraint-tooltip]')
+  await expect(markers).toHaveCount(12)
   const checkLayout = async () => {
-    await expect.poll(async () => labels.evaluateAll(elements => {
+    await expect(tooltips).toHaveCount(0)
+    await expect.poll(async () => markers.evaluateAll(elements => {
       const boxes = elements.map(element => element.getBoundingClientRect())
       const canvas = document.querySelector('canvas')!.getBoundingClientRect()
       return boxes.every((box, index) => box.width > 0 && box.left >= canvas.left && box.right <= canvas.right &&
         box.top >= canvas.top && box.bottom <= canvas.bottom && boxes.slice(index + 1).every(other =>
           box.right <= other.left || box.left >= other.right || box.bottom <= other.top || box.top >= other.bottom))
     })).toBe(true)
+    await markers.first().focus()
+    await expect(tooltips).toHaveCount(1)
+    await expect.poll(async () => tooltips.evaluate(element => {
+      const box = element.getBoundingClientRect()
+      const canvas = document.querySelector('canvas')!.getBoundingClientRect()
+      return box.width > 0 && box.left >= canvas.left && box.right <= canvas.right &&
+        box.top >= canvas.top && box.bottom <= canvas.bottom
+    })).toBe(true)
+    await page.locator('canvas').focus()
+    await expect(tooltips).toHaveCount(0)
   }
   await checkLayout()
-  await page.screenshot({ path: test.info().outputPath('separated-constraint-labels.png') })
+  await page.screenshot({ path: test.info().outputPath('synth-compartment-constraint-markers.png') })
+  await markers.first().hover()
+  await expect(tooltips).toHaveCount(1)
+  await page.screenshot({ path: test.info().outputPath('synth-compartment-constraint-hover.png') })
+  await page.getByRole('button', { name: 'All constraints', exact: true }).hover()
   await page.getByLabel('Camera view', { exact: true }).selectOption('front')
   await checkLayout()
   await page.setViewportSize({ width: 1000, height: 800 })
   await checkLayout()
   await page.getByLabel('Camera view', { exact: true }).selectOption('perspective')
   await checkLayout()
+})
+
+test('hovering an opening guide highlights both measurements and shows one shared ratio tooltip', async ({ page }) => {
+  const project: Project = { version: 1, name: 'Proportional openings', connections: [], panels: [0, 318, 936].map((y, index) =>
+    createPanel({ id: ['a', 'b', 'c'][index], name: `Boundary ${index + 1}`, width: 600, height: 300, thickness: 18, rotation: [-Math.PI / 2, 0, 0], position: [0, 300 + y, 0] })),
+  constraints: [{ id: 'openings', enabled: true, kind: 'opening-ratio', panelIds: ['a', 'b', 'b', 'c'], axis: 'y', ratio: 2 }] }
+  await importProject(page, project)
+  const original = await exportedProject(page)
+  const button = page.getByRole('button', { name: 'All constraints', exact: true })
+  await button.click()
+  const markers = page.locator('button[data-constraint-id="openings"]')
+  const tooltips = page.locator('[role="tooltip"][data-constraint-tooltip]')
+  await expect(markers).toHaveCount(2)
+  await expect(tooltips).toHaveCount(0)
+  const line = page.locator('[data-constraint-line="openings"]').first()
+  const lineBox = (await line.boundingBox())!
+  const lineMidpoint = { x: lineBox.x + lineBox.width / 2, y: lineBox.y + lineBox.height / 2 }
+  await page.mouse.move(lineMidpoint.x, lineMidpoint.y)
+  await expect(tooltips).toHaveCount(1)
+  await expect(tooltips).toHaveAttribute('data-constraint-tooltip', 'openings')
+  await expect(tooltips).toContainText('Opening 1 · Y gap · 300 mm')
+  await expect(tooltips).toContainText('Opening 2 · Y gap · 600 mm')
+  await expect(tooltips).toContainText('Ratio 1 : 2')
+  for (const marker of await markers.all()) await expect(marker).toHaveAttribute('data-active', 'true')
+  await page.screenshot({ path: test.info().outputPath('opening-guide-hover.png') })
+  await page.mouse.down({ button: 'right' })
+  await page.mouse.move(lineMidpoint.x + 80, lineMidpoint.y + 40, { steps: 8 })
+  await page.mouse.up({ button: 'right' })
+  await expect.poll(async () => {
+    const moved = (await line.boundingBox())!
+    return Math.hypot(moved.x - lineBox.x, moved.y - lineBox.y)
+  }).toBeGreaterThan(30)
+  await button.hover()
+  await expect(tooltips).toHaveCount(0)
+  await markers.last().focus()
+  await expect(tooltips).toHaveCount(1)
+  await expect(tooltips).toContainText('Opening 1 · Y gap · 300 mm')
+  await expect(tooltips).toContainText('Opening 2 · Y gap · 600 mm')
+  for (const marker of await markers.all()) await expect(marker).toHaveAttribute('data-active', 'true')
+  await page.locator('canvas').focus()
+  await expect(tooltips).toHaveCount(0)
+  expect(await exportedProject(page)).toEqual(original)
 })
