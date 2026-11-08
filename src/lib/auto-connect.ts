@@ -1,3 +1,4 @@
+import { addSharedJointCorners } from './shared-joint-corners'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { fitAddedConnectorClearance } from './connector-clearance'
 import { createPanel, resolvePanels, validateProject } from './model'
@@ -173,6 +174,10 @@ export function autoConnect(project: Project, selectedIds: readonly string[] = [
       joints++; connectors += first.count
     }
   }
+  const corners = addSharedJointCorners(project, selectedIds)
+  project = corners.project
+  joints += corners.joints
+  connectors += corners.connectors
   return { project, joints, connectors, upgrades, disassembledNames: [...disassembledNames], splits: prepared.splits, addedPanelIds: prepared.addedPanelIds }
 }
 
