@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { copySelection, getPasteTargets, getInsertionTargets } from './clipboard'
 import { createAssembly, materializeAssemblies, removeAssembly, updateAssemblyFinish, updateAssemblyParameters, updateAssemblyParameterValues } from './assemblies'
 import { createExampleProject } from './example-library'
-import { attachPanel, createPanel, parseProject, resolvePanels, validateProject } from './model'
-import { connectorId } from './connector-selection'
+import { attachPanel, createPanel, parseProject, resolvePanels, rotateProject, validateProject } from './model'
+import { gridProject } from './example-geometry'
+import { connectorId, getPhysicalConnectors } from './connector-selection'
 import type { Project } from './types'
 
 const looseProject = (): Project => ({ version: 1, name: 'Paste', panels: [createPanel({ name: 'Source', width: 250, height: 250, position: [-1000, 500, 0], color: '#123456', pattern: 'pegboard' }), createPanel({ name: 'Target', position: [0, 500, 0] })], connections: [] })
@@ -315,4 +316,76 @@ it('copies assembly hardware selections as resolved panels with overrides, witho
   expect(validateProject(rebuilt).filter(issue => issue.severity === 'error')).toEqual([])
   expect(roundTripProject(next)).toEqual(JSON.parse(JSON.stringify(next)))
   expect(project).toEqual(before)
+})
+
+
+describe('shared-panel selection paste', () => {
+  it.each([0, 35])('stacks a compartment with a shared shelf and T joints after %i° rotation', degrees => {
+    const project = rotateProject(gridProject('Stack', [350], [300], { depth: 250 }), 'z', degrees)
+    const before = structuredClone(project)
+    const roof = project.panels.find(panel => panel.name === 'Shelf 1.2')!
+    const copied = copySelection(project, project.panels.map(panel => panel.id))
+    const target = getPasteTargets(project, [roof.id], copied).find(target => target.project && target.id.includes('/shared-panel'))
+    expect(target).toBeDefined()
+    const next = target!.project!
+    expect(next.panels).toHaveLength(7)
+    for (const original of resolvePanels(project)) {
+      const retained = resolvePanels(next).find(panel => panel.id === original.id)!
+      expect(retained).toMatchObject({ name: original.name, width: original.width, height: original.height, color: original.color })
+      retained.position.forEach((value, axis) => expect(value).toBeCloseTo(original.position[axis]))
+    }
+    expect(next.connections.filter(connection => connection.type === 't')).toHaveLength(4)
+    expect(validateProject(next)).toEqual([])
+    if (!degrees) expect(Math.max(...resolvePanels(next).map(panel => panel.position[1]))).toBeCloseTo(679)
+    expect(roundTripProject(next)).toEqual(next)
+    expect(target!.panelIds).toContain(roof.id)
+    expect(project).toEqual(before)
+  })
+
+  it('rejects shared placements with stock too thin for T joints or rules on the discarded panel', () => {
+    const project = gridProject('Stack', [350], [300], { depth: 250 })
+    const roof = project.panels.find(panel => panel.name === 'Shelf 1.2')!
+    const floor = project.panels.find(panel => panel.name === 'Shelf 1.1')!
+    for (const source of [
+      { ...project, panels: project.panels.map(panel => ({ ...panel, thickness: 16 })) },
+      { ...project, constraints: [{ id: 'floor-width', kind: 'dimension' as const, panelId: floor.id, dimension: 'width' as const, value: floor.width, enabled: true }] },
+    ]) {
+      const copied = copySelection(source, source.panels.map(panel => panel.id))
+      expect(getPasteTargets(source, [roof.id], copied).filter(target => target.id.includes('/shared-panel')).every(target => !target.project)).toBe(true)
+    }
+  })
+})
+
+
+it('rejects a shared-panel stack blocked by existing stock and omits a fully existing copy', () => {
+  const project = gridProject('Stack', [350], [300], { depth: 250 })
+  const roof = project.panels.find(panel => panel.name === 'Shelf 1.2')!
+  const copied = copySelection(project, project.panels.map(panel => panel.id))
+  const blocker = createPanel({ width: 500, height: 500, position: [0, 500, 0] })
+  const blocked = { ...project, panels: [...project.panels, blocker] }
+  expect(getPasteTargets(blocked, [roof.id], copied).filter(target => target.id.includes('/shared-panel')).every(target => !target.project)).toBe(true)
+  const candidates = getPasteTargets(project, project.panels.map(panel => panel.id), copied).filter(target => target.id.includes('/shared-panel') && target.project)
+  expect(candidates.length).toBeGreaterThan(0)
+  expect(candidates.every(target => target.project!.panels.length > project.panels.length)).toBe(true)
+  const placements = candidates.map(target => target.project!.panels
+    .filter(panel => !project.panels.some(original => original.id === panel.id))
+    .map(panel => panel.position.map(value => Math.round(value))).sort().join(';'))
+  expect(new Set(placements).size).toBe(candidates.length)
+})
+
+it('upgrades roof corners when copied bottom joints belonged to external T branches', () => {
+  const project = gridProject('Tower', [350], [300, 300], { depth: 250 })
+  const roof = project.panels.find(panel => panel.name === 'Shelf 1.3')!
+  const ids = project.panels.filter(panel => ['Shelf 1.2', 'Shelf 1.3', 'Upright 1.2', 'Upright 2.2'].includes(panel.name)).map(panel => panel.id)
+  const copied = copySelection(project, ids)
+  expect(copied.kind).toBe('selection')
+  const target = getPasteTargets(project, [roof.id], copied).find(target => target.project && target.id.includes('/shared-panel'))!
+  expect(target).toBeDefined()
+  expect(target.project!.connections.filter(connection => connection.type === 't')).toHaveLength(8)
+  const roofJoints = target.project!.connections.filter(connection => connection.parentId === roof.id || connection.childId === roof.id)
+  expect(roofJoints.every(connection => connection.type === 't')).toBe(true)
+  const roofJointIds = new Set(roofJoints.map(connection => connection.id.replace(/:\d+$/, '')))
+  expect(getPhysicalConnectors(target.project!).filter(piece => roofJointIds.has(piece.connection.id.replace(/:\d+$/, ''))).map(piece => piece.type)).toEqual(['t', 't', 't', 't'])
+  expect(validateProject(target.project!)).toEqual([])
+  expect(roundTripProject(target.project)).toEqual(target.project)
 })

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { attachPanel, createPanel, parseProject } from '../src/lib/model'
+import { gridProject } from '../src/lib/example-geometry'
 import { createAssembly } from '../src/lib/assemblies'
 import { createExampleProject } from '../src/lib/example-library'
 import type { Project } from '../src/lib/types'
@@ -185,3 +186,31 @@ for (const kind of ['panels', 'connectors', 'mixed'] as const) {
     expect(await saved(page, 5)).toEqual(next)
   })
 }
+
+
+test('stacks a copied compartment using a shared shelf, with cancel, undo and reload', async ({ page }) => {
+  const project = gridProject('Stack', [350], [300, 300], { depth: 250 })
+  await load(page, project)
+  for (const [index, name] of ['Shelf 1.2', 'Shelf 1.3', 'Upright 1.2', 'Upright 2.2'].entries()) {
+    await page.locator('.panel-list-select').filter({ hasText: name }).click({ modifiers: index ? ['Shift'] : [] })
+  }
+  await page.keyboard.press('Control+c')
+  await page.locator('.panel-list-select').filter({ hasText: 'Shelf 1.3' }).click()
+  await page.keyboard.press('Control+v')
+  const handle = page.getByRole('button', { name: /Paste at .*shared panel/ }).first()
+  await expect(handle).toBeVisible()
+  await handle.hover()
+  expect(await saved(page, 7)).toEqual(project)
+  await page.keyboard.press('Escape')
+  await expect(handle).toHaveCount(0)
+  await page.keyboard.press('Control+v')
+  await handle.click()
+  const next = await saved(page, 10)
+  expect(next.connections.filter(connection => connection.type === 't')).toHaveLength(8)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await saved(page, 7)).toEqual(project)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  expect(await saved(page, 10)).toEqual(next)
+  await page.reload()
+  expect(await saved(page, 10)).toEqual(next)
+})

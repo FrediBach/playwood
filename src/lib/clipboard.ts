@@ -3,6 +3,8 @@ import { Euler, Quaternion, Vector3 } from 'three'
 import { getAssemblyCopyPanelPlacement, getAssemblyAttachmentTargets, getAssemblyInstance, type AssemblyAttachmentTarget } from './assemblies'
 import { attachPanel, createPanel, resolvePanels, validateProject } from './model'
 import type { AssemblyDefinition, AssemblyInstance, AttachmentOptions, DesignConstraint, Panel, Project, Side, Vec3 } from './types'
+import { autoConnect } from './auto-connect'
+import { reconcileAssemblyPlacement, samePanelPlacement } from './assembly-placement'
 import { copyDesignConstraints, designConstraintPanelIds } from './design-constraints'
 
 type CopiedSelection = { kind: 'selection'; panels: Panel[]; connections: Project['connections']; connectorOverrides: Project['connectorOverrides'] }
@@ -111,7 +113,19 @@ export function getInsertionTargets(project: Project, ids: string[], copied: Cop
 /** Attach any copied panel as an anchor, moving the complete snapshot rigidly with it. */
 function getSelectionPasteTargets(project: Project, ids: string[], copied: CopiedSelection & { constraints?: DesignConstraint[] }): AssemblyAttachmentTarget[] {
   const oldErrors = new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id))
-  return copied.panels.flatMap(anchor => getInsertionTargets(project, ids, { kind: 'panel', panel: anchor }).map(target => {
+  const parents = resolvePanels(project).filter(panel => ids.includes(panel.id))
+  const translations: Vector3[] = []
+  // Translate without turning the copy, so a floor can reuse a matching roof.
+  const sharedTargets = (anchor: Panel): AssemblyAttachmentTarget[] => parents.flatMap(parent => {
+    if (!samePanelPlacement(parent, { ...anchor, position: parent.position })) return []
+    const translation = new Vector3(...parent.position).sub(new Vector3(...anchor.position))
+    if (translations.some(other => other.distanceTo(translation) < 0.05)) return []
+    translations.push(translation)
+    const placed = { ...anchor, id: crypto.randomUUID(), position: parent.position }
+    return [{ id: `${parent.id}/shared-panel`, label: `${parent.name} · shared panel`, position: parent.position,
+      project: { ...project, panels: [...project.panels, placed] } }]
+  })
+  return copied.panels.flatMap(anchor => [...sharedTargets(anchor), ...getInsertionTargets(project, ids, { kind: 'panel', panel: anchor })].map(target => {
     const id = `${anchor.id}/${target.id}`, label = `${anchor.name} → ${target.label}`
     if (!target.project) return { ...target, id, label }
     try {
@@ -133,15 +147,33 @@ function getSelectionPasteTargets(project: Project, ids: string[], copied: Copie
         if (override) connectorOverrides[connectorId(connectionMap.get(connection.id)!, index)] = { ...override }
       }
       const constraints = copyDesignConstraints(copied.constraints, panelMap)
-      const next: Project = { ...base, panels: [...project.panels, ...panels], connections: [...base.connections, ...connections],
+      let next: Project = { ...base, panels: [...project.panels, ...panels], connections: [...base.connections, ...connections],
         ...(Object.keys(connectorOverrides).length ? { connectorOverrides } : {}),
         ...(constraints.length ? { constraints: [...base.constraints ?? [], ...constraints] } : {}),
       }
-      if (next.panels.length > 200 || next.connections.length > 400) throw new Error('Projects support up to 200 panels and 400 connections.')
       const added = new Set(panelMap.values())
+      let reconciled: ReturnType<typeof reconcileAssemblyPlacement> | undefined
+      if (target.id.endsWith('/shared-panel')) {
+        reconciled = reconcileAssemblyPlacement(next, [...added])
+        // External T/cross branches are deliberately absent from the snapshot.
+        // Fit their missing boundary joints after retaining the shared board;
+        // overlapping copied hardware alone cannot identify these upgrades.
+        const connected = autoConnect(reconciled.project, reconciled.panelIds)
+        next = connected.project
+        if (connected.disassembledNames.length) {
+          reconciled.warning = `Requires disassembly: ${connected.disassembledNames.join(', ')}. ${reconciled.warning ?? ''}`.trim()
+        }
+        if (!next.panels.some(panel => added.has(panel.id))) {
+          throw new Error('This copy already exists at this position.')
+        }
+        if (!next.connections.some(connection => added.has(connection.parentId) !== added.has(connection.childId))) {
+          throw new Error('This copy cannot form a compatible joint with the shared panel.')
+        }
+      }
+      if (next.panels.length > 200 || next.connections.length > 400) throw new Error('Projects support up to 200 panels and 400 connections.')
       const issue = validateProject(next).find(issue => issue.severity === 'error' && !oldErrors.has(issue.id) || issue.id.startsWith('collision-') && issue.panelIds.some(id => added.has(id)))
       if (issue) throw new Error(issue.message)
-      return { ...target, id, label, project: next }
+      return { ...target, id, label, ...reconciled, project: next }
     } catch (error) {
       return { id, label, position: target.position, error: error instanceof Error ? error.message : 'This selection cannot fit here.' }
     }
