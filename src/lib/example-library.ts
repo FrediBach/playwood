@@ -1,3 +1,4 @@
+import { synthShelfProject } from './synth-shelf'
 import { catTowerProject } from './cat-tower'
 import { connectedExample } from './connected-examples'
 import { ASSEMBLY_LIBRARY } from './assembly-library'
@@ -24,6 +25,7 @@ export const EXAMPLE_LIBRARY: readonly ExampleDefinition[] = [
   { id: 'desk', name: 'Work table', description: 'Room for your next big idea.', category: 'Starter builds', create: () => createStarterProject('desk') },
   { id: 'display', name: 'Creative display', description: 'Put your creativity on display.', category: 'Starter builds', create: () => createStarterProject('display') },
   { id: 'cat-tower', name: 'Cat tower', description: 'Six levels on a 2×2 cube footprint, with rotating climbing openings and corner lookouts. 300×300 and 635×300 mm panels.', category: 'Shelving', create: catTowerProject },
+  { id: 'synth-shelf', name: 'Three-tier synth shelf', description: 'Three 900 mm wide trays tilted 30°, with front stops, a compact base, and five 150° connectors per tray.', category: 'Shelving', source: 'user-projects/three-tier-synth-shelf.json', create: synthShelfProject },
   { id: 'diamond-shelf', name: 'Diamond shelf', description: 'Five diamond compartments, white panels, and black connectors. Rotated 45°.', category: 'Shelving', create: diamondShelfProject },
   { id: 'h-table-monitor-speaker-stand', name: 'H-table with monitor and speaker stand', description: 'An H-table workstation with raised monitor and speaker stands and black connectors.', category: 'Tables', source: 'user-projects/h-table-monitor-speaker-stand.json', create: () => ({ ...parseProject(structuredClone(monitorSpeakerTable)), name: 'H-table with monitor and speaker stand' }) },
   ...[...CAD_EXAMPLES, ...PDF_EXAMPLES].map(example => ({
