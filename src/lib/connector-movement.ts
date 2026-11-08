@@ -67,3 +67,43 @@ export function getConnectorKeyboardSlides(project: Pick<Project, 'connections' 
   }
   return slides
 }
+
+/** Preserve physical rail positions proportionally, including manually reordered pieces. */
+export function rescaleConnectorSlides(before: Project, after: Project, beforePanels: Panel[], afterPanels: Panel[]): Project {
+  // Hidden stock still has installed hardware and must resize identically.
+  const visibleBefore = beforePanels.map(panel => ({ ...panel, visible: true }))
+  const visibleAfter = afterPanels.map(panel => ({ ...panel, visible: true }))
+  const connections = new Map(after.connections.map(connection => [connection.id, connection]))
+  const overrides = { ...after.connectorOverrides }
+  let changed = false
+  for (const connection of before.connections) {
+    if (!connection.count) continue
+    const nextConnection = connections.get(connection.id)
+    if (!nextConnection || nextConnection.count !== connection.count) continue
+    const oldRail = getConnectorRail(connection, visibleBefore, before.connections)
+    const newRail = getConnectorRail(nextConnection, visibleAfter, after.connections)
+    if (!oldRail || !newRail) continue
+    const oldSpan = oldRail.upper - oldRail.lower, newSpan = newRail.upper - newRail.lower
+    if (oldSpan <= 1e-6 || newSpan < 0 || Math.abs(newSpan - oldSpan) < 1e-6) continue
+    const positions = oldRail.along.map((along, index) => {
+      const id = connectorId(connection.id, index)
+      const oldPosition = along + connectorSlide(oldRail, index, before.connectorOverrides?.[id]?.slide)
+      const newPosition = newRail.lower + (oldPosition - oldRail.lower) * newSpan / oldSpan
+      const slide = newPosition - newRail.along[index]
+      if (Math.abs(slide - (overrides[id]?.slide ?? 0)) > 1e-6) {
+        overrides[id] = { ...overrides[id], slide }
+        changed = true
+      }
+      return { id, oldPosition, newPosition }
+    }).filter(piece => !before.connectorOverrides?.[piece.id]?.removed)
+      .sort((a, b) => a.oldPosition - b.oldPosition)
+    for (let index = 1; index < positions.length; index++) {
+      const previous = positions[index - 1], current = positions[index]
+      const oldGap = current.oldPosition - previous.oldPosition
+      if (current.newPosition - previous.newPosition < Math.min(40, oldGap) - 1e-6) {
+        throw new Error('This resize would crowd connectors together. Move or remove some connectors, or use a larger dimension.')
+      }
+    }
+  }
+  return changed ? { ...after, connectorOverrides: overrides } : after
+}

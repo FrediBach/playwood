@@ -1,7 +1,7 @@
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { resolvePanels, validateProject } from './model'
-import { connectorSlide, getConnectorRail } from './connector-movement'
+import { connectorSlide, getConnectorRail, rescaleConnectorSlides } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { isPanelConnectedToAssembly } from './assemblies'
 import { designConstraintLimits, designConstraintCoordinate, designConstraintPanelIds, describeDesignConstraint, evaluateDesignConstraints } from './design-constraints'
@@ -812,6 +812,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     }
     next = { ...next, connectorOverrides: Object.keys(overrides).length ? overrides : project.connectorOverrides }
   }
+  if (edit.kind === 'resize' && !edit.local) next = rescaleConnectorSlides(project, next, panels, next.panels)
   const previousErrors = new Set(validateProject(project, validation).filter(issue => issue.severity === 'error').map(issue => issue.id))
   const newError = validateProject(next, validation).find(issue => issue.severity === 'error' && !previousErrors.has(issue.id))
   if (newError) {

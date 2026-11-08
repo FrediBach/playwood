@@ -165,7 +165,17 @@ describe('preview structural resize handles', () => {
       expect(next.customOutline).toEqual(old.customOutline)
     }
     expect(result.project.connections.map(connection => connection.offset)).toEqual(project.connections.map(connection => connection.offset))
-    expect(result.project.connectorOverrides).toEqual(project.connectorOverrides)
+    for (const piece of getPhysicalConnectors(project)) {
+      const oldRail = getConnectorRail(piece.connection, before, project.connections)!
+      const connection = result.project.connections.find(item => item.id === piece.connection.id)!
+      const newRail = getConnectorRail(connection, result.project.panels, result.project.connections)!
+      const fraction = (rail: typeof oldRail, source: Project) => (rail.along[piece.index]
+        + connectorSlide(rail, piece.index, source.connectorOverrides?.[piece.id]?.slide) - rail.lower) / (rail.upper - rail.lower)
+      expect(fraction(newRail, result.project)).toBeCloseTo(fraction(oldRail, project), 7)
+      const { slide: _oldSlide, ...oldAppearance } = project.connectorOverrides?.[piece.id] ?? {}
+      const { slide: _newSlide, ...newAppearance } = result.project.connectorOverrides?.[piece.id] ?? {}
+      expect(newAppearance).toEqual(oldAppearance)
+    }
   })
   it('offers four edge handles on a loose panel, keeps its opposite edge fixed, and preserves rotation and thickness', () => {
     const panel = createPanel({ width: 400, height: 300, position: [120, 500, 10], rotation: [0.2, 0.3, 0.4] })
