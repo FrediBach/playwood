@@ -12,6 +12,8 @@ import type { Panel } from '@/lib/types'
 
 
 interface CreateEditorKeyHandlerOptions {
+  connectMode?: boolean
+  cancelConnect?: () => void
   previewShortcut: (event: KeyboardEvent) => boolean
   previewShortcutsEnabled: boolean
   modalOpen: boolean
@@ -54,6 +56,7 @@ interface CreateEditorKeyHandlerOptions {
 }
 
 export function createEditorKeyHandler({
+  connectMode, cancelConnect,
   previewShortcut, previewShortcutsEnabled, modalOpen, constraints, pickingConstraint, constraintPicker,
   setPickingConstraint, setRightOpen, projectConstraintsOpen, closeProjectConstraints,
   objectMode, realisticPreview, redo, undo,
@@ -68,6 +71,13 @@ export function createEditorKeyHandler({
   return (e: KeyboardEvent) => {
     const target=e.target as HTMLElement
     if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||target.closest('dialog,[role="dialog"]')||modalOpen) return
+    if(connectMode) {
+      if(e.key==='Escape') { e.preventDefault(); cancelConnect?.(); document.querySelector<HTMLButtonElement>('button[aria-label="Connect mode"]')?.focus() }
+      else if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z') { e.preventDefault(); e.shiftKey?redo():undo() }
+      else if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='b') { e.preventDefault(); if(!e.repeat)toggleBoxSelect() }
+      else if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key.toLowerCase()==='f') setFitSignal(v=>v+1)
+      return
+    }
     if(constraints.editing) { if(e.key==='Escape') { e.preventDefault(); if(pickingConstraint) { constraintPicker.current=null; setPickingConstraint(false); setRightOpen(true)}  else constraints.cancel()}  return}
     if(projectConstraintsOpen&&e.key==='Escape') { e.preventDefault(); closeProjectConstraints(); return}
     if(objectMode&&!realisticPreview) {

@@ -36,6 +36,7 @@ import { useConstructionEditor } from '@/hooks/use-construction-editor'
 import { useCopyPaste } from '@/hooks/use-copy-paste'
 import { useDesignConstraints } from '@/hooks/use-design-constraints'
 import { usePreviewDrag } from '@/hooks/use-preview-drag'
+import { useConnectStroke } from '@/hooks/use-connect-stroke'
 import { usePreviewResize } from '@/hooks/use-preview-resize'
 import { useProject } from '@/hooks/use-project'
 import { useDirectorySync } from '@/hooks/use-directory-sync'
@@ -89,6 +90,8 @@ export default function App() {
 }=useConnectorSelectionDetails({ project, selectedConnectorIds, selectedPanels, assemblyTab, projectConstraintsOpen, setConnectorInfill })
   const notify=useCallback((message:string)=>setToast(message),[setToast])
   const [snapSettings,setSnapSettings]=useState(readSnapSettings)
+  const [connectMode,setConnectMode]=useState(false)
+  const cancelConnect=useCallback(()=>setConnectMode(false),[])
   const objectMode=assemblyTab==='objects'
   const objects=useConstructionEditor({project,commit,notify,snapSettings})
   const constraints=useDesignConstraints({project,commit,notify})
@@ -116,22 +119,31 @@ export default function App() {
   const { updatePanel,updateMultiplePanels }=createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds, setResizeReview, setMovementReview })
   const { duplicateSelected,deleteSelected,detachSelection,mergeSelection,splitSelection,distributeSelection,moveSelection }=createSelectionCommands({ assembly, commit, selectedIds, notify, project, setSelectedIds, setInspectorTab, inspectingConnectors, removeSelectedConnectors, selectedIdSet, setFrameSignal, setMovementReview })
   const { connectWithPanel,extendToGround,addAutoConnectors,acceptConnectionFit }=createConnectionCommands({ commit, clipboard, assembly, setInspectorTab, setExploded, selectedIds, setSelectedIds, notify, modalOpen, project, setPendingConnectionFit, pendingConnectionFit, groundPanelFit, setFitSignal, connectorPanelFit, setSelectedId, setRightOpen, selectedConnectors })
-  const movementEnabled=selectionMovementAvailable({ objectMode, constraints, clipboard, modalOpen, assembly, inspectingConnectors, realisticPreview, exploded, inspectorTab })
+  const movementEnabled=!connectMode&&selectionMovementAvailable({ objectMode, constraints, clipboard, modalOpen, assembly, inspectingConnectors, realisticPreview, exploded, inspectorTab })
   const resize=usePreviewResize({project,selectedIds:inspectingConnectors?[]:selectedIds,selectedConnectorIds:inspectingConnectors?selectedConnectorIds:[],snapSettings,enabled:movementEnabled&&!drag.active&&!contextMenu,commit,notify,select:setSelectedId})
   const { boxSelectAvailable,objectInteractionDisabled,objectGesture,displayedObjects,objectPreview }=useObjectInteractions({ modalOpen, drag, resize, constraints, assembly, clipboard, realisticPreview, exploded, project, objects, objectMode, boxSelectActive, snapSettings, commit, notify, inspectorTab, hasVisiblePanels })
+  const connectAvailable=!objectMode&&!modalOpen&&!constraints.editing&&!drag.active&&!resize.active&&!clipboard.active&&!assembly.editingInstance&&!assembly.placementActive&&!realisticPreview&&!exploded&&inspectorTab!=='attach'&&panels.filter(panel=>panel.visible).length>1
+  const connect=useConnectStroke({project,enabled:connectMode&&connectAvailable,commit,notify,cancel:cancelConnect})
+  useEffect(()=>{if(!connectAvailable)setConnectMode(false)},[connectAvailable])
+  const toggleConnect=()=>{
+    if(!connectAvailable)return
+    closeContextMenu();setBoxSelectActive(false);setConnectMode(value=>!value)
+    if(window.innerWidth<=900){setLeftOpen(false);setRightOpen(false)}
+    window.setTimeout(()=>document.querySelector<HTMLCanvasElement>('canvas')?.focus(),0)
+  }
   const cancelBoxSelect=useCallback(()=>setBoxSelectActive(false),[setBoxSelectActive])
   useEffect(()=>{setBoxSelectActive(false)},[project,view,realisticPreview,exploded,boxSelectAvailable,setBoxSelectActive])
   const toggleBoxSelect=()=>{
     if(!boxSelectAvailable)return
-    closeContextMenu();assembly.clearPlacement();setBoxSelectActive(active=>!active)
+    closeContextMenu();cancelConnect();assembly.clearPlacement();setBoxSelectActive(active=>!active)
   }
   const { resolveBoxConnectorIds,selectBox,resolveBoxPanelIds,selectAll }=createBoxSelectionCommands({ inspectingConnectors, panels, assembly, project, physicalConnectors, setBoxSelectActive, objectMode, objects, setRightOpen, setInspectorTab, setPanelSelection, setSelectedConnectorIds })
   const objectControlsDisabled=objectInteractionDisabled||objectGesture.active
   const { chooseObject,changeAssemblyTab }=createObjectSelectionCommands({ objectControlsDisabled, objects, setRightOpen, setLeftOpen, drag, resize, objectGesture, modalOpen, clipboard, assembly, constraints, setProjectConstraintsOpen, setPickingConstraint, constraintPicker, setSelectedIds, setExploded, setAssemblyTab, setInspectorTab, closeContextMenu, selectedPanels, selectedConnectors })
-  const canAttachPanel=panelAttachmentAvailable({ selectedPanels, inspectingConnectors, assembly, clipboard, constraints, modalOpen, drag, resize, boxSelectActive, inspectorTab })
+  const canAttachPanel=!connectMode&&panelAttachmentAvailable({ selectedPanels, inspectingConnectors, assembly, clipboard, constraints, modalOpen, drag, resize, boxSelectActive, inspectorTab })
   const [previewShortcutHandler]=useState(createPreviewShortcutHandler)
   useEffect(()=>{
-    const onKey=createEditorKeyHandler({ previewShortcut: e => previewShortcutHandler(e,menuActions,closeContextMenu), previewShortcutsEnabled: !objectMode&&!modalOpen&&!constraints.editing&&!drag.active&&!resize.active&&!clipboard.active&&!assembly.target&&!assembly.placementActive&&!boxSelectActive&&inspectorTab!=='attach', modalOpen, constraints, pickingConstraint, constraintPicker, setPickingConstraint, setRightOpen, projectConstraintsOpen, closeProjectConstraints, objectMode, realisticPreview, redo, undo, objects, objectControlsDisabled, toggleBoxSelect, boxSelectActive, setSnapSettings, setFitSignal, boxSelectAvailable, canAttachPanel, startAttach, clipboard, inspectingConnectors, movementEnabled, drag, resize, assembly, selectedPanels, commit, selectedIds, notify, setRealisticPreview, selectAll, duplicateSelected, deleteSelected, setInspectorTab, setSelectedId })
+    const onKey=createEditorKeyHandler({ connectMode, cancelConnect, previewShortcut: e => previewShortcutHandler(e,menuActions,closeContextMenu), previewShortcutsEnabled: !objectMode&&!modalOpen&&!constraints.editing&&!drag.active&&!resize.active&&!clipboard.active&&!assembly.target&&!assembly.placementActive&&!boxSelectActive&&inspectorTab!=='attach', modalOpen, constraints, pickingConstraint, constraintPicker, setPickingConstraint, setRightOpen, projectConstraintsOpen, closeProjectConstraints, objectMode, realisticPreview, redo, undo, objects, objectControlsDisabled, toggleBoxSelect, boxSelectActive, setSnapSettings, setFitSignal, boxSelectAvailable, canAttachPanel, startAttach, clipboard, inspectingConnectors, movementEnabled, drag, resize, assembly, selectedPanels, commit, selectedIds, notify, setRealisticPreview, selectAll, duplicateSelected, deleteSelected, setInspectorTab, setSelectedId })
     window.addEventListener('keydown',onKey)
     return()=>window.removeEventListener('keydown',onKey)
   })
@@ -195,6 +207,7 @@ export default function App() {
     assemblyImportRef, assemblyImportError
   }
   const editorWorkspaceProps: React.ComponentProps<typeof EditorWorkspace> = {
+    connect, connectAvailable, toggleConnect,
     objectMode, displayedObjects, objectPreview, objects, objectInteractionDisabled, objectGesture, boxSelectActive,
     snapSettings, chooseObject, project, boxSelectAvailable, selectionKind, toggleBoxSelect, selectBox, cancelBoxSelect,
     resolveBoxPanelIds, resolveBoxConnectorIds, resize, drag, setSnapSettings, constraints, modalOpen, clipboard,

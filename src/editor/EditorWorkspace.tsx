@@ -10,6 +10,7 @@ import { useDesignConstraints } from '@/hooks/use-design-constraints'
 import { useObjectGesture } from '@/hooks/use-object-gesture'
 import { useObjectPreview } from '@/hooks/use-object-preview'
 import { usePreviewDrag } from '@/hooks/use-preview-drag'
+import { useConnectStroke } from '@/hooks/use-connect-stroke'
 import { usePreviewResize } from '@/hooks/use-preview-resize'
 import { AssemblyAttachmentTarget } from '@/lib/assemblies'
 import { editConnectors } from '@/lib/connector-selection'
@@ -20,6 +21,9 @@ import type { AttachmentOptions,CameraView,Connection,ConstructionObjects,Design
 
 
 interface EditorWorkspaceProps {
+  connect: ReturnType<typeof useConnectStroke>
+  connectAvailable: boolean
+  toggleConnect: () => void
   objectMode: boolean
   displayedObjects: ConstructionObjects
   objectPreview: ReturnType<typeof useObjectPreview>
@@ -97,6 +101,7 @@ interface EditorWorkspaceProps {
 }
 
 export function EditorWorkspace({
+  connect, connectAvailable, toggleConnect,
   objectMode, displayedObjects, objectPreview, objects,
   objectInteractionDisabled, objectGesture, boxSelectActive, snapSettings,
   chooseObject, project, boxSelectAvailable, selectionKind,
@@ -122,6 +127,9 @@ export function EditorWorkspace({
   return <AssemblyWorkspace
     {...workspaceInteraction}
     {...workspaceParts}
+    connect={connect}
+    connectDisabled={!connectAvailable}
+    onToggleConnect={toggleConnect}
     objectSelection={objectMode}
     objectPreviewStatus={objectPreviewStatus(objectGesture,objectPreview,objects,objectMode)}
     spaceConstraint={project.spaceConstraint}
@@ -138,7 +146,7 @@ export function EditorWorkspace({
     snapDirection={drag.snapDirection}
     snapSettings={snapSettings}
     setSnapSettings={setSnapSettings}
-    onPreviewContextMenu={workspaceContextMenu({ objectMode, constraints, modalOpen, drag, resize, clipboard, assembly, inspectorTab, realisticPreview, selectedConnectorIds, chooseConnector, selectedIds, choosePanel, setContextMenu }) }
+    onPreviewContextMenu={connect.gesture.active?undefined:workspaceContextMenu({ objectMode, constraints, modalOpen, drag, resize, clipboard, assembly, inspectorTab, realisticPreview, selectedConnectorIds, chooseConnector, selectedIds, choosePanel, setContextMenu }) }
     selectedConnectorIds={selectedConnectorIds}
     onSelectConnector={chooseConnector}
     selectedIds={selectedIds}
@@ -199,7 +207,7 @@ export function EditorWorkspace({
     attachmentSide={attachment.side}
     visibleBounds={visibleBounds}
     hasVisiblePanels={hasVisiblePanels}
-    attachmentHandles={workspaceAttachmentHandles({ constraints, modalOpen, inspectingConnectors, clipboard, validTargets, assembly })}
+    attachmentHandles={connect.gesture.active?[]:workspaceAttachmentHandles({ constraints, modalOpen, inspectingConnectors, clipboard, validTargets, assembly })}
     onAttachmentPreview={clipboard.active? clipboard.hover:assembly.hover}
     onAttachmentCommit={clipboard.active? clipboard.attach:assembly.attach}
     suppressedConnectionIds={clipboard.active? clipboard.suppressedConnectionIds:assembly.suppressedConnectionIds}

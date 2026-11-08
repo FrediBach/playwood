@@ -19,6 +19,8 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
   objectPreviewStatus?: string
   boxSelectDisabled?: boolean
   onToggleBoxSelect?: () => void
+  connectDisabled?: boolean
+  onToggleConnect?: () => void
   snapSettings: SnapSettings
   setSnapSettings: Setter<SnapSettings>
   previewPanels: NonNullable<SceneProps['previewPanels']>
@@ -61,6 +63,7 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
 const number = (n:number)=>Math.round(n).toLocaleString()
 
 export function AssemblyWorkspace({
+  connect, connectDisabled, onToggleConnect,
   objectSelection, constructionLayer, objectPreviewStatus, spaceConstraint,
   boxSelectActive, boxSelectDisabled, selectionKind, onToggleBoxSelect,
   onBoxSelect, onBoxSelectCancel, resolveBoxPanelIds, resolveBoxConnectorIds,
@@ -120,6 +123,7 @@ export function AssemblyWorkspace({
     setShowGrid={setShowGrid}/>
       <div className="scene-container"><Scene
     {...sceneProps}
+    connect={connect}
     objectSelection={objectSelection}
     constructionLayer={realisticPreview||exploded?undefined:constructionLayer}
     spaceConstraint={spaceConstraint}
@@ -163,6 +167,9 @@ export function AssemblyWorkspace({
       <WorkspaceEmptyState realisticPreview={realisticPreview} panels={panels} constructionLayer={constructionLayer} addPanel={addPanel}/>
       {!realisticPreview && objectPreviewStatus && <div className="object-preview-status" role="status">{objectPreviewStatus}</div>}
       <ViewportControls
+    connectActive={connect?.gesture.active}
+    connectDisabled={connectDisabled}
+    onConnect={onToggleConnect}
     boxSelectActive={boxSelectActive}
     boxSelectDisabled={boxSelectDisabled}
     onBoxSelect={onToggleBoxSelect}
@@ -175,8 +182,8 @@ export function AssemblyWorkspace({
     onFit={()=>setFitSignal(value=>value+1)}
     exploded={exploded}
     onToggleExploded={()=>setExploded(value=>!value)}
-    status={movementStatus}
-    notice={notice}
+    status={connect?.gesture.active ? connect.panelIds.length ? undefined : <><span>Connect · drag between panels or click twice</span><kbd>Esc</kbd> Exit</> : movementStatus}
+    notice={connect?.gesture.active ? undefined : notice}
     showTransformShortcuts={showTransformShortcuts(boxSelectActive,panelSelectionActive,selectedIds,movementEnabled,editingAssembly,dragging,resizing)}
     roomDetails={realisticPreview&&<RoomDetails hasVisiblePanels={hasVisiblePanels} visibleBounds={visibleBounds} autoFurnish={autoFurnish} setAutoFurnish={setAutoFurnish} furnishedSurfaces={furnishedSurfaces}/>}/>
       {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}

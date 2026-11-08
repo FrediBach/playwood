@@ -1,11 +1,14 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Box, ChevronDown, Expand, Hand, House, Keyboard, Maximize, Minus, Plus, SquareDashedMousePointer } from 'lucide-react'
+import { Box, Cable, ChevronDown, Expand, Hand, House, Keyboard, Maximize, Minus, Plus, SquareDashedMousePointer } from 'lucide-react'
 import { IconButton } from './editor-controls'
 import { Tooltip } from './ui/tooltip'
 import type { CameraView } from '@/lib/types'
 import './viewport-controls.css'
 
 interface Props {
+  connectActive?: boolean
+  connectDisabled?: boolean
+  onConnect?: () => void
   panMode: boolean
   onTogglePan: () => void
   boxSelectActive?: boolean
@@ -24,7 +27,7 @@ interface Props {
   roomDetails?: ReactNode
 }
 
-export function ViewportControls({ panMode, onTogglePan, boxSelectActive = false, boxSelectDisabled = false, onBoxSelect, realisticPreview, view, onViewChange, onZoom, onFit, exploded, onToggleExploded, status, notice, showTransformShortcuts, roomDetails }: Props) {
+export function ViewportControls({ connectActive, connectDisabled, onConnect, panMode, onTogglePan, boxSelectActive = false, boxSelectDisabled = false, onBoxSelect, realisticPreview, view, onViewChange, onZoom, onFit, exploded, onToggleExploded, status, notice, showTransformShortcuts, roomDetails }: Props) {
   return <div className="viewport-dock">
     {roomDetails}
     {(notice || status || showTransformShortcuts) && <div className="viewport-guidance">
@@ -45,6 +48,7 @@ export function ViewportControls({ panMode, onTogglePan, boxSelectActive = false
         </div>}
       <IconButton label="Pan view" aria-pressed={panMode} onClick={onTogglePan}><Hand size={17}/></IconButton>
       {onBoxSelect && <IconButton label="Box select (B)" aria-pressed={boxSelectActive} aria-keyshortcuts="B" disabled={boxSelectDisabled} onClick={onBoxSelect}><SquareDashedMousePointer size={17}/></IconButton>}
+      {!realisticPreview && onConnect && <IconButton label="Connect mode" aria-pressed={!!connectActive} disabled={connectDisabled} onClick={onConnect}><Cable size={17}/></IconButton>}
       <span className="viewport-divider"/>
       <IconButton label="Zoom out" onClick={() => onZoom(-1)}><Minus size={17}/></IconButton>
       <IconButton label="Zoom in" onClick={() => onZoom(1)}><Plus size={17}/></IconButton>

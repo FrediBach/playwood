@@ -140,9 +140,10 @@
 }
 
 @media (max-width: 400px) {
+  .viewport-bar { flex-wrap: wrap; justify-content: center; }
   .viewport-bar .button-icon,
   .viewport-shortcuts summary { width: 28px; }
-  .viewport-camera select { width: 90px; }
+  .viewport-camera select { width: 80px; }
   .viewport-divider { margin: 0 2px; }
 }
 

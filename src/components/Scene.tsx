@@ -25,6 +25,7 @@ import { DesignConstraintOverlay } from './DesignConstraintOverlay'
 import { createPanelMaterials } from './panel-materials'
 import { PreviewBoxSelection,type BoxSelectionPreview,type BoxSelectionProps } from './PreviewBoxSelection'
 import { PreviewDragMovement,type PreviewDragProps } from './PreviewDragMovement'
+import { PreviewConnectGesture,type PreviewConnectGestureProps } from './PreviewConnectGesture'
 import { PreviewFurnishings } from './PreviewFurnishings'
 import { PreviewResizeHandles } from './PreviewResizeHandles'
 import { createVacuumPlan,type VacuumPoint } from './robot-vacuum-navigation'
@@ -52,6 +53,11 @@ export interface AssemblyAttachmentHandle {
 }
 
 export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
+  connect?: {
+    gesture: PreviewConnectGestureProps
+    panelIds: readonly string[]
+    preview?: Pick<Project, 'connections' | 'connectorOverrides'>
+  }
   constructionLayer?: ConstructionLayerProps
   panels: Panel[]
   connections: Connection[]
@@ -452,7 +458,7 @@ type WorldProps = SceneProps & { attachmentElements: AttachmentElements; boxPrev
 /** Highlight both selection categories without changing which one receives movement. */
 function sceneHighlights(props: WorldProps) {
   const boxPreview = props.boxSelectActive ? props.boxPreview : null
-  const highlightedPanels = boxPreview ? [...(boxPreview.additive ? props.selectedIds : []), ...boxPreview.panelIds] : props.selectedIds
+  const highlightedPanels = props.connect?.gesture.active ? props.connect.panelIds : boxPreview ? [...(boxPreview.additive ? props.selectedIds : []), ...boxPreview.panelIds] : props.selectedIds
   const highlightedConnectors = boxPreview ? [...(boxPreview.additive ? props.selectedConnectorIds ?? [] : []), ...boxPreview.connectorIds] : props.selectedConnectorIds
   const selectedIdSet = new Set([...highlightedPanels, ...props.constraintPanelIds ?? [], ...props.repeatPreview?.sourcePanelIds ?? [], ...props.repeatPreview?.reusedPanelIds ?? []])
   return {selectedIdSet, highlightedConnectors}
@@ -470,6 +476,9 @@ function SceneParts(props: WorldProps & { shownPanels: Panel[] }) {
     {!exploded && !!repeatConnectionIds.size && <ConnectorMeshes panels={panels} connections={connections.filter(connection => repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} ghost />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}
     {previewConnections.length > 0 && <ConnectorMeshes panels={[...panels, ...previewPanels]} connections={previewConnections} connectorOverrides={props.connectorOverrides} ghost />}
+    {props.connect?.gesture.active && props.connect.preview && <group name="Connect preview" userData={{ previewConnect: true }}>
+      <ConnectorMeshes panels={panels} {...props.connect.preview} ghost />
+    </group>}
   </>
 }
 
@@ -546,6 +555,7 @@ function World(props: WorldProps) {
   const floorY = PREVIEW_FLOOR_Y
   const feedback = useSceneSnapFeedback(props)
   return <>
+    {props.connect && <PreviewConnectGesture {...props.connect.gesture}/>}
     <PreviewBoxSelection {...props} onPreview={props.onBoxPreview}/>
     <PreviewContextGesture onOpen={props.boxSelectActive ? undefined : props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
     <SceneMovement {...props} feedback={feedback}/>
@@ -620,11 +630,11 @@ export default function Scene(props: SceneProps) {
   const { controlHeld } = useControlHeld(props)
     const attachmentHandles = visibleAttachmentHandles(props,controlHeld)
   return <ViewportBoundary>
-    <div className={`scene-surface${props.boxSelectActive ? ' is-box-selecting' : ''}`} data-preview-furnishings={props.realisticPreview ? props.furnishings?.length ?? 0 : 0}>
-    <Canvas aria-label={props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
+    <div className={`scene-surface${props.boxSelectActive ? ' is-box-selecting' : ''}${props.connect?.gesture.active ? ' is-connecting' : ''}`} data-preview-furnishings={props.realisticPreview ? props.furnishings?.length ?? 0 : 0}>
+    <Canvas aria-label={props.connect?.gesture.active ? 'Connect mode. Drag between panels or click two endpoints to add a connector. Arrow keys aim the crosshair; Enter chooses an endpoint. Escape cancels and exits.' : props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
-      style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.boxSelectActive ? 'crosshair' : props.panMode ? 'grab' : undefined }}
-      onPointerMissed={event => { if (event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}
+      style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.boxSelectActive || props.connect?.gesture.active ? 'crosshair' : props.panMode ? 'grab' : undefined }}
+      onPointerMissed={event => { if (!props.connect?.gesture.active && event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}
       fallback={<div style={{ padding: 32 }}>Your browser needs WebGL to display this 3D workspace.</div>}>
       <World {...props} boxPreview={boxPreview} onBoxPreview={setBoxPreview} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
     </Canvas>

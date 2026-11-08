@@ -91,6 +91,12 @@ Failed numeric Width/Height edits on ordinary panels can open `ResizeAlternative
 
 Auto-connect size proposals remain source-bound in `App.pendingConnectionFit`. Coordinated angled fits include a list of both panel dimension changes for `PanelConnectionFitDialog`; no project data changes while reviewing. Cancel/Escape discards the candidate. Acceptance checks source identity and commits all prior exact/snapped fits, coordinated resizing, and new hardware together as one history entry.
 
+### Drawing individual connectors
+
+Connect mode retains its endpoints, highlighted panels, status, and candidate project outside history. Pointer movement only previews the result of [`getConnectStrokeCandidate`](../src/lib/connect-stroke.ts); invalid targets clear the candidate. Release or the second endpoint click commits one connector through `useProject`, with a functional source-identity check. Cancellation and project changes discard the preview, and repeated additions remain separate Undo steps. The mode itself is not saved.
+
+New seams use ordinary one-piece support connections; additions to existing seams use the connection count and per-piece slide overrides. Existing hardware identities and world placements are preserved. Undo/redo, autosave, project export, and reload therefore use the existing version 1 format without new fields.
+
 ### Panel attachment
 
 [use-attachment-preview.ts](../src/hooks/use-attachment-preview.ts) derives a complete candidate using `attachPanel` or `attachExistingPanel`, resolves its transforms, and identifies changed or newly added panels. It also selects connections needed to render the ghost and validates issues involving preview panels. The Apply action is enabled only when a candidate exists and its attachment errors are empty. Applying commits the candidate once; changing side, count, angle, or draft dimensions only recalculates the preview.
