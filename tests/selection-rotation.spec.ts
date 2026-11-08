@@ -185,7 +185,7 @@ test('typing, modified keys, composition, dialogs and placement previews do not 
   await canvas.focus()
   await page.keyboard.press('ControlOrMeta+c')
   await page.keyboard.press('ControlOrMeta+v')
-  await expect(page.getByRole('button', { name: /^Paste at / }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Choose location / }).first()).toBeVisible()
   await canvas.focus()
   await page.keyboard.press('z')
   await page.keyboard.press('Escape')

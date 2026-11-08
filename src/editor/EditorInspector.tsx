@@ -315,7 +315,7 @@ function SelectionInspector({
   attachment, setAttachment, attachTarget, setAttachTarget,
   previewIssues, attachmentSideGuide, managingProjectConstraints, addPanel
 }: SelectionInspectorProps)  {
-  if (clipboard.active) return <div className="multi-selection-heading"><h2>Place {clipboard.inserting||'copy'}</h2><p>Hover a + in the workspace to preview. Click to attach, or cancel to return.</p></div>
+  if (clipboard.active) return <div className="multi-selection-heading"><h2>Place {clipboard.inserting||'copy'}</h2><p>Choose a numbered location, then compare the illustrated arrangements. Attach saves the preview; Escape cancels.</p></div>
   if (assembly.editingInstance&&assembly.editingDefinition) return <AssemblyEditingInspector
     panels={assembly.editingDefinition.panels.filter(panel => selectedIdSet.has(assembly.editingInstance!.panelIds[panel.id]))}
     definitionPanels={assembly.editingDefinition.panels} parameters={assembly.editingDefinition.parameters} onParametersChange={assembly.parameters}
@@ -641,7 +641,7 @@ interface RenderInspectorFooterOptions {
 }
 
 function renderInspectorFooter({ constraints, setConstraintFooter, clipboard, attachmentSummary, assembly, attachmentWarning, assemblyHint, managingProjectConstraints, closeProjectConstraints }: RenderInspectorFooterOptions)  {
-  return constraints.editing? <div ref={setConstraintFooter} />:clipboard.active? <><p className="inspector-task-status" role="status">{attachmentSummary||'Choose a + in the workspace to attach.'}</p><Button variant="outline" className="full-button" onClick={clipboard.cancel}>Cancel placement</Button></>:assembly.placementActive? <><p className={`inspector-task-status ${attachmentWarning? 'is-blocked':''}`} role="status">{attachmentSummary||assemblyHint}</p><Button variant="outline" className="full-button" onClick={assembly.clearPlacement}>Cancel attachment</Button></>:managingProjectConstraints? <Button variant="outline" className="full-button" aria-label="Done managing constraints" onClick={closeProjectConstraints}>Done</Button>:undefined
+  return constraints.editing? <div ref={setConstraintFooter} />:clipboard.active? <><p className="inspector-task-status" role="status">{attachmentSummary||'Choose a location and arrangement in the workspace.'}</p><Button variant="outline" className="full-button" onClick={clipboard.cancel}>Cancel</Button></>:assembly.placementActive? <><p className={`inspector-task-status ${attachmentWarning? 'is-blocked':''}`} role="status">{attachmentSummary||assemblyHint}</p><Button variant="outline" className="full-button" onClick={assembly.clearPlacement}>Cancel attachment</Button></>:managingProjectConstraints? <Button variant="outline" className="full-button" aria-label="Done managing constraints" onClick={closeProjectConstraints}>Done</Button>:undefined
 }
 
 interface SelectionBuildToolsProps {

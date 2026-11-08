@@ -190,7 +190,7 @@ interface GetAssemblyPlacementFeedbackOptions {
 
 export function getAssemblyPlacementFeedback({ assembly, clipboard, instance, inspectingConnectors, exploded, realisticPreview }: GetAssemblyPlacementFeedbackOptions) {
   const validTargets=assembly.targets.filter(target => target.project)
-  const assemblyHint=clipboard.active? `Hover a + to preview the ${clipboard.inserting||'copy'}. Click to attach · Esc to cancel.`:instance&&!inspectingConnectors&&!exploded&&!realisticPreview
+  const assemblyHint=clipboard.active? 'Choose a location, then an arrangement · Esc to cancel.':instance&&!inspectingConnectors&&!exploded&&!realisticPreview
     ? validTargets.length? 'Hover a + to preview. Click to attach.':assembly.targets.find(target => target.error)?.error??'This assembly has no compatible corner attachments. Duplicate it to place another instance.'
     :undefined
   const attachmentWarning=clipboard.active? clipboard.hovered?.warning:assembly.target?.warning

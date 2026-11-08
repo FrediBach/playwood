@@ -16,6 +16,7 @@ import { Tooltip } from './ui/tooltip'
 
 type Setter<T> = Dispatch<SetStateAction<T>>
 interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'previewConnections'> {
+  attachmentChooser?: React.ReactNode
   objectPreviewStatus?: string
   boxSelectDisabled?: boolean
   onToggleBoxSelect?: () => void
@@ -86,7 +87,7 @@ export function AssemblyWorkspace({
   attachmentSideGuide, visibleBounds, hasVisiblePanels, onDrillIn,
   attachmentHandles, onAttachmentPreview, onAttachmentCommit, attachmentBoundsPanels,
   suppressedConnectionIds=[], suppressedPanelIds=[], editingAssembly, assemblyHint,
-  attachmentSummary, attachmentWarning
+  attachmentSummary, attachmentWarning, attachmentChooser
 }: Props) {
   const [panMode, setPanMode] = useState(false)
   const [autoFurnish, setAutoFurnish] = useState(false)
@@ -187,6 +188,7 @@ export function AssemblyWorkspace({
     showTransformShortcuts={showTransformShortcuts(boxSelectActive,panelSelectionActive,selectedIds,movementEnabled,editingAssembly,dragging,resizing)}
     roomDetails={realisticPreview&&<RoomDetails hasVisiblePanels={hasVisiblePanels} visibleBounds={visibleBounds} autoFurnish={autoFurnish} setAutoFurnish={setAutoFurnish} furnishedSurfaces={furnishedSurfaces}/>}/>
       {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}
+      {attachmentChooser}
     </main>
 }
 

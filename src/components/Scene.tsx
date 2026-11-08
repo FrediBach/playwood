@@ -49,6 +49,8 @@ export interface AssemblyAttachmentHandle {
   position: Vec3
   label: string
   active?: boolean
+  badge?: string
+  segment?: Vec3[]
   warning?: string
 }
 
@@ -570,6 +572,7 @@ function World(props: WorldProps) {
     {showDimensions && shownPanels.length > 0 && !exploded && <Dimensions bounds={bounds} />}
     <SceneOverlays {...props} shownPanels={shownPanels}/>
     <SceneResizeHandles {...props} feedback={feedback} onInspectBlockers={inspectBlockers}/>
+    {props.attachmentHandles?.filter(handle => handle.active && handle.segment).map(handle => <Line key={handle.id} points={handle.segment!.map(point => point.map(value => value * MM) as Vec3)} color="#e7753f" lineWidth={5} depthTest={false} renderOrder={100}/>)}
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
     <CameraController panMode={props.panMode} bounds={cameraBounds} vacuumDock={vacuumPlan?.dock} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
@@ -653,7 +656,7 @@ function visibleAttachmentHandles(props: SceneProps,controlHeld: boolean) {
 function AttachmentButtons({ attachmentHandles, attachmentElements, props }: { attachmentHandles: AssemblyAttachmentHandle[]; attachmentElements: RefObject<Map<string,HTMLDivElement>>; props: SceneProps })  {
   return <div className="assembly-attachment-layer">{attachmentHandles.map(handle => <div key={handle.id} className="assembly-attachment-anchor" ref={element => { if(element) attachmentElements.current.set(handle.id,element); else attachmentElements.current.delete(handle.id) } }>
     <button
-    className={`assembly-attach-handle ${handle.active? 'is-active':''} ${handle.warning? 'has-warning':''}`}
+    className={`assembly-attach-handle ${handle.badge ? 'is-location' : ''} ${handle.active? 'is-active':''} ${handle.warning? 'has-warning':''}`}
     aria-label={handle.label}
     title={handle.label}
     data-attachment-id={handle.id}
@@ -663,7 +666,7 @@ function AttachmentButtons({ attachmentHandles, attachmentElements, props }: { a
     onFocus={() => props.onAttachmentPreview?.(handle.id)}
     onBlur={() => props.onAttachmentPreview?.(null)}
     onKeyDown={event => { if(event.key!=='Escape'&&!event.ctrlKey&&!event.metaKey) event.stopPropagation() } }
-    onClick={event => { event.stopPropagation(); props.onAttachmentCommit?.(handle.id) } }><Plus size={17} /></button>
+    onClick={event => { event.stopPropagation(); props.onAttachmentCommit?.(handle.id) } }>{handle.badge ?? <Plus size={17} />}</button>{handle.badge && <span className="attachment-location-name">{handle.label}</span>}
   </div>)}</div>
 }
 

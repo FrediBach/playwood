@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { groupPasteLocations } from '@/lib/paste-locations'
 import { copySelection, getPasteTargets, getInsertionTargets, type CopiedItem } from '@/lib/clipboard'
 import { designConstraintPanelIds } from '@/lib/design-constraints'
 import type { AssemblyAttachmentTarget } from '@/lib/assemblies'
@@ -17,13 +18,18 @@ interface Options {
 export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commit, select, prepare, notify }: Options) {
   const [clipboard, setClipboard] = useState<CopiedItem | null>(null)
   const [placement, setPlacement] = useState<{ project: Project; selection: string; insertion?: 'panel' | 'assembly'; targets: AssemblyAttachmentTarget[] } | null>(null)
+  const [locationPage, setLocationPage] = useState(0)
+  const [locationId, setLocationId] = useState<string | null>(null)
+  const [locationHover, setLocationHover] = useState<string | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const selection = JSON.stringify([selectedIds, selectedConnectorIds])
   if (placement && (placement.project !== project || placement.selection !== selection)) {
-    setPlacement(null); setHoverId(null)
+    setPlacement(null); setHoverId(null); setLocationId(null); setLocationHover(null); setLocationPage(0)
   }
   const active = !!placement && placement.project === project && placement.selection === selection
   const targets = active ? placement.targets : []
+  const locations = useMemo(() => groupPasteLocations(active ? placement.targets : []), [active, placement])
+  const location = locations.find(item => item.id === locationId)
   const hovered = targets.find(target => target.id === hoverId)
   const preview = hovered?.project
   const panelIds = useMemo(() => new Set(project.panels.map(panel => panel.id)), [project.panels])
@@ -33,13 +39,18 @@ export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commi
   const addedPanels = (next: Project) => next.panels.filter(panel => !panelIds.has(panel.id))
   const previewPanels = preview ? addedPanels(preview) : []
   const previewConnections = preview?.connections.filter(connection => !connectionValues.has(JSON.stringify(connection))) ?? []
-  const cancel = () => { setPlacement(null); setHoverId(null) }
+  const cancel = () => { setPlacement(null); setHoverId(null); setLocationId(null); setLocationHover(null); setLocationPage(0) }
   return {
-    active, targets, hovered, preview, previewPanels, previewConnections,
+    active, targets, hovered, preview, previewPanels, previewConnections, locations, location, locationHover, locationPage,
+    pageLocations: locations.slice(locationPage * 8, (locationPage + 1) * 8),
+    changeLocationPage: (page: number) => { setLocationPage(page); setLocationHover(null) },
+    hoverLocation: setLocationHover,
+    chooseLocation: (id: string) => { setLocationId(id); setLocationHover(id); setHoverId(null) },
+    back: () => { setLocationId(null); setHoverId(null) },
     inserting: active && placement.insertion,
     suppressedConnectionIds: preview ? project.connections.filter(connection => !previewConnectionIds.has(connection.id)).map(connection => connection.id) : [],
     suppressedPanelIds: preview ? project.panels.filter(panel => !previewPanelIds.has(panel.id)).map(panel => panel.id) : [],
-    boundsPanels: targets.flatMap(target => target.project ? addedPanels(target.project) : []),
+    boundsPanels: previewPanels,
     cancel, hover: setHoverId,
     insert: (item: Exclude<CopiedItem, { kind: 'selection' }>) => {
       cancel()
@@ -51,7 +62,7 @@ export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commi
           return
         }
         prepare(); setPlacement({ project, selection, targets: valid, insertion: item.kind })
-        notify(`Choose a + in the preview to attach the ${item.kind}. Escape cancels.`)
+        notify('')
       } catch (error) { notify((error as Error).message) }
     },
     copy: () => {
@@ -69,8 +80,8 @@ export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commi
         const candidates = getPasteTargets(project, selectedIds, clipboard)
         const valid = candidates.filter(target => target.project)
         if (!valid.length) { cancel(); notify(candidates.find(target => target.error)?.error ?? 'No compatible attachment points on this target.'); return }
-        prepare(); setHoverId(null); setPlacement({ project, selection, targets: valid })
-        notify('Choose a + in the preview to attach the copy. Escape cancels.')
+        prepare(); setHoverId(null); setLocationId(null); setLocationHover(null); setLocationPage(0); setPlacement({ project, selection, targets: valid })
+        notify('')
       } catch (error) { cancel(); notify((error as Error).message) }
     },
     attach: (id: string) => {

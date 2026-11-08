@@ -1,3 +1,4 @@
+import { PastePlacementChooser } from '@/components/PastePlacementChooser'
 import { AssemblyWorkspace } from '@/components/AssemblyWorkspace'
 import type { AttachmentSideGuideState } from '@/components/AttachmentSideGuide'
 import type { BoxSelection } from '@/components/PreviewBoxSelection'
@@ -208,8 +209,9 @@ export function EditorWorkspace({
     visibleBounds={visibleBounds}
     hasVisiblePanels={hasVisiblePanels}
     attachmentHandles={connect.gesture.active?[]:workspaceAttachmentHandles({ constraints, modalOpen, inspectingConnectors, clipboard, validTargets, assembly })}
-    onAttachmentPreview={clipboard.active? clipboard.hover:assembly.hover}
-    onAttachmentCommit={clipboard.active? clipboard.attach:assembly.attach}
+    attachmentChooser={clipboard.active && !modalOpen && <PastePlacementChooser clipboard={clipboard} project={project}/>}
+    onAttachmentPreview={clipboard.active? clipboard.hoverLocation:assembly.hover}
+    onAttachmentCommit={clipboard.active? clipboard.chooseLocation:assembly.attach}
     suppressedConnectionIds={clipboard.active? clipboard.suppressedConnectionIds:assembly.suppressedConnectionIds}
     suppressedPanelIds={clipboard.active? clipboard.suppressedPanelIds:assembly.suppressedPanelIds}
     attachmentBoundsPanels={clipboard.active? clipboard.boundsPanels:assembly.attachmentBoundsPanels}
@@ -259,6 +261,9 @@ interface WorkspaceAttachmentHandlesOptions {
 }
 
 function workspaceAttachmentHandles({ constraints, modalOpen, inspectingConnectors, clipboard, validTargets, assembly }: WorkspaceAttachmentHandlesOptions): AssemblyAttachmentHandle[]|undefined {
+  if (clipboard.active && !constraints.editing && !modalOpen) return clipboard.locations.flatMap((location, index) =>
+    (clipboard.location ? clipboard.location.id !== location.id : !clipboard.pageLocations.includes(location)) ? [] : [{ id: location.id, label: `Choose location ${index + 1}: ${location.label}`,
+      position: location.position, segment: location.segment, badge: `${index + 1}`, active: (clipboard.location?.id ?? clipboard.locationHover) === location.id }])
   return !constraints.editing&&!modalOpen&&!inspectingConnectors? (clipboard.active? clipboard.targets:validTargets).map(target => ({ id: target.id,label: `${clipboard.active? (clipboard.inserting? `Attach ${clipboard.inserting} at`:'Paste at'):'Attach'} ${target.label}${target.warning? ` · ${target.warning}`:''}`,position: target.position,warning: target.warning,active: (clipboard.active? clipboard.hovered:assembly.target)?.id===target.id })):[]
 }
 

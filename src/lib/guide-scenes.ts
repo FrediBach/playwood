@@ -293,8 +293,8 @@ function buildScenes(id: GuideId): GuideScene[] {
       const pasted = attachPanel(p, parent.id, createPanel({ ...copied, id: 'guide-copy', name: 'Copied side' }), { ...options, side: 'left' })
       return [scene(p, 'Copy one panel to reuse its dimensions and finish.', { selected: [copied.id], labels: [label(copied, 'Copy this panel')] }),
         scene(p, 'Select the destination panel before pasting.', { selected: [parent.id], labels: [label(parent, 'Destination panel')] }),
-        scene(pasted, 'Hover or focus a + to preview the copied panel.', { selected: [parent.id], ghost: ['guide-copy'], labels: [label(pasted.panels[2], 'Paste preview at +')] }),
-        scene(pasted, 'Click the + to commit the copy and its connection.', { selected: ['guide-copy'], labels: [label(pasted.panels[2], 'New independent panel')] })]
+        scene(pasted, 'Choose a location, then preview an arrangement.', { selected: [parent.id], ghost: ['guide-copy'], labels: [label(pasted.panels[2], 'Arrangement preview')] }),
+        scene(pasted, 'Choose Attach copy to keep the panels and their connections.', { selected: ['guide-copy'], labels: [label(pasted.panels[2], 'New independent panel')] })]
     }
     case 'multi-select': {
       const p = box(), pair = p.panels.filter(panel => panel.name.startsWith('Shelf')).map(panel => panel.id)

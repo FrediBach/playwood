@@ -279,6 +279,8 @@ export function duplicateAssembly(project: Project, instanceId: string): Project
 
 export interface AssemblyAttachmentTarget {
   id: string; label: string; position: Vec3; project?: Project; error?: string; warning?: string
+  /** Transient destination shared by paste alternatives. */
+  location?: { id: string; label: string; position: Vec3; segment?: Vec3[] }
   /** Surviving placed panels, including retained panels shared with the target. */
   panelIds?: string[]
   /** Original port and rigid pose remain available after an instance is baked. */

@@ -70,6 +70,12 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
   const targets: AssemblyAttachmentTarget[] = parents.flatMap(parent => edges.flatMap(edge => [false, true].map(flip => {
     const rotation = new Quaternion().setFromEuler(new Euler(...parent.rotation))
     const local = edge.position(parent)
+    const world = (point: Vec3) => new Vector3(...point).applyQuaternion(rotation).add(new Vector3(...parent.position)).toArray() as Vec3
+    const vertical = edge.side === 'left' || edge.side === 'right'
+    const segment: [Vec3, Vec3] = vertical
+      ? [world([local[0], -parent.height / 2, 0]), world([local[0], parent.height / 2, 0])]
+      : [world([-parent.width / 2, local[1], 0]), world([parent.width / 2, local[1], 0])]
+    const location = { id: `${parent.id}/${edge.side}`, label: `${parent.name} · ${edge.side} edge`, position: world(local), segment }
     local[2] = (flip ? -1 : 1) * 35
     const position = new Vector3(...local).applyQuaternion(rotation).add(new Vector3(...parent.position)).toArray() as Vec3
     const id = `${parent.id}/${edge.side}/${flip}`
@@ -84,7 +90,7 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
       const issue = validateProject(next).find(item => item.severity === 'error' && !oldErrors.has(item.id) || item.id.startsWith('collision-') && item.panelIds.some(panelId => newIds.has(panelId)))
       if (issue) throw new Error(issue.message)
       if (next.panels.length > 200 || next.connections.length > 400) throw new Error('Projects support up to 200 panels and 400 connections.')
-      return { id, label, position, ...placement }
+      return { id, label, position, location, ...placement }
     } catch (error) { return { id, label, position, error: error instanceof Error ? error.message : 'This copy cannot fit here.' } }
   })))
   return targets.sort((a, b) => Number(!!a.warning) - Number(!!b.warning))
@@ -122,7 +128,11 @@ function getSelectionPasteTargets(project: Project, ids: string[], copied: Copie
     if (translations.some(other => other.distanceTo(translation) < 0.05)) return []
     translations.push(translation)
     const placed = { ...anchor, id: crypto.randomUUID(), position: parent.position }
+    const segment = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]].map(([x, y]) =>
+      new Vector3(x * parent.width / 2, y * parent.height / 2, 0).applyEuler(new Euler(...parent.rotation))
+        .add(new Vector3(...parent.position)).toArray() as Vec3)
     return [{ id: `${parent.id}/shared-panel`, label: `${parent.name} · shared panel`, position: parent.position,
+      location: { id: `${parent.id}/surface`, label: `${parent.name} · shared surface`, position: parent.position, segment },
       project: { ...project, panels: [...project.panels, placed] } }]
   })
   return copied.panels.flatMap(anchor => [...sharedTargets(anchor), ...getInsertionTargets(project, ids, { kind: 'panel', panel: anchor })].map(target => {

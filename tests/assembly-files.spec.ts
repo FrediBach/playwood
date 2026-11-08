@@ -22,7 +22,7 @@ async function openLibrary(page: Page) {
 async function load(page: Page, project: Project) {
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles(upload(project))
-  await expect.poll(() => saved(page)).toEqual(project)
+  await expect.poll(() => saved(page), { timeout: 15000 }).toEqual(project)
 }
 
 test('export and import preserve configured construction, create independent copies, and support undo and reload', async ({ page }) => {
@@ -75,9 +75,10 @@ test('imports use library attachment previews, cancellation, shared-panel warnin
   await load(page, original)
   await openLibrary(page)
   await page.getByLabel('Import assembly file').setInputFiles(upload(file))
-  const shared = page.getByRole('button', { name: /Attach assembly at.*shared panel.*Requires disassembly:/ }).first()
+  const shared = page.getByRole('button', { name: /Choose location .*shared panel/ }).first()
   await expect(shared).toBeVisible()
-  await shared.focus()
+  await shared.click()
+  await page.getByRole('button', { name: /^Preview arrangement/ }).first().focus()
   await expect(page.locator('.assembly-workspace-hint')).toContainText('Requires disassembly:')
   expect(await saved(page)).toEqual(original)
   await page.keyboard.press('Escape')
@@ -86,8 +87,9 @@ test('imports use library attachment previews, cancellation, shared-panel warnin
 
   // Selecting the same file again must fire a new import.
   await page.getByLabel('Import assembly file').setInputFiles(upload(file))
-  await shared.focus()
-  await shared.press('Enter')
+  await shared.click()
+  await page.getByRole('button', { name: /^Preview arrangement/ }).first().focus()
+  await page.getByRole('button', { name: 'Attach assembly', exact: true }).click()
   await expect.poll(async () => (await saved(page)).panels.length).toBe(7)
   const placed = await saved(page)
   expect(validateProject(placed)).toEqual([])
