@@ -343,7 +343,7 @@ An assembly endpoint normally contains `instanceId` and `portId`. When disassemb
 | Edit shared definition | Update source panels, rebuild all linked copies, preserve retained parameter and finish overrides, and realign neighbors |
 | Make independent | Clone the definition and retarget one instance while preserving its physical connections |
 | Disconnect | Remove that instance's assembly links and place it separately; neighboring corner hardware is restored |
-| Disassemble | Remove instance ownership while keeping its panels and physical joints in place; retain the definition for later reuse |
+| Disassemble | Remove instance ownership while keeping its panels and physical joints in place; retain the definition for later reuse. `disassembleAssemblies` combines selected instances into one candidate, converting joints between disassembled neighbors into ordinary hardware. |
 | Remove instance | Remove its materialized panels and incident links, rebuilding surviving hardware |
 | Close an instance opening | Fork that instance's evaluated source, add a fitted closing panel, and preserve physical links without closing other copies |
 | Move instances | Translate the connected physical set, including linked neighbors and connected ordinary panels, as rigid objects |

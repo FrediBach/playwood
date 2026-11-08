@@ -1,7 +1,7 @@
 import {
   AssemblyAttachmentTarget, acceptAssemblyParameterBatch,
   createAssembly,
-  disassembleAssembly,
+  disassembleAssemblies,
   disconnectAssembly,
   duplicateAssembly,getAssemblyAttachmentTargets,getAssemblyInstance,
   instantiateAssembly,
@@ -38,7 +38,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
   if (placement && (!instanceIds.has(placement.targetId) || placement.sourceId && !instanceIds.has(placement.sourceId))) setPlacement(null)
   const editingInstance = instances.find(instance => instance.id === editingId)
   const editingDefinition = definitions.find(definition => definition.id === editingInstance?.definitionId)
-  const { selectedInstance,memberInstance,hasMembers,definition }=getAssemblySelection(selectedIds,project,editingInstance,definitions)
+  const { selectedInstance,selectedInstances,memberInstance,hasMembers,definition }=getAssemblySelection(selectedIds,project,editingInstance,definitions)
   const targetInstanceId = !editingInstance ? selectedInstance?.id : undefined
   const sourceInstanceId = placement && placement.targetId === targetInstanceId ? placement.sourceId : undefined
   const targets = useMemo(() => {
@@ -95,7 +95,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
   }
   const attach = createAttachmentCommand(targets,notify,sourceInstanceId,instances,commit,select,close,setSelectedIds,sourceIds,existingIds,prepareSelection,fit)
   return {
-    instances, definitions, selectedInstance, memberInstance, hasMembers, definition,
+    instances, definitions, selectedInstance, selectedInstances, memberInstance, hasMembers, definition,
     editingInstance, editingDefinition, targets, target, preview, previewPanels, previewConnections, suppressedConnectionIds, suppressedPanelIds, attachmentBoundsPanels,
     placementActive: !!placement && placement.targetId === targetInstanceId,
     select, edit, drillIn, updateDefinition, close, clearPlacement,
@@ -117,14 +117,17 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
     remove: (id: string) => run(() => removeAssembly(project, id), 'Instance removed. Neighboring connectors restored.'),
     disconnect: (id: string) => { if (run(() => disconnectAssembly(project, id), 'Instance disconnected and moved clear of its neighbors. Corner connectors restored.')) fit() },
     independent: (id: string) => run(() => makeAssemblyIndependent(project, id), 'Instance now has its own assembly design. Physical connections kept.'),
-    disassemble: (id: string) => {
-      const instance = instances.find(item => item.id === id)
-      if (!instance) return
-      if (run(() => disassembleAssembly(project, id), 'Assembly disassembled. Its panels are editable separately. Undo to restore the instance.')) {
+    disassemble: (ids: string | string[]) => {
+      const selected = new Set(typeof ids === 'string' ? [ids] : ids)
+      const instanceIds = [...selected]
+      if (!instanceIds.length) return
+      try {
+        commit(current => disassembleAssemblies(current, instanceIds))
         close()
-        setSelectedIds(Object.values(instance.panelIds))
+        setSelectedIds([...new Set([...selectedIds, ...instances.filter(instance => selected.has(instance.id)).flatMap(instance => Object.values(instance.panelIds))])])
         prepareSelection()
-      }
+        notify(instanceIds.length === 1 ? 'Assembly disassembled. Its panels are editable separately. Undo to restore the instance.' : `${instanceIds.length} assemblies disassembled. Their panels are editable separately. Undo to restore the instances.`)
+      } catch (error) { notify(error instanceof Error ? error.message : 'These assemblies could not be disassembled.') }
     },
     rename: (id: string, name: string) => run(() => renameAssembly(project, id, name)),
     finish: (id: string, finish: AssemblyFinish) => run(() => updateAssemblyFinish(project, id, finish)),
@@ -181,10 +184,12 @@ function useAssemblyPreview(target: AssemblyAttachmentTarget|undefined,project: 
 }
 
 function getAssemblySelection(selectedIds: string[],project: Project,editingInstance: AssemblyInstance|undefined,definitions: AssemblyDefinition[]) {
+  const selected = new Set(selectedIds)
+  const selectedInstances = editingInstance ? [] : (project.assemblies?.instances ?? []).filter(instance => Object.values(instance.panelIds).every(id => selected.has(id)))
   const owners=selectedIds.map(id => getAssemblyInstance(project,id))
   const memberInstance=owners[0]&&owners.every(owner => owner?.id===owners[0]?.id)? owners[0]:undefined
   const selectedInstance=!editingInstance&&memberInstance&&Object.values(memberInstance.panelIds).length===selectedIds.length? memberInstance:undefined
   const definition=definitions.find(item => item.id===(selectedInstance??memberInstance)?.definitionId)
   const hasMembers=owners.some(Boolean)
-  return { selectedInstance,memberInstance,hasMembers,definition }
+  return { selectedInstance,selectedInstances,memberInstance,hasMembers,definition }
 }

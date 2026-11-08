@@ -2,7 +2,8 @@ import { openInspectorSection } from './inspector-helpers'
 import { test, expect, type Page } from '@playwright/test'
 import { Euler, Quaternion } from 'three'
 import { createExampleProject } from '../src/lib/example-library'
-import { validateProject } from '../src/lib/model'
+import { createPanel, validateProject } from '../src/lib/model'
+import { createAssembly, duplicateAssembly, makeAssemblyIndependent, updateAssemblyDefinition } from '../src/lib/assemblies'
 import type { Project } from '../src/lib/types'
 
 async function exportedProject(page: Page): Promise<Project> {
@@ -285,6 +286,84 @@ test('corner handles build the four-box Diamond, reconcile hardware, and restore
   await importProject(page, tilted)
   expect(await exportedProject(page)).toEqual(tilted)
   expect(errors).toEqual([])
+})
+
+for (const action of ['inspector', 'narrow inspector', 'context menu'] as const) test(`disassembles multiple selected assemblies from the ${action} as one persistent undoable edit`, async ({ page }) => {
+  test.setTimeout(90000)
+  await page.goto('/')
+  await importProject(page, createExampleProject('diamond-shelf'))
+  const before = await exportedProject(page)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  if (action !== 'context menu') {
+    if (action === 'narrow inspector') {
+      await page.setViewportSize({ width: 390, height: 844 })
+      const open = page.getByRole('button', { name: 'Open inspector', exact: true })
+      if (await open.isVisible()) await open.click()
+    }
+    await openInspectorSection(page, 'Manage assemblies')
+    if (action === 'narrow inspector') {
+      await page.getByRole('button', { name: 'Disassemble', exact: true }).scrollIntoViewIfNeeded()
+      await expect(page.getByRole('button', { name: 'Disassemble', exact: true })).toBeInViewport()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      await page.screenshot({ path: 'test-results/batch-disassemble-narrow.png' })
+    }
+    await page.getByRole('button', { name: 'Disassemble', exact: true }).click()
+  } else {
+    await page.locator('canvas').focus()
+    await page.keyboard.press('Shift+F10')
+    await page.getByRole('menuitem', { name: 'Disassemble', exact: true }).click()
+  }
+  if (action === 'narrow inspector') await page.setViewportSize({ width: 1440, height: 1000 })
+  await expect(page.locator('[data-assembly-id]')).toHaveCount(0)
+  await expect(page.locator('.panel-list-row.selected')).toHaveCount(16)
+  const after = await exportedProject(page)
+  expect(after.assemblies?.instances).toEqual([])
+  expect(after.assemblies?.links).toEqual([])
+  expect(after.assemblies?.loosePorts).toEqual([])
+  expect(after.assemblies?.definitions).toEqual(before.assemblies?.definitions)
+  expect(after.connections).toEqual(before.connections)
+  expectPanelsPreserved(before, after)
+  expect(validateProject(after).filter(issue => issue.severity === 'error' || issue.id.endsWith('-alignment'))).toEqual([])
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(before)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  expect(await exportedProject(page)).toEqual(after)
+  await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible()
+  await page.reload()
+  expect(await exportedProject(page)).toEqual(after)
+})
+
+test('batch disassembly preserves ordinary panels and partially selected assemblies in a mixed selection', async ({ page }) => {
+  const cube = createExampleProject('cube')
+  let project = createAssembly(cube, cube.panels.map(panel => panel.id), 'Box')
+  const original = project.assemblies!.instances[0].id
+  project = duplicateAssembly(project, original)
+  project = duplicateAssembly(project, original)
+  const remaining = project.assemblies!.instances[2]
+  project = makeAssemblyIndependent(project, remaining.id)
+  project = updateAssemblyDefinition(project, original, { name: 'Batch selection' })
+  project = updateAssemblyDefinition(project, remaining.id, { name: 'Unselected' })
+  project = updateAssemblyDefinition(project, remaining.id, { name: 'Batch selection' }, [Object.keys(remaining.panelIds)[0]])
+  project.panels.push(createPanel({ name: 'Batch selection loose panel', position: [2000, 500, 0] }))
+  await page.goto('/')
+  await importProject(page, project)
+  const before = await exportedProject(page)
+  await page.getByRole('button', { name: 'Filter panels', exact: true }).click()
+  const filters = page.getByRole('dialog', { name: 'Filter panels', exact: true })
+  await filters.getByRole('searchbox', { name: 'Search', exact: true }).fill('Batch selection')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await openInspectorSection(page, 'Manage assemblies')
+  await page.getByRole('button', { name: 'Disassemble', exact: true }).click()
+  await expect(page.locator('.panel-list-row.selected')).toHaveCount(9)
+  await expect(page.locator('.assembly-tree-panel.is-selected')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Disassemble', exact: true })).toHaveCount(0)
+  const after = await exportedProject(page)
+  expect(after.assemblies!.instances).toEqual([before.assemblies!.instances[2]])
+  expect(after.panels).toEqual(before.panels)
+  expect(after.connections).toEqual(before.connections)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  expect(await exportedProject(page)).toEqual(before)
 })
 
 test('disassembling a free copy preserves its finish and hardware as independently editable panels', async ({ page }) => {

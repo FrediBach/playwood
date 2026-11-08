@@ -174,9 +174,11 @@ The principal paths are:
 | Reset instance dimensions | `resetAssemblyParameterValues` | Restores source defaults |
 | Change/reset instance appearance | `updateAssemblyFinish` / `resetAssemblyFinish` | Changes the instance override, including independent color/coverage reset |
 | Make independent | `makeAssemblyIndependent` | Gives an instance a separate source while retaining physical links |
-| Disassemble | `disassembleAssembly` | Removes instance membership while retaining editable panels and physical joints |
+| Disassemble | `disassembleAssemblies` / `disassembleAssembly` | Removes membership for fully selected instances while retaining editable panels and physical joints |
 
 These operations live in [assemblies.ts](../src/lib/assemblies.ts) and its supporting parameter/rescale modules. The hook's `run` wrapper commits a successful model result and catches rejected operations. A shared editing session is a UI mode, not one long transaction: accepted edits commit as they occur. Done editing leaves that mode and selects the whole instance. Only a form with an explicit local draft, such as Editable values, waits for Save.
+
+Batch disassembly is available in the multi-selection inspector and preview context menu. `useAssemblyEditor.selectedInstances` contains only fully selected instances outside shared-source editing. The command applies `disassembleAssemblies` through one functional commit against the latest project, preserving the panel selection and making the entire batch one Undo step. Ordinary panels and partially selected instances in a mixed selection remain unchanged.
 
 Selecting hardware leaves shared-source editing because connector changes apply to materialized instance hardware. Directly changing assembly member panels in the project would bypass the definition, instance mappings, and shared-link rebuild logic.
 

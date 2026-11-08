@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { gridProject } from './example-geometry'
 import { Euler, Vector3 } from 'three'
 import { attachExistingPanel, createPanel, detachPanel, getProjectBounds, parseProject, removePanel, rotateProject, validateProject } from './model'
-import { createAssembly, disassembleAssembly, disconnectAssembly, duplicateAssembly, getAssemblyAttachmentTargets, getAssemblyInstance, getAssemblyMovementPanelIds, instantiateAssembly, isPanelConnectedToAssembly, makeAssemblyIndependent, materializeAssemblies, moveAssemblies, removeAssembly, renameAssembly, resetAssemblyFinish, updateAssemblyDefinition, updateAssemblyFinish } from './assemblies'
+import { createAssembly, disassembleAssemblies, disassembleAssembly, disconnectAssembly, duplicateAssembly, getAssemblyAttachmentTargets, getAssemblyInstance, getAssemblyMovementPanelIds, instantiateAssembly, isPanelConnectedToAssembly, makeAssemblyIndependent, materializeAssemblies, moveAssemblies, removeAssembly, renameAssembly, resetAssemblyFinish, updateAssemblyDefinition, updateAssemblyFinish } from './assemblies'
 import { movePanels, resizePanels } from './structure-edit'
 import type { Project } from './types'
 
@@ -141,7 +141,7 @@ describe('reusable assemblies', () => {
 
   it('turns joints between fully disassembled boxes into ordinary editable cross joints', () => {
     const project = rotateProject(diamond(), 'z', 45)
-    const next = project.assemblies!.instances.reduce((current, instance) => disassembleAssembly(current, instance.id), project)
+    const next = disassembleAssemblies(project, project.assemblies!.instances.map(instance => instance.id))
     expect(next.assemblies!.instances).toEqual([])
     expect(next.assemblies!.links).toEqual([])
     expect(next.assemblies!.loosePorts).toEqual([])
@@ -152,6 +152,25 @@ describe('reusable assemblies', () => {
     expect(validateProject(moved)).toEqual([])
     expect(roundTripProject(moved)).toEqual(moved)
     expect(count(moved, 'cross')).toBe(8)
+  })
+
+  it('disassembles a batch without changing neighboring instances, finishes, hardware or the source snapshot', () => {
+    const initial = rotateProject(diamond(), 'z', 45)
+    const ids = initial.assemblies!.instances.slice(0, 2).map(instance => instance.id)
+    const project = updateAssemblyFinish(initial, ids[0], { color: '#123456', material: 'oak' })
+    const before = structuredClone(project)
+    const next = disassembleAssemblies(project, [...ids, ids[0]])
+    expect(next.assemblies!.instances).toEqual(project.assemblies!.instances.slice(2))
+    expect(next.assemblies!.definitions).toBe(project.assemblies!.definitions)
+    expect(next.panels).toBe(project.panels)
+    expect(next.connections).toBe(project.connections)
+    expect(next.connectorOverrides).toBe(project.connectorOverrides)
+    expect(next.assemblies!.links.every(link => !ids.includes(link.a.instanceId ?? '') && !ids.includes(link.b.instanceId ?? ''))).toBe(true)
+    expect(validateProject(next)).toEqual([])
+    expect(roundTripProject(next)).toEqual(next)
+    expect(disassembleAssemblies(project, [])).toBe(project)
+    expect(() => disassembleAssemblies(project, [...ids, 'missing-instance'])).toThrow()
+    expect(project).toEqual(before)
   })
 
   it('restores a loose corner when its neighboring instance is removed or disconnected', () => {

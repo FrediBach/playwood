@@ -33,7 +33,7 @@ import { objectConversionReason } from '@/lib/object-conversion'
 import { parallelPanelCut } from '@/lib/parallel-panels'
 import { updateSelectedConnections } from '@/lib/selection'
 import type { AssemblyDefinition,AssemblyInstance,AttachmentOptions,Connection,ConnectorType,Panel,Project,ValidationIssue } from '@/lib/types'
-import { Box,Copy,Link2,MousePointer2,Plus,Trash2 } from 'lucide-react'
+import { Box,Copy,Link2,MousePointer2,Plus,Trash2,Ungroup } from 'lucide-react'
 import { type SetStateAction } from 'react'
 
 
@@ -322,7 +322,17 @@ function SelectionInspector({
     name={assembly.editingDefinition.name} count={assemblyCount(assembly.editingDefinition.id)} onChange={assembly.updateDefinition} accessories={trofastInspector} />
   if (instance&&assembly.definition) return <SelectedAssemblyInspector definition={assembly.definition} buildTools={buildTools} instance={instance} assembly={assembly} assemblyCount={assemblyCount} selectedPanels={selectedPanels} selectedFinishCoverages={selectedFinishCoverages} project={project} assemblyHint={assemblyHint} validTargets={validTargets} duplicateSelected={duplicateSelected} exportAssembly={exportAssembly} clipboard={clipboard} deleteSelected={deleteSelected} />
   if (assembly.memberInstance&&selected&&assembly.definition) return <><AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={() => assembly.select(assembly.memberInstance!.id)} onEdit={() => assembly.edit(assembly.memberInstance!.id)} />{buildTools}</>
-  if (assembly.hasMembers) return <><div className="selected-heading"><Box size={15} /><span>MULTIPLE OBJECTS</span></div><p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p><AssemblyBatchValues key={selectionKey} project={project} selectedIds={selectedIds} onApply={assembly.applyParameterBatch}/>{buildTools}<div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15} />Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15} />Remove</Button></div></>
+  if (assembly.hasMembers) return <>
+    <div className="selected-heading"><Box size={15} /><span>MULTIPLE OBJECTS</span></div>
+    <p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p>
+    <AssemblyBatchValues key={selectionKey} project={project} selectedIds={selectedIds} onApply={assembly.applyParameterBatch}/>
+    {buildTools}
+    {!!assembly.selectedInstances.length&&<InspectorDisclosure title="Manage assemblies" summary={`${assembly.selectedInstances.length} selected`}>
+      <Button variant="ghost" size="sm" onClick={() => assembly.disassemble(assembly.selectedInstances.map(item => item.id))}><Ungroup size={14}/>Disassemble</Button>
+      <p className="field-note">Turn fully selected assemblies into separate editable panels. Panels and connectors stay in place. Undo restores all instances together.</p>
+    </InspectorDisclosure>}
+    <div className="panel-actions"><Button variant="outline" onClick={duplicateSelected}><Copy size={15} />Duplicate selection</Button><Button variant="ghost" onClick={deleteSelected}><Trash2 size={15} />Remove</Button></div>
+  </>
   return <LoosePanelSelectionInspector
     selectedPanels={selectedPanels}
     distributeSelection={distributeSelection}

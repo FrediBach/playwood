@@ -18,7 +18,7 @@ interface MenuContext {
   selectedIdSet: Set<string>
   inspectingConnectors: boolean
   modalOpen: boolean
-  assembly: Pick<ReturnType<typeof useAssemblyEditor>, 'editingInstance' | 'selectedInstance' | 'memberInstance' | 'hasMembers' | 'done' | 'edit' | 'select' | 'disconnect' | 'independent' | 'disassemble'>
+  assembly: Pick<ReturnType<typeof useAssemblyEditor>, 'editingInstance' | 'selectedInstance' | 'selectedInstances' | 'memberInstance' | 'hasMembers' | 'done' | 'edit' | 'select' | 'disconnect' | 'independent' | 'disassemble'>
   canAddConnectorsBetween?: boolean
   canConnectWithPanel: boolean
   canAttachPanel?: boolean
@@ -110,7 +110,6 @@ function addPanelActions(context: MenuContext, menuAction: AddAction) {
       if (canAttachCopy) menuAction('Assembly', 'Attach a copy',Copy,actions.attachCopy)
       if (project.assemblies?.links.some(link=>link.a.instanceId===instance.id||link.b.instanceId===instance.id)) menuAction('Assembly', 'Disconnect from neighbors',Unlink,()=>assembly.disconnect(instance.id))
       menuAction('Assembly', 'Make independent',Unlink,()=>assembly.independent(instance.id))
-      menuAction('Assembly', 'Disassemble',Ungroup,()=>assembly.disassemble(instance.id))
     } else if (assembly.memberInstance) {
       const memberInstance = assembly.memberInstance
       menuAction('Assembly', 'Select assembly',Box,()=>assembly.select(memberInstance.id))
@@ -118,6 +117,7 @@ function addPanelActions(context: MenuContext, menuAction: AddAction) {
     } else if (!assembly.hasMembers) {
       addLoosePanelActions(context, menuAction)
     }
+    if (assembly.selectedInstances.length) menuAction('Assembly', 'Disassemble',Ungroup,()=>assembly.disassemble(assembly.selectedInstances.map(item => item.id)))
     if (instance || !assembly.hasMembers) for (const [index, hole] of holes.entries()) menuAction('Build', `${hole.alignment ? 'Review hole fit' : 'Fill hole'} · ${hole.label}`,Square,()=>closeHole(hole.id),false,false,`h ${String(index + 1).split('').join(' ')} Enter`, `hole/${hole.id}`)
     menuAction('Selection', 'Copy',Clipboard,actions.copy)
     if (!assembly.memberInstance || instance) {

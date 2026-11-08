@@ -444,6 +444,11 @@ export function disconnectAssembly(project: Project, instanceId: string): Projec
   return assertDesignConstraintEdit(project, rebuild(project, separateInstance(project, { ...data, links }, instanceId)))
 }
 
+/** Bake selected instances into one candidate while retaining all physical joints. */
+export function disassembleAssemblies(project: Project, instanceIds: readonly string[]): Project {
+  return [...new Set(instanceIds)].reduce(disassembleAssembly, project)
+}
+
 /** Bake only this instance; mixed corner joints retain their existing hardware. */
 export function disassembleAssembly(project: Project, instanceId: string): Project {
   const instance = instanceFor(project, instanceId), data = project.assemblies!, definition = evaluatedFor(data, instance)
