@@ -1,15 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { getGuideScene } from './guide-scenes'
 import { BUILD_GUIDES } from './build-guides'
-import { getProjectBounds, resolvePanels, validateProject } from './model'
+import { createStarterProject, getProjectBounds, resolvePanels, validateProject } from './model'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { GuidePreview } from '@/components/GuidePreview'
 import { evaluateDesignConstraints } from './design-constraints'
+import { getPhysicalConnectors } from './connector-selection'
+import { guideFurnishings } from './guide-file-scenes'
 
 const guideIds = BUILD_GUIDES.map(guide => guide.id)
 
 describe('beginner guide project studies', () => {
+  it('keeps lesson navigation unique and all related guides reachable', () => {
+    expect(new Set(guideIds).size).toBe(guideIds.length)
+    for (const guide of BUILD_GUIDES) {
+      expect(guide.steps).toHaveLength(4)
+      for (const related of guide.related) expect(guideIds).toContain(related)
+    }
+  })
+
   it.each(guideIds)('%s produces four finite, readable scene snapshots', id => {
     for (let step = 0; step < 4; step++) {
       const scene = getGuideScene(id, step)
@@ -25,6 +35,7 @@ describe('beginner guide project studies', () => {
       }
       expect(scene.selected.every(id => panels.some(panel => panel.id === id))).toBe(true)
       expect(scene.ghost.every(id => panels.some(panel => panel.id === id))).toBe(true)
+      expect((scene.ghostConnectors ?? []).every(id => getPhysicalConnectors(scene.project).some(piece => piece.id === id))).toBe(true)
       expect(scene.labels.every(label => !!label.point || panels.some(panel => panel.id === label.panelId))).toBe(true)
       expect(validateProject(scene.project).filter(issue => issue.severity === 'error')).toEqual([])
       expect(getGuideScene(id, step)).toBe(scene)
@@ -112,6 +123,17 @@ describe('beginner guide project studies', () => {
     expect(palette.panels.every(panel => panel.color === '#d9bd8c')).toBe(true)
   })
 
+  it('keeps guide furnishings repeatable across fresh example identities', () => {
+    const first = createStarterProject('shelf'), second = createStarterProject('shelf')
+    const snapshot = structuredClone(first)
+    const normalize = (project: typeof first) => guideFurnishings(project).map(item => ({
+      ...item, panelId: project.panels.find(panel => panel.id === item.panelId)!.name,
+    }))
+    expect(normalize(first).length).toBeGreaterThan(0)
+    expect(normalize(first)).toEqual(normalize(second))
+    expect(first).toEqual(snapshot)
+  })
+
   it('illustrates surface height and minimum clear gap using the real rule commands', () => {
     const raised = getGuideScene('constraints', 1).project
     const finished = getGuideScene('constraints', 3).project
@@ -121,5 +143,58 @@ describe('beginner guide project studies', () => {
     expect(measurements.every(result => result.violation === 0)).toBe(true)
     expect(measurements.find(result => result.constraint.kind === 'floor')!.actual).toBeCloseTo(800)
     expect(measurements.find(result => result.constraint.kind === 'gap')!.actual).toBeCloseTo(200)
+  })
+
+  it('previews just the newly drawn connector without changing boards or installed pieces', () => {
+    const original = getGuideScene('draw-connectors', 0)
+    const preview = getGuideScene('draw-connectors', 1)
+    const accepted = getGuideScene('draw-connectors', 2)
+    expect(resolvePanels(accepted.project)).toEqual(resolvePanels(original.project))
+    expect(getPhysicalConnectors(original.project)).toHaveLength(2)
+    expect(getPhysicalConnectors(accepted.project)).toHaveLength(3)
+    expect(preview.ghost).toEqual([])
+    expect(preview.ghostConnectors).toEqual(accepted.selectedConnectors)
+    expect(preview.project).toBe(accepted.project)
+    expect(getPhysicalConnectors(accepted.project).slice(0, 2).map(piece => piece.id))
+      .toEqual(getPhysicalConnectors(original.project).map(piece => piece.id))
+  })
+
+  it('raises the illustrated upper compartment without resizing it or moving the base', () => {
+    const original = getGuideScene('selection-stretch', 0), moved = getGuideScene('selection-stretch', 2)
+    expect(original.selected).toHaveLength(4)
+    for (const panel of resolvePanels(original.project)) {
+      const after = resolvePanels(moved.project).find(item => item.id === panel.id)!
+      if (original.selected.includes(panel.id)) {
+        expect(after.position[1]).toBeCloseTo(panel.position[1] + 80)
+        expect([after.width, after.height, after.thickness, ...after.rotation]).toEqual([panel.width, panel.height, panel.thickness, ...panel.rotation])
+      } else if (panel.name === 'Bottom shelf') expect(after).toEqual(panel)
+      else expect(after.width).toBeCloseTo(panel.width + 80)
+    }
+    expect(getGuideScene('selection-stretch', 3).project).toBe(original.project)
+  })
+
+  it('shows the stated cut sizes, persistent locks, gap fill, and overlap repair', () => {
+    const equal = getGuideScene('equal-sizes', 2).project
+    expect(equal.panels.map(panel => panel.width)).toEqual([520, 520])
+    expect(equal.constraints ?? []).toHaveLength(0)
+    expect(getGuideScene('equal-sizes', 3).project.constraints).toHaveLength(4)
+    const pair = getGuideScene('merge-panels', 0).project, merged = getGuideScene('merge-panels', 2).project
+    expect(merged.panels).toHaveLength(1)
+    expect(merged.panels[0]).toMatchObject({ id: pair.panels[0].id, width: 635, height: 300, thickness: 18 })
+    expect(getProjectBounds(resolvePanels(merged))).toEqual(getProjectBounds(resolvePanels(pair)))
+    expect(validateProject(getGuideScene('repair-overlaps', 0).project).some(issue => issue.message.includes('overlaps'))).toBe(true)
+    expect(validateProject(getGuideScene('repair-overlaps', 2).project)).toEqual([])
+  })
+
+  it('measures the illustrated fixed center, aligned backs, and equal openings', () => {
+    const project = getGuideScene('reference-rules', 3).project
+    const measurements = evaluateDesignConstraints(project.constraints, resolvePanels(project))
+    expect(measurements).toHaveLength(3)
+    expect(measurements.every(result => result.violation === 0)).toBe(true)
+    expect(measurements.find(result => result.constraint.kind === 'position')!.actual).toBeCloseTo(-400)
+    expect(measurements.find(result => result.constraint.kind === 'setback')!.actual).toBeCloseTo(0)
+    const panels = resolvePanels(project)
+    expect(panels[1].position[0] - panels[0].position[0] - 18).toBe(382)
+    expect(panels[2].position[0] - panels[1].position[0] - 18).toBe(382)
   })
 })

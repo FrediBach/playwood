@@ -1,3 +1,5 @@
+import { buildEditingGuideScenes } from './guide-editing-scenes'
+import { buildFileGuideScenes, guideFurnishings } from './guide-file-scenes'
 import { buildObjectGuideScenes } from './guide-object-scenes'
 import type { ObjectSurface } from './object-geometry'
 import type { GuideId } from './build-guide-types'
@@ -19,7 +21,7 @@ import { splitPanelGrid } from './grid-split'
 import { getRescaleValues, rescaleProject } from './project-rescale'
 import { addCustomColor, removeCustomColor, updateCustomColor } from './custom-colors'
 import { snapPanelDelta } from './preview-snap'
-import { detectPreviewFurnishings, type FurnishingPlacement } from './preview-furnishings'
+import type { FurnishingPlacement } from './preview-furnishings'
 import { setDesignConstraint } from './design-constraint-commands'
 
 export interface GuideScene {
@@ -32,6 +34,7 @@ export interface GuideScene {
   view?: 'front' | 'side' | 'top'
   dimensions?: boolean
   selectedConnectors?: string[]
+  ghostConnectors?: string[]
   resizeHandles?: (PreviewResizeHandle & { distance?: number })[]
   outlinePoints?: boolean
   room?: boolean
@@ -79,6 +82,15 @@ function attachedGuideCopy(project: Project, instanceId: string): Project {
 
 function buildScenes(id: GuideId): GuideScene[] {
   switch (id) {
+    case 'draw-connectors':
+    case 'selection-stretch':
+    case 'equal-sizes':
+    case 'merge-panels':
+    case 'reference-rules':
+    case 'repair-overlaps': return buildEditingGuideScenes(id)
+    case 'folder-sync':
+    case 'connector-order':
+    case 'blender-export': return buildFileGuideScenes(id)
     case 'boolean-objects': return buildObjectGuideScenes(false)
     case 'object-solver': return buildObjectGuideScenes(true)
     case 'constraints': {
@@ -163,7 +175,7 @@ function buildScenes(id: GuideId): GuideScene[] {
       const p = createStarterProject('shelf')
       return [scene(p, 'Inspect the assembled shelf in Studio before opening Realistic preview.', { dimensions: true }),
         scene(p, 'The 165 cm floor lamp gives the furniture a familiar reference in the room.', { room: true }),
-        scene(p, 'Auto furnish places books and decor on suitable visible shelves without adding project parts.', { room: true, furnishings: detectPreviewFurnishings(resolvePanels(p)) }),
+        scene(p, 'Auto furnish places books and decor on suitable visible shelves without adding project parts.', { room: true, furnishings: guideFurnishings(p) }),
         scene(p, 'Return to Studio to keep editing the same panels, dimensions, and connections.', { dimensions: true, selected: [p.panels[4].id] })]
     }
     case 'workspace': {

@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 import { BUILD_GUIDES } from '../src/lib/build-guides'
 
+const newGuides = ['draw-connectors', 'selection-stretch', 'equal-sizes', 'merge-panels', 'reference-rules', 'repair-overlaps', 'folder-sync', 'connector-order', 'blender-export']
+
 async function openGuide(page: Page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Open building guide', exact: true }).click()
@@ -29,6 +31,7 @@ test('every building technique has four illustrated steps without another WebGL 
       await expect(illustration).toHaveAccessibleName(/\S+/)
       expect(await illustration.locator('polygon, path').count()).toBeGreaterThan(0)
       await expect(article.getByText('What you should see', { exact: true })).toBeVisible()
+      if (newGuides.includes(id) && step === 3) await page.screenshot({ path: `test-results/guide-${id}-step-${step}.png` })
       if (id === 'connect-panel' && (step === 2 || step === 4)) await page.screenshot({ path: `test-results/guide-connect-panel-step-${step}.png` })
       if (['boolean-objects', 'object-solver', 'resize'].includes(id) || ['projects', 'box-select', 'grid-split', 'snap-settings', 'constraints', 'palette', 'move-creation', 'rescale', 'room-preview'].includes(id)) await page.screenshot({ path: `test-results/guide-${id}-step-${step}.png` })
       if (step < 4) await article.getByRole('button', { name: 'Next step', exact: true }).click()
@@ -45,7 +48,7 @@ test('search, direct step selection, related guides and keyboard reference are u
   const search = page.getByRole('searchbox', { name: 'Search guides' })
   await search.fill('auto-add')
   await expect(page.locator('[data-guide-id="auto-connect"]')).toBeVisible()
-  for (const [query, id] of [['Auto furnish', 'room-preview'], ['Finish coverage', 'finishes'], ['Shift before', 'resize'], ['50 mm clearance', 'move-creation'], ['Replacement color', 'palette'], ['grid spacings', 'snap-settings'], ['X dividers', 'grid-split'], ['20 cm', 'constraints'], ['Same level above floor', 'constraints'], ['Boolean logic', 'boolean-objects'], ['Union', 'boolean-objects'], ['Subtract', 'boolean-objects'], ['Intersect', 'boolean-objects'], ['object solver', 'object-solver'], ['Convert to panels', 'object-solver'], ['corner cutouts', 'object-solver'], ['TROFAST', 'first-panel'], ['Filter panels', 'groups'], ['Filter connectors', 'groups'], ['Extend to ground', 'resize'], ['mirror', 'rotate'], ['Distribute evenly', 'multi-select'], ['Only nice values', 'rescale'], ['Metal', 'connectors'], ['Separate overlapping connectors', 'connectors'], ['Add connectors between', 'connectors'], ['Nazena', 'finishes'], ['vacuum', 'room-preview'], ['Panel cutting SVGs', 'save-export'], ['Build space', 'constraints']]) {
+  for (const [query, id] of [['Auto furnish', 'room-preview'], ['Finish coverage', 'finishes'], ['Shift before', 'resize'], ['50 mm clearance', 'move-creation'], ['Replacement color', 'palette'], ['grid spacings', 'snap-settings'], ['X dividers', 'grid-split'], ['20 cm', 'constraints'], ['Same level above floor', 'constraints'], ['Boolean logic', 'boolean-objects'], ['Union', 'boolean-objects'], ['Subtract', 'boolean-objects'], ['Intersect', 'boolean-objects'], ['object solver', 'object-solver'], ['Convert to panels', 'object-solver'], ['corner cutouts', 'object-solver'], ['TROFAST', 'first-panel'], ['Filter panels', 'groups'], ['Filter connectors', 'groups'], ['Extend to ground', 'resize'], ['mirror', 'rotate'], ['Distribute evenly', 'multi-select'], ['Only nice values', 'rescale'], ['Metal', 'connectors'], ['Separate overlapping connectors', 'connectors'], ['Add connectors between', 'connectors'], ['Nazena', 'finishes'], ['vacuum', 'room-preview'], ['Panel cutting SVGs', 'save-export'], ['Build space', 'constraints'], ['Connect mode', 'draw-connectors'], ['Stretch connected panels', 'selection-stretch'], ['Make sizes equal', 'equal-sizes'], ['Lock panel size', 'equal-sizes'], ['Merge panels', 'merge-panels'], ['Fixed reference position', 'reference-rules'], ['Signed setback', 'reference-rules'], ['Opening 2 / opening 1', 'reference-rules'], ['Apply automatic fix', 'repair-overlaps'], ['Scene location', 'workspace'], ['wireframe', 'groups'], ['Synced folder projects', 'folder-sync'], ['Download order list', 'connector-order'], ['Construction · GLB', 'blender-export']]) {
     await search.fill(query)
     await expect(page.locator(`[data-guide-id="${id}"]`)).toBeVisible()
   }
@@ -82,7 +85,7 @@ test('reading help preserves the project and resumes the last step after reopeni
   const project = await page.evaluate(() => localStorage.getItem('playwood-studio-project-v1'))
   const canvas = page.getByLabel('3D preview canvas', { exact: true })
   await page.getByRole('button', { name: 'Open building guide', exact: true }).click()
-  await page.locator('[data-guide-id="close-hole"]').click()
+  await page.locator('[data-guide-id="draw-connectors"]').click()
   await page.getByRole('button', { name: /^Step 3:/ }).click()
   const stepTitle = await page.locator('#guide-step-title').textContent()
   // Even a canvas event must be ignored while the guide owns keyboard input.
@@ -95,7 +98,7 @@ test('reading help preserves the project and resumes the last step after reopeni
   await expect(page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' })).toBeDisabled()
   expect(await page.evaluate(() => localStorage.getItem('playwood-studio-project-v1'))).toBe(project)
   await page.getByRole('button', { name: 'Open building guide', exact: true }).click()
-  await expect(page.locator('[data-guide-id="close-hole"]')).toHaveAttribute('aria-current', 'page')
+  await expect(page.locator('[data-guide-id="draw-connectors"]')).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('button', { name: /^Step 3:/ })).toHaveAttribute('aria-current', 'step')
   await expect(page.locator('#guide-step-title')).toHaveText(stepTitle!)
   await page.getByRole('button', { name: 'Close dialog' }).click()
@@ -120,6 +123,16 @@ for (const width of [390, 800]) {
     await expect(page.getByRole('button', { name: /^Step 3:/ })).toHaveAttribute('aria-current', 'step')
     expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
     expect(await page.locator('.guide-article').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    for (const id of newGuides) {
+      if (width <= 760) await page.getByRole('button', { name: `Browse ${BUILD_GUIDES.length} techniques` }).click()
+      await page.locator(`[data-guide-id="${id}"]`).click()
+      for (let step = 1; step <= 4; step++) {
+        await expect(page.locator('.guide-illustration svg[role="img"]')).toBeVisible()
+        expect(await page.locator('.guide-article').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+        if (id === 'reference-rules' && step === 3) await page.screenshot({ path: `test-results/guide-reference-rules-${width}.png` })
+        if (step < 4) await page.getByRole('button', { name: 'Next step', exact: true }).click()
+      }
+    }
     const bounds = await dialog.boundingBox()
     expect(bounds!.x).toBeGreaterThanOrEqual(0)
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width)
