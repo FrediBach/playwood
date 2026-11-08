@@ -91,7 +91,7 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   /** Attachment candidates included in fitting, without rendering them. */
   attachmentBoundsPanels?: Panel[]
   view: CameraView
-  snapProbe?: { position: Vec3; direction: Vec3 }
+  snapProbe?: { position: Vec3; direction: Vec3; affectedPanelIds?: string[] }
   snapDirection?: Vec3
   snapSettings?: SnapSettings
   /** Accepted nice-value spacing; leaves the separate snapping preferences intact. */
@@ -506,11 +506,14 @@ function SceneMovement(props: SceneProps & { feedback: ReturnType<typeof useScen
   </>
 }
 
-/** A blocker inspection belongs to the exact handle set that was inspected. */
+/** A resize inspection belongs to the exact handle set that was inspected. */
 function useResizeBlockerInspection(props: SceneProps) {
   const [inspection, setInspection] = useState<{ id: string; handles: SceneProps['resizeHandles'] } | null>(null)
-  const blockers = !props.boxSelectActive && !props.dragging && !props.resizing && !props.exploded && props.movementEnabled
-    && inspection?.handles === props.resizeHandles ? props.resizeHandles?.find(handle => handle.id === inspection?.id)?.blocked : undefined
+  const handle = !props.boxSelectActive && !props.dragging && !props.exploded && props.movementEnabled
+    ? props.resizing ? props.resizeHandles?.find(item => item.affectedPanelIds && item.sizes)
+      : inspection?.handles === props.resizeHandles ? props.resizeHandles?.find(item => item.id === inspection?.id) : undefined
+    : undefined
+  const blockers = handle?.blocked ?? (handle?.affectedPanelIds ? { panelIds: handle.affectedPanelIds, connectorIds: [] } : undefined)
   const inspectBlockers = (id: string | null) => setInspection(id ? { id, handles: props.resizeHandles } : null)
   return { blockers, inspectBlockers }
 }

@@ -6,8 +6,8 @@ interface GuideProps {
   panels: Project['panels']
   connections: Project['connections']
   connectorOverrides?: Project['connectorOverrides']
-  resizeHandles?: { id: string; position: Vec3 }[]
-  snapProbe?: { position: Vec3; direction: Vec3 }
+  resizeHandles?: { id: string; position: Vec3; affectedPanelIds?: string[] }[]
+  snapProbe?: { position: Vec3; direction: Vec3; affectedPanelIds?: string[] }
   snapDirection?: Vec3
 }
 interface ActiveSelection {
@@ -22,10 +22,10 @@ export function getSceneSnapGuides(props: GuideProps, {connectorSelection, activ
   const activePanelIdSet = new Set(activePanelIds)
   const activeConnectorIdSet = new Set(activeConnectorIds)
   const guideProject: Project = { version: 1, name: '', panels: props.panels, connections: props.connections, connectorOverrides: props.connectorOverrides }
-  const guideTargets = snapTargets(guideProject, activePanelIds, activeConnectorIds, connectorSelection)
   const keyboardProbe = keyboardSnap?.handleId
     ? props.resizeHandles?.find(handle => handle.id === keyboardSnap.handleId) : undefined
   const probe = props.snapProbe ?? keyboardProbe
+  const guideTargets = snapTargets(guideProject, [...activePanelIds, ...probe?.affectedPanelIds ?? []], activeConnectorIds, connectorSelection)
   const guideSources = probe ? [probe.position] : connectorSelection
     ? snapTargets(guideProject, [], getPhysicalConnectors(guideProject).filter(piece => !activeConnectorIdSet.has(piece.id)).map(piece => piece.id), true)
     : props.panels.filter(panel => panel.visible && activePanelIdSet.has(panel.id)).flatMap(panelSnapPoints)

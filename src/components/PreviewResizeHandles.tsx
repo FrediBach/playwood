@@ -82,8 +82,9 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     event.stopPropagation()
     event.nativeEvent.stopImmediatePropagation()
     if (!enabled || gesture.current || event.button !== 0 || event.metaKey || event.altKey) return
-    if (handle.sizeLocked && !event.ctrlKey) return
-    if (handle.blocked && !event.ctrlKey && !(event.shiftKey && handle.panelEdge)) return
+    const repeat = event.ctrlKey && handle.panelHandle
+    if (handle.sizeLocked && !repeat) return
+    if (handle.blocked && !repeat && !(event.shiftKey && handle.panelEdge)) return
     onInspectBlockers?.(null)
     camera.updateMatrixWorld()
     const axis = new Vector3(...handle.direction).normalize()
@@ -99,7 +100,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     const orbit = controls as OrbitControls | undefined
     gesture.current = {
       handleId: handle.id, pointerId: event.pointerId, target: event.currentTarget,
-      x: event.clientX, y: event.clientY, point, plane, axis, started: false, mode: event.ctrlKey ? 'repeat' : event.shiftKey ? 'panel' : 'connected',
+      x: event.clientX, y: event.clientY, point, plane, axis, started: false, mode: repeat ? 'repeat' : event.shiftKey && handle.panelEdge ? 'panel' : 'connected',
       controls: orbit, controlsEnabled: orbit?.enabled ?? true, previousCursor: document.body.style.cursor,
       arm: Number(event.currentTarget.parentElement?.dataset.resizeArm) || ARM,
     }
@@ -150,9 +151,10 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     if (!sign) return
     event.preventDefault()
     event.stopPropagation()
-    if (enabled && (!handle.blocked || event.ctrlKey) && onResizeStart(handle.id, event.ctrlKey ? 'repeat' : 'connected')) {
+    const repeat = event.ctrlKey && handle.panelHandle
+    if (enabled && (!handle.blocked || repeat) && onResizeStart(handle.id, repeat ? 'repeat' : 'connected')) {
       onResizeMove(sign * keyboardStep * (event.shiftKey ? 10 : 1), true)
-      if (event.ctrlKey) repeatFocus.current = { direction: handle.direction, target: event.currentTarget }
+      if (repeat) repeatFocus.current = { direction: handle.direction, target: event.currentTarget }
       onResizeEnd(false)
     }
   }
@@ -257,18 +259,20 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
         <button type="button" className="preview-resize-handle" aria-label={`Resize · ${handle.label}`} data-resize-handle={handle.id} aria-disabled={!!handle.blocked} aria-description={handle.blocked?.reason}
           aria-keyshortcuts={`ArrowUp ArrowDown ArrowLeft ArrowRight${handle.panelHandle ? ' Control+ArrowUp Control+ArrowRight Control+Plus' : ''}`} title={handle.blocked ? undefined : `${handle.label} · drag to pull or push.${handle.panelEdge ? ' Shift-drag: resize only this panel edge, keeping connectors fixed.' : ''}${handle.panelHandle ? ' Control-drag: repeat a rectangular compartment along this arrow.' : ''} Arrow keys: ${keyboardStep} mm; Shift: ${keyboardStep * 10} mm.${handle.panelHandle ? ' Control + Up/Right/+: add one bay.' : ''}`}
           onPointerDown={event => down(event, handle)} onKeyDown={event => step(event, handle)}
-          onPointerEnter={() => { onInspectBlockers?.(handle.blocked ? handle.id : null); invalidate() }}
+          onPointerEnter={() => { onInspectBlockers?.(handle.blocked || handle.affectedPanelIds ? handle.id : null); invalidate() }}
           onPointerLeave={() => onInspectBlockers?.(null)} onBlur={() => onInspectBlockers?.(null)}
-          onFocus={() => { onInspectBlockers?.(handle.blocked ? handle.id : null); invalidate() }}
+          onFocus={() => { onInspectBlockers?.(handle.blocked || handle.affectedPanelIds ? handle.id : null); invalidate() }}
           onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onContextMenu={event => event.preventDefault()}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h11M10 4l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <span className={`preview-resize-caption${limited && activeId === handle.id ? ' is-limited' : ''}`}>
           {activeId === handle.id ? <>{handle.repeat && <span className="preview-resize-size">Repeat · {handle.repeat.count} {handle.repeat.count === 1 ? 'bay' : 'bays'}</span>}{shownDistance > 0 ? '+' : ''}{shownDistance} mm{limited ? ' · limit' : ''}
             {!!handle.repeat?.reused && <span className="preview-resize-size">{handle.repeat.reused} existing {handle.repeat.reused === 1 ? 'panel' : 'panels'} reused</span>}
-            {handle.sizes?.map((size, index) => <span className="preview-resize-size" key={index}>{size.label} = {Math.round(size.value * 100) / 100} mm</span>)}
+            {(handle.affectedPanelIds ? handle.sizes?.slice(0, 6) : handle.sizes)?.map((size, index) => <span className="preview-resize-size" key={index}>{size.label} = {Math.round(size.value * 100) / 100} mm</span>)}
+            {handle.affectedPanelIds && (handle.sizes?.length ?? 0) > 6 && <span className="preview-resize-size">And {handle.sizes!.length - 6} more changed cuts</span>}
+            {handle.limitReason && <span className="preview-resize-size">{handle.limitReason}</span>}
             {handle.repeat && <span className="preview-resize-size">{handle.repeat.reason ?? `${Math.round(handle.repeat.pitch * 100) / 100} mm per bay`}</span>}
-            <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.sizeLocked && <LockKeyhole size={13} aria-label="Size locked" />}{handle.label}{handle.blocked && <span className="preview-resize-size">{handle.blocked.reason}</span>}{handle.repeatOnly && <small>{handle.panelEdge && !handle.sizeLocked ? 'Shift-pull: panel edge · Control-pull: repeat' : 'Fixed size · Control-pull to repeat'}</small>}</>}
+            <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.sizeLocked && <LockKeyhole size={13} aria-label="Size locked" />}{handle.label}{handle.affectedPanelIds && !handle.blocked && <span className="preview-resize-size">{handle.affectedPanelIds.length} connecting {handle.affectedPanelIds.length === 1 ? 'panel' : 'panels'}</span>}{handle.blocked && <span className="preview-resize-size">{handle.blocked.reason}</span>}{handle.repeatOnly && <small>{handle.panelEdge && !handle.sizeLocked ? 'Shift-pull: panel edge · Control-pull: repeat' : 'Fixed size · Control-pull to repeat'}</small>}</>}
         </span>
       </div>)}
     </div>

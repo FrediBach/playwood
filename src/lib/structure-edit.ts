@@ -34,8 +34,9 @@ type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
 type Row = { entries: Map<number, number>; value: number; stockBound?: boolean; inferred?: InferredRelationship }
 type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 type Contact = { a: number; b: number; normal: Vector3; sign: number }
+export interface SelectionStretchEdge { panelId: string; dimension: 'width' | 'height'; side: -1 | 1 }
 type MovementScope = { panelIds: Set<string>; reference: number; preserveCuts?: Set<string> }
-type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean; scope?: MovementScope } | { kind: 'resize'; relaxedRelationship?: string; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
+type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean; scope?: MovementScope; stretch?: readonly SelectionStretchEdge[] } | { kind: 'resize'; relaxedRelationship?: string; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 interface ValidationContext { trofastWorld?: boolean }
 
@@ -65,6 +66,14 @@ function findContacts(frames: Frame[]): Contact[] {
     }
   }
   return contacts
+}
+
+/** The same implicit surface supports used by structural edits. */
+export function panelSurfaceContacts(project: Project): { panelIds: [string, string]; normal: Vec3 }[] {
+  const frames = resolvePanels(project).map(frame)
+  const outlines = new Set(project.connections.filter(connection => connection.outlineEdge !== undefined).map(connection => connection.childId))
+  return findContacts(frames).filter(contact => !outlines.has(frames[contact.a].panel.id) && !outlines.has(frames[contact.b].panel.id))
+    .map(contact => ({ panelIds: [frames[contact.a].panel.id, frames[contact.b].panel.id], normal: contact.normal.toArray() as Vec3 }))
 }
 
 /**
@@ -504,6 +513,21 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         const constraint = (edit.centerDelta || edit.local ? row : preference)(edit.centerDelta?.[dimension] ?? 0)
         selected.forEach(item => center(constraint, indices.get(item.panel.id)!, axis, 1 / selected.length))
       }
+  } else if (edit.kind === 'move' && edit.stretch) {
+    // A selection stretch has an explicit boundary. Neither saved rules nor
+    // inferred preferences may recut or move anything beyond that boundary.
+    const spans = new Map(edit.stretch.map(edge => [edge.panelId, edge]))
+    const delta = new Vector3(...edit.delta)
+    for (const [index, item] of frames.entries()) {
+      if (ids.has(item.panel.id)) continue
+      const span = spans.get(item.panel.id)
+      const dimension = span?.dimension === 'width' ? 0 : 1
+      for (let variable = 0; variable < 5; variable++) {
+        const value = !span ? 0 : variable === dimension ? item.axes[dimension].dot(delta) / 2
+          : variable === 3 + dimension ? item.axes[dimension].dot(delta) * span.side : 0
+        add(row(value), index * 5 + variable, 1)
+      }
+    }
   } else if (edit.kind === 'move' && edit.scope) {
     const axis = new Vector3(...edit.delta).normalize()
     for (const [index, item] of frames.entries()) {
@@ -637,7 +661,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       }
     }
     catch (error) {
-      if ((edit.kind === 'move' && edit.scope) || !constraints.length || !preferences.size) throw error
+      if ((edit.kind === 'move' && (edit.scope || edit.stretch)) || !constraints.length || !preferences.size) throw error
       // Explicit design intent outranks automatic center/exterior anchoring.
       // Joints, supported contacts, gesture targets and local-edit locks remain.
       const hardRows = rows.filter(row => !preferences.has(row))
@@ -676,6 +700,15 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       rows.flatMap(row => row.inferred ? [row.inferred] : []))
   }
   const changedPanels = new Map(frames.map((item, index) => {
+    if (edit.kind === 'move' && edit.stretch) {
+      const span = edit.stretch.find(edge => edge.panelId === item.panel.id)
+      if (!ids.has(item.panel.id) && !span) return [item.panel.id, item.panel] as const
+      const delta = new Vector3(...edit.delta)
+      if (ids.has(item.panel.id)) return [item.panel.id, { ...item.panel, position: position(item.panel).add(delta).toArray() as Vec3 }] as const
+      const dimension = span!.dimension === 'width' ? 0 : 1
+      return [item.panel.id, { ...item.panel, [span!.dimension]: item.panel[span!.dimension] + item.axes[dimension].dot(delta) * span!.side,
+        position: position(item.panel).addScaledVector(delta, 0.5).toArray() as Vec3 }] as const
+    }
     // Scope locks prescribe exact zero changes. Avoid recutting frozen panels
     // by a few microns of iterative-solver residual; final joint checks remain.
     if (edit.kind === 'move' && edit.scope && !edit.scope.panelIds.has(item.panel.id)) return [item.panel.id, item.panel] as const
@@ -812,7 +845,7 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     }
     next = { ...next, connectorOverrides: Object.keys(overrides).length ? overrides : project.connectorOverrides }
   }
-  if (edit.kind === 'resize' && !edit.local) next = rescaleConnectorSlides(project, next, panels, next.panels)
+  if ((edit.kind === 'resize' && !edit.local) || (edit.kind === 'move' && edit.stretch)) next = rescaleConnectorSlides(project, next, panels, next.panels)
   const previousErrors = new Set(validateProject(project, validation).filter(issue => issue.severity === 'error').map(issue => issue.id))
   const newError = validateProject(next, validation).find(issue => issue.severity === 'error' && !previousErrors.has(issue.id))
   if (newError) {
@@ -857,6 +890,27 @@ export function movePanels(project: Project, ids: readonly string[], delta: Vec3
   if (delta.some(value => !Number.isFinite(value))) throw new Error('Panel movement must be a finite distance.')
   if (delta.every(value => Math.abs(value) < EPSILON)) return project
   return editStructure(project, ids, { kind: 'move', delta, releaseContacts: options.releaseContacts })
+}
+
+/** Translate a rigid selection while extending only prescribed boundary ends.
+ * Every opposite end and every other panel is a hard lock in the joint solve.
+ * Discovery and continuous clearance checks belong to selection-stretch.ts. */
+export function stretchPanelSelection(project: Project, ids: readonly string[], edges: readonly SelectionStretchEdge[], delta: Vec3): Project {
+  if (delta.some(value => !Number.isFinite(value))) throw new Error('Panel movement must be a finite distance.')
+  if (delta.every(value => Math.abs(value) < EPSILON)) return project
+  const selected = new Set(ids), panels = new Map(resolvePanels(project).map(panel => [panel.id, panel]))
+  if (new Set(edges.map(edge => edge.panelId)).size !== edges.length) throw new Error('Stretch each boundary panel once.')
+  if (!edges.length || !selected.size || [...selected].some(id => !panels.has(id))) throw new Error('The stretch selection is no longer available.')
+  const direction = new Vector3(...delta).normalize()
+  for (const edge of edges) {
+    const panel = panels.get(edge.panelId)
+    if (!panel || selected.has(edge.panelId) || panel.customOutline || (edge.side !== -1 && edge.side !== 1)) throw new Error('Choose rectangular panels at the selection boundary.')
+    const axis = frame(panel).axes[edge.dimension === 'width' ? 0 : 1]
+    if (Math.abs(axis.dot(direction)) < 1 - EPSILON) throw new Error('The stretch direction must follow each boundary panel cut.')
+    const size = panel[edge.dimension] + axis.dot(new Vector3(...delta)) * edge.side
+    if (size < 40 || size > 4000) throw new StructureEditError(LIMIT_MESSAGE, [panel.id])
+  }
+  return assertNoNewTrofastIssues(project, editStructure(project, ids, { kind: 'move', delta, stretch: edges }))
 }
 
 export interface MovementAlternative {

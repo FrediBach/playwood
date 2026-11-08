@@ -253,13 +253,13 @@ test('pulling a single connector widens its connected structure without sliding 
   await expect.poll(() => savedProject(page)).toEqual(project)
 })
 
-test('resize handles are limited to one visible selection and disappear during attachment or exploded views', async ({ page }) => {
+test('single-panel handles switch with selection and disappear during attachment or exploded views', async ({ page }) => {
   const project = createStarterProject('shelf')
   await openProject(page, project)
   const handles = page.locator('[data-resize-handle]:visible')
   await expect(handles.first()).toBeVisible()
   await page.locator('.panel-list-select').nth(1).click({ modifiers: ['Shift'] })
-  await expect(handles).toHaveCount(0)
+  await expect(page.locator('[data-resize-handle^="panel-"]:visible')).toHaveCount(0)
   await page.locator('.panel-list-select').first().click()
   await expect(handles.first()).toBeVisible()
   await page.getByRole('button', { name: 'Exploded view', exact: true }).click()

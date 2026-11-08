@@ -18,10 +18,11 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
 }) {
   const panelId = selectedIds.length === 1 && !selectedConnectorIds.length ? selectedIds[0] : undefined
   const connectorId = selectedConnectorIds.length === 1 && !selectedIds.length ? selectedConnectorIds[0] : undefined
+  const panelIds = selectedIds.length > 1 && !selectedConnectorIds.length ? selectedIds : undefined
   const prepared = useMemo(() => {
-    if (!enabled || (!panelId && !connectorId)) return null
-    return preparePreviewResize(project, { panelId, connectorId })
-  }, [project, panelId, connectorId, enabled])
+    if (!enabled || (!panelId && !connectorId && !panelIds)) return null
+    return preparePreviewResize(project, { panelId, panelIds, connectorId })
+  }, [project, panelId, panelIds, connectorId, enabled])
   type Session = NonNullable<typeof prepared>
   type Result = ReturnType<typeof movePreviewResize> & { count?: number; reason?: string; selectedPanelId?: string; reusedPanelIds?: string[] }
   const session = useRef<{ source: Session; handleId: string; mode: PreviewResizeMode; repeat?: StructureRepeatSession } | null>(null)
@@ -56,7 +57,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
         return (['width', 'height'] as const).filter(dimension => before && Math.abs(panel[dimension] - before[dimension]) > 1e-6)
           .map(dimension => ({ label: `${panel.name} · ${dimension === 'width' ? 'Width' : 'Height'}`, value: panel[dimension] }))
       })
-    return { ...handle, sizes, position }
+    return { ...handle, sizes, position, limitReason: current.reason }
   }), [prepared, current, panels])
 
   return {
@@ -73,7 +74,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
       if (!prepared || !handle) return false
       try {
         if (handle.sizeLocked && mode !== 'repeat') throw new Error(handle.blocked?.reason ?? 'Panel size is locked.')
-        if (handle.blocked && mode !== 'repeat' && !(mode === 'panel' && handle.panelEdge)) throw new Error(handle.panelEdge
+        if (handle.blocked && mode !== 'repeat' && !(mode === 'panel' && handle.panelEdge)) throw new Error(handle.affectedPanelIds ? handle.blocked.reason : handle.panelEdge
           ? 'Connected resizing is fixed in this direction. Hold Shift to resize only this panel edge, or Control to repeat its compartment.'
           : 'This direction is fixed. Hold Control while pulling to repeat its compartment.')
         let repeat: StructureRepeatSession | undefined
@@ -101,7 +102,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
         }
         const source = session.current.source
         const handle = source.handles.find(item => item.id === session.current!.handleId)!
-        const targets = snapTargets(project, selectedIds, selectedConnectorIds, !!connectorId)
+        const targets = snapTargets(project, [...selectedIds, ...handle.affectedPanelIds ?? []], selectedConnectorIds, !!connectorId)
         const snapped = snapDistance(handle.position, handle.direction, Math.round(distance), targets, keyboard ? { ...snapSettings, tolerance: Math.min(snapSettings.tolerance, Math.abs(distance) * 0.45) } : snapSettings)
         const result = movePreviewResize(source, session.current.handleId, snapped, session.current.mode === 'panel')
         latest.current = result

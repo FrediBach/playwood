@@ -6,6 +6,7 @@ import { resolvePanels } from './model'
 import { roundNiceValue } from './nice-values'
 import { movePanels, resizePanelEdge, StructureEditError } from './structure-edit'
 import { prepareStructureRepeat } from './structure-repeat'
+import { moveSelectionStretch, prepareSelectionStretch, type SelectionStretchPlan } from './selection-stretch'
 import type { Panel, Project, Vec3 } from './types'
 
 export interface PreviewResizeHandle {
@@ -20,6 +21,8 @@ export interface PreviewResizeHandle {
   repeatOnly?: boolean
   panelEdge?: boolean
   panelHandle?: boolean
+  affectedPanelIds?: string[]
+  limitReason?: string
 }
 
 export type PreviewResizeMode = 'connected' | 'panel' | 'repeat'
@@ -33,10 +36,11 @@ export interface RepeatPreview {
   reason?: string
 }
 
-export interface PreviewResizeSelection { panelId?: string; connectorId?: string }
+export interface PreviewResizeSelection { panelId?: string; panelIds?: readonly string[]; connectorId?: string }
 
 type Operation = { kind: 'move'; panelId: string; direction: Vec3 }
   | { kind: 'edge'; panelId: string; dimension: 'width' | 'height'; side: -1 | 1 }
+  | { kind: 'stretch'; panelIds: readonly string[]; plan: SelectionStretchPlan }
 
 interface Driver { operation: Operation; scale: number }
 
@@ -58,7 +62,13 @@ const changesSize = (original: Panel[], project: Project) => project.panels.some
 })
 const apply = (project: Project, operation: Operation, distance: number) => operation.kind === 'edge'
   ? resizePanelEdge(project, operation.panelId, operation.dimension, operation.side, distance)
-  : movePanels(project, [operation.panelId], vector(operation.direction).multiplyScalar(distance).toArray() as Vec3)
+  : operation.kind === 'stretch' ? moveSelectionStretch(project, operation.panelIds, operation.plan, distance)
+    : movePanels(project, [operation.panelId], vector(operation.direction).multiplyScalar(distance).toArray() as Vec3)
+
+function stretchDirectionLabel(direction: Vec3, index: number) {
+  const axis = direction.findIndex(value => Math.abs(value) > 1 - 1e-6)
+  return axis < 0 ? `direction ${index + 1}` : (direction[axis] > 0 ? ['right', 'up', 'forward'] : ['left', 'down', 'backward'])[axis]
+}
 
 function connectorPosition(project: Project, id: string): Vec3 | null {
   const piece = getPhysicalConnectors(project).find(item => item.id === id)
@@ -72,6 +82,19 @@ function connectorPosition(project: Project, id: string): Vec3 | null {
 /** Probe structural edits once when selection changes. An enabled handle must change cuts,
  * preserve joints and angles, and move its root along one exact direction. */
 export function preparePreviewResize(project: Project, selection: PreviewResizeSelection): PreviewResizeSession | null {
+  if (selection.panelIds) {
+    if (selection.panelId || selection.connectorId || selection.panelIds.length < 2) return null
+    const plans = prepareSelectionStretch(project, selection.panelIds)
+    if (!plans.length) return null
+    const pieces = getPhysicalConnectors(project)
+    return { original: project, selection, handles: plans.map((plan, index) => ({
+      id: plan.id, position: plan.position, direction: plan.direction,
+      label: `Stretch connected panels · ${stretchDirectionLabel(plan.direction, index)}`,
+      affectedPanelIds: plan.panelIds,
+      blocked: plan.blocked ? { reason: plan.blocked.reason, panelIds: plan.blocked.panelIds,
+        connectorIds: pieces.filter(piece => plan.blocked!.connectionIds.includes(piece.connection.id)).map(piece => piece.id) } : undefined,
+    })), drivers: new Map(plans.map(plan => [plan.id, { operation: { kind: 'stretch', panelIds: selection.panelIds!, plan }, scale: 1 }])) }
+  }
   if (!!selection.panelId === !!selection.connectorId) return null
   const panels = resolvePanels(project)
   const session: PreviewResizeSession = { original: project, handles: [], selection, drivers: new Map() }
@@ -177,7 +200,7 @@ export function preparePreviewResize(project: Project, selection: PreviewResizeS
 
 /** Preview from the pointer-down snapshot, stopping at the last feasible cut.
  * No state is persisted here, so callers can cancel or commit one undo step. */
-export function movePreviewResize(session: PreviewResizeSession, handleId: string, distance: number, local = false): { project: Project; distance: number; limited: boolean } {
+export function movePreviewResize(session: PreviewResizeSession, handleId: string, distance: number, local = false): { project: Project; distance: number; limited: boolean; reason?: string } {
   if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
   const handle = session.handles.find(item => item.id === handleId)
   const driver = session.drivers.get(handleId)
@@ -195,16 +218,18 @@ export function movePreviewResize(session: PreviewResizeSession, handleId: strin
     return next
   }
   try { return { project: attempt(distance), distance, limited: false } }
-  catch {
+  catch (error) {
     let lower = 0, upper = 1, project = session.original
+    let limitError = error
     // Bisection also handles support/contact limits, which need not coincide
     // with the individual panel dimension limits.
     for (let iteration = 0; iteration < 20; iteration++) {
       const middle = (lower + upper) / 2
       try { const next = attempt(distance * middle); project = next; lower = middle }
-      catch { upper = middle }
+      catch (failure) { upper = middle; limitError = failure }
     }
-    return { project, distance: distance * lower, limited: true }
+    return { project, distance: distance * lower, limited: true,
+      ...(driver.operation.kind === 'stretch' && limitError instanceof Error ? { reason: limitError.message } : {}) }
   }
 }
 

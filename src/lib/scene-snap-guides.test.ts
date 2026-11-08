@@ -26,6 +26,13 @@ describe('scene snap guide sources and targets', () => {
     expect(guides.direction).toEqual([1, 0, 0])
   })
 
+  it('excludes connecting panels that are stretching from pointer and keyboard snap targets', () => {
+    const snapProbe = { position: [200, 500, 0] as Vec3, direction: [0, 1, 0] as Vec3, affectedPanelIds: ['target'] }
+    expect(getSceneSnapGuides({ ...props, snapProbe }, selection, null).targets).toEqual([])
+    expect(getSceneSnapGuides({ ...props, resizeHandles: [{ ...snapProbe, id: 'stretch' }] }, selection,
+      { handleId: 'stretch', direction: snapProbe.direction }).targets).toEqual([])
+  })
+
   it('prioritizes a pointer probe over keyboard feedback and an explicit direction', () => {
     const snapProbe = { position: [200, 500, 0] as Vec3, direction: [0, 1, 0] as Vec3 }
     const guides = getSceneSnapGuides({ ...props, snapProbe, snapDirection: [0, 0, 1], resizeHandles: [{ id: 'width', position: [220, 400, 0] }] }, selection, { handleId: 'width', direction: [1, 0, 0] })
