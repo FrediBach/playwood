@@ -83,6 +83,29 @@ describe('connected edits preserve independent cuts', () => {
     expectValid(before, after)
   })
 
+  it.each([false, true])('keeps previously sized parallel stoppers intact through sequential edits (tray locks: %s)', locked => {
+    const loaded = parseProject(importedShelf)
+    const before: Project = locked ? { ...loaded, constraints: [...loaded.constraints ?? [], ...loaded.panels
+      .filter(panel => panel.name.startsWith('Synth tray')).map(panel => ({ id: `tray-height/${panel.id}`, enabled: true,
+        kind: 'dimension' as const, panelId: panel.id, dimension: 'height' as const, value: panel.height }))] } : loaded
+    const snapshot = JSON.stringify(before)
+    const stoppers = before.panels.filter(panel => panel.name.startsWith('Front stopper'))
+    const expected = new Map(stoppers.map(panel => [panel.id, panel.height]))
+    let current = before
+    for (const stopper of stoppers) {
+      const next = resizePanels(current, [stopper.id], { height: 50 })
+      expected.set(stopper.id, 50)
+      for (const panel of next.panels.filter(panel => expected.has(panel.id))) {
+        expect(panel.height, panel.name).toBeCloseTo(expected.get(panel.id)!, 6)
+        expect(panel.width).toBe(stopper.width)
+      }
+      expectCuts(current, next, ['Synth tray 1', 'Synth tray 2', 'Synth tray 3'])
+      expectValid(before, next)
+      current = next
+    }
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
   it('honors an authored matching cut even when that cut is oblique to the requested edit', () => {
     const base = createPanel({ name: 'Shelf', width: 600, height: 300, position: [0, 800, 0] })
     const attached = attachPanel({ version: 1, name: 'Intentional matching cuts', panels: [base], connections: [] }, base.id,

@@ -19,7 +19,7 @@ export function NumberField({label,labelAction,value,onChange,min=-10000,max=100
   const rounding=nice&&unit==='mm'?niceStep:undefined
   const deferred=commitOnBlur||rounding!==undefined
   // Native number spinners use min as their step origin. Align that origin to
-  // zero-based nice multiples too (for example width min 80 with 25 mm steps).
+  // zero-based nice multiples too (for example width min 40 with 25 mm steps).
   const { displayScale,firstNice,lastNice }=numberInputScale(rounding,min,max,precision)
   const [text,setText] = useState(mixed?'':String(Math.round(value*displayScale)/displayScale))
   const [error,setError] = useState('')
@@ -153,7 +153,7 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
         const locked=selection.filter(item=>isPanelDimensionLocked(dimensionConstraints,item.id,dimension)).length
         const state=locked===selection.length?true:locked?'mixed':false
         const label=dimension==='width'?'Width':'Height'
-        return <NumberField key={dimension} label={label} commitOnBlur={resizeOnCommit} value={panel[dimension]} min={80} max={3000} {...numberProps(dimension)}
+        return <NumberField key={dimension} label={label} commitOnBlur={resizeOnCommit} value={panel[dimension]} min={40} max={4000} {...numberProps(dimension)}
           disabled={disabledFields.includes(dimension)||!!locked} onChange={value=>onChange({[dimension]:value})}
           labelAction={onDimensionLockChange&&<button type="button" className="dimension-lock" aria-label={`${state===true?'Unlock':'Lock'} ${dimension}`} aria-pressed={state}
             title={state===true?`Unlock ${dimension}: pause exact ${dimension} constraints`:`Lock ${dimension} at ${selection.length>1?'each panel’s current value':'the current value'}${state==='mixed'?' (some panels are locked)':''}`}

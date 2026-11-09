@@ -231,6 +231,14 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   }
   const radialCuts = new Set<number>()
   const joinedPanels = new Set<number>()
+  const incidentJoints = new Map<number, Connection[]>()
+  for (const connection of connections) for (const id of [connection.parentId, connection.childId]) {
+    const index = indices.get(id)!
+    incidentJoints.set(index, [...incidentJoints.get(index) ?? [], connection])
+  }
+  const contactedPanels = new Set(contacts.flatMap(contact => [contact.a, contact.b]))
+  const freeEndPanels = new Set([...incidentJoints].flatMap(([index, joints]) => joints.length === 1
+    && !['t', 'cross'].includes(joints[0].type) && !contactedPanels.has(index) ? [index] : []))
   contacts.forEach(contact => { radialCuts.add(contact.a * 2); radialCuts.add(contact.a * 2 + 1); radialCuts.add(contact.b * 2); radialCuts.add(contact.b * 2 + 1) })
   const seamFits = new Map(connections.map(connection => {
     const dimension = ['top', 'bottom', 'front', 'back'].includes(connection.side) ? 0 : 1
@@ -542,7 +550,12 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       const transverse = requestedAxes.length && requestedAxes.every(axis => Math.abs(axis.dot(item.axes[dimension])) < 1 - EPSILON)
       const independentSeam = edit.kind === 'resize' && joinedPanels.has(index) && !radialCuts.has(index * 2 + dimension)
         && !requestedCuts.has(cutRoot(index * 2 + dimension))
-      if (transverse || independentSeam) {
+      // A terminal panel has no opposite joint that needs this cut to span
+      // an opening. Keep its free end intact even when another edited cut
+      // is parallel; paired seam ends still transmit deliberate size changes.
+      const independentFreeEnd = edit.kind === 'resize' && freeEndPanels.has(index)
+        && radialCuts.has(index * 2 + dimension)
+      if (transverse || independentSeam || independentFreeEnd) {
         const preserve = row()
         cutPreferences.add(preserve)
         add(preserve, index * 5 + 3 + dimension, 1)

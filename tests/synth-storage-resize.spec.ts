@@ -61,3 +61,31 @@ test('lowering a synth shelf moves its tray and stopper without recutting them',
   await expect.poll(async () => resolvePanels(await saved(page)).find(panel => panel.id === shelf.id)!.position[1]).toBeCloseTo(shelf.position[1] - 10, 4)
   expectAccessoryCutsUnchanged(await saved(page))
 })
+
+test('the inspector accepts 50 mm stopper heights without clamping them to 80 mm', async ({ page }) => {
+  await openConstruction(page)
+  const before = await saved(page)
+  const stoppers = original.panels.filter(panel => panel.name.startsWith('Front stopper'))
+  for (const stopper of stoppers) {
+    await page.getByRole('button', { name: stopper.name, exact: true }).click()
+    const height = page.getByLabel('Height', { exact: true })
+    await height.fill('50')
+    await height.press('Enter')
+    await expect(height).toHaveValue('50')
+    await expect.poll(async () => (await saved(page)).panels.find(panel => panel.id === stopper.id)!.height).toBe(50)
+  }
+  const after = await saved(page)
+  for (const stopper of stoppers) {
+    expect(after.panels.find(panel => panel.id === stopper.id)!.height).toBe(50)
+  }
+  expect(after.constraints).toEqual(before.constraints)
+  for (const tray of original.panels.filter(panel => panel.name.startsWith('Synth tray'))) {
+    expect(after.panels.find(panel => panel.id === tray.id)).toMatchObject({ width: tray.width, height: tray.height })
+  }
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)', exact: true }).click()
+  await expect.poll(async () => (await saved(page)).panels.find(panel => panel.id === stoppers[2].id)!.height).toBe(stoppers[2].height)
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
+  await expect.poll(() => saved(page)).toEqual(after)
+  await page.reload()
+  expect(await saved(page)).toEqual(after)
+})
