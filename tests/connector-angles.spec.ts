@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './browser-fixture'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { attachPanel, createPanel, createStarterProject, parseProject, resolvePanels, validateProject } from '../src/lib/model'
 import type { Project } from '../src/lib/types'

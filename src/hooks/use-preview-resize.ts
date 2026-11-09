@@ -1,9 +1,10 @@
 import { snapDistance, snapTargets, type SnapSettings } from '@/lib/preview-snap'
 import { useMemo, useRef, useState } from 'react'
-import { finishPreviewResize, movePreviewResize, preparePreviewResize, type PreviewResizeMode, type RepeatPreview } from '@/lib/preview-resize'
+import { finishPreviewResize, movePreviewResize, type PreviewResizeMode, type RepeatPreview } from '@/lib/preview-resize'
 import { moveStructureRepeat, prepareStructureRepeat, type StructureRepeatSession } from '@/lib/structure-repeat'
 import { resolvePanels } from '@/lib/model'
 import type { Project } from '@/lib/types'
+import { createSelectionPreparations } from './selection-preparations'
 
 /** Keep transient geometry out of autosave and commit each gesture once. */
 export function usePreviewResize({ project, selectedIds, selectedConnectorIds, enabled, commit, notify, snapSettings, select }: {
@@ -19,13 +20,16 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
   const panelId = selectedIds.length === 1 && !selectedConnectorIds.length ? selectedIds[0] : undefined
   const connectorId = selectedConnectorIds.length === 1 && !selectedIds.length ? selectedConnectorIds[0] : undefined
   const panelIds = selectedIds.length > 1 && !selectedConnectorIds.length ? selectedIds : undefined
+  const preparations = useMemo(() => createSelectionPreparations(project), [project])
   const prepared = useMemo(() => {
     if (!enabled || (!panelId && !connectorId && !panelIds)) return null
-    return preparePreviewResize(project, { panelId, panelIds, connectorId })
-  }, [project, panelId, panelIds, connectorId, enabled])
+    const cached = preparations.resize({ panelId, panelIds, connectorId })
+    // A new activation must not revive a gesture from before a mode change.
+    return cached ? { ...cached } : null
+  }, [preparations, panelId, panelIds, connectorId, enabled])
   type Session = NonNullable<typeof prepared>
   type Result = ReturnType<typeof movePreviewResize> & { count?: number; reason?: string; selectedPanelId?: string; reusedPanelIds?: string[] }
-  const session = useRef<{ source: Session; handleId: string; mode: PreviewResizeMode; repeat?: StructureRepeatSession } | null>(null)
+  const session = useRef<{ source: Session; handleId: string; mode: PreviewResizeMode; repeat?: StructureRepeatSession; targets?: ReturnType<typeof snapTargets> } | null>(null)
   const latest = useRef<Result | null>(null)
   const [preview, setPreview] = useState<Result | null>(null)
   const current = session.current?.source === prepared ? preview : null
@@ -102,7 +106,9 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
         }
         const source = session.current.source
         const handle = source.handles.find(item => item.id === session.current!.handleId)!
-        const targets = snapTargets(project, [...selectedIds, ...handle.affectedPanelIds ?? []], selectedConnectorIds, !!connectorId)
+        const targets = snapSettings.geometry
+          ? session.current.targets ??= snapTargets(source.original, [...selectedIds, ...handle.affectedPanelIds ?? []], selectedConnectorIds, !!connectorId)
+          : []
         const snapped = snapDistance(handle.position, handle.direction, Math.round(distance), targets, keyboard ? { ...snapSettings, tolerance: Math.min(snapSettings.tolerance, Math.abs(distance) * 0.45) } : snapSettings)
         const result = movePreviewResize(source, session.current.handleId, snapped, session.current.mode === 'panel')
         latest.current = result

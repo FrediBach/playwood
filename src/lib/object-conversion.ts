@@ -6,7 +6,7 @@ import { solveObjectPrism } from './object-prism-solver'
 import { cuboidGridLayout, solveCuboidGrid } from './object-grid'
 import { solveCuboidCompartments } from './object-compartments'
 import { evaluateConstructionObjects, type ObjectSurface } from './object-geometry'
-import { copyConstructionObjects } from './construction-objects'
+import { copyConstructionObjects, objectConversionReason } from './construction-objects'
 import { solveCuboid } from './object-solver'
 import { getPhysicalConnectors } from './connector-selection'
 import { assertAddedHardwarePanelClearance, overlappingConnectorIds } from './connector-clearance'
@@ -25,10 +25,7 @@ export interface ObjectConversionOptions {
   connectorColor: string;
   connectorMaterial: ConnectorMaterial;
 }
-export function objectConversionReason(project: Project, ids: readonly string[]): string | undefined {
-  const roots = new Set(project.constructionObjects?.roots)
-  if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !roots.has(id))) return 'Select complete top-level objects to convert.'
-}
+export { objectConversionReason } from './construction-objects'
 
 /** Separate roots retain compartment boundaries. Matching cuboid rows and rectangular grids share their dividing walls. */
 function compartmentGroups(shapes: ObjectSurface[], region: (shape: ObjectSurface) => ConversionRegion) {

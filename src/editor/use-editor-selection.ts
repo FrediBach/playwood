@@ -1,9 +1,9 @@
 import type { AttachmentSideGuideState } from '@/components/AttachmentSideGuide'
 import { useParallelPanelSplitCounts } from '@/hooks/useParallelPanelSplitCounts'
+import { createSelectionPreparations } from '@/hooks/selection-preparations'
 import { getConnectorPanelFit } from '@/lib/connect-panel'
 import { connectorInfillReason } from '@/lib/connector-infill'
 import { CONNECTORS } from '@/lib/connector-options'
-import { getPanelGroundExtension } from '@/lib/extend-to-ground'
 import { gridPanelCut } from '@/lib/grid-split'
 import { orderedConnectors } from '@/lib/list-groups'
 import { getProjectBounds,validateProject } from '@/lib/model'
@@ -29,7 +29,8 @@ export function usePanelSelectionDetails({ selectedIds, panels, project, attachm
   const selectedFinishCoverages=selectedPanels.map(p=>p.material==='painted'?1:p.finishCoverage??0)
   const selected=selectedPanels.length===1?selectedPanels[0]:undefined
   const selectedId=selected?.id??null
-  const groundPanelFit=useMemo(()=>selectedId?getPanelGroundExtension(project,selectedId):{result:undefined,reason:'Select one panel to extend.'},[project,selectedId])
+  const preparations=useMemo(()=>createSelectionPreparations(project),[project])
+  const groundPanelFit=useMemo(()=>selectedId?preparations.ground(selectedId):{result:undefined,reason:'Select one panel to extend.'},[preparations,selectedId])
   const attachmentSideGuide: AttachmentSideGuideState | undefined=selected?{
     panelId:selected.id,
     side:attachment.side,

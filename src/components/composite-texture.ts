@@ -1,5 +1,3 @@
-import * as THREE from 'three'
-
 export type CompositeMaterial = 'osb' | 'nazena'
 const SIZE = 1024
 const TAU = Math.PI * 2
@@ -28,7 +26,7 @@ function noiseSampler(cells: number, seed: number) {
 }
 
 /** Rasterize fragments across tile boundaries, so even the relief wraps without seams. */
-export function createCompositeSources(material: CompositeMaterial) {
+export function createCompositeRaster(material: CompositeMaterial) {
   const textile = material === 'nazena'
   const color = new Uint8Array(SIZE * SIZE * 4), surface = new Uint8Array(color.length)
   const seed = textile ? 211 : 157
@@ -93,8 +91,7 @@ export function createCompositeSources(material: CompositeMaterial) {
     }
   }
   return {
-    color: new THREE.Source({ data: color, width: SIZE, height: SIZE }),
-    surface: new THREE.Source({ data: surface, width: SIZE, height: SIZE }),
+    color, surface, width: SIZE, height: SIZE,
     tileWidth: tileMeters,
     tileHeight: tileMeters,
   }

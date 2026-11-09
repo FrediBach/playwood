@@ -82,6 +82,8 @@ PLAYWRIGHT_PORT=5175 npm run test:e2e -- tests/assembly-files.spec.ts
 
 Specs commonly create a real `Project` using domain helpers, load it through the file-import control, operate labeled controls, and read exported JSON or local storage. This verifies the browser wiring as well as the domain command. Use [tests/inspector-helpers.ts](../tests/inspector-helpers.ts) to open named inspector disclosures through their real controls. Prefer accessible roles and labels where possible.
 
+Scene helpers that discover loaded Vite modules through Resource Timing use [tests/browser-fixture.ts](../tests/browser-fixture.ts). It enlarges the timing buffer before navigation so startup requests remain available and helpers reuse the existing React Three Fiber instance.
+
 Persistence is debounced: wait for the saved state or poll the stored value before reloading. Rendering tests should wait for the expected scene or observable pixels, rather than relying on a fixed delay. Listen for page errors when a new flow risks runtime/WebGL failures. A click succeeding is insufficient evidence that a candidate project was actually committed.
 
 Screenshots are saved on failures, and some specs explicitly write diagnostic images to `test-results/`. Those images are evidence for inspection, not automatically approved visual snapshots. `test-results/` and `playwright-report/` are ignored.

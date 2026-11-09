@@ -1,30 +1,34 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from 'react'
 import type { LibraryDrawing } from '@/lib/library-preview'
+import { preparedExampleProjects, type LibraryWorkerRequest, type LibraryWorkerResponse } from '@/lib/example-project-preparation'
 
-// Built-ins are immutable; retain only their small drawings across Library visits.
+// Keep built-in drawings across visits; unused projects have a separate bounded cache.
 const examples = new Map<string, LibraryDrawing>()
 class PreviewRenderer {
   private worker: Worker | null = null
   private next = 0
-  private pending = new Map<number, { resolve: (drawing: LibraryDrawing) => void; reject: (error: Error) => void }>()
+  private pending = new Map<number, { exampleId?: string; resolve: (drawing: LibraryDrawing) => void; reject: (error: Error) => void }>()
 
   render(id: string, content?: string): Promise<LibraryDrawing> {
     const cached = content === undefined ? examples.get(id) : undefined
     if (cached) return Promise.resolve(cached)
     if (!this.worker) {
       this.worker = new Worker(new URL('../lib/library-preview.worker.ts', import.meta.url), { type: 'module' })
-      this.worker.onmessage = (event: MessageEvent<{ request: number; drawing?: LibraryDrawing; error?: string }>) => {
+      this.worker.onmessage = (event: MessageEvent<LibraryWorkerResponse>) => {
         const job = this.pending.get(event.data.request)
         this.pending.delete(event.data.request)
-        if (event.data.drawing) job?.resolve(event.data.drawing)
+        if (event.data.drawing) {
+          if (job?.exampleId && event.data.project) preparedExampleProjects.remember(job.exampleId, event.data.project)
+          job?.resolve(event.data.drawing)
+        }
         else job?.reject(new Error(event.data.error || 'Preview unavailable.'))
       }
       this.worker.onerror = () => this.dispose()
     }
     const request = ++this.next
     return new Promise<LibraryDrawing>((resolve, reject) => {
-      this.pending.set(request, { resolve, reject })
-      this.worker!.postMessage({ request, id, content })
+      this.pending.set(request, { exampleId: content === undefined ? id : undefined, resolve, reject })
+      this.worker!.postMessage({ kind: 'preview', request, id, content } satisfies LibraryWorkerRequest)
     }).then(drawing => {
       if (content === undefined) examples.set(id, drawing)
       return drawing

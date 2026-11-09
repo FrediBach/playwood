@@ -1,5 +1,5 @@
 import { openInspectorSection } from './inspector-helpers'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './browser-fixture'
 import { createAssembly } from '../src/lib/assemblies'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { createExampleProject } from '../src/lib/example-library'

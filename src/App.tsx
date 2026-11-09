@@ -40,6 +40,7 @@ import { useConnectStroke } from '@/hooks/use-connect-stroke'
 import { usePreviewResize } from '@/hooks/use-preview-resize'
 import { useProject } from '@/hooks/use-project'
 import { useDirectorySync } from '@/hooks/use-directory-sync'
+import { useMaterialPrewarm } from '@/hooks/use-material-prewarm'
 import { getAssemblyInstance } from '@/lib/assemblies'
 import { findClosingPanelHoles } from '@/lib/close-holes'
 import { resolvePanels } from '@/lib/model'
@@ -50,6 +51,7 @@ import { CheckCheck } from 'lucide-react'
 import { useCallback,useEffect,useMemo,useState } from 'react'
 
 export default function App() {
+  useMaterialPrewarm()
   const {project,documentId,getSnapshot,commit,undo,redo,canUndo,canRedo,saveStatus,repairNotice}=useProject()
   const {
   overlapRepair, setOverlapRepair, equalSizes, setEqualSizes, assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds,

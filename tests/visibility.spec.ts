@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './browser-fixture'
 import { createPanel } from '../src/lib/model'
 
 const key = 'playwood-studio-project-v1'

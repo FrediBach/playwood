@@ -69,6 +69,8 @@ Undo moves the current project to the front of `future` and restores the last pa
 
 Starting a blank project, applying a template, and importing a project also use `commit`. They replace the current construction without clearing the in-memory undo stack. That allows Undo to restore the previous project until the page is reloaded. New-project and template replacement confirmation UI is coordinated through `App` and [ProjectDialogs.tsx](../src/components/ProjectDialogs.tsx).
 
+Selecting a full library build opens its replacement confirmation immediately. [use-template-preparation.ts](../src/hooks/use-template-preparation.ts) either uses an unused project prepared for its thumbnail or constructs it in a worker. Pending requests retain their originating project and their own request identity; cancellation, closing the dialog, or changing the source stops the worker and rejects late results, including an earlier request for the same example. Replace stays disabled until the candidate is ready. Acceptance checks source identity again inside the functional replacement commit. Loading, errors, cancellation, and cached candidates remain outside history and browser/folder autosave. Blank projects and insertion of library assembly modules keep their existing synchronous paths.
+
 ## Preview and draft transactions
 
 ### Panel overlap repair

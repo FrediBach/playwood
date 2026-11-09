@@ -5,6 +5,7 @@ import { download } from '@/editor/project-file-commands'
 import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { useConstructionEditor } from '@/hooks/use-construction-editor'
 import { useProject } from '@/hooks/use-project'
+import { useTemplatePreparation, type PendingTemplate } from '@/hooks/use-template-preparation'
 import { addConnectorsBetween } from '@/lib/connector-infill'
 import { moveProject,projectToCsv,rotateProject,validateProject } from '@/lib/model'
 import { panelSvgFilename,panelToSvg } from '@/lib/panel-svg'
@@ -19,8 +20,8 @@ interface EditorDialogsProps {
   draft: Panel
   setDraft: React.Dispatch<React.SetStateAction<Panel>>
   loadTemplate: (template: string) => void
-  pendingTemplate: { id: string; project: Project; returnTo: ProjectDialog }|null
-  applyTemplate: (template: string,next: Project) => void
+  pendingTemplate: PendingTemplate|null
+  applyTemplate: (template: string,next: Project,source?: Project) => void
   exportName: string
   notify: (message: string) => void
   exportProject: () => void
@@ -50,6 +51,7 @@ export function EditorDialogs({
   setExploded, setDialog, setFitSignal, inspectingConnectors,
   selectedIds, addDraftPanel
 }: EditorDialogsProps)  {
+  const replacement = useTemplatePreparation(pendingTemplate,project,dialog==='replace')
   return <ProjectDialogs
     onNew={startNewProject}
     dialog={dialog}
@@ -57,8 +59,15 @@ export function EditorDialogs({
     draft={draft}
     setDraft={setDraft}
     loadTemplate={loadTemplate}
-    replacementName={pendingTemplate?.project.name??''}
-    onReplace={() => { if(pendingTemplate) applyTemplate(pendingTemplate.id,pendingTemplate.project) } }
+    replacementName={replacement.project?.name??pendingTemplate?.name??''}
+    replacementLoading={replacement.loading}
+    replacementError={replacement.error}
+    replacementReady={!!replacement.project}
+    onReplace={() => {
+      if(!pendingTemplate||!replacement.project) return
+      try { applyTemplate(pendingTemplate.id,replacement.project,pendingTemplate.source) }
+      catch(error) { notify(error instanceof Error?error.message:'This example could not be opened.') }
+    } }
     onExportPanelSvg={(panel,index) => { download(panelToSvg(panel),`${exportName}-${panelSvgFilename(panel,index)}`,'image/svg+xml'); notify('Panel SVG exported') } }
     exportProject={exportProject}
     onExportParts={() => { download(projectToCsv(project),`${exportName}-parts.csv`,'text/csv'); notify('Parts list exported') } }

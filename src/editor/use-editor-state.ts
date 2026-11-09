@@ -2,6 +2,7 @@ import { PanelPaletteProvider } from '@/components/PanelColorField'
 import { type ProjectDialog } from '@/components/ProjectDialogs'
 import { INITIAL_ATTACHMENT } from '@/editor/editor-defaults'
 import { useProject } from '@/hooks/use-project'
+import type { PendingTemplate } from '@/hooks/use-template-preparation'
 import { getAssemblyInstance } from '@/lib/assemblies'
 import { getAutoConnectFit } from '@/lib/auto-connect-fit'
 import { addCustomColor,getProjectPalette,removeCustomColor,updateCustomColor } from '@/lib/custom-colors'
@@ -73,7 +74,7 @@ function useEditorReviews(project: Project) {
   const [connectorInfill,setConnectorInfill]=useState<{source:Project;ids:string[]}|null>(null)
   const [objectConversion,setObjectConversion]=useState<{source:Project;ids:string[]}|null>(null)
   const modalOpen=!!overlapRepair||!!equalSizes||!!movementReview||!!resizeReview||!!dialog||!!pendingConnectionFit||!!connectorInfill||!!objectConversion
-  const [pendingTemplate,setPendingTemplate]=useState<{id:string;project:Project;returnTo:ProjectDialog}|null>(null)
+  const [pendingTemplate,setPendingTemplate]=useState<PendingTemplate|null>(null)
   return { dialog, setDialog, pendingConnectionFit, setPendingConnectionFit, movementReview, setMovementReview,
     overlapRepair, setOverlapRepair, equalSizes, setEqualSizes, resizeReview, setResizeReview,
     connectorInfill, setConnectorInfill, objectConversion, setObjectConversion, modalOpen, pendingTemplate, setPendingTemplate }

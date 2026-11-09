@@ -4,9 +4,11 @@ import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { useCopyPaste } from '@/hooks/use-copy-paste'
 import { useDesignConstraints } from '@/hooks/use-design-constraints'
 import { useProject } from '@/hooks/use-project'
+import type { PendingTemplate } from '@/hooks/use-template-preparation'
 import { createAssemblyFile,parseAssemblyFile } from '@/lib/assembly-file'
-import { insertAssemblyDefinition } from '@/lib/assembly-library'
-import { createExampleProject } from '@/lib/example-library'
+import { ASSEMBLY_LIBRARY,insertAssemblyDefinition } from '@/lib/assembly-library'
+import { createExampleProject,EXAMPLE_LIBRARY } from '@/lib/example-library'
+import { preparedExampleProjects } from '@/lib/example-project-preparation'
 import { repairLegacyExampleInserts } from '@/lib/legacy-example-inserts'
 import { repairLegacyShelf } from '@/lib/legacy-shelf'
 import { parseProject } from '@/lib/model'
@@ -28,12 +30,12 @@ interface CreateProjectFileCommandsOptions {
   setFitSignal: React.Dispatch<React.SetStateAction<number>>
   notify: (message: string) => void
   setAssemblyImportError: React.Dispatch<React.SetStateAction<string>>
-  setPendingTemplate: React.Dispatch<React.SetStateAction<{ id: string; project: Project; returnTo: ProjectDialog; } | null>>
+  setPendingTemplate: React.Dispatch<React.SetStateAction<PendingTemplate | null>>
   dialog: ProjectDialog
   setDialog: React.Dispatch<React.SetStateAction<ProjectDialog>>
   setProjectConstraintsOpen: React.Dispatch<React.SetStateAction<boolean>>
   constraints: ReturnType<typeof useDesignConstraints>
-  pendingTemplate: { id: string; project: Project; returnTo: ProjectDialog }|null
+  pendingTemplate: PendingTemplate|null
   closeContextMenu: () => void
   setView: React.Dispatch<React.SetStateAction<CameraView>>
   setAttachTarget: React.Dispatch<React.SetStateAction<string>>
@@ -98,8 +100,20 @@ export function createProjectFileCommands({
       }
     })
   }
-  const loadTemplate=(template: string) => { setPendingTemplate({ id: template,project: createExampleProject(template),returnTo: dialog }); setDialog('replace') }
-  const applyTemplate=(template: string,next: Project) => { setProjectConstraintsOpen(false); constraints.cancel(); clipboard.cancel(); commit(next,{ replace: true }); assembly.close(); const instance=next.assemblies?.instances[0]; setSelectedIds(instance? Object.values(instance.panelIds):next.panels.slice(0,1).map(p => p.id)); setInspectorTab('panel'); setDialog(null); setPendingTemplate(null); setExploded(false); setFitSignal(v => v+1); notify(template==='blank'? 'A fresh start. Add your first panel.':'Template loaded. Make it your own.') }
+  const loadTemplate=(template: string) => {
+    const example = [...EXAMPLE_LIBRARY,...ASSEMBLY_LIBRARY].find(example=>example.id===template)
+    if(template!=='blank'&&!example) { notify('This example is unavailable.'); return }
+    const prepared = template==='blank'?createExampleProject('blank'):preparedExampleProjects.take(template)
+    setPendingTemplate({ id: template,name: prepared?.name??example?.name??'Untitled project',source: project,project: prepared,returnTo: dialog })
+    setDialog('replace')
+  }
+  const applyTemplate=(template: string,next: Project,source?: Project) => {
+    commit(current=>{
+      if(source&&current!==source) throw new Error('The current project changed. Cancel and choose the example again.')
+      return next
+    },{ replace: true })
+    setProjectConstraintsOpen(false); constraints.cancel(); clipboard.cancel(); assembly.close(); const instance=next.assemblies?.instances[0]; setSelectedIds(instance? Object.values(instance.panelIds):next.panels.slice(0,1).map(p => p.id)); setInspectorTab('panel'); setDialog(null); setPendingTemplate(null); setExploded(false); setFitSignal(v => v+1); notify(template==='blank'? 'A fresh start. Add your first panel.':'Template loaded. Make it your own.')
+  }
   const closeProjectDialog=() => { setDialog(dialog==='replace'? pendingTemplate?.returnTo??null:null); setPendingTemplate(null) }
   const exportName=project.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'playwood-project'
   const startNewProject=() => { closeContextMenu(); applyTemplate('blank',createExampleProject('blank')); setRealisticPreview(false); setView('perspective'); setAttachTarget('new'); setAttachment(INITIAL_ATTACHMENT); setImportError(''); notify('New project started. Undo to restore your previous project.') }
@@ -109,9 +123,9 @@ export function createProjectFileCommands({
     commit(next,{ replace: true }); assembly.close()
     const first=next.assemblies?.instances[0]
     setSelectedIds(first? Object.values(first.panelIds):next.panels.slice(0,1).map(panel => panel.id))
-    setInspectorTab('panel'); setExploded(false); setRealisticPreview(false); setFitSignal(v => v+1); setImportError(''); setDialog(null)
+    setInspectorTab('panel'); setExploded(false); setRealisticPreview(false); setFitSignal(v => v+1); setImportError(''); setDialog(null); setPendingTemplate(null)
   }
-  const importProject=async (file: File) => { try { if(file.size>2000000) throw new Error('Choose a project file smaller than 2 MB.'); const imported=parseProject(JSON.parse(await file.text())); const shelf=(imported.constraints?.length||imported.spaceConstraint?.enabled)? imported:repairLegacyShelf(imported); const repaired=(imported.constraints?.length||imported.spaceConstraint?.enabled)? shelf:repairLegacyExampleInserts(shelf); openProject(repaired); notify(repaired===imported? 'Project imported':repaired!==shelf? 'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}  catch(e) { setImportError(e instanceof Error? e.message:'This project file could not be read.'); setDialog('export')}  }
+  const importProject=async (file: File) => { try { if(file.size>2000000) throw new Error('Choose a project file smaller than 2 MB.'); const imported=parseProject(JSON.parse(await file.text())); const shelf=(imported.constraints?.length||imported.spaceConstraint?.enabled)? imported:repairLegacyShelf(imported); const repaired=(imported.constraints?.length||imported.spaceConstraint?.enabled)? shelf:repairLegacyExampleInserts(shelf); openProject(repaired); notify(repaired===imported? 'Project imported':repaired!==shelf? 'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}  catch(e) { setImportError(e instanceof Error? e.message:'This project file could not be read.'); setDialog('export'); setPendingTemplate(null)}  }
   return { loadTemplate,insertModule,insertModuleDefinition,insertSavedAssembly,exportAssembly,startNewProject,closeProjectDialog,applyTemplate,exportName,exportProject,importProject,openProject,importAssembly }
 }
 

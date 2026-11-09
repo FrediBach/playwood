@@ -24,6 +24,9 @@ interface Props {
   onNew: () => void
   onReplace: () => void
   replacementName: string
+  replacementReady: boolean
+  replacementLoading: boolean
+  replacementError?: string
   onAdd: () => void
   attachNewPanel: boolean
   onMoveCreation: ComponentProps<typeof MoveCreation>['onMove']
@@ -76,8 +79,8 @@ function NewProjectDialog({onClose,onNew,exportProject,project}: Pick<Props, 'on
   return <><DialogTitle>Start a new project?</DialogTitle><DialogDescription>This will replace “{project.name}” with an empty workspace, including its saved copy in this browser. Export your current project first to keep a separate copy. You can undo this change until you reload or close the app.</DialogDescription><Button variant="outline" onClick={exportProject}><Download size={17}/>Export current project</Button><div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={onNew}>Start new project</Button></div></>
 }
 
-function ReplaceProjectDialog({onClose,onReplace,exportProject,project,replacementName}: Pick<Props, 'onClose' | 'onReplace' | 'exportProject' | 'project' | 'replacementName'>) {
-  return <><DialogTitle>Replace current project?</DialogTitle><DialogDescription>This will replace “{project.name}” with “{replacementName}”, including its saved copy in this browser. Export your current project first to keep a separate copy. You can undo this change until you reload or close the app.</DialogDescription><Button variant="outline" onClick={exportProject}><Download size={17}/>Export current project</Button><div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={onReplace}>Replace project</Button></div></>
+function ReplaceProjectDialog({onClose,onReplace,exportProject,project,replacementName,replacementReady,replacementLoading,replacementError}: Pick<Props, 'onClose' | 'onReplace' | 'exportProject' | 'project' | 'replacementName' | 'replacementReady' | 'replacementLoading' | 'replacementError'>) {
+  return <><DialogTitle>Replace current project?</DialogTitle><DialogDescription>This will replace “{project.name}” with “{replacementName}”, including its saved copy in this browser. Export your current project first to keep a separate copy. You can undo this change until you reload or close the app.</DialogDescription><Button variant="outline" onClick={exportProject}><Download size={17}/>Export current project</Button>{replacementLoading&&<p role="status" className="dialog-note">Preparing example…</p>}{replacementError&&<p role="alert" className="error-message">{replacementError}</p>}<div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={!replacementReady} onClick={onReplace}>Replace project</Button></div></>
 }
 
 function RotateDialog({onClose,onRotate}: Pick<Props, 'onClose' | 'onRotate'>) {

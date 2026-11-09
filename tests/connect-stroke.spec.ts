@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './browser-fixture'
 import { attachPanel, createPanel, resolvePanels, validateProject } from '../src/lib/model'
 import { getConnectorRail, connectorSlide } from '../src/lib/connector-movement'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'

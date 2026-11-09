@@ -69,7 +69,11 @@ test('box drafts, Boolean operands, keyboard movement and persistence form one u
   await page.getByRole('button', { name: 'Select object Outer', exact: true }).click()
   await page.getByRole('button', { name: 'Select object Cutter', exact: true }).click({ modifiers: ['Shift'] })
   await page.getByRole('button', { name: 'Subtract', exact: true }).click()
-  await expect.poll(async () => (await savedObjects(page)).roots.length).toBe(1)
+  // The earlier single box also has one root; wait for the Boolean result to save.
+  await expect.poll(async () => {
+    const objects = await savedObjects(page)
+    return { count: objects.roots.length, root: objects.nodes.find(node => node.id === objects.roots[0]) }
+  }).toMatchObject({ count: 1, root: { kind: 'boolean', operation: 'subtract' } })
   await ready(page)
   await expect.poll(() => objectPixels(page)).toBeGreaterThan(1000)
   const beforeMove = await savedObjects(page)

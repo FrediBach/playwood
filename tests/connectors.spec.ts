@@ -1,5 +1,5 @@
 import { openInspectorSection } from './inspector-helpers'
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './browser-fixture'
 import type { Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three'
 import { attachPanel, createPanel, getProjectBounds, resolvePanels } from '../src/lib/model'
 import type { AttachmentOptions, ConnectorType, Project } from '../src/lib/types'
@@ -65,7 +65,7 @@ async function renderedConnectors(page: Page, checkPanelIntersections = false) {
       scene?.updateMatrixWorld(true)
       scene?.traverse(object => {
         const mesh = object as Mesh
-        if (mesh.isMesh && mesh.geometry.type === 'ExtrudeGeometry') panels.push(mesh)
+        if (mesh.isMesh && mesh.userData.panelId && !mesh.userData.trofastInsertId) panels.push(mesh)
       })
     }
     const triangle = checkIntersections

@@ -24,6 +24,43 @@ const piecePosition = (project: Project, index = 0) => {
 }
 
 describe('preview structural resize handles', () => {
+  it('reuses repeated effective pulls, including limits, without reusing a different handle or source', () => {
+    const panel = createPanel({ width: 100, height: 400 })
+    const project: Project = { version: 1, name: 'Repeated pulls', panels: [panel], connections: [] }
+    const session = preparePreviewResize(project, { panelId: panel.id })!
+    const handle = 'panel-width-positive'
+    const result = movePreviewResize(session, handle, 50)
+    expect(movePreviewResize(session, handle, 50)).toBe(result)
+    expect(result.project.panels[0].width).toBe(150)
+    const opposite = movePreviewResize(session, 'panel-width-negative', 50)
+    expect(opposite.project.panels[0].position[0]).toBe(-25)
+    expect(result.project.panels[0].position[0]).toBe(25)
+    const limited = movePreviewResize(session, handle, -200)
+    expect(limited.limited).toBe(true)
+    expect(limited.project.panels[0].width).toBeCloseTo(40, 3)
+    expect(movePreviewResize(session, handle, -200)).toBe(limited)
+    expect(movePreviewResize(session, handle, 0).project).toBe(project)
+    const next = preparePreviewResize(result.project, { panelId: panel.id })!
+    expect(movePreviewResize(next, handle, 50).project.panels[0].width).toBe(200)
+    expect(project.panels[0]).toEqual(panel)
+  })
+
+  it('keeps connected and independent candidates separate at the same effective distance', () => {
+    const project = createStarterProject()
+    const panel = named(project, 'Middle shelf')
+    const session = preparePreviewResize(project, { panelId: panel.id })!
+    const handle = 'panel-height-positive'
+    const connected = movePreviewResize(session, handle, 80)
+    expect(movePreviewResize(session, handle, 80)).toBe(connected)
+    const local = movePreviewResize(session, handle, 80, true)
+    expect(movePreviewResize(session, handle, 80, true)).toBe(local)
+    expect(named(connected.project, 'Bottom shelf').height).toBeCloseTo(named(project, 'Bottom shelf').height + 80)
+    expect(named(local.project, 'Bottom shelf').height).toBe(named(project, 'Bottom shelf').height)
+    expect(movePreviewResize(session, handle, 80)).toEqual(connected)
+    valid(local.project)
+    valid(connected.project)
+  })
+
   it('retains a blocked edge and identifies its fixed panel without unrelated furniture', () => {
     const panel = createPanel({ width: 400, height: 300, position: [0, 500, 0] })
     const unrelated = createPanel({ position: [3000, 500, 0] })

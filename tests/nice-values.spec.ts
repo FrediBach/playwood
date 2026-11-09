@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './browser-fixture'
 import { createPanel, createStarterProject, parseProject, resolvePanels } from '../src/lib/model'
 import { preparePreviewResize } from '../src/lib/preview-resize'
 import type { Project } from '../src/lib/types'

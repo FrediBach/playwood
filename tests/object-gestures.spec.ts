@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './browser-fixture'
 import { createStarterProject } from '../src/lib/model'
 import { constructionBounds } from '../src/lib/object-geometry'
 import type { Project, Vec3 } from '../src/lib/types'

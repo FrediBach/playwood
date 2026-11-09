@@ -2,6 +2,13 @@ import type { ConstructionObject, ConstructionObjects, ObjectBooleanOperation, P
 
 export const MAX_CONSTRUCTION_OBJECTS = 200
 export const MAX_CONSTRUCTION_OBJECT_DEPTH = 16
+
+/** Cheap selection eligibility, shared by the inspector and conversion worker. */
+export function objectConversionReason(project: Project, ids: readonly string[]): string | undefined {
+  const roots = new Set(project.constructionObjects?.roots)
+  if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !roots.has(id))) return 'Select complete top-level objects to convert.'
+}
+
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
 function text(value: unknown): string {
   if (typeof value !== 'string' || !value.trim() || value.length > 120) throw new Error('Object names and IDs must contain 1–120 characters.')

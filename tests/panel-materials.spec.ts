@@ -1,9 +1,39 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './browser-fixture'
 import { createPanel } from '../src/lib/model'
 import { gridProject } from '../src/lib/example-geometry'
 import { MATERIALS } from '../src/lib/materials'
 import type { Project } from '../src/lib/types'
 import { openInspectorSection } from './inspector-helpers'
+
+test('background material generation supplies full-resolution, unchanged texture pixels', async ({ page }) => {
+  await page.addInitScript(() => {
+    const completed: Record<string, number> = {}
+    Object.assign(window, { materialWarmResults: completed })
+    const NativeWorker = Worker
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options)
+        if (String(url).includes('material-raster.worker')) this.addEventListener('message', event => {
+          if (event.data.raster) completed[event.data.material] = event.data.raster.data.byteLength
+        })
+      }
+    }
+  })
+  await page.goto('/')
+  const completed = () => page.evaluate(() => (window as Window & { materialWarmResults?: Record<string, number> }).materialWarmResults)
+  await expect.poll(completed, { timeout: 20000 }).toMatchObject({ osb: 5242880, nazena: 5242880, oak: 1572864, walnut: 1572864, mdf: 1572864 })
+  const texture = await page.evaluate(async () => {
+    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/src/components/wood-texture.ts'))!
+    const { createWoodTextures } = await import(moduleUrl)
+    const maps = createWoodTextures('osb')
+    const { width, height, data } = maps.color.image
+    const hash = await crypto.subtle.digest('SHA-256', data)
+    const colorHash = [...new Uint8Array(hash)].map(value => value.toString(16).padStart(2, '0')).join('')
+    maps.color.dispose(); maps.surface.dispose()
+    return { width, height, colorHash }
+  })
+  expect(texture).toEqual({ width: 1024, height: 1024, colorHash: '0ea1e19f7e9b28e020ca5b328f3e2b1b30aa88c2d0c624043bddcf2e271d755c' })
+})
 
 async function importProject(page: Page, project: Project) {
   await page.getByLabel('Import project file').setInputFiles({

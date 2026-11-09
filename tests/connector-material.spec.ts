@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './browser-fixture'
 import { createPanel } from '../src/lib/model'
 import { openInspectorSection } from './inspector-helpers'
 

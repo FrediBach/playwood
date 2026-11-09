@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './browser-fixture'
 
 async function cameraState(page: Page) {
   return page.locator('canvas').evaluate(async canvas => {

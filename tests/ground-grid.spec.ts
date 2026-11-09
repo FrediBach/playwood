@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './browser-fixture'
 import { createPanel } from '../src/lib/model'
 
 test('floor panels occlude meter marks while exposed floor marks remain visible', async ({ page }) => {

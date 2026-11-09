@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './browser-fixture'
 import { Euler, Vector3 } from 'three'
 import { gridProject } from '../src/lib/example-geometry'
 import { resolvePanels, rotateProject, validateProject } from '../src/lib/model'

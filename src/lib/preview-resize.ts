@@ -198,10 +198,23 @@ export function preparePreviewResize(project: Project, selection: PreviewResizeS
   return session.handles.length ? session : null
 }
 
+interface PreviewResizeResult { project: Project; distance: number; limited: boolean; reason?: string }
+const lastMoves = new WeakMap<PreviewResizeSession, { handleId: string; distance: number; local: boolean; result: PreviewResizeResult }>()
+
+/** Repeated rounded/snapped pointer positions reuse one immutable candidate.
+ * Retain only the latest result, and release it with its source session. */
+export function movePreviewResize(session: PreviewResizeSession, handleId: string, distance: number, local = false): PreviewResizeResult {
+  if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
+  const previous = lastMoves.get(session)
+  if (previous?.handleId === handleId && previous.distance === distance && previous.local === local) return previous.result
+  const result = solvePreviewResize(session, handleId, distance, local)
+  lastMoves.set(session, { handleId, distance, local, result })
+  return result
+}
+
 /** Preview from the pointer-down snapshot, stopping at the last feasible cut.
  * No state is persisted here, so callers can cancel or commit one undo step. */
-export function movePreviewResize(session: PreviewResizeSession, handleId: string, distance: number, local = false): { project: Project; distance: number; limited: boolean; reason?: string } {
-  if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
+function solvePreviewResize(session: PreviewResizeSession, handleId: string, distance: number, local: boolean): PreviewResizeResult {
   const handle = session.handles.find(item => item.id === handleId)
   const driver = session.drivers.get(handleId)
   if (!handle || !driver || (handle.sizeLocked || (handle.blocked && !local)) || Math.abs(distance) < 1e-6) return { project: session.original, distance: 0, limited: false }

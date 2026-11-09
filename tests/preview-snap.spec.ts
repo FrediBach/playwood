@@ -1,5 +1,5 @@
 import { createPanel } from '../src/lib/model'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './browser-fixture'
 
 test('preview snapping controls, shortcuts and saved preferences', async ({ page }) => {
   await page.goto('/')

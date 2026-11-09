@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './browser-fixture'
 import { createPanel, createStarterProject } from '../src/lib/model'
 import { ASSEMBLY_LIBRARY } from '../src/lib/assembly-library'
 

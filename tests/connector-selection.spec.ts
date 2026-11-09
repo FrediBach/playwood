@@ -1,4 +1,4 @@
-import { expect as baseExpect, test, type Page } from '@playwright/test'
+import { expect as baseExpect, test, type Page } from './browser-fixture'
 
 const expect = baseExpect.configure({ timeout: 20000 })
 test.setTimeout(90000)

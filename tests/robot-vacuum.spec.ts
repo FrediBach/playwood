@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './browser-fixture'
 import { createPanel } from '../src/lib/model'
 import type { VacuumPlan } from '../src/components/robot-vacuum-navigation'
 

@@ -1,16 +1,19 @@
-import { EXAMPLE_LIBRARY } from './example-library'
-import { ASSEMBLY_LIBRARY } from './assembly-library'
+import { createExampleProject } from './example-library'
 import { parseDirectoryProjectContent } from './directory-sync'
 import { createLibraryDrawing } from './library-preview'
+import type { LibraryWorkerRequest, LibraryWorkerResponse } from './example-project-preparation'
 
-self.onmessage = (event: MessageEvent<{ request: number; id: string; content?: string }>) => {
-  const { request, id, content } = event.data
+self.onmessage = (event: MessageEvent<LibraryWorkerRequest>) => {
+  const { request, id, kind } = event.data
   try {
-    const example = content === undefined ? [...EXAMPLE_LIBRARY, ...ASSEMBLY_LIBRARY].find(entry => entry.id === id) : undefined
-    const project = content === undefined ? example?.create() : parseDirectoryProjectContent(content)
-    if (!project) throw new Error('Project preview unavailable.')
-    self.postMessage({ request, drawing: createLibraryDrawing(project) })
+    if (kind === 'project') {
+      self.postMessage({ request, project: createExampleProject(id) } satisfies LibraryWorkerResponse)
+      return
+    }
+    const { content } = event.data
+    const project = content === undefined ? createExampleProject(id) : parseDirectoryProjectContent(content)
+    self.postMessage({ request, drawing: createLibraryDrawing(project), ...(content === undefined ? { project } : {}) } satisfies LibraryWorkerResponse)
   } catch {
-    self.postMessage({ request, error: 'Preview unavailable. Try Sync → Resync for folder files.' })
+    self.postMessage({ request, error: kind === 'project' ? 'This example could not be prepared. Cancel and choose it again.' : 'Preview unavailable. Try Sync → Resync for folder files.' } satisfies LibraryWorkerResponse)
   }
 }

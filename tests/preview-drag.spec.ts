@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './browser-fixture'
 import { createAssembly, duplicateAssembly } from '../src/lib/assemblies'
 import { createExampleProject } from '../src/lib/example-library'
 import { preparePreviewDrag } from '../src/lib/preview-drag'
