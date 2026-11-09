@@ -1,6 +1,6 @@
 import { getAssemblyInstance, isPanelConnectedToAssembly } from './assemblies'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
-import { DESIGN_CONSTRAINT_TOLERANCE, designConstraintPanelIds, evaluateDesignConstraints, isPanelDimensionLocked, parseDesignConstraints } from './design-constraints'
+import { DESIGN_CONSTRAINT_TOLERANCE, designConstraintLimits, designConstraintPanelIds, evaluateDesignConstraints, isPanelDimensionLocked, parseDesignConstraints } from './design-constraints'
 import { resolvePanels } from './model'
 import { reconcileDesignConstraints } from './structure-edit'
 import { assertNoNewTrofastIssues } from './trofast'
@@ -26,14 +26,26 @@ export function setDesignConstraint(project: Project, rule: DesignConstraint, an
 
 /** Freeze each selected cut at its current size in one immutable transaction. */
 export function lockPanelSizes(project: Project, panelIds: readonly string[]): Project {
+  return setPanelDimensionLocked(setPanelDimensionLocked(project, panelIds, 'width', true), panelIds, 'height', true)
+}
+
+/** Exact dimension rules are the saved locks. Unlocking pauses them without discarding their settings. */
+export function setPanelDimensionLocked(project: Project, panelIds: readonly string[], dimension: 'width' | 'height', locked: boolean): Project {
   let next = project
   const panels = new Map(project.panels.map(panel => [panel.id, panel]))
   for (const id of new Set(panelIds)) {
     const panel = panels.get(id)
     if (!panel) throw new Error('The selected panel no longer exists.')
-    for (const dimension of ['width', 'height'] as const) {
-      if (isPanelDimensionLocked(next.constraints, id, dimension)) continue
-      next = setDesignConstraint(next, {
+    if (!locked) {
+      if (!isPanelDimensionLocked(next.constraints, id, dimension)) continue
+      next = { ...next, constraints: next.constraints!.map(rule => isPanelDimensionLocked([rule], id, dimension) ? { ...rule, enabled: false } : rule) }
+    } else if (!isPanelDimensionLocked(next.constraints, id, dimension)) {
+      const paused = next.constraints?.find(rule => {
+        if (rule.enabled || rule.kind !== 'dimension' || rule.panelId !== id || rule.dimension !== dimension) return false
+        const { min, max } = designConstraintLimits(rule)
+        return min === panel[dimension] && max === min
+      })
+      next = setDesignConstraint(next, paused ? { ...paused, enabled: true } : {
         id: crypto.randomUUID(), enabled: true, kind: 'dimension', panelId: id,
         dimension, relation: 'exact', value: panel[dimension],
       })

@@ -25,6 +25,7 @@ import { AssemblyAttachmentTarget } from '@/lib/assemblies'
 import { findClosingPanelHoles } from '@/lib/close-holes'
 import { getConnectorPanelFit } from '@/lib/connect-panel'
 import { editConnectors } from '@/lib/connector-selection'
+import { setPanelDimensionLocked } from '@/lib/design-constraint-commands'
 import { getPanelGroundExtension } from '@/lib/extend-to-ground'
 import { gridPanelCut } from '@/lib/grid-split'
 import { orderedConnectors } from '@/lib/list-groups'
@@ -420,8 +421,13 @@ function LoosePanelSelectionInspector({
   setAttachment, attachTarget, setAttachTarget, previewIssues,
   attachmentSideGuide, managingProjectConstraints, addPanel
 }: LoosePanelSelectionInspectorProps)  {
+  const onDimensionLockChange = (dimension: 'width' | 'height', locked: boolean) => {
+    commitWithInsertChecks(current => setPanelDimensionLocked(current, selectedIds, dimension, locked))
+  }
   return <>
     {selectedPanels.length>1&&<MultiPanelInspector
+    dimensionConstraints={project.constraints}
+    onDimensionLockChange={onDimensionLockChange}
     onDistribute={distributeSelection}
     editError={panelEditError?.selection===selectionKey? panelEditError.message:undefined}
     onManageConstraints={() => openConstraints()}
@@ -436,6 +442,7 @@ function LoosePanelSelectionInspector({
     onDelete={deleteSelected}
     onDetach={detachSelection} />}
     {selected&&(inspectorTab==='panel'? <SelectedPanelInspector
+    onDimensionLockChange={onDimensionLockChange}
     panelEditError={panelEditError}
     selectionKey={selectionKey}
     openConstraints={openConstraints}
@@ -459,6 +466,7 @@ function LoosePanelSelectionInspector({
 }
 
 interface SelectedPanelInspectorProps {
+  onDimensionLockChange: (dimension: 'width' | 'height', locked: boolean) => void
   panelEditError: { selection: string; message: string }|null
   selectionKey: string
   openConstraints: (add?: boolean) => void
@@ -484,9 +492,11 @@ function SelectedPanelInspector({
   trofastInspector, extendToGround, groundPanelFit, buildTools,
   selected, project, panels, connection,
   issues, updatePanel, updateConnection, detachSelection,
-  duplicateSelected, deleteSelected
+  duplicateSelected, deleteSelected, onDimensionLockChange
 }: SelectedPanelInspectorProps)  {
   return <SinglePanelInspector
+    dimensionConstraints={project.constraints}
+    onDimensionLockChange={onDimensionLockChange}
     editError={panelEditError?.selection===selectionKey? panelEditError.message:undefined}
     onManageConstraints={() => openConstraints()}
     constraints={constraintsInspector}

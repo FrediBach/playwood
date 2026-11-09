@@ -3,7 +3,7 @@ import { preparePreviewResize, movePreviewResize } from './preview-resize'
 import { resizePanels } from './structure-edit'
 import { describe, expect, it } from 'vitest'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
-import { lockPanelSizes, setDesignConstraint } from './design-constraint-commands'
+import { lockPanelSizes, setDesignConstraint, setPanelDimensionLocked } from './design-constraint-commands'
 import { evaluateDesignConstraints } from './design-constraints'
 import { createPanel, createStarterProject, resolvePanels } from './model'
 import type { DesignConstraint, Project } from './types'
@@ -107,6 +107,46 @@ describe('design rule command transactions', () => {
 })
 
 describe('panel size locks', () => {
+  it('locks one dimension, leaving the other editable, and reuses a paused lock after reload', () => {
+    const project = emptyWithPanel()
+    const locked = setPanelDimensionLocked(project, ['side'], 'width', true)
+    expect(locked.constraints).toHaveLength(1)
+    expect(() => resizePanels(locked, ['side'], { width: 500 })).toThrow()
+    expect(resizePanels(locked, ['side'], { height: 700 }).panels[0].height).toBe(700)
+    const paused = setPanelDimensionLocked(locked, ['side'], 'width', false)
+    expect(paused.constraints).toEqual(locked.constraints!.map(rule => ({ ...rule, enabled: false })))
+    expect(paused.panels).toBe(locked.panels)
+    const restored = setPanelDimensionLocked(roundTripProject(paused), ['side'], 'width', true)
+    expect(restored.constraints).toEqual(locked.constraints)
+    expect(project.constraints).toBeUndefined()
+  })
+
+  it('pauses only enabled fixed rules on the selected axis, preserving other requirements', () => {
+    const project: Project = { ...emptyWithPanel(), constraints: [
+      { id: 'legacy', enabled: true, kind: 'dimension', panelId: 'side', dimension: 'width', value: 400 },
+      { id: 'zero-range', enabled: true, kind: 'dimension', panelId: 'side', dimension: 'width', relation: 'range', min: 400, max: 400 },
+      { id: 'min', enabled: true, kind: 'dimension', panelId: 'side', dimension: 'width', relation: 'minimum', value: 300 },
+      { id: 'range', enabled: true, kind: 'dimension', panelId: 'side', dimension: 'width', relation: 'range', min: 300, max: 500 },
+      { id: 'height', enabled: true, kind: 'dimension', panelId: 'side', dimension: 'height', value: 600 },
+      { id: 'paused', enabled: false, kind: 'dimension', panelId: 'side', dimension: 'width', value: 700 },
+    ] }
+    const unlocked = setPanelDimensionLocked(project, ['side'], 'width', false)
+    expect(unlocked.constraints?.map(rule => rule.enabled)).toEqual([false, false, true, true, true, false])
+    expect(unlocked.constraints?.slice(2)).toEqual(project.constraints?.slice(2))
+    expect(unlocked.panels).toBe(project.panels)
+    expect(setPanelDimensionLocked(unlocked, ['side'], 'width', false)).toBe(unlocked)
+  })
+
+  it('locks changed cuts at their current size without rewriting a paused authored target', () => {
+    const locked = setPanelDimensionLocked(emptyWithPanel(), ['side'], 'width', true)
+    const paused = setPanelDimensionLocked(locked, ['side'], 'width', false)
+    const resized = resizePanels(paused, ['side'], { width: 500 })
+    const relocked = setPanelDimensionLocked(resized, ['side'], 'width', true)
+    expect(relocked.constraints?.[0]).toEqual(paused.constraints?.[0])
+    expect(relocked.constraints?.[1]).toMatchObject({ dimension: 'width', value: 500, enabled: true })
+    expect(relocked.panels).toBe(resized.panels)
+  })
+
   it('locks multiple panels atomically, round-trips, and avoids duplicate rules', () => {
     const project = emptyWithPanel()
     project.panels.push(createPanel({ id: 'other', position: [1000, 500, 0] }))

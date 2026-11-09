@@ -222,9 +222,40 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   // plane. Dimensions are allowed to adapt while thickness remains physical.
   const weights = frames.flatMap(() => [1, 1, 64, 0.25, 0.25])
   const connections = [...project.connections, ...(edit.kind === 'fit' ? [edit.connection] : [])].filter(connection => indices.has(connection.parentId) && indices.has(connection.childId))
+  // Two retained seam ends transmit a cut change; one end transmits only
+  // placement. Track those dimension groups separately from physical joints.
+  const cutGroups = frames.flatMap((_, index) => [index * 2, index * 2 + 1])
+  const cutRoot = (index: number): number => {
+    while (cutGroups[index] !== index) { cutGroups[index] = cutGroups[cutGroups[index]]; index = cutGroups[index] }
+    return index
+  }
+  const radialCuts = new Set<number>()
+  const joinedPanels = new Set<number>()
+  contacts.forEach(contact => { radialCuts.add(contact.a * 2); radialCuts.add(contact.a * 2 + 1); radialCuts.add(contact.b * 2); radialCuts.add(contact.b * 2 + 1) })
+  const seamFits = new Map(connections.map(connection => {
+    const dimension = ['top', 'bottom', 'front', 'back'].includes(connection.side) ? 0 : 1
+    const childDimension = connection.quarterTurn ? 1 - dimension : dimension
+    const parent = frames[indices.get(connection.parentId)!].panel, child = frames[indices.get(connection.childId)!].panel
+    const parentLength = dimension === 0 ? parent.width : parent.height
+    const childLength = childDimension === 0 ? child.width : child.height
+    const overlap = Math.min(parentLength / 2, connection.offset + childLength / 2)
+      - Math.max(-parentLength / 2, connection.offset - childLength / 2)
+    // Preserve modest setbacks on substantially shared seams. A shallow
+    // branch on a deeper panel retains its near end, but a far overhang
+    // larger than two thirds of the shared seam is not an inferred fit.
+    const spansJoint = overlap > Math.max(parentLength, childLength) / 2 + CONTACT_TOLERANCE
+    const retainedEnds = [-1, 1].filter(side => {
+      const setback = Math.abs(side * parentLength / 2 - connection.offset - side * childLength / 2)
+      return setback < CONTACT_TOLERANCE || (spansJoint && overlap > setback * 1.5 + CONTACT_TOLERANCE)
+    })
+    return [connection.id, { dimension, childDimension, retainedEnds }] as const
+  }))
   // Movement and independent edge pulls may shift one branch center along a
   // shared T/cross joint without dragging the other branches along its seam.
-  const offsetKey = (connection: Connection) => (edit.kind === 'move' || (edit.kind === 'resize' && edit.local) || edit.kind === 'fit') ? connection.id : jointId(connection)
+  // A partial-depth branch also needs its own offset to follow its near end
+  // without imposing the full-depth branch's cut on the shorter panel.
+  const offsetKey = (connection: Connection) => (edit.kind === 'move' || (edit.kind === 'resize' && edit.local) || edit.kind === 'fit'
+    || (seamFits.get(connection.id)?.retainedEnds.length ?? 2) < 2) ? connection.id : jointId(connection)
   const offsetVariables = new Map<string, number>()
   for (const connection of connections) if (!offsetVariables.has(offsetKey(connection))) {
     offsetVariables.set(offsetKey(connection), weights.length)
@@ -232,6 +263,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   }
   const rows: Row[] = []
   const preferences = new Set<Row>()
+  const cutPreferences = new Set<Row>()
   const interiorPreferences = new Set<Row>()
   const boundaryPreferences: { rows: Set<Row>; distance: number }[] = []
   const bounds: Row[] = []
@@ -368,26 +400,17 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     // along its normal. Keep their joint-end alignments just as for a cut
     // resize; otherwise each support can slide and acquire a different cut.
     const seamDimension = ['top', 'bottom', 'front', 'back'].includes(connection.side) ? 0 : 1
+    const childSeamDimension = connection.quarterTurn ? 1 - seamDimension : seamDimension
+    joinedPanels.add(parentIndex)
+    joinedPanels.add(childIndex)
+    radialCuts.add(parentIndex * 2 + 1 - seamDimension)
+    radialCuts.add(childIndex * 2 + 1 - childSeamDimension)
     const movingSpan = movementAxis && Math.abs(selected[0].axes[2].dot(movementAxis)) > 1 - EPSILON
       && Math.abs(frames[parentIndex].axes[seamDimension].dot(movementAxis)) > 1 - EPSILON
     if ((edit.kind === 'resize' && !edit.local) || movingSpan) {
-      const horizontal = ['top', 'bottom', 'front', 'back'].includes(connection.side)
-      const dimension = horizontal ? 0 : 1
-      const childDimension = connection.quarterTurn ? 1 - dimension : dimension
-      const parentLength = dimension === 0 ? parent.width : parent.height
-      const childLength = childDimension === 0 ? child.width : child.height
-      const overlap = Math.min(parentLength / 2, connection.offset + childLength / 2)
-        - Math.max(-parentLength / 2, connection.offset - childLength / 2)
-      // Preserve both existing end setbacks along the joint, even for inset
-      // or previously edited panels. These rows constrain changes, so unequal
-      // lengths retain their difference rather than being snapped flush.
-      // Only preserving exactly flush ends lets a resize dissipate into joint
-      // sliding and progressively different depths across the structure.
-      // A joint covering half an edge or less can instead be one of several
-      // split supports (e.g. two legs under a desktop); its spans must remain
-      // independent, retaining only ends that were already flush.
-      const spansJoint = overlap > Math.max(parentLength, childLength) / 2 + CONTACT_TOLERANCE
-      for (const side of [-1, 1]) if (spansJoint || Math.abs(side * parentLength / 2 - connection.offset - side * childLength / 2) < CONTACT_TOLERANCE) {
+      const { dimension, childDimension, retainedEnds } = seamFits.get(connection.id)!
+      if (retainedEnds.length === 2) cutGroups[cutRoot(parentIndex * 2 + dimension)] = cutRoot(childIndex * 2 + childDimension)
+      for (const side of retainedEnds) {
         const constraint = inferred('setback', [connection.id, side], parentIndex, childIndex,
           `preserve setback at the parent’s ${edgeName(dimension, side)}`)
         add(constraint, parentIndex * 5 + 3 + dimension, side / 2)
@@ -491,6 +514,42 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     })
   })
 
+  if (edit.kind === 'resize' || edit.kind === 'move') {
+    // Translating an angled appendage is preferable to recutting it merely
+    // to reduce the weighted translation cost. Likewise, a cut used only as
+    // a seam length should change only when the requested cut reaches it
+    // through paired end alignments. Real radial spans and authored cut
+    // rules remain free; necessary exceptions are solved below.
+    const requestedAxes = selected.flatMap(item => {
+      if (edit.kind === 'move') {
+        const delta = new Vector3(...(edit.deltas?.[item.panel.id] ?? edit.delta))
+        return delta.lengthSq() > EPSILON * EPSILON ? [delta.normalize()] : []
+      }
+      const patch = edit.patches?.[item.panel.id] ?? edit.patch
+      return (['width', 'height'] as const).flatMap((dimension, index) => patch[dimension] !== undefined
+        && Math.abs(patch[dimension]! - item.panel[dimension]) > EPSILON ? [item.axes[index]] : [])
+    })
+    const requestedCuts = new Set(selected.flatMap(item => {
+      if (edit.kind !== 'resize') return []
+      const patch = edit.patches?.[item.panel.id] ?? edit.patch
+      return (['width', 'height'] as const).flatMap((dimension, index) => patch[dimension] !== undefined
+        && Math.abs(patch[dimension]! - item.panel[dimension]) > EPSILON ? [cutRoot(indices.get(item.panel.id)! * 2 + index)] : [])
+    }))
+    for (const [index, item] of frames.entries()) for (const [dimension, field] of (['width', 'height'] as const).entries()) {
+      if (ids.has(item.panel.id) || controlledDimensions.has(`${item.panel.id}/${field}`)) continue
+      // Rule-related loose peers already have hard cut-preservation rows.
+      if (constraints.length && !physicallySupported.has(item.panel.id)) continue
+      const transverse = requestedAxes.length && requestedAxes.every(axis => Math.abs(axis.dot(item.axes[dimension])) < 1 - EPSILON)
+      const independentSeam = edit.kind === 'resize' && joinedPanels.has(index) && !radialCuts.has(index * 2 + dimension)
+        && !requestedCuts.has(cutRoot(index * 2 + dimension))
+      if (transverse || independentSeam) {
+        const preserve = row()
+        cutPreferences.add(preserve)
+        add(preserve, index * 5 + 3 + dimension, 1)
+      }
+    }
+  }
+
   for (const item of selected) {
     if (edit.kind === 'reconcile' || edit.kind === 'fit') continue
     const index = indices.get(item.panel.id)!
@@ -587,6 +646,9 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         const level = coordinate(frames[moving[0]], axis)
         for (const index of group) {
           if (ids.has(frames[index].panel.id)) continue
+          // An oblique projected corner is not a compartment boundary along
+          // this movement axis; attached sloping trays must be able to follow.
+          if (!frames[index].axes.some(own => Math.abs(own.dot(axis)) > 1 - EPSILON)) continue
           for (const side of [-1, 1]) {
             if (side * (coordinate(frames[index], axis, side) - level) > CONTACT_TOLERANCE) {
               const anchor = preference()
@@ -648,8 +710,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     }
   }
 
-  let changes: number[]
-  try {
+  const solveChanges = (rows: Row[]): number[] => {
+    let changes: number[]
     try {
       try { changes = solveWithBounds(rows, bounds, weights) }
       catch (error) {
@@ -683,6 +745,26 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
             changes = anchored
           } catch { /* This boundary must yield to the edit and its hard rules. */ }
         }
+      }
+    }
+
+    return changes
+  }
+  let changes: number[]
+  try {
+    try { changes = solveChanges(rows) }
+    catch (error) {
+      if (!cutPreferences.size) throw error
+      // Necessary spans may yield to joints and authored rules; preserving
+      // unrelated cuts takes priority over incidental placement preferences.
+      const retained = rows.filter(row => !cutPreferences.has(row))
+      changes = solveChanges(retained)
+      for (const preserve of cutPreferences) {
+        try {
+          const candidate = solveChanges([...retained, preserve])
+          retained.push(preserve)
+          changes = candidate
+        } catch { /* Only cuts required by the edit and its rules may yield. */ }
       }
     }
   } catch (error) {

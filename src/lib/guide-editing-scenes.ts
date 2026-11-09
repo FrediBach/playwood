@@ -56,7 +56,7 @@ export function buildEditingGuideScenes(id: EditingGuideId): GuideScene[] {
       return [scene(p, 'Both boards have 300 mm cut heights and 18 mm thickness; only their widths differ.', { selected: ids(p), view: 'front', labels: [{ panelId: p.panels[0].id, text: '500 mm' }, { panelId: p.panels[1].id, text: '520 mm' }] }),
         scene(equal, 'The draft lengthens the first board to match the second; acceptance is still separate.', { ghost: [p.panels[0].id], view: 'front', document: { title: 'Shared width', lines: ['520 mm', 'Review all changes', 'Apply equal sizes'] } }),
         scene(equal, 'Both accepted widths are 520 mm. A one-time match does not add an equality rule.', { selected: ids(equal), view: 'front' }),
-        scene(locked, 'Lock panel size adds a width rule and a height rule for each selected board.', { selected: ids(locked), view: 'front', document: { title: '4 size rules', lines: ['Width: 520 mm', 'Height: 300 mm', 'Pause to unlock'] } })]
+        scene(locked, 'The locks beside Width and Height save each selected board’s current cuts.', { selected: ids(locked), view: 'front', document: { title: '4 size rules', lines: ['Width: 520 mm · Locked', 'Height: 300 mm · Locked', 'Click a lock to unlock'] } })]
     }
     case 'merge-panels': {
       const p = pair([300, 300], [0, 335], 300, 300), merged = mergePanels(p, ids(p))

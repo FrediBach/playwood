@@ -1,0 +1,7 @@
+.field-label-action { display: flex; align-items: center; gap: 3px; }
+.panel-dimension-fields > .field > span:first-child { min-height: 24px; display: flex; align-items: center; }
+.dimension-lock { width: 24px; height: 24px; padding: 0; flex-shrink: 0; display: inline-grid; place-items: center; border-radius: 4px; background: transparent; color: var(--muted); }
+.dimension-lock:hover { background: #eaeae3; color: #3b4331; }
+.dimension-lock[aria-pressed=true] { background: #e2e5d9; color: #404a36; }
+.dimension-lock[aria-pressed=mixed] { background: #e2e5d9; color: #404a36; outline: 1px dashed #8f9980; outline-offset: -2px; }
+.dimension-lock:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

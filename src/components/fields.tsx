@@ -1,17 +1,19 @@
 import { MATERIALS } from '@/lib/materials'
+import { isPanelDimensionLocked } from '@/lib/design-constraints'
 import { roundNiceValue } from '@/lib/nice-values'
 import { panelCornerRadius } from '@/lib/panel-shape'
 import { getSharedPanelFields } from '@/lib/selection'
-import type { Panel,Pattern } from '@/lib/types'
-import { ChevronDown } from 'lucide-react'
+import type { DesignConstraint,Panel,Pattern } from '@/lib/types'
+import { ChevronDown, LockKeyhole, LockKeyholeOpen } from 'lucide-react'
 import { useId,useState,type ReactNode } from 'react'
 import { FinishCoverageField } from './FinishCoverageField'
 import { PanelColorField } from './PanelColorField'
 import { PanelOutlineControl } from './PanelOutlineEditor'
 import { useNiceValueStep } from './nice-values-context'
+import './dimension-locks.css'
 
-export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false,commitOnBlur=false,precision=1,nice=true}: {
-  label:string;value:number;onChange:(v:number)=>boolean|void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean;commitOnBlur?:boolean;precision?:number;nice?:boolean
+export function NumberField({label,labelAction,value,onChange,min=-10000,max=10000,step=1,unit='mm',disabled=false,mixed=false,commitOnBlur=false,precision=1,nice=true}: {
+  label:string;labelAction?:ReactNode;value:number;onChange:(v:number)=>boolean|void;min?:number;max?:number;step?:number;unit?:string;disabled?:boolean;mixed?:boolean;commitOnBlur?:boolean;precision?:number;nice?:boolean
 }) {
   const niceStep=useNiceValueStep()
   const rounding=nice&&unit==='mm'?niceStep:undefined
@@ -33,11 +35,11 @@ export function NumberField({label,value,onChange,min=-10000,max=10000,step=1,un
     setError('')
   }
   const commit=createNumberCommit(unavailable,edited,setEdited,text,rounding,min,max,onChange,setText,value,displayScale,setError)
-  return <label className={`field ${unavailable?'field-disabled':''}`} htmlFor={id}>
-    <span>{label}</span>
+  return <div className={`field ${unavailable?'field-disabled':''}`}>
+    <span className={labelAction?'field-label-action':undefined}><label htmlFor={id}>{label}</label>{labelAction}</span>
     <NumberInput id={id} label={label} mixed={mixed} text={text} rounding={rounding} firstNice={firstNice} lastNice={lastNice} min={min} max={max} step={step} unavailable={unavailable} error={error} setEdited={setEdited} setText={setText} setError={setError} deferred={deferred} onChange={onChange} value={value} displayScale={displayScale} commit={commit} unit={unit}/>
     {error&&<span id={`${id}-error`} className="error-message" role="alert">{error}</span>}
-  </label>
+  </div>
 }
 
 function NumberInput({ id, label, mixed, text, rounding, firstNice, lastNice, min, max, step, unavailable, error, setEdited, setText, setError, deferred, onChange, value, displayScale, commit, unit }: { id: string; label: string; mixed: boolean; text: string; rounding: number|undefined; firstNice: number; lastNice: number; min: number; max: number; step: number; unavailable: boolean; error: string; setEdited: React.Dispatch<React.SetStateAction<boolean>>; setText: React.Dispatch<React.SetStateAction<string>>; setError: React.Dispatch<React.SetStateAction<string>>; deferred: boolean; onChange: (v: number) => boolean|void; value: number; displayScale: number; commit: () => void; unit: string })  {
@@ -110,9 +112,14 @@ export function SelectField({label,value,onChange,children,disabled=false,mixed=
   </label>
 }
 
-export function PanelFields({panel,panels,onChange:applyChange,compact=false,disabledFields=[],resizeOnCommit=false,group}: {
+export interface PanelDimensionLocks {
+  dimensionConstraints?: readonly DesignConstraint[]
+  onDimensionLockChange?: (dimension: 'width' | 'height', locked: boolean) => void
+}
+
+export function PanelFields({panel,panels,onChange:applyChange,compact=false,disabledFields=[],resizeOnCommit=false,group,dimensionConstraints,onDimensionLockChange}: {
   panel:Panel;panels?:Panel[];onChange:(v:Partial<Panel>)=>boolean|void;compact?:boolean;resizeOnCommit?:boolean;disabledFields?:readonly (keyof Panel)[];group?:'dimensions'|'shape'|'appearance'
-}) {
+} & PanelDimensionLocks) {
   const selection=panels?.length?panels:[panel]
   const shared=getSharedPanelFields(selection)
   const mixed=(key:keyof Panel)=>!shared.has(key)
@@ -141,9 +148,17 @@ export function PanelFields({panel,panels,onChange:applyChange,compact=false,dis
   const maxHoleSize=Math.min(40,...selection.map(p=>p.holeSpacing-6))
   const minSpacing=Math.max(...selection.map(p=>Math.max(15,p.holeSize+6,Math.ceil(Math.sqrt(p.width*p.height/4500)))))
   return <>
-    {(!group || group==='dimensions') && <><div className="field-row">
-      <NumberField label="Width" commitOnBlur={resizeOnCommit} value={panel.width} min={80} max={3000} {...numberProps('width')} onChange={width=>onChange({width})}/>
-      <NumberField label="Height" commitOnBlur={resizeOnCommit} value={panel.height} min={80} max={3000} {...numberProps('height')} onChange={height=>onChange({height})}/>
+    {(!group || group==='dimensions') && <><div className={`field-row ${onDimensionLockChange?'panel-dimension-fields':''}`}>
+      {(['width','height'] as const).map(dimension=>{
+        const locked=selection.filter(item=>isPanelDimensionLocked(dimensionConstraints,item.id,dimension)).length
+        const state=locked===selection.length?true:locked?'mixed':false
+        const label=dimension==='width'?'Width':'Height'
+        return <NumberField key={dimension} label={label} commitOnBlur={resizeOnCommit} value={panel[dimension]} min={80} max={3000} {...numberProps(dimension)}
+          disabled={disabledFields.includes(dimension)||!!locked} onChange={value=>onChange({[dimension]:value})}
+          labelAction={onDimensionLockChange&&<button type="button" className="dimension-lock" aria-label={`${state===true?'Unlock':'Lock'} ${dimension}`} aria-pressed={state}
+            title={state===true?`Unlock ${dimension}: pause exact ${dimension} constraints`:`Lock ${dimension} at ${selection.length>1?'each panel’s current value':'the current value'}${state==='mixed'?' (some panels are locked)':''}`}
+            onClick={()=>onDimensionLockChange(dimension,state!==true)}>{state?<LockKeyhole size={13} aria-hidden="true"/>:<LockKeyholeOpen size={13} aria-hidden="true"/>}</button>}/>
+      })}
       <NumberField label="Thickness" nice={false} value={panel.thickness} min={3} max={60} {...numberProps('thickness')} onChange={thickness=>onChange({thickness})}/>
     </div>
     {!compact&&<p className="field-note">Panel cut dimensions, before assembly.</p>}

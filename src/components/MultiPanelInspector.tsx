@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { CircleHelp, Copy, Layers, Link2, Move3D, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { NumberField, PanelFields, SelectField } from '@/components/fields'
+import { NumberField, PanelFields, SelectField, type PanelDimensionLocks } from '@/components/fields'
 import { InspectorDisclosure } from './InspectorPrimitives'
 import { JointPositionDiagram } from './InspectorDiagrams'
 import { PanelSecondaryFields } from './PanelInspectorFields'
@@ -10,7 +10,7 @@ import { getSharedPanelFields, panelValuesEqual } from '@/lib/selection'
 import type { Connection, Panel, Side, ValidationIssue, Vec3 } from '@/lib/types'
 
 type ConnectionPatch = Partial<Pick<Connection, 'side' | 'offset' | 'inset' | 'flip'>>
-interface Props {
+interface Props extends PanelDimensionLocks {
   panels: Panel[]
   connections: Connection[]
   issues: ValidationIssue[]
@@ -41,7 +41,7 @@ function SharedConnectionFields({connections,onChange}: {connections:(Connection
   </section>
 }
 
-export function MultiPanelInspector({ panels, connections, issues, onChange, onConnectionChange, onDuplicate, onDelete, onDetach, onDistribute, buildTools, constraints, editError, onManageConstraints }: Props) {
+export function MultiPanelInspector({ panels, connections, issues, onChange, onConnectionChange, onDuplicate, onDelete, onDetach, onDistribute, buildTools, constraints, editError, onManageConstraints, dimensionConstraints, onDimensionLockChange }: Props) {
   const first = panels[0]
   const shared = getSharedPanelFields(panels)
   const selectedConnections = panels.map(panel => connections.find(c => c.childId === panel.id && c.role !== 'support'))
@@ -68,7 +68,7 @@ export function MultiPanelInspector({ panels, connections, issues, onChange, onC
     <div className="multi-selection-heading"><h2>{panels.length} panels selected</h2><p>Edits apply to all selected panels. Mixed values are disabled.</p></div>
     {shared.has('name')&&<label className="field"><span>Name</span><input key={`${panels.map(p=>p.id).join(',')}-${first.name}`} defaultValue={first.name} aria-label="Panel name" maxLength={60} onBlur={e=>onChange({name:e.target.value.trim()||'Untitled panel'})} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/></label>}
     {issues.filter(issue=>issue.panelIds.some(id=>selectedIds.has(id))).map(issue=><div className={`validation-note ${issue.severity}`} role="status" key={issue.id}><CircleHelp size={16}/><span>{issue.message}</span></div>)}
-    <section className="inspector-section" aria-label="Panel dimensions"><div className="section-title"><h2>Dimensions</h2><span>mm</span></div><PanelFields group="dimensions" compact resizeOnCommit panel={first} panels={panels} onChange={onChange}/></section>
+    <section className="inspector-section" aria-label="Panel dimensions"><div className="section-title"><h2>Dimensions</h2><span>mm</span></div><PanelFields group="dimensions" compact resizeOnCommit panel={first} panels={panels} onChange={onChange} dimensionConstraints={dimensionConstraints} onDimensionLockChange={onDimensionLockChange}/></section>
     {editError&&<div className="validation-note error" role="status"><span>{editError}{onManageConstraints&&<button className="text-button" onClick={onManageConstraints}>Review constraints</button>}</span></div>}
     {hasDriving&&<SharedConnectionFields connections={selectedConnections} onChange={onConnectionChange}/>}
     <section className="inspector-section"><div className="section-title"><h2>Placement</h2><Move3D size={16}/></div>

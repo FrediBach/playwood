@@ -14,7 +14,7 @@ const fractions = (project: Project) => getPhysicalConnectors(project).filter(pi
 test('synth shelf width scales custom connector spacing and survives undo and reload', async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles('resources/library-3d/user-projects/three-tier-synth-shelf.json')
-  await expect.poll(async () => (await saved(page)).name).toBe('Three-tier synth shelf')
+  await expect.poll(async () => (await saved(page))?.name).toBe('Three-tier synth shelf')
   await page.getByRole('button', { name: 'Deep floor base', exact: true }).click()
   const before = await saved(page)
   const width = page.getByLabel('Width', { exact: true })

@@ -67,7 +67,7 @@ export function useDesignConstraints({ project, commit, notify }: {
     lockSizes: (panelIds: readonly string[]) => {
       try {
         commit(current => lockPanelSizes(current, panelIds))
-        notify('Panel size locked. Disable or remove the width and height rules in Constraints to unlock.')
+        notify('Panel size locked. Use the locks beside Width and Height to unlock.')
       } catch (error) { notify(error instanceof Error ? error.message : 'Panel sizes could not be locked.') }
     },
     editing, openRequest, manageRequest, cancelRequest, onEditingChange, onPreview, onApply,

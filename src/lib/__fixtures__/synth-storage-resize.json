@@ -1,0 +1,1329 @@
+{
+  "version": 1,
+  "name": "Synth shelf with 2×2 storage",
+  "panels": [
+    {
+      "id": "02b5faa9-6143-4215-a41e-3dc6ca2da87e",
+      "name": "Storage shelf 1.1",
+      "width": 432.5,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -233.75,
+        9.000000000000057,
+        83.65405403
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "e165de04-3566-4540-bd06-543f45d782e4",
+      "name": "Storage shelf 1.2",
+      "width": 432.5,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -233.75,
+        225.30737825000006,
+        83.65405403
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "3dcfedc2-7c13-4df3-80f1-0ae689a165cd",
+      "name": "Storage upright 1.1",
+      "width": 181.30737825,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        -467.5,
+        117.15368912500006,
+        83.65405403000003
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "37ca02fe-be3b-4da2-91d6-13894a665065",
+      "name": "Storage upright 2.1",
+      "width": 181.30737825,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        2.842170943040401e-14,
+        117.15368912500006,
+        83.65405403000003
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "b9bbdca2-3452-4165-93c5-b03675c2a333",
+      "name": "Storage shelf 1.3",
+      "width": 432.5,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -233.75,
+        441.61475650000006,
+        83.65405403
+      ],
+      "rotation": [
+        1.5707963267948968,
+        1.2246467991473532e-16,
+        -3.141592653589793
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "21ee947a-773b-4363-99ef-64654a298f51",
+      "name": "Storage upright 1.2",
+      "width": 181.30737826,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        -467.5,
+        333.46106738000003,
+        83.65405403
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "fb94bf63-c93d-4b79-8a67-57965efb20ae",
+      "name": "Storage upright 2.2",
+      "width": 181.30737826,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        0,
+        333.4610673700001,
+        83.65405403000001
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "90af59bc-819e-4874-ae31-a686ed8ddcca",
+      "name": "Storage shelf 2.1",
+      "width": 432.5,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        233.75,
+        9.000000000000057,
+        83.65405403
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "4974966c-c365-4f51-b020-73e44939ab1c",
+      "name": "Storage shelf 2.2",
+      "width": 432.5,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        233.75,
+        225.30737825000017,
+        83.65405403000003
+      ],
+      "rotation": [
+        1.5707963267948968,
+        -3.14018491736755e-16,
+        -3.141592653589793
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "414d116c-49a3-45b8-8c0e-15cb9163e920",
+      "name": "Storage upright 3.1",
+      "width": 181.30737825,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        467.5,
+        117.15368912500006,
+        83.65405403000003
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "767563ee-8f44-4914-a374-91a0a20362c9",
+      "name": "Storage shelf 2.3",
+      "width": 432.5,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        233.75,
+        441.6147565000001,
+        83.65405403000005
+      ],
+      "rotation": [
+        1.5707963267948968,
+        1.224646799147353e-16,
+        -3.141592653589793
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "6205738e-80b9-4e96-a107-cdb42377faf1",
+      "name": "Storage upright 3.2",
+      "width": 181.30737826,
+      "height": 586.74436382,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        467.50000000000006,
+        333.46106738000003,
+        83.65405403000008
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "e7ba804c-636f-402b-93cd-1d395d358ce7",
+      "name": "Shelf 1.2",
+      "width": 900,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        796.2347136,
+        -56.16243708
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        0,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "4ac056bf-c7dc-46ba-99e7-d096c91a6b7e",
+      "name": "Upright 1.1",
+      "width": 319.61995709,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -467.50000000000006,
+        618.92473507,
+        -56.16243708
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "d19cb9b7-dc52-4b55-b2a9-916fa61491d6",
+      "name": "Upright 2.1",
+      "width": 319.61995709,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        467.50000000000006,
+        618.92473507,
+        -56.16243708
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "6af243f7-08e7-4566-ac35-a4a45e85af75",
+      "name": "Shelf 1.3",
+      "width": 900,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        1155.97889869,
+        -56.16243708000014
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        0,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "f353198d-eaea-41ed-9587-cb02ca16f134",
+      "name": "Upright 1.2",
+      "width": 324.74418508,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -467.49999999999994,
+        976.10680615,
+        -56.16243708000014
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "1a9d054f-00c6-4f52-9133-1ea57a66f151",
+      "name": "Upright 2.2",
+      "width": 324.74418507,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        467.5,
+        976.10680615,
+        -56.16243708
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "87b3a438-68ee-4653-8eb9-088633349730",
+      "name": "Shelf 1.4",
+      "width": 900,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        1511.13592619,
+        -56.16243708
+      ],
+      "rotation": [
+        1.5707963267948968,
+        1.2246467991473532e-16,
+        -3.141592653589793
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "46cd1002-a63d-4e89-8a29-57d19569d3cb",
+      "name": "Upright 1.3",
+      "width": 320.1570275,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        -467.5,
+        1333.55741244,
+        -56.16243708000008
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "88236bf4-4603-40e5-963d-0fe85ef2b83a",
+      "name": "Upright 2.3",
+      "width": 320.1570275,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e7df",
+      "pattern": "solid",
+      "position": [
+        467.5,
+        1333.55741244,
+        -56.16243707999997
+      ],
+      "rotation": [
+        -1.5707963267948963,
+        -1.5707963267948966,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "94e776b2-ec51-4d42-97d2-fdd2d812acdd",
+      "name": "Synth tray 1",
+      "width": 900,
+      "height": 250.18801014,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        728.3570610649999,
+        222.06640580912645
+      ],
+      "rotation": [
+        -1.0471975511965979,
+        0,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "8289a6ac-d89d-4568-9956-b88cffba62c2",
+      "name": "Front stopper 1",
+      "width": 900,
+      "height": 56.25121815,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#292b27",
+      "pattern": "solid",
+      "position": [
+        0,
+        696.5729950520878,
+        368.36924116461347
+      ],
+      "rotation": [
+        -2.617993877991494,
+        0,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "07345d69-5dad-43c2-813e-748236bedf54",
+      "name": "Synth tray 2",
+      "width": 900,
+      "height": 250.08946158,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        1088.125883295,
+        222.02373303089303
+      ],
+      "rotation": [
+        -1.0471975511965979,
+        0,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "3a933a59-bd73-408b-a2f1-e25739c735cf",
+      "name": "Front stopper 2",
+      "width": 900,
+      "height": 54.12339547,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#292b27",
+      "pattern": "solid",
+      "position": [
+        0,
+        1055.4450801742735,
+        367.75193993814685
+      ],
+      "rotation": [
+        -2.617993877991494,
+        0,
+        0
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "ff2d4119-9186-4574-afd7-f12ed6aa7444",
+      "name": "Synth tray 3",
+      "width": 900,
+      "height": 249.71638774,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -2.575002091599241e-14,
+        1443.376179255,
+        221.86218731942952
+      ],
+      "rotation": [
+        2.0943951023931957,
+        1.6728986382985834e-16,
+        -3.141592653589793
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "b5d4ffec-8278-4d4d-b884-41542529dc81",
+      "name": "Front stopper 3",
+      "width": 900,
+      "height": 56.9681678,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#292b27",
+      "pattern": "solid",
+      "position": [
+        -5.087654269549357e-14,
+        1412.020467147155,
+        368.1400415977197
+      ],
+      "rotation": [
+        0.5235987755982991,
+        -1.2246467991473532e-16,
+        -3.141592653589793
+      ],
+      "cornerRadius": 0,
+      "visible": true,
+      "holeSize": 12,
+      "holeSpacing": 48
+    }
+  ],
+  "connections": [
+    {
+      "id": "48483c08-73ee-46b0-ba97-c5703562a544:0",
+      "parentId": "02b5faa9-6143-4215-a41e-3dc6ca2da87e",
+      "childId": "3dcfedc2-7c13-4df3-80f1-0ae689a165cd",
+      "type": "90",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 2,
+      "color": "#292b27"
+    },
+    {
+      "id": "dfe9ad95-4729-42f5-9636-3ea1c7466cb6:0",
+      "parentId": "02b5faa9-6143-4215-a41e-3dc6ca2da87e",
+      "childId": "37ca02fe-be3b-4da2-91d6-13894a665065",
+      "type": "t",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 2,
+      "color": "#292b27"
+    },
+    {
+      "id": "dfe9ad95-4729-42f5-9636-3ea1c7466cb6:1",
+      "parentId": "02b5faa9-6143-4215-a41e-3dc6ca2da87e",
+      "childId": "90af59bc-819e-4874-ae31-a686ed8ddcca",
+      "type": "t",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 0,
+      "color": "#292b27"
+    },
+    {
+      "id": "7e172fd4-3af4-4fe6-942b-e004695b5613:0",
+      "parentId": "21ee947a-773b-4363-99ef-64654a298f51",
+      "childId": "e165de04-3566-4540-bd06-543f45d782e4",
+      "type": "t",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 2,
+      "color": "#292b27",
+      "role": "support"
+    },
+    {
+      "id": "7e172fd4-3af4-4fe6-942b-e004695b5613:1",
+      "parentId": "21ee947a-773b-4363-99ef-64654a298f51",
+      "childId": "3dcfedc2-7c13-4df3-80f1-0ae689a165cd",
+      "type": "t",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 0,
+      "color": "#292b27",
+      "role": "support"
+    },
+    {
+      "id": "38848a09-ffda-43eb-9ca4-a2469c0f6a2c:0",
+      "parentId": "fb94bf63-c93d-4b79-8a67-57965efb20ae",
+      "childId": "e165de04-3566-4540-bd06-543f45d782e4",
+      "type": "cross",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 2,
+      "color": "#292b27",
+      "role": "support"
+    },
+    {
+      "id": "38848a09-ffda-43eb-9ca4-a2469c0f6a2c:1",
+      "parentId": "fb94bf63-c93d-4b79-8a67-57965efb20ae",
+      "childId": "4974966c-c365-4f51-b020-73e44939ab1c",
+      "type": "cross",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 0,
+      "color": "#292b27",
+      "role": "support"
+    },
+    {
+      "id": "38848a09-ffda-43eb-9ca4-a2469c0f6a2c:2",
+      "parentId": "fb94bf63-c93d-4b79-8a67-57965efb20ae",
+      "childId": "37ca02fe-be3b-4da2-91d6-13894a665065",
+      "type": "cross",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 0,
+      "color": "#292b27",
+      "role": "support"
+    },
+    {
+      "id": "b48b1998-5f5e-49ff-9f4b-1767c98f61c7:0",
+      "parentId": "b9bbdca2-3452-4165-93c5-b03675c2a333",
+      "childId": "fb94bf63-c93d-4b79-8a67-57965efb20ae",
+      "type": "t",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 2,
+      "color": "#292b27"
+    },
+    {
+      "id": "b48b1998-5f5e-49ff-9f4b-1767c98f61c7:1",
+      "parentId": "b9bbdca2-3452-4165-93c5-b03675c2a333",
+      "childId": "767563ee-8f44-4914-a374-91a0a20362c9",
+      "type": "t",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 0,
+      "color": "#292b27"
+    },
+    {
+      "id": "354979fb-81ea-4c63-bf4c-fc63f39ccac2:0",
+      "parentId": "90af59bc-819e-4874-ae31-a686ed8ddcca",
+      "childId": "414d116c-49a3-45b8-8c0e-15cb9163e920",
+      "type": "90",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 2,
+      "color": "#292b27"
+    },
+    {
+      "id": "e0871529-98d0-4356-875d-f747d214e243:0",
+      "parentId": "414d116c-49a3-45b8-8c0e-15cb9163e920",
+      "childId": "4974966c-c365-4f51-b020-73e44939ab1c",
+      "type": "t",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 2,
+      "color": "#292b27"
+    },
+    {
+      "id": "e0871529-98d0-4356-875d-f747d214e243:1",
+      "parentId": "414d116c-49a3-45b8-8c0e-15cb9163e920",
+      "childId": "6205738e-80b9-4e96-a107-cdb42377faf1",
+      "type": "t",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 0,
+      "color": "#292b27"
+    },
+    {
+      "id": "8406faa7-5d3b-4314-8d7c-a8443c5b63fd:0",
+      "parentId": "f353198d-eaea-41ed-9587-cb02ca16f134",
+      "childId": "e7ba804c-636f-402b-93cd-1d395d358ce7",
+      "type": "t",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "8406faa7-5d3b-4314-8d7c-a8443c5b63fd:1",
+      "parentId": "f353198d-eaea-41ed-9587-cb02ca16f134",
+      "childId": "4ac056bf-c7dc-46ba-99e7-d096c91a6b7e",
+      "type": "t",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "5b2cf890-6740-4e21-a96a-49adf8a04760:0",
+      "parentId": "1a9d054f-00c6-4f52-9133-1ea57a66f151",
+      "childId": "e7ba804c-636f-402b-93cd-1d395d358ce7",
+      "type": "t",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "5b2cf890-6740-4e21-a96a-49adf8a04760:1",
+      "parentId": "1a9d054f-00c6-4f52-9133-1ea57a66f151",
+      "childId": "d19cb9b7-dc52-4b55-b2a9-916fa61491d6",
+      "type": "t",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "c7a9acdc-b37e-43c0-8293-e4884d872b15:0",
+      "parentId": "46cd1002-a63d-4e89-8a29-57d19569d3cb",
+      "childId": "6af243f7-08e7-4566-ac35-a4a45e85af75",
+      "type": "t",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 2
+    },
+    {
+      "id": "c7a9acdc-b37e-43c0-8293-e4884d872b15:1",
+      "parentId": "46cd1002-a63d-4e89-8a29-57d19569d3cb",
+      "childId": "f353198d-eaea-41ed-9587-cb02ca16f134",
+      "type": "t",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 0
+    },
+    {
+      "id": "b398418a-2c1c-4e0f-9718-6a2ab6490586:0",
+      "parentId": "88236bf4-4603-40e5-963d-0fe85ef2b83a",
+      "childId": "6af243f7-08e7-4566-ac35-a4a45e85af75",
+      "type": "t",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "b398418a-2c1c-4e0f-9718-6a2ab6490586:1",
+      "parentId": "88236bf4-4603-40e5-963d-0fe85ef2b83a",
+      "childId": "1a9d054f-00c6-4f52-9133-1ea57a66f151",
+      "type": "t",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support"
+    },
+    {
+      "id": "a861c3ec-3454-4279-adf9-9bbb82ee4577:0",
+      "parentId": "87b3a438-68ee-4653-8eb9-088633349730",
+      "childId": "46cd1002-a63d-4e89-8a29-57d19569d3cb",
+      "type": "90",
+      "side": "right",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 2
+    },
+    {
+      "id": "e43bfa51-3d03-4aee-9430-776727d4d2aa:0",
+      "parentId": "87b3a438-68ee-4653-8eb9-088633349730",
+      "childId": "88236bf4-4603-40e5-963d-0fe85ef2b83a",
+      "type": "90",
+      "side": "left",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 2
+    },
+    {
+      "id": "97baec78-e420-4fc5-af7e-7a8e82f7ad23:0",
+      "parentId": "e7ba804c-636f-402b-93cd-1d395d358ce7",
+      "childId": "94e776b2-ec51-4d42-97d2-fdd2d812acdd",
+      "type": "150",
+      "side": "bottom",
+      "offset": 0,
+      "inset": 0,
+      "flip": true,
+      "color": "#292b27",
+      "count": 5
+    },
+    {
+      "id": "b309ffdc-2ffe-4d3e-b2b1-7a49d4bb7ca1:0",
+      "parentId": "94e776b2-ec51-4d42-97d2-fdd2d812acdd",
+      "childId": "8289a6ac-d89d-4568-9956-b88cffba62c2",
+      "type": "90",
+      "side": "bottom",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 3
+    },
+    {
+      "id": "0713e6d0-7797-4cb1-8892-c0206b442ffa:0",
+      "parentId": "6af243f7-08e7-4566-ac35-a4a45e85af75",
+      "childId": "07345d69-5dad-43c2-813e-748236bedf54",
+      "type": "150",
+      "side": "bottom",
+      "offset": 0,
+      "inset": 0,
+      "flip": true,
+      "color": "#292b27",
+      "count": 5
+    },
+    {
+      "id": "115a308b-4c10-46e8-bc5d-6634008fbdd7:0",
+      "parentId": "07345d69-5dad-43c2-813e-748236bedf54",
+      "childId": "3a933a59-bd73-408b-a2f1-e25739c735cf",
+      "type": "90",
+      "side": "bottom",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 3
+    },
+    {
+      "id": "869dd337-8e85-402a-a196-9e99f7a25693:0",
+      "parentId": "87b3a438-68ee-4653-8eb9-088633349730",
+      "childId": "ff2d4119-9186-4574-afd7-f12ed6aa7444",
+      "type": "150",
+      "side": "bottom",
+      "offset": 0,
+      "inset": 0,
+      "flip": false,
+      "color": "#292b27",
+      "count": 5
+    },
+    {
+      "id": "007ddcfd-f5c6-47f4-80b8-6827876cea35:0",
+      "parentId": "ff2d4119-9186-4574-afd7-f12ed6aa7444",
+      "childId": "b5d4ffec-8278-4d4d-b884-41542529dc81",
+      "type": "90",
+      "side": "bottom",
+      "offset": 0,
+      "inset": 0,
+      "flip": true,
+      "color": "#292b27",
+      "count": 3
+    },
+    {
+      "id": "488a700c-6949-4268-8b4f-bef185b889a1:0",
+      "parentId": "21ee947a-773b-4363-99ef-64654a298f51",
+      "childId": "b9bbdca2-3452-4165-93c5-b03675c2a333",
+      "type": "t",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "488a700c-6949-4268-8b4f-bef185b889a1:1",
+      "parentId": "21ee947a-773b-4363-99ef-64654a298f51",
+      "childId": "4ac056bf-c7dc-46ba-99e7-d096c91a6b7e",
+      "type": "t",
+      "side": "left",
+      "flip": false,
+      "offset": 139.81649111,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "3af7c18b-f52a-4faf-b403-599c5a74503a:0",
+      "parentId": "6205738e-80b9-4e96-a107-cdb42377faf1",
+      "childId": "767563ee-8f44-4914-a374-91a0a20362c9",
+      "type": "t",
+      "side": "right",
+      "flip": false,
+      "offset": 8.526512829121202e-14,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "3af7c18b-f52a-4faf-b403-599c5a74503a:1",
+      "parentId": "6205738e-80b9-4e96-a107-cdb42377faf1",
+      "childId": "d19cb9b7-dc52-4b55-b2a9-916fa61491d6",
+      "type": "t",
+      "side": "right",
+      "flip": false,
+      "offset": 139.81649111000007,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "bc8122a3-61e7-4fc5-bb73-5b3b51b5cf56:0",
+      "parentId": "21ee947a-773b-4363-99ef-64654a298f51",
+      "childId": "b9bbdca2-3452-4165-93c5-b03675c2a333",
+      "type": "90",
+      "role": "support",
+      "side": "left",
+      "flip": false,
+      "quarterTurn": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 1,
+      "color": "#292b27"
+    },
+    {
+      "id": "43bfbc62-4867-4270-b529-81031b608b45:0",
+      "parentId": "6205738e-80b9-4e96-a107-cdb42377faf1",
+      "childId": "767563ee-8f44-4914-a374-91a0a20362c9",
+      "type": "90",
+      "role": "support",
+      "side": "right",
+      "flip": false,
+      "quarterTurn": false,
+      "offset": 8.526512829121202e-14,
+      "inset": 0,
+      "count": 1,
+      "color": "#292b27"
+    }
+  ],
+  "customColors": [
+    {
+      "id": "custom:#292b27",
+      "name": "Custom #292b27",
+      "color": "#292b27"
+    }
+  ],
+  "connectorOverrides": {
+    "[\"97baec78-e420-4fc5-af7e-7a8e82f7ad23:0\",0]": {
+      "slide": 70
+    },
+    "[\"97baec78-e420-4fc5-af7e-7a8e82f7ad23:0\",2]": {
+      "slide": 360
+    },
+    "[\"0713e6d0-7797-4cb1-8892-c0206b442ffa:0\",0]": {
+      "slide": 70
+    },
+    "[\"0713e6d0-7797-4cb1-8892-c0206b442ffa:0\",2]": {
+      "slide": 360
+    },
+    "[\"869dd337-8e85-402a-a196-9e99f7a25693:0\",0]": {
+      "slide": 70
+    },
+    "[\"869dd337-8e85-402a-a196-9e99f7a25693:0\",2]": {
+      "slide": 360
+    },
+    "[\"869dd337-8e85-402a-a196-9e99f7a25693:0\",1]": {
+      "slide": 215
+    },
+    "[\"869dd337-8e85-402a-a196-9e99f7a25693:0\",3]": {
+      "color": "#292b27",
+      "type": "150",
+      "material": "plastic",
+      "slide": -35
+    },
+    "[\"869dd337-8e85-402a-a196-9e99f7a25693:0\",4]": {
+      "color": "#292b27",
+      "type": "150",
+      "material": "plastic",
+      "slide": -610
+    },
+    "[\"0713e6d0-7797-4cb1-8892-c0206b442ffa:0\",1]": {
+      "slide": 215
+    },
+    "[\"0713e6d0-7797-4cb1-8892-c0206b442ffa:0\",3]": {
+      "color": "#292b27",
+      "type": "150",
+      "material": "plastic",
+      "slide": -395
+    },
+    "[\"0713e6d0-7797-4cb1-8892-c0206b442ffa:0\",4]": {
+      "color": "#292b27",
+      "type": "150",
+      "material": "plastic",
+      "slide": -250
+    },
+    "[\"97baec78-e420-4fc5-af7e-7a8e82f7ad23:0\",1]": {
+      "slide": 215
+    },
+    "[\"97baec78-e420-4fc5-af7e-7a8e82f7ad23:0\",3]": {
+      "color": "#292b27",
+      "type": "150",
+      "material": "plastic",
+      "slide": -395
+    },
+    "[\"97baec78-e420-4fc5-af7e-7a8e82f7ad23:0\",4]": {
+      "color": "#292b27",
+      "type": "150",
+      "material": "plastic",
+      "slide": -250
+    },
+    "[\"bc8122a3-61e7-4fc5-bb73-5b3b51b5cf56:0\",0]": {
+      "slide": -273.37218191,
+      "color": "#ffffff"
+    },
+    "[\"43bfbc62-4867-4270-b529-81031b608b45:0\",0]": {
+      "slide": -273.37218190999994,
+      "color": "#ffffff"
+    },
+    "[\"354979fb-81ea-4c63-bf4c-fc63f39ccac2:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"354979fb-81ea-4c63-bf4c-fc63f39ccac2:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"e0871529-98d0-4356-875d-f747d214e243:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"e0871529-98d0-4356-875d-f747d214e243:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"5b2cf890-6740-4e21-a96a-49adf8a04760:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"5b2cf890-6740-4e21-a96a-49adf8a04760:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"b398418a-2c1c-4e0f-9718-6a2ab6490586:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"b398418a-2c1c-4e0f-9718-6a2ab6490586:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"e43bfa51-3d03-4aee-9430-776727d4d2aa:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"e43bfa51-3d03-4aee-9430-776727d4d2aa:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"3af7c18b-f52a-4faf-b403-599c5a74503a:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"3af7c18b-f52a-4faf-b403-599c5a74503a:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"48483c08-73ee-46b0-ba97-c5703562a544:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"48483c08-73ee-46b0-ba97-c5703562a544:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"7e172fd4-3af4-4fe6-942b-e004695b5613:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"7e172fd4-3af4-4fe6-942b-e004695b5613:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"8406faa7-5d3b-4314-8d7c-a8443c5b63fd:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"8406faa7-5d3b-4314-8d7c-a8443c5b63fd:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"c7a9acdc-b37e-43c0-8293-e4884d872b15:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"c7a9acdc-b37e-43c0-8293-e4884d872b15:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"a861c3ec-3454-4279-adf9-9bbb82ee4577:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"a861c3ec-3454-4279-adf9-9bbb82ee4577:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"488a700c-6949-4268-8b4f-bef185b889a1:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"488a700c-6949-4268-8b4f-bef185b889a1:0\",1]": {
+      "color": "#ffffff"
+    }
+  },
+  "constraints": [
+    {
+      "id": "13fd29c2-4461-48a9-9fff-c659274205de",
+      "enabled": true,
+      "kind": "opening-ratio",
+      "axis": "x",
+      "ratio": 1,
+      "panelIds": [
+        "3dcfedc2-7c13-4df3-80f1-0ae689a165cd",
+        "37ca02fe-be3b-4da2-91d6-13894a665065",
+        "37ca02fe-be3b-4da2-91d6-13894a665065",
+        "414d116c-49a3-45b8-8c0e-15cb9163e920"
+      ]
+    },
+    {
+      "id": "c04d86ad-0e10-4807-b85f-5a4a766f2a89",
+      "enabled": true,
+      "kind": "opening-ratio",
+      "axis": "x",
+      "ratio": 1,
+      "panelIds": [
+        "21ee947a-773b-4363-99ef-64654a298f51",
+        "fb94bf63-c93d-4b79-8a67-57965efb20ae",
+        "fb94bf63-c93d-4b79-8a67-57965efb20ae",
+        "6205738e-80b9-4e96-a107-cdb42377faf1"
+      ]
+    },
+    {
+      "id": "d4afdd45-0a22-4de8-807f-81a25527937d",
+      "enabled": true,
+      "kind": "opening-ratio",
+      "axis": "y",
+      "ratio": 1,
+      "panelIds": [
+        "02b5faa9-6143-4215-a41e-3dc6ca2da87e",
+        "e165de04-3566-4540-bd06-543f45d782e4",
+        "e165de04-3566-4540-bd06-543f45d782e4",
+        "b9bbdca2-3452-4165-93c5-b03675c2a333"
+      ]
+    },
+    {
+      "id": "a178ecc3-f6b5-47cb-831c-b256ada10dc4",
+      "enabled": true,
+      "kind": "opening-ratio",
+      "axis": "y",
+      "ratio": 1,
+      "panelIds": [
+        "90af59bc-819e-4874-ae31-a686ed8ddcca",
+        "4974966c-c365-4f51-b020-73e44939ab1c",
+        "4974966c-c365-4f51-b020-73e44939ab1c",
+        "767563ee-8f44-4914-a374-91a0a20362c9"
+      ]
+    },
+    {
+      "id": "1fdceb34-8111-493c-a138-78eab43bcb76",
+      "enabled": true,
+      "kind": "opening-ratio",
+      "axis": "x",
+      "ratio": 1,
+      "panelIds": [
+        "3dcfedc2-7c13-4df3-80f1-0ae689a165cd",
+        "37ca02fe-be3b-4da2-91d6-13894a665065",
+        "21ee947a-773b-4363-99ef-64654a298f51",
+        "fb94bf63-c93d-4b79-8a67-57965efb20ae"
+      ]
+    },
+    {
+      "id": "a2b77a3f-b0f6-4dba-bd53-15ba3c3d5bef",
+      "enabled": true,
+      "kind": "opening-ratio",
+      "axis": "y",
+      "ratio": 1,
+      "panelIds": [
+        "02b5faa9-6143-4215-a41e-3dc6ca2da87e",
+        "e165de04-3566-4540-bd06-543f45d782e4",
+        "90af59bc-819e-4874-ae31-a686ed8ddcca",
+        "4974966c-c365-4f51-b020-73e44939ab1c"
+      ]
+    }
+  ]
+}
