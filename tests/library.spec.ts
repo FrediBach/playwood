@@ -343,7 +343,7 @@ test('monitor and speaker stand table previews, opens, and survives undo and rel
   expect(await savedProject(page)).toEqual(saved)
 })
 
-test('cat tower previews, opens with its two stock sizes, and survives undo and reload', async ({ page }) => {
+test('cat tower previews, opens with connected center braces, and survives undo and reload', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
@@ -355,10 +355,11 @@ test('cat tower previews, opens with its two stock sizes, and survives undo and 
   await card.click()
   await page.getByRole('dialog', { name: 'Replace current project?' }).getByRole('button', { name: 'Replace project', exact: true }).click()
   await expect(page.locator('.project-name')).toHaveText('Cat tower')
-  await expect.poll(async () => (await savedProject(page))?.panels.length).toBe(38)
+  await expect.poll(async () => (await savedProject(page))?.panels.length).toBe(44)
   const saved = (await savedProject(page))!
   expect(saved.panels.filter(panel => panel.width === 300 && panel.height === 300)).toHaveLength(18)
   expect(saved.panels.filter(panel => panel.width === 635 && panel.height === 300)).toHaveLength(20)
+  expect(saved.panels.filter(panel => panel.width === 50 && panel.height === 300)).toHaveLength(6)
   expect(saved.connections.some(connection => connection.type === 't')).toBe(true)
   await expect.poll(() => page.locator('canvas').evaluate(canvas => (canvas as HTMLCanvasElement).toDataURL().length)).toBeGreaterThan(30000)
   await page.screenshot({ path: 'test-results/cat-tower-perspective.png' })

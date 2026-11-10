@@ -9,12 +9,27 @@ import { getPhysicalConnectors } from './connector-selection'
 const corners = [[-167.5, -167.5], [167.5, -167.5], [167.5, 167.5], [-167.5, 167.5]]
 
 describe('cat tower', () => {
-  it('uses only the two requested cuts, connected hardware, and exportable geometry', () => {
+  it('uses the original cuts plus narrow center braces, connected hardware, and exportable geometry', () => {
     const project = catTowerProject()
-    expect(project.panels).toHaveLength(38)
+    expect(project.panels).toHaveLength(44)
     expect(project.panels.filter(panel => panel.width === 635)).toHaveLength(20)
     expect(project.panels.filter(panel => panel.width === 300)).toHaveLength(18)
     expect(project.panels.every(panel => panel.height === 300 && panel.thickness === 18)).toBe(true)
+    const braces = project.panels.filter(panel => panel.width === 50)
+    expect(braces).toHaveLength(6)
+    for (const brace of braces) {
+      const joints = project.connections.filter(connection => connection.parentId === brace.id || connection.childId === brace.id)
+      const jointIds = new Set(joints.map(connection => connection.id.replace(/:\d+$/, '')))
+      const members = new Set(project.connections.filter(connection => jointIds.has(connection.id.replace(/:\d+$/, '')))
+        .flatMap(connection => [connection.parentId, connection.childId]))
+      const landings = resolvePanels(project).filter(panel => members.has(panel.id) && Math.abs(panel.rotation[0] + Math.PI / 2) < .001)
+      // Each brace has installed hardware to horizontal stock above and below.
+      for (const direction of [-1, 1]) {
+        expect(landings.some(panel => Math.abs(panel.position[1] - brace.position[1] - direction * 167.5) < .001)).toBe(true)
+      }
+      expect(joints.every(connection => project.connections.some(other =>
+        other.id.replace(/:\d+$/, '') === connection.id.replace(/:\d+$/, '') && other.count > 0))).toBe(true)
+    }
     expect(validateProject(project)).toEqual([])
     expect(roundTripProject(project)).toEqual(project)
     expect(overlappingHardware(project)).toEqual([])
@@ -60,7 +75,7 @@ describe('cat tower', () => {
       expect(floorAt(level + 1, x, z)).toBe(false)
       // Both outside walls are absent at this resting/climbing corner.
       const walls = bounds.filter(box => box.min[1] > level * 335 + 18 && box.max[1] < (level + 1) * 335)
-      expect(walls).toHaveLength(4)
+      expect(walls).toHaveLength(5)
       expect(walls.some(box => x > box.min[0] && x < box.max[0] && Math.sign(z) * box.min[2] > 320)).toBe(false)
       expect(walls.some(box => z > box.min[2] && z < box.max[2] && Math.sign(x) * box.min[0] > 320)).toBe(false)
     }

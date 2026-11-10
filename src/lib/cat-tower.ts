@@ -20,6 +20,10 @@ export function catTowerProject(): Project {
     // A full base connects the entry platform to both surrounding walls.
     panel(`${label} · ${level === 0 ? 'entry landing' : 'corner landing'}`, level === 0 ? 635 : 300, [level === 0 ? 0 : -holeX * 167.5, y, holeZ * 167.5], [-Math.PI / 2, 0, 0])
     if (level === 6) continue
+    // A narrow central wall bridges each tier at the landing seam, on the
+    // floored side of its opening. The 50 mm edge accommodates a 40 mm clamp.
+    panel(`Level ${level + 1} · center brace`, 50,
+      [-holeX * 67.5, y + 167.5, 0], [0, 0, 0])
     // Omit both wall segments at the lookout corner. The opposite walls span
     // two bays; the two remaining half walls leave a full-width entry/lookout.
     panel(`Level ${level + 1} · back wall`, 635, [0, y + 167.5, -z * 335], [0, 0, 0])
