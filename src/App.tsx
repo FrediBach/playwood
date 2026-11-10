@@ -226,9 +226,14 @@ export default function App() {
     selected, attachment, attachmentSideGuide, visibleBounds, hasVisiblePanels, inspectingConnectors, validTargets,
     assemblyHint, attachmentSummary, attachmentWarning, assemblyCount
   }
+  // Reuse the scene's resolved resize candidate only for inspector display.
+  // Keep committed selection/project inputs for expensive tools and edit commands.
+  const inspectorPanels=useMemo(()=>resize.panels
+    ? resize.panels.filter(panel=>selectedIdSet.has(panel.id))
+    : selectedPanels,[resize.panels,selectedIdSet,selectedPanels])
   const editorInspectorProps: React.ComponentProps<typeof EditorInspector> = {
     objectMode, objects, inspectingConnectors, selectedConnectorIds, selectionKey, inspectorTab, instance, assembly,
-    clipboard, managingProjectConstraints, selectedPanels, selected, setRightOpen, setInspectorTab, startAttach,
+    clipboard, managingProjectConstraints, selectedPanels: inspectorPanels, selected: inspectorPanels.find(panel=>panel.id===selected?.id), setRightOpen, setInspectorTab, startAttach,
     applyAttachment, previewProject, attachmentErrors, attachment, assemblyCount, previewResult, constraints,
     setConstraintFooter, attachmentSummary, attachmentWarning, assemblyHint, closeProjectConstraints,
     projectConstraintsOpen, project, panels, commit, setFitSignal, notify, objectControlsDisabled, setObjectConversion,

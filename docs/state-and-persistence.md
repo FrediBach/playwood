@@ -115,6 +115,8 @@ Control-drag preparation releases joints crossing the selection boundary in the 
 
 For multiple panels, resize preparation records the complete selection and a boundary-stretch plan. Each preview rigidly translates that selection and resizes only its authorized connecting panels, retaining hard freezes on the remaining project. Selection or project changes invalidate the prepared source. Collision-limited candidates and their diagnostics remain outside history and autosave; release accepts one valid candidate through the same functional source-identity guard. Escape, blur, and pointer cancellation discard it. No selection, handle, or boundary-plan data is serialized, and existing saves require no migration.
 
+`App` also reuses the resize hook’s already-resolved panels for the selected panel inspector values, with memoized selection filtering. Numeric fields update in the same render as the scene preview and revert on cancellation. Committed project and selection inputs still drive validation, split feasibility, build tools, commands, and persistence; inspector synchronization adds no geometry resolution, effect, or animation loop.
+
 `App` supplies the active resize/drag project to the workspace, otherwise the committed project. Insertion and attachment previews add ghost panels/connections and suppress hardware or panels that the candidate replaces. An apparently changed connector during hover is therefore not necessarily a saved edit.
 
 ### Insertion and assembly placement
