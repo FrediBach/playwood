@@ -1,5 +1,5 @@
 import { previewShortcut, type PreviewCommandLabel } from '@/lib/preview-shortcuts'
-import { Eye, ArrowDownToLine, Box, Check, Clipboard, Copy, FolderPlus, Grid2X2, Link2, LockKeyhole, Maximize, Pencil, Plus, Rows3, Scan, Scissors, SlidersHorizontal, Square, Unlink, Ungroup, Trash2, type LucideIcon } from 'lucide-react'
+import { Eye, ArrowDownToLine, ArrowDownToDot, AlignVerticalSpaceAround, Equal, Pin, Ruler, Columns3, AlignStartHorizontal, Ellipsis, Box, Check, Clipboard, Copy, FolderPlus, Grid2X2, Link2, LockKeyhole, Maximize, Pencil, Plus, Rows3, Scan, Scissors, SlidersHorizontal, Square, Unlink, Ungroup, Trash2, type LucideIcon } from 'lucide-react'
 import { differingPanelDimension } from '@/lib/equal-panel-sizes'
 import type { PreviewMenuAction } from './PreviewContextMenu'
 import type { useAssemblyEditor } from '@/hooks/use-assembly-editor'
@@ -7,6 +7,7 @@ import { assemblySelectionError } from '@/lib/assemblies'
 import { panelDistribution } from '@/lib/panel-distribution'
 import { parallelPanelCut } from '@/lib/parallel-panels'
 import type { findPanelHoles } from '@/lib/close-holes'
+import type { ConstraintSuggestion } from '@/lib/constraint-suggestions'
 import type { Panel, Project, ListKind } from '@/lib/types'
 
 interface MenuContext {
@@ -30,6 +31,10 @@ interface MenuContext {
   holes: ReturnType<typeof findPanelHoles>
   canMenuAutoConnect: boolean
   hasVisiblePanels: boolean
+  /** One-click rules for the current selection; computed only while the menu is open. */
+  constraintSuggestions?: ConstraintSuggestion[]
+  /** A constraint form or preview is open; one-click rules would make it stale. */
+  constraintsEditing?: boolean
   actions: {
     cyclePanelVisibility: () => void
     equalizeSizes?: () => void
@@ -46,6 +51,7 @@ interface MenuContext {
     removeSelectedConnectors: () => void
     lockPanelSizes: () => void
     openConstraints: (add?: boolean) => void
+    applyConstraintSuggestion?: (suggestion: ConstraintSuggestion) => void
     startAttach: () => void
     extendToGround: () => void
     detachSelection: () => void
@@ -62,7 +68,25 @@ interface MenuContext {
 }
 const MENU_GROUPS = ['Selection', 'Build', 'Assembly', 'Organize', 'Remove', 'Preview'] as const
 type MenuGroup = typeof MENU_GROUPS[number]
-type AddAction = (group: MenuGroup, label: PreviewCommandLabel | `Fill hole · ${string}` | `Review hole fit · ${string}`, icon: LucideIcon, run: () => void, danger?: boolean, disabled?: boolean, shortcut?: string, id?: string) => void
+type AddAction = (group: MenuGroup, label: PreviewCommandLabel | 'Add constraints' | `Fill hole · ${string}` | `Review hole fit · ${string}`, icon: LucideIcon, run: () => void, danger?: boolean, disabled?: boolean, shortcut?: string, id?: string, submenu?: PreviewMenuAction[]) => void
+
+const suggestionIcons: Record<string, LucideIcon> = {
+  ground: ArrowDownToLine, 'floor-height': ArrowDownToDot, 'lock-width': LockKeyhole, 'lock-height': LockKeyhole,
+  'equal-width': Equal, 'equal-height': Equal, 'level-min': AlignStartHorizontal, 'level-max': AlignStartHorizontal,
+  gap: Ruler, distribute: Columns3, pin: Pin,
+}
+
+/** Prefilled one-click rules, followed by the full constraint form. */
+function constraintSubmenu(context: MenuContext): PreviewMenuAction[] {
+  const { constraintSuggestions = [], actions, modalOpen, constraintsEditing } = context
+  const apply = actions.applyConstraintSuggestion
+  const suggested: PreviewMenuAction[] = apply ? constraintSuggestions.map(suggestion => ({
+    id: `constraint/${suggestion.id}`, group: 'Suggested', label: suggestion.label, icon: suggestionIcons[suggestion.id] ?? AlignVerticalSpaceAround,
+    run: () => apply(suggestion), disabled: modalOpen || constraintsEditing,
+  })) : []
+  return [...suggested, { id: 'Custom constraint…', group: suggested.length ? 'Custom' : undefined, label: 'Custom constraint…', icon: Ellipsis,
+    run: () => actions.openConstraints(true), shortcut: previewShortcut('Custom constraint…') }]
+}
 
 function addConnectorActions(context: MenuContext, menuAction: AddAction) {
   const {selectedConnectorIds, modalOpen, assembly, canConnectWithPanel, actions}=context
@@ -83,9 +107,9 @@ function addEditingActions(context: MenuContext, menuAction: AddAction) {
 
 function addLoosePanelActions(context: MenuContext, menuAction: AddAction) {
   const {project, selectedPanels, selectedIds, selectedIdSet, canExtendToGround, splitCounts, checkingSplits, canDivideGrid, actions}=context
-  const {groupSelected, openConstraints, startAttach, extendToGround, detachSelection, splitSelection}=actions
+  const {groupSelected, startAttach, extendToGround, detachSelection, splitSelection}=actions
   if (actions.equalizeSizes) menuAction('Build', 'Make sizes equal',Rows3,actions.equalizeSizes,false,context.modalOpen||!differingPanelDimension(selectedPanels))
-  menuAction('Build', 'Add constraint',SlidersHorizontal,()=>openConstraints(true))
+  menuAction('Build', 'Add constraints',SlidersHorizontal,()=>{},false,false,undefined,undefined,constraintSubmenu(context))
   menuAction('Build', 'Lock panel size',LockKeyhole,actions.lockPanelSizes,false,context.modalOpen)
   menuAction('Organize', 'Group selected',FolderPlus,()=>groupSelected('panels',selectedIds),false,selectedPanels.length<2)
   if (selectedPanels.length===1) menuAction('Build', 'Attach a panel',Link2,startAttach,false,context.canAttachPanel===false)
@@ -132,7 +156,7 @@ export function buildPreviewMenuActions(context: MenuContext): PreviewMenuAction
   const {panels, assembly, selectedIdSet, inspectingConnectors, hasVisiblePanels, actions}=context
   const {selectAll, openConstraints}=actions
   const menuActions: PreviewMenuAction[]=[]
-  const menuAction: AddAction = (group, label, icon, run, danger = false, disabled = false, shortcut = previewShortcut(label), id = label) => menuActions.push({ id, group, label, icon, run, danger, disabled, shortcut })
+  const menuAction: AddAction = (group, label, icon, run, danger = false, disabled = false, shortcut = previewShortcut(label), id = label, submenu) => menuActions.push({ id, group, label, icon, run, danger, disabled, shortcut, submenu })
   if (inspectingConnectors) addConnectorActions(context, menuAction)
   else if (assembly.editingInstance) addEditingActions(context, menuAction)
   else addPanelActions(context, menuAction)

@@ -11,3 +11,8 @@
 .preview-context-group-title { padding: 3px 10px; color: #77776d; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 
 .preview-context-menu kbd { margin-left: auto; flex-shrink: 0; font: inherit; font-size: 11px; color: #77776d; white-space: nowrap; padding: 2px 4px; border: 1px solid #e2e1da; border-radius: 4px; background: #f6f5ef; }
+
+.preview-context-menu button.is-expanded { background: #eeede6; }
+.preview-context-chevron { margin-left: auto; flex: 0 0 14px; color: #77776d; }
+.preview-context-menu kbd + .preview-context-chevron { margin-left: 0; }
+.preview-context-submenu { z-index: 101; width: 300px; }

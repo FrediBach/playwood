@@ -4,7 +4,7 @@ export const previewShortcuts = {
   'Copy': 'Mod+c', 'Duplicate': 'Mod+d', 'Delete selection': 'Delete', 'Remove connectors': 'Delete',
   'Attach a panel': 'a', 'Add panel': 'n', 'Connect with a panel': 'a',
   'Add connectors between': 'Shift+a', 'Separate overlapping connectors': 'Shift+s',
-  'Make sizes equal': 'e', 'Add constraint': 'Shift+c', 'Lock panel size': 'l',
+  'Make sizes equal': 'e', 'Custom constraint…': 'Shift+c', 'Lock panel size': 'l',
   'Extend to ground': 'Shift+e', 'Disconnect panels': 'Shift+d',
   'Distribute evenly': 'Shift+r', 'Merge panels': 'm', 'Split in the middle': 'p',
   'Divide into a grid': 'Shift+g', 'Split x times': 'Shift+p', 'Auto-connect': 'c',
@@ -19,6 +19,11 @@ export type PreviewCommandLabel = keyof typeof previewShortcuts
 
 export function previewShortcut(label: string): string | undefined {
   return Object.hasOwn(previewShortcuts, label) ? previewShortcuts[label as PreviewCommandLabel] : undefined
+}
+
+/** Top-level and nested menu actions, for keyboard shortcut dispatch. */
+export function flattenPreviewMenuActions<T extends { submenu?: T[] }>(actions: readonly T[]): T[] {
+  return actions.flatMap(action => action.submenu ? [action, ...action.submenu] : [action])
 }
 
 type Key = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'repeat' | 'isComposing' | 'preventDefault'>

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { lockPanelSizes, setDesignConstraint } from '@/lib/design-constraint-commands'
+import { applyConstraintSuggestion, type ConstraintSuggestion } from '@/lib/constraint-suggestions'
 import { designConstraintPanelIds } from '@/lib/design-constraints'
 import { resolvePanels } from '@/lib/model'
 import type { DesignConstraint, Project } from '@/lib/types'
@@ -64,6 +65,21 @@ export function useDesignConstraints({ project, commit, notify }: {
   }
   const activeRule = current?.rule ?? (highlight && project.constraints?.find(rule => rule.id === highlight.id)) ?? null
   return {
+    /** Commit a prefilled one-click rule set; the menu computed it from the current project. */
+    applySuggestion: (suggestion: ConstraintSuggestion) => {
+      try {
+        const source = project
+        let added: DesignConstraint | undefined
+        commit(current => {
+          if (current !== source) throw new Error('The project changed. Reopen the menu to add this constraint.')
+          const next = applyConstraintSuggestion(current, suggestion)
+          added = next.constraints?.find(rule => rule.enabled && !current.constraints?.some(old => old.id === rule.id && old.enabled))
+          return next
+        })
+        if (added) setHighlight(added)
+        notify(`${suggestion.label}: ${suggestion.adjusts ? 'panels adjusted and ' : ''}constraint${suggestion.rules.length > 1 ? 's' : ''} added. Undo is available.`)
+      } catch (error) { notify(error instanceof Error ? error.message : 'This constraint could not be added.') }
+    },
     lockSizes: (panelIds: readonly string[]) => {
       try {
         commit(current => lockPanelSizes(current, panelIds))
