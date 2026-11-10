@@ -1,0 +1,32 @@
+.dialog-content.move-creation-dialog{width:600px}
+.move-creation-dialog .movement-preview{margin:0 0 16px;background:#f1f2ec;border:1px solid #dce0d5;border-radius:8px;padding:10px}
+.movement-views{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.movement-views svg{width:100%;height:auto;overflow:visible}
+.movement-views svg text{font-size:10px;fill:#65705b}
+.movement-views svg .movement-view-title{font-size:11px;font-weight:600;fill:#424e38}
+.movement-preview figcaption{font-size:11px;line-height:1.6}
+.movement-legend{display:flex;gap:12px;flex-wrap:wrap;color:#65705b}
+.movement-legend span:nth-child(2){color:#b64325}
+.movement-legend span:last-child{margin-left:auto;font-size:10px}
+.movement-preview figcaption p{margin-top:5px;color:#4c5941}
+.move-creation-dialog .movement-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.move-creation-dialog .movement-fields .field{margin-bottom:0}
+.movement-presets{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.move-creation-dialog .dialog-note{margin-top:12px;font-size:12px;line-height:1.5}
+@media(max-width:600px){
+  .dialog-content.move-creation-dialog{padding:22px 18px}
+  .move-creation-dialog h2+p{margin-bottom:12px;font-size:12px;line-height:1.5}
+  .move-creation-dialog .movement-preview{padding:6px;margin-bottom:12px}
+  .movement-views{gap:4px}
+  .movement-views svg text{font-size:12px}
+  .movement-preview figcaption{font-size:10px}
+  .movement-legend{gap:8px}
+  .movement-legend span:last-child{display:none}
+  .move-creation-dialog .movement-fields{grid-template-columns:1fr;gap:8px}
+  .move-creation-dialog .movement-fields .field{display:grid;grid-template-columns:1fr 112px;align-items:center;gap:8px;margin-bottom:0}
+  .move-creation-dialog .movement-fields .field>span{font-size:11px;margin:0}
+  .movement-presets{gap:6px}
+  .movement-presets .ui-button{font-size:11px;padding-inline:9px;height:32px}
+  .move-creation-dialog .dialog-note{font-size:11px;margin-top:10px}
+  .move-creation-dialog .dialog-footer{margin-top:12px}
+}
