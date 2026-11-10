@@ -98,6 +98,7 @@ export function AssemblyWorkspace({
   const notice = getWorkspaceNotice(boxSelectActive,dragging,dragSnap,realisticPreview,assemblyHint,attachmentSummary,attachmentWarning)
   return <main className="workspace" aria-label="3D assembly workspace">
       <WorkspaceToolbar
+    niceValueStep={niceValueStep}
     constraintCount={constraintCount}
     constraintsOverviewOpen={constraintsOverviewOpen}
     onConstraints={onConstraints}
@@ -241,12 +242,12 @@ function getMovementStatus(constraintPicking: boolean|undefined,constraintEditin
 }
 
 function WorkspaceToolbar({
-  onConstraints, constraintEditing, constraintCount, constraintsOverviewOpen, snapSettings, setSnapSettings,
+  onConstraints, constraintEditing, constraintCount, constraintsOverviewOpen, niceValueStep, snapSettings, setSnapSettings,
   panels, realisticPreview,
   setRealisticPreview, onMoveCreation, onRotate, onRescale,
   leftOpen, setLeftOpen, rightOpen, setRightOpen,
   showDimensions, setShowDimensions, showGrid, setShowGrid
-}: Pick<Props, 'constraintCount' | 'constraintsOverviewOpen' | 'onConstraints' | 'constraintEditing' | 'snapSettings' | 'setSnapSettings' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onMoveCreation' | 'onRotate' | 'onRescale' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
+}: Pick<Props, 'niceValueStep' | 'constraintCount' | 'constraintsOverviewOpen' | 'onConstraints' | 'constraintEditing' | 'snapSettings' | 'setSnapSettings' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onMoveCreation' | 'onRotate' | 'onRescale' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
   return <div className="workspace-top">
         <div className="preview-mode-switch" role="group" aria-label="Preview mode">
           <button aria-pressed={!realisticPreview} onClick={()=>setRealisticPreview(false)}><Box size={15}/>Studio</button>
@@ -266,7 +267,7 @@ function WorkspaceToolbar({
           </details>
           <IconButton label="All constraints" className="constraints-toolbar-button" aria-pressed={!!constraintsOverviewOpen} aria-description={`${constraintCount ?? 0} saved constraints, including paused rules and enabled build space`} disabled={constraintEditing} onClick={onConstraints}><SlidersHorizontal size={18}/>{!!constraintCount && <span className="constraints-toolbar-badge" aria-hidden="true">{constraintCount}</span>}</IconButton>
           <IconButton label="Move creation" disabled={constraintEditing||!panels.length} onClick={onMoveCreation}><Move size={18}/></IconButton>
-          <IconButton label="Rescale creation" disabled={constraintEditing||!panels.length} onClick={onRescale}><Scaling size={18}/></IconButton>
+          <IconButton label="Rescale creation" tooltipLabel={niceValueStep ? `Rescale creation · Only nice values enabled · ${niceValueStep} mm step` : 'Rescale creation'} className="constraints-toolbar-button" aria-description={niceValueStep ? `Only nice values enabled · ${niceValueStep} mm step` : 'Only nice values disabled'} disabled={constraintEditing||!panels.length} onClick={onRescale}><Scaling size={18}/>{!!niceValueStep && <span className="constraints-toolbar-badge" aria-hidden="true">{niceValueStep}</span>}</IconButton>
           <IconButton label="Rotate creation" disabled={constraintEditing||!panels.length} onClick={onRotate}><RotateCw size={18}/></IconButton>
           {!realisticPreview&&!leftOpen&&<IconButton label="Open panel list" onClick={()=>setLeftOpen(true)}><PanelLeftOpen size={18}/></IconButton>}
           <Tooltip label="Show dimensions"><button className={`canvas-toggle ${showDimensions?'active':''}`} aria-label="Show dimensions" aria-pressed={showDimensions} onClick={()=>setShowDimensions(v=>!v)}><Ruler size={18}/></button></Tooltip>
