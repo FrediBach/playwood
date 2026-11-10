@@ -50,7 +50,7 @@ const BuildGuide = lazy(() => import('./BuildGuide'))
 export function ProjectDialogs(props: Props) {
   const opener = useRef<HTMLElement | null>(null)
   return <Dialog open={props.dialog!==null} onOpenChange={open=>{if(!open)props.onClose()}}>
-    <DialogContent className={props.dialog==='rescale'?'rescale-creation-dialog':props.dialog==='move'?'move-creation-dialog':props.dialog==='help'?'build-guide-dialog':props.dialog==='templates'?'wide-dialog':props.dialog==='parts'?'parts-dialog':''}
+    <DialogContent className={props.dialog==='rotate'?'rotate-creation-dialog':props.dialog==='rescale'?'rescale-creation-dialog':props.dialog==='move'?'move-creation-dialog':props.dialog==='help'?'build-guide-dialog':props.dialog==='templates'?'wide-dialog':props.dialog==='parts'?'parts-dialog':''}
       onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
       onCloseAutoFocus={event => { if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus() } }}>
       <DialogBody {...props}/>
@@ -83,8 +83,8 @@ function ReplaceProjectDialog({onClose,onReplace,exportProject,project,replaceme
   return <><DialogTitle>Replace current project?</DialogTitle><DialogDescription>This will replace “{project.name}” with “{replacementName}”, including its saved copy in this browser. Export your current project first to keep a separate copy. You can undo this change until you reload or close the app.</DialogDescription><Button variant="outline" onClick={exportProject}><Download size={17}/>Export current project</Button>{replacementLoading&&<p role="status" className="dialog-note">Preparing example…</p>}{replacementError&&<p role="alert" className="error-message">{replacementError}</p>}<div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={!replacementReady} onClick={onReplace}>Replace project</Button></div></>
 }
 
-function RotateDialog({onClose,onRotate}: Pick<Props, 'onClose' | 'onRotate'>) {
-  return <RotateCreation onCancel={onClose} onRotate={onRotate}/>
+function RotateDialog({onClose,onRotate,project}: Pick<Props, 'onClose' | 'onRotate' | 'project'>) {
+  return <RotateCreation project={project} onCancel={onClose} onRotate={onRotate}/>
 }
 
 function AddDialog({draft,setDraft,onClose,onAdd,attachNewPanel}: Pick<Props, 'draft' | 'setDraft' | 'onClose' | 'onAdd' | 'attachNewPanel'>) {
