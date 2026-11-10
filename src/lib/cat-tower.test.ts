@@ -1,7 +1,8 @@
+import optimizedTower from '../../resources/library-3d/user-projects/cat-tower.json'
 import { describe, expect, it } from 'vitest'
 import { roundTripProject } from '../test/project-round-trip'
 import { catTowerProject } from './cat-tower'
-import { getProjectBounds, resolvePanels, validateProject } from './model'
+import { getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
 import { overlappingHardware } from './connector-hardware-test-helpers'
 import { assertAddedHardwarePanelClearance } from './connector-clearance'
 import { getPhysicalConnectors } from './connector-selection'
@@ -9,6 +10,23 @@ import { getPhysicalConnectors } from './connector-selection'
 const corners = [[-167.5, -167.5], [167.5, -167.5], [167.5, 167.5], [-167.5, 167.5]]
 
 describe('cat tower', () => {
+  it('preserves the optimized export and returns independent copies', () => {
+    const expected = parseProject(structuredClone(optimizedTower))
+    const project = catTowerProject()
+    expect(project).toEqual(expected)
+    expect(project.connectorOverrides).toEqual(optimizedTower.connectorOverrides)
+    expect(project.customColors).toEqual(optimizedTower.customColors)
+    expect(project.panels.filter(panel => panel.material === 'walnut')).toHaveLength(26)
+    expect(project.panels.filter(panel => panel.material === 'painted')).toHaveLength(18)
+    const second = catTowerProject()
+    project.panels[0].color = '#ff0000'
+    const key = Object.keys(project.connectorOverrides!)[0]
+    project.connectorOverrides![key].color = '#ff0000'
+    project.customColors![0].name = 'Changed'
+    expect(second).toEqual(expected)
+    expect(catTowerProject()).toEqual(expected)
+  })
+
   it('uses the original cuts plus narrow center braces, connected hardware, and exportable geometry', () => {
     const project = catTowerProject()
     expect(project.panels).toHaveLength(44)

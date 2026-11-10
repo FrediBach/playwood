@@ -1,0 +1,2742 @@
+{
+  "version": 1,
+  "name": "Cat tower",
+  "panels": [
+    {
+      "id": "ad929eaf-a346-4c90-81d3-58162c78bf63",
+      "name": "Level 1 · long landing",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        9,
+        167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "9320762a-69f3-4737-8e46-f46032fbcf78",
+      "name": "Level 1 · entry landing",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        9,
+        -167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "29b0ac9a-8290-4b00-8442-dca77c157297",
+      "name": "Level 1 · center brace",
+      "width": 50,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        67.5,
+        176.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "ffd300ed-cde9-4b47-9c8a-08be35064e5c",
+      "name": "Level 1 · back wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        176.5,
+        335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "1b4d3639-72f9-4ed1-a272-110661174cb0",
+      "name": "Level 1 · front half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -167.5,
+        176.5,
+        -335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "906c49e8-1ddf-43d0-b09e-26228dec847e",
+      "name": "Level 1 · side wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -335,
+        176.5,
+        0
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "d9b9a24c-77f3-4263-b9da-bdf22293a99a",
+      "name": "Level 1 · side half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        335,
+        176.5,
+        167.5
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "e910aef3-c3ed-47f9-943e-58cf64f4118f",
+      "name": "Level 2 · long landing",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        344,
+        167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "cb98aea4-3a88-4b75-893f-4f33cfce13e9",
+      "name": "Level 2 · corner landing",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -167.5,
+        344,
+        -167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "0fde2c1a-7767-48a0-aaa2-869aaf617522",
+      "name": "Level 2 · center brace",
+      "width": 50,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -67.5,
+        511.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "763f62c6-d308-4b10-814c-1410b2b85188",
+      "name": "Level 2 · back wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        0,
+        511.5,
+        -335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "5ded47da-6c7c-49b4-a779-a3efaeed66e0",
+      "name": "Level 2 · front half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        -167.5,
+        511.5,
+        335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "c8200468-f766-4e6d-8686-aed47a45b6a1",
+      "name": "Level 2 · side wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        -335,
+        511.5,
+        0
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "9a4f2029-748a-4637-8e5f-057eab180d64",
+      "name": "Level 2 · side half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        335,
+        511.5,
+        -167.5
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "f446c120-dccd-4002-adab-c880b1b01083",
+      "name": "Level 3 · long landing",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        0,
+        679,
+        -167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "43babb94-e3f2-47e6-8f93-ae991ff8859b",
+      "name": "Level 3 · corner landing",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        -167.5,
+        679,
+        167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "91e3f520-98ca-4352-a3bc-b97abc6acb62",
+      "name": "Level 3 · center brace",
+      "width": 50,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -67.5,
+        846.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "f992162d-9ae6-4965-bbbd-f1de3e6b7c8e",
+      "name": "Level 3 · back wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        846.5,
+        -335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "2e2ed118-316b-413b-8577-c9277a5f1ff7",
+      "name": "Level 3 · front half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        167.5,
+        846.5,
+        335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "227d548d-7e23-44cc-a01a-db787fd3e415",
+      "name": "Level 3 · side wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        335,
+        846.5,
+        0
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "7f90b9a9-2955-4b89-998c-653f696862e7",
+      "name": "Level 3 · side half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -335,
+        846.5,
+        -167.5
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "727cacc6-2bef-4794-9dba-709b799bb31a",
+      "name": "Level 4 · long landing",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        1014,
+        -167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "a2d73ae7-4813-43cd-81b3-724897cec388",
+      "name": "Level 4 · corner landing",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        167.5,
+        1014,
+        167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "db6b987e-9beb-4341-a623-6c0aefd41db6",
+      "name": "Level 4 · center brace",
+      "width": 50,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        67.5,
+        1181.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "c7f9b0fb-155b-4d10-a60a-a49ea6ad042c",
+      "name": "Level 4 · back wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        0,
+        1181.5,
+        335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "e146ae46-70d9-4ebb-aeba-43123ed00c4e",
+      "name": "Level 4 · front half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        167.5,
+        1181.5,
+        -335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "da410493-7d26-4437-87b4-f8aae7d7ff3d",
+      "name": "Level 4 · side wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        335,
+        1181.5,
+        0
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "73e1842e-6f2d-47a3-b19f-818bd1bb3f65",
+      "name": "Level 4 · side half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        -335,
+        1181.5,
+        167.5
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "40afeb16-e758-4dad-af6b-9578deba3ca9",
+      "name": "Level 5 · long landing",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        0,
+        1349,
+        167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "93d1a811-f148-4ac4-944d-51d0fa17434c",
+      "name": "Level 5 · corner landing",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        167.5,
+        1349,
+        -167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "23603ff3-b3bf-411c-9862-d635105134c3",
+      "name": "Level 5 · center brace",
+      "width": 50,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        67.5,
+        1516.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "a94c4e72-a717-4f22-acc8-aed3c08e0014",
+      "name": "Level 5 · back wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        1516.5,
+        335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "3f69fba5-d1e8-4fda-adaa-717017f56c6b",
+      "name": "Level 5 · front half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -167.5,
+        1516.5,
+        -335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "c0d504ef-8fb6-4aab-a1a6-7932e2002a0d",
+      "name": "Level 5 · side wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -335,
+        1516.5,
+        0
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "223f7250-0e35-4917-9d42-780833ea2895",
+      "name": "Level 5 · side half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        335,
+        1516.5,
+        167.5
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "11f15d2e-e3f5-4fdf-94e4-bcbced8a1aa7",
+      "name": "Level 6 · long landing",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        0,
+        1684,
+        167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "9d98012b-3f75-4db5-b92a-5cf1ff6f4106",
+      "name": "Level 6 · corner landing",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -167.5,
+        1684,
+        -167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "d4867b8b-b1cb-401e-904c-b48ef19b5f3d",
+      "name": "Level 6 · center brace",
+      "width": 50,
+      "height": 300,
+      "thickness": 18,
+      "material": "walnut",
+      "color": "#79563d",
+      "pattern": "solid",
+      "position": [
+        -67.5,
+        1851.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "4ea8b7c7-0f9a-4f66-8489-09a302b821d7",
+      "name": "Level 6 · back wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        0,
+        1851.5,
+        -335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "fae8a8c0-080c-4da8-8dd3-d67428185faf",
+      "name": "Level 6 · front half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        -167.5,
+        1851.5,
+        335
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "5d416154-afbc-4353-9107-fb25bb3c11f2",
+      "name": "Level 6 · side wall",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        -335,
+        1851.5,
+        0
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "a9b65d39-e29e-41d2-b325-82a673aaf934",
+      "name": "Level 6 · side half wall",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        335,
+        1851.5,
+        -167.5
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "94aaf685-2632-4902-976f-c34f9c3a6355",
+      "name": "Roof · long landing",
+      "width": 635,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        0,
+        2019,
+        -167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    },
+    {
+      "id": "14deae04-3a45-4da0-bc8a-49c8ba82f6b2",
+      "name": "Roof · corner landing",
+      "width": 300,
+      "height": 300,
+      "thickness": 18,
+      "material": "painted",
+      "color": "#e8e5db",
+      "pattern": "solid",
+      "position": [
+        -167.5,
+        2019,
+        167.5
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "visible": true,
+      "cornerRadius": 0,
+      "holeSize": 12,
+      "holeSpacing": 48
+    }
+  ],
+  "connections": [
+    {
+      "id": "18242d82-debb-44c7-b5e3-7684f66e6027:0",
+      "parentId": "0fde2c1a-7767-48a0-aaa2-869aaf617522",
+      "childId": "f446c120-dccd-4002-adab-c880b1b01083",
+      "type": "cross",
+      "side": "top",
+      "flip": true,
+      "offset": 67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "18242d82-debb-44c7-b5e3-7684f66e6027:1",
+      "parentId": "0fde2c1a-7767-48a0-aaa2-869aaf617522",
+      "childId": "43babb94-e3f2-47e6-8f93-ae991ff8859b",
+      "type": "cross",
+      "side": "top",
+      "flip": true,
+      "offset": -100,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "18242d82-debb-44c7-b5e3-7684f66e6027:2",
+      "parentId": "0fde2c1a-7767-48a0-aaa2-869aaf617522",
+      "childId": "91e3f520-98ca-4352-a3bc-b97abc6acb62",
+      "type": "cross",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "f7516272-e450-4b00-8798-071419a73056:0",
+      "parentId": "db6b987e-9beb-4341-a623-6c0aefd41db6",
+      "childId": "40afeb16-e758-4dad-af6b-9578deba3ca9",
+      "type": "cross",
+      "side": "top",
+      "flip": false,
+      "offset": -67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "f7516272-e450-4b00-8798-071419a73056:1",
+      "parentId": "db6b987e-9beb-4341-a623-6c0aefd41db6",
+      "childId": "93d1a811-f148-4ac4-944d-51d0fa17434c",
+      "type": "cross",
+      "side": "top",
+      "flip": false,
+      "offset": 100,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "f7516272-e450-4b00-8798-071419a73056:2",
+      "parentId": "db6b987e-9beb-4341-a623-6c0aefd41db6",
+      "childId": "23603ff3-b3bf-411c-9862-d635105134c3",
+      "type": "cross",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "e55796bc-1b32-430a-811e-30a4ac162a5b:0",
+      "parentId": "ad929eaf-a346-4c90-81d3-58162c78bf63",
+      "childId": "29b0ac9a-8290-4b00-8442-dca77c157297",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "e55796bc-1b32-430a-811e-30a4ac162a5b:1",
+      "parentId": "ad929eaf-a346-4c90-81d3-58162c78bf63",
+      "childId": "9320762a-69f3-4737-8e46-f46032fbcf78",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "7782c889-9ccc-49c7-a77b-b91ce630c0bb:0",
+      "parentId": "ffd300ed-cde9-4b47-9c8a-08be35064e5c",
+      "childId": "e910aef3-c3ed-47f9-943e-58cf64f4118f",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "7782c889-9ccc-49c7-a77b-b91ce630c0bb:1",
+      "parentId": "ffd300ed-cde9-4b47-9c8a-08be35064e5c",
+      "childId": "5ded47da-6c7c-49b4-a779-a3efaeed66e0",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": -167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "58079328-8ca0-4ba1-af5d-b2d4a77083aa:0",
+      "parentId": "1b4d3639-72f9-4ed1-a272-110661174cb0",
+      "childId": "cb98aea4-3a88-4b75-893f-4f33cfce13e9",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "58079328-8ca0-4ba1-af5d-b2d4a77083aa:1",
+      "parentId": "1b4d3639-72f9-4ed1-a272-110661174cb0",
+      "childId": "763f62c6-d308-4b10-814c-1410b2b85188",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "9ed63ece-02d9-4ec0-a7fa-6edbe73b0f7a:0",
+      "parentId": "906c49e8-1ddf-43d0-b09e-26228dec847e",
+      "childId": "e910aef3-c3ed-47f9-943e-58cf64f4118f",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": -167.49999999999994,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "9ed63ece-02d9-4ec0-a7fa-6edbe73b0f7a:1",
+      "parentId": "906c49e8-1ddf-43d0-b09e-26228dec847e",
+      "childId": "c8200468-f766-4e6d-8686-aed47a45b6a1",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "f968121e-5d7d-4dea-b67a-165226963be9:0",
+      "parentId": "906c49e8-1ddf-43d0-b09e-26228dec847e",
+      "childId": "cb98aea4-3a88-4b75-893f-4f33cfce13e9",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 167.50000000000003,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "f968121e-5d7d-4dea-b67a-165226963be9:1",
+      "parentId": "906c49e8-1ddf-43d0-b09e-26228dec847e",
+      "childId": "c8200468-f766-4e6d-8686-aed47a45b6a1",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "331cbd78-892a-4da8-ab00-964c61c0a2e6:0",
+      "parentId": "e910aef3-c3ed-47f9-943e-58cf64f4118f",
+      "childId": "0fde2c1a-7767-48a0-aaa2-869aaf617522",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": -67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "331cbd78-892a-4da8-ab00-964c61c0a2e6:1",
+      "parentId": "e910aef3-c3ed-47f9-943e-58cf64f4118f",
+      "childId": "cb98aea4-3a88-4b75-893f-4f33cfce13e9",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": -167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "bfe15115-0d36-4862-8834-0076be337e77:0",
+      "parentId": "763f62c6-d308-4b10-814c-1410b2b85188",
+      "childId": "f446c120-dccd-4002-adab-c880b1b01083",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "bfe15115-0d36-4862-8834-0076be337e77:1",
+      "parentId": "763f62c6-d308-4b10-814c-1410b2b85188",
+      "childId": "f992162d-9ae6-4965-bbbd-f1de3e6b7c8e",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "1f12cfe9-b4a5-411d-979a-174e3f4bf204:0",
+      "parentId": "c8200468-f766-4e6d-8686-aed47a45b6a1",
+      "childId": "f446c120-dccd-4002-adab-c880b1b01083",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 167.50000000000006,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "1f12cfe9-b4a5-411d-979a-174e3f4bf204:1",
+      "parentId": "c8200468-f766-4e6d-8686-aed47a45b6a1",
+      "childId": "7f90b9a9-2955-4b89-998c-653f696862e7",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "be18e98b-1f9f-441f-a3df-056c2501c311:0",
+      "parentId": "9a4f2029-748a-4637-8e5f-057eab180d64",
+      "childId": "f446c120-dccd-4002-adab-c880b1b01083",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": -5.684341886080802e-14,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "be18e98b-1f9f-441f-a3df-056c2501c311:1",
+      "parentId": "9a4f2029-748a-4637-8e5f-057eab180d64",
+      "childId": "227d548d-7e23-44cc-a01a-db787fd3e415",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": -167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "732f7fbe-a786-4c24-a940-c1b3c423fe9f:0",
+      "parentId": "f992162d-9ae6-4965-bbbd-f1de3e6b7c8e",
+      "childId": "727cacc6-2bef-4794-9dba-709b799bb31a",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "732f7fbe-a786-4c24-a940-c1b3c423fe9f:1",
+      "parentId": "f992162d-9ae6-4965-bbbd-f1de3e6b7c8e",
+      "childId": "e146ae46-70d9-4ebb-aeba-43123ed00c4e",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "f77cb1cf-b7af-4b53-a4e3-3f08663f2451:0",
+      "parentId": "2e2ed118-316b-413b-8577-c9277a5f1ff7",
+      "childId": "a2d73ae7-4813-43cd-81b3-724897cec388",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "f77cb1cf-b7af-4b53-a4e3-3f08663f2451:1",
+      "parentId": "2e2ed118-316b-413b-8577-c9277a5f1ff7",
+      "childId": "c7f9b0fb-155b-4d10-a60a-a49ea6ad042c",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": -167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "a91aaefa-21d4-440f-a5bd-49be72152c24:0",
+      "parentId": "227d548d-7e23-44cc-a01a-db787fd3e415",
+      "childId": "727cacc6-2bef-4794-9dba-709b799bb31a",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": 167.49999999999994,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "a91aaefa-21d4-440f-a5bd-49be72152c24:1",
+      "parentId": "227d548d-7e23-44cc-a01a-db787fd3e415",
+      "childId": "da410493-7d26-4437-87b4-f8aae7d7ff3d",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "496efffd-42db-4437-8bef-d41948d2a9af:0",
+      "parentId": "227d548d-7e23-44cc-a01a-db787fd3e415",
+      "childId": "a2d73ae7-4813-43cd-81b3-724897cec388",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": -167.50000000000003,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "496efffd-42db-4437-8bef-d41948d2a9af:1",
+      "parentId": "227d548d-7e23-44cc-a01a-db787fd3e415",
+      "childId": "da410493-7d26-4437-87b4-f8aae7d7ff3d",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "d3a531eb-f635-478e-882b-1988f8d45408:0",
+      "parentId": "727cacc6-2bef-4794-9dba-709b799bb31a",
+      "childId": "db6b987e-9beb-4341-a623-6c0aefd41db6",
+      "type": "t",
+      "side": "bottom",
+      "flip": false,
+      "offset": 67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "d3a531eb-f635-478e-882b-1988f8d45408:1",
+      "parentId": "727cacc6-2bef-4794-9dba-709b799bb31a",
+      "childId": "a2d73ae7-4813-43cd-81b3-724897cec388",
+      "type": "t",
+      "side": "bottom",
+      "flip": false,
+      "offset": 167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "80e974b7-5e24-42bd-966c-fda790a721b0:0",
+      "parentId": "c7f9b0fb-155b-4d10-a60a-a49ea6ad042c",
+      "childId": "40afeb16-e758-4dad-af6b-9578deba3ca9",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "80e974b7-5e24-42bd-966c-fda790a721b0:1",
+      "parentId": "c7f9b0fb-155b-4d10-a60a-a49ea6ad042c",
+      "childId": "a94c4e72-a717-4f22-acc8-aed3c08e0014",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "09ec73f5-7394-4691-b5ae-9cd4d9bff479:0",
+      "parentId": "da410493-7d26-4437-87b4-f8aae7d7ff3d",
+      "childId": "40afeb16-e758-4dad-af6b-9578deba3ca9",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": -167.50000000000006,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "09ec73f5-7394-4691-b5ae-9cd4d9bff479:1",
+      "parentId": "da410493-7d26-4437-87b4-f8aae7d7ff3d",
+      "childId": "223f7250-0e35-4917-9d42-780833ea2895",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": -167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "1371719e-3bd3-401e-b535-f926713d7150:0",
+      "parentId": "73e1842e-6f2d-47a3-b19f-818bd1bb3f65",
+      "childId": "40afeb16-e758-4dad-af6b-9578deba3ca9",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 5.684341886080802e-14,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "1371719e-3bd3-401e-b535-f926713d7150:1",
+      "parentId": "73e1842e-6f2d-47a3-b19f-818bd1bb3f65",
+      "childId": "c0d504ef-8fb6-4aab-a1a6-7932e2002a0d",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "8282cea9-0a9b-4eaa-a38f-810352b02064:0",
+      "parentId": "a94c4e72-a717-4f22-acc8-aed3c08e0014",
+      "childId": "11f15d2e-e3f5-4fdf-94e4-bcbced8a1aa7",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "8282cea9-0a9b-4eaa-a38f-810352b02064:1",
+      "parentId": "a94c4e72-a717-4f22-acc8-aed3c08e0014",
+      "childId": "fae8a8c0-080c-4da8-8dd3-d67428185faf",
+      "type": "t",
+      "side": "top",
+      "flip": true,
+      "offset": -167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "812ab670-6703-4329-9e9d-98861f78b272:0",
+      "parentId": "3f69fba5-d1e8-4fda-adaa-717017f56c6b",
+      "childId": "9d98012b-3f75-4db5-b92a-5cf1ff6f4106",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "812ab670-6703-4329-9e9d-98861f78b272:1",
+      "parentId": "3f69fba5-d1e8-4fda-adaa-717017f56c6b",
+      "childId": "4ea8b7c7-0f9a-4f66-8489-09a302b821d7",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "3a713167-3a66-48b4-857d-2a4597aeec2d:0",
+      "parentId": "c0d504ef-8fb6-4aab-a1a6-7932e2002a0d",
+      "childId": "11f15d2e-e3f5-4fdf-94e4-bcbced8a1aa7",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": -167.49999999999994,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "3a713167-3a66-48b4-857d-2a4597aeec2d:1",
+      "parentId": "c0d504ef-8fb6-4aab-a1a6-7932e2002a0d",
+      "childId": "5d416154-afbc-4353-9107-fb25bb3c11f2",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "aee81f65-0f6a-48fc-b50a-5e1180806c83:0",
+      "parentId": "c0d504ef-8fb6-4aab-a1a6-7932e2002a0d",
+      "childId": "9d98012b-3f75-4db5-b92a-5cf1ff6f4106",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 167.50000000000003,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "aee81f65-0f6a-48fc-b50a-5e1180806c83:1",
+      "parentId": "c0d504ef-8fb6-4aab-a1a6-7932e2002a0d",
+      "childId": "5d416154-afbc-4353-9107-fb25bb3c11f2",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "d8a1765e-14bd-4d0a-96b9-29772ab832a2:0",
+      "parentId": "11f15d2e-e3f5-4fdf-94e4-bcbced8a1aa7",
+      "childId": "d4867b8b-b1cb-401e-904c-b48ef19b5f3d",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": -67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "d8a1765e-14bd-4d0a-96b9-29772ab832a2:1",
+      "parentId": "11f15d2e-e3f5-4fdf-94e4-bcbced8a1aa7",
+      "childId": "9d98012b-3f75-4db5-b92a-5cf1ff6f4106",
+      "type": "t",
+      "side": "top",
+      "flip": false,
+      "offset": -167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "50739de5-ac0c-40c4-8032-37b8e29276a8:0",
+      "parentId": "94aaf685-2632-4902-976f-c34f9c3a6355",
+      "childId": "d4867b8b-b1cb-401e-904c-b48ef19b5f3d",
+      "type": "t",
+      "side": "bottom",
+      "flip": true,
+      "offset": -67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "50739de5-ac0c-40c4-8032-37b8e29276a8:1",
+      "parentId": "94aaf685-2632-4902-976f-c34f9c3a6355",
+      "childId": "14deae04-3a45-4da0-bc8a-49c8ba82f6b2",
+      "type": "t",
+      "side": "bottom",
+      "flip": true,
+      "offset": -167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 0,
+      "role": "support",
+      "quarterTurn": false
+    },
+    {
+      "id": "f7d63b85-97b5-4bb0-93f6-ac04d6105e60:0",
+      "parentId": "ad929eaf-a346-4c90-81d3-58162c78bf63",
+      "childId": "ffd300ed-cde9-4b47-9c8a-08be35064e5c",
+      "type": "90",
+      "side": "bottom",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "7e72339a-4b55-47fe-9d12-72b3c6433955:0",
+      "parentId": "ad929eaf-a346-4c90-81d3-58162c78bf63",
+      "childId": "906c49e8-1ddf-43d0-b09e-26228dec847e",
+      "type": "90",
+      "side": "left",
+      "flip": false,
+      "offset": 167.50000000000003,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "747dfdc2-a1c7-446c-b3ba-49c4bc0d015c:0",
+      "parentId": "ad929eaf-a346-4c90-81d3-58162c78bf63",
+      "childId": "d9b9a24c-77f3-4263-b9da-bdf22293a99a",
+      "type": "90",
+      "side": "right",
+      "flip": false,
+      "offset": 2.842170943040401e-14,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "5a9e0a7a-3500-45fb-9583-09b7871729d2:0",
+      "parentId": "9320762a-69f3-4737-8e46-f46032fbcf78",
+      "childId": "1b4d3639-72f9-4ed1-a272-110661174cb0",
+      "type": "90",
+      "side": "top",
+      "flip": false,
+      "offset": -167.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "529c1251-330e-4486-b4d7-aa65eeafcf0f:0",
+      "parentId": "9320762a-69f3-4737-8e46-f46032fbcf78",
+      "childId": "906c49e8-1ddf-43d0-b09e-26228dec847e",
+      "type": "90",
+      "side": "left",
+      "flip": false,
+      "offset": -167.49999999999997,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "40b99e0c-5d8b-40cc-8423-6d0d9aa34555:0",
+      "parentId": "29b0ac9a-8290-4b00-8442-dca77c157297",
+      "childId": "e910aef3-c3ed-47f9-943e-58cf64f4118f",
+      "type": "90",
+      "side": "top",
+      "flip": false,
+      "offset": -67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "eb974194-6948-4139-9fb7-a5102704e046:0",
+      "parentId": "ffd300ed-cde9-4b47-9c8a-08be35064e5c",
+      "childId": "906c49e8-1ddf-43d0-b09e-26228dec847e",
+      "type": "90",
+      "side": "left",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "3fc9f151-dd0a-4e15-8311-b9c2278a9d8e:0",
+      "parentId": "ffd300ed-cde9-4b47-9c8a-08be35064e5c",
+      "childId": "d9b9a24c-77f3-4263-b9da-bdf22293a99a",
+      "type": "90",
+      "side": "right",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "3a9f9c53-2d08-43a9-96a3-45cd31d45d4d:0",
+      "parentId": "1b4d3639-72f9-4ed1-a272-110661174cb0",
+      "childId": "906c49e8-1ddf-43d0-b09e-26228dec847e",
+      "type": "90",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "58452949-8a2c-4aab-80ed-b0a16491632d:0",
+      "parentId": "d9b9a24c-77f3-4263-b9da-bdf22293a99a",
+      "childId": "e910aef3-c3ed-47f9-943e-58cf64f4118f",
+      "type": "90",
+      "side": "top",
+      "flip": true,
+      "offset": -5.684341886080802e-14,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "25c50a4a-bed3-43f9-b6b2-6d92269da3c7:0",
+      "parentId": "763f62c6-d308-4b10-814c-1410b2b85188",
+      "childId": "c8200468-f766-4e6d-8686-aed47a45b6a1",
+      "type": "90",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "43a1a7a5-4385-4292-a55e-e647841455b1:0",
+      "parentId": "763f62c6-d308-4b10-814c-1410b2b85188",
+      "childId": "9a4f2029-748a-4637-8e5f-057eab180d64",
+      "type": "90",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "3b4845c9-b28f-458d-b582-a858254b5fba:0",
+      "parentId": "5ded47da-6c7c-49b4-a779-a3efaeed66e0",
+      "childId": "c8200468-f766-4e6d-8686-aed47a45b6a1",
+      "type": "90",
+      "side": "left",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "4ddfb238-0904-4a01-9d41-30ea7d588b9f:0",
+      "parentId": "5ded47da-6c7c-49b4-a779-a3efaeed66e0",
+      "childId": "43babb94-e3f2-47e6-8f93-ae991ff8859b",
+      "type": "90",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "c49b4e67-f07e-406b-9b17-c1da38ce2dcd:0",
+      "parentId": "c8200468-f766-4e6d-8686-aed47a45b6a1",
+      "childId": "43babb94-e3f2-47e6-8f93-ae991ff8859b",
+      "type": "90",
+      "side": "top",
+      "flip": false,
+      "offset": -167.49999999999997,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "a0fbc717-0498-48f3-9069-448f383e91f1:0",
+      "parentId": "91e3f520-98ca-4352-a3bc-b97abc6acb62",
+      "childId": "727cacc6-2bef-4794-9dba-709b799bb31a",
+      "type": "90",
+      "side": "top",
+      "flip": true,
+      "offset": 67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "1cb81375-b963-4461-8e7d-566dd0747410:0",
+      "parentId": "f992162d-9ae6-4965-bbbd-f1de3e6b7c8e",
+      "childId": "227d548d-7e23-44cc-a01a-db787fd3e415",
+      "type": "90",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "09bdefb1-0cc3-4d2f-ba5a-087797ce562c:0",
+      "parentId": "f992162d-9ae6-4965-bbbd-f1de3e6b7c8e",
+      "childId": "7f90b9a9-2955-4b89-998c-653f696862e7",
+      "type": "90",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "734cc6ae-5264-42e7-8e2d-5eba3b9ba91e:0",
+      "parentId": "2e2ed118-316b-413b-8577-c9277a5f1ff7",
+      "childId": "227d548d-7e23-44cc-a01a-db787fd3e415",
+      "type": "90",
+      "side": "right",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "97d78381-56ce-404b-b4d9-6a8144187358:0",
+      "parentId": "7f90b9a9-2955-4b89-998c-653f696862e7",
+      "childId": "727cacc6-2bef-4794-9dba-709b799bb31a",
+      "type": "90",
+      "side": "top",
+      "flip": false,
+      "offset": 5.684341886080802e-14,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "b84a300d-b56b-45a9-b6f2-a2484faa13c0:0",
+      "parentId": "c7f9b0fb-155b-4d10-a60a-a49ea6ad042c",
+      "childId": "da410493-7d26-4437-87b4-f8aae7d7ff3d",
+      "type": "90",
+      "side": "right",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "9319c567-27d1-4941-8d8b-d6c72eabfdd4:0",
+      "parentId": "c7f9b0fb-155b-4d10-a60a-a49ea6ad042c",
+      "childId": "73e1842e-6f2d-47a3-b19f-818bd1bb3f65",
+      "type": "90",
+      "side": "left",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "0c899232-7eed-4867-bb37-9ae172742a76:0",
+      "parentId": "e146ae46-70d9-4ebb-aeba-43123ed00c4e",
+      "childId": "da410493-7d26-4437-87b4-f8aae7d7ff3d",
+      "type": "90",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "2848355e-9480-4a47-9faf-9766b966acb2:0",
+      "parentId": "e146ae46-70d9-4ebb-aeba-43123ed00c4e",
+      "childId": "93d1a811-f148-4ac4-944d-51d0fa17434c",
+      "type": "90",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "4df69da3-202a-4cb7-b95f-89d36d0e0cf3:0",
+      "parentId": "da410493-7d26-4437-87b4-f8aae7d7ff3d",
+      "childId": "93d1a811-f148-4ac4-944d-51d0fa17434c",
+      "type": "90",
+      "side": "top",
+      "flip": true,
+      "offset": 167.49999999999997,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "478e4d98-086a-4e5b-b491-1fe81b4d17e7:0",
+      "parentId": "23603ff3-b3bf-411c-9862-d635105134c3",
+      "childId": "11f15d2e-e3f5-4fdf-94e4-bcbced8a1aa7",
+      "type": "90",
+      "side": "top",
+      "flip": false,
+      "offset": -67.5,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 1,
+      "role": "support"
+    },
+    {
+      "id": "6b720f7d-ed8e-4676-9930-e4909eb55e8e:0",
+      "parentId": "a94c4e72-a717-4f22-acc8-aed3c08e0014",
+      "childId": "c0d504ef-8fb6-4aab-a1a6-7932e2002a0d",
+      "type": "90",
+      "side": "left",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "1b13e590-3bbc-4b5a-b8a1-8e61530b138f:0",
+      "parentId": "a94c4e72-a717-4f22-acc8-aed3c08e0014",
+      "childId": "223f7250-0e35-4917-9d42-780833ea2895",
+      "type": "90",
+      "side": "right",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "e2e29769-90fb-439f-9300-3e6f8322175e:0",
+      "parentId": "3f69fba5-d1e8-4fda-adaa-717017f56c6b",
+      "childId": "c0d504ef-8fb6-4aab-a1a6-7932e2002a0d",
+      "type": "90",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "b9c93d86-4520-4f21-bbad-041eaff82f53:0",
+      "parentId": "223f7250-0e35-4917-9d42-780833ea2895",
+      "childId": "11f15d2e-e3f5-4fdf-94e4-bcbced8a1aa7",
+      "type": "90",
+      "side": "top",
+      "flip": true,
+      "offset": -5.684341886080802e-14,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "04345341-3479-4697-abda-a83c827b5596:0",
+      "parentId": "4ea8b7c7-0f9a-4f66-8489-09a302b821d7",
+      "childId": "5d416154-afbc-4353-9107-fb25bb3c11f2",
+      "type": "90",
+      "side": "left",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "39025ed9-e034-44f9-83f5-6332b369f377:0",
+      "parentId": "4ea8b7c7-0f9a-4f66-8489-09a302b821d7",
+      "childId": "a9b65d39-e29e-41d2-b325-82a673aaf934",
+      "type": "90",
+      "side": "right",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "3a3cee44-5056-40d0-980a-c20b3f36242d:0",
+      "parentId": "4ea8b7c7-0f9a-4f66-8489-09a302b821d7",
+      "childId": "94aaf685-2632-4902-976f-c34f9c3a6355",
+      "type": "90",
+      "side": "top",
+      "flip": false,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "a5af5c22-893f-43fe-94e0-7d65ba433bdf:0",
+      "parentId": "fae8a8c0-080c-4da8-8dd3-d67428185faf",
+      "childId": "5d416154-afbc-4353-9107-fb25bb3c11f2",
+      "type": "90",
+      "side": "left",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "8ea61763-eaf6-4fbb-aa56-cfdc071332ed:0",
+      "parentId": "fae8a8c0-080c-4da8-8dd3-d67428185faf",
+      "childId": "14deae04-3a45-4da0-bc8a-49c8ba82f6b2",
+      "type": "90",
+      "side": "top",
+      "flip": true,
+      "offset": 0,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support"
+    },
+    {
+      "id": "51554118-79f7-48a8-8471-4a6147fc82d7:0",
+      "parentId": "5d416154-afbc-4353-9107-fb25bb3c11f2",
+      "childId": "94aaf685-2632-4902-976f-c34f9c3a6355",
+      "type": "90",
+      "side": "top",
+      "flip": false,
+      "offset": 167.50000000000006,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "20c3429e-a337-499a-8eff-869e489355e3:0",
+      "parentId": "5d416154-afbc-4353-9107-fb25bb3c11f2",
+      "childId": "14deae04-3a45-4da0-bc8a-49c8ba82f6b2",
+      "type": "90",
+      "side": "top",
+      "flip": false,
+      "offset": -167.49999999999997,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "e13c7c42-36dc-45e1-98cb-efa87e4ca7dc:0",
+      "parentId": "a9b65d39-e29e-41d2-b325-82a673aaf934",
+      "childId": "94aaf685-2632-4902-976f-c34f9c3a6355",
+      "type": "90",
+      "side": "top",
+      "flip": true,
+      "offset": -5.684341886080802e-14,
+      "inset": 0,
+      "color": "#292b27",
+      "count": 2,
+      "role": "support",
+      "quarterTurn": true
+    },
+    {
+      "id": "f884bad0-57c6-4587-98f0-ccf82935de46:0",
+      "parentId": "ffd300ed-cde9-4b47-9c8a-08be35064e5c",
+      "childId": "e910aef3-c3ed-47f9-943e-58cf64f4118f",
+      "type": "90",
+      "role": "support",
+      "side": "top",
+      "flip": true,
+      "quarterTurn": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 1,
+      "color": "#292b27"
+    },
+    {
+      "id": "f5e7124e-d3aa-4054-8a14-69fa97bd544a:0",
+      "parentId": "f992162d-9ae6-4965-bbbd-f1de3e6b7c8e",
+      "childId": "727cacc6-2bef-4794-9dba-709b799bb31a",
+      "type": "90",
+      "role": "support",
+      "side": "top",
+      "flip": false,
+      "quarterTurn": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 1,
+      "color": "#292b27"
+    },
+    {
+      "id": "f2745384-eef8-4d46-8849-041a5950d69c:0",
+      "parentId": "a94c4e72-a717-4f22-acc8-aed3c08e0014",
+      "childId": "11f15d2e-e3f5-4fdf-94e4-bcbced8a1aa7",
+      "type": "90",
+      "role": "support",
+      "side": "top",
+      "flip": true,
+      "quarterTurn": false,
+      "offset": 0,
+      "inset": 0,
+      "count": 1,
+      "color": "#292b27"
+    }
+  ],
+  "connectorOverrides": {
+    "[\"9ed63ece-02d9-4ec0-a7fa-6edbe73b0f7a:0\",0]": {
+      "slide": 35.44058999999998,
+      "color": "#000000"
+    },
+    "[\"f968121e-5d7d-4dea-b67a-165226963be9:0\",1]": {
+      "slide": -35.44058999999998,
+      "color": "#000000"
+    },
+    "[\"1f12cfe9-b4a5-411d-979a-174e3f4bf204:0\",1]": {
+      "slide": -35.44058999999998,
+      "color": "#000000"
+    },
+    "[\"be18e98b-1f9f-441f-a3df-056c2501c311:0\",1]": {
+      "slide": -35.44058999999992,
+      "color": "#000000"
+    },
+    "[\"a91aaefa-21d4-440f-a5bd-49be72152c24:0\",1]": {
+      "slide": -35.44058999999992,
+      "color": "#000000"
+    },
+    "[\"496efffd-42db-4437-8bef-d41948d2a9af:0\",0]": {
+      "slide": 35.44059000000004,
+      "color": "#000000"
+    },
+    "[\"09ec73f5-7394-4691-b5ae-9cd4d9bff479:0\",0]": {
+      "slide": 35.44059000000004,
+      "color": "#000000"
+    },
+    "[\"1371719e-3bd3-401e-b535-f926713d7150:0\",0]": {
+      "slide": 35.44058999999998,
+      "color": "#000000"
+    },
+    "[\"3a713167-3a66-48b4-857d-2a4597aeec2d:0\",0]": {
+      "slide": 35.44058999999998,
+      "color": "#000000"
+    },
+    "[\"aee81f65-0f6a-48fc-b50a-5e1180806c83:0\",1]": {
+      "slide": -35.44058999999998,
+      "color": "#000000"
+    },
+    "[\"7e72339a-4b55-47fe-9d12-72b3c6433955:0\",0]": {
+      "slide": 36.008625999999985,
+      "color": "#000000"
+    },
+    "[\"747dfdc2-a1c7-446c-b3ba-49c4bc0d015c:0\",0]": {
+      "slide": 36.00862599999998,
+      "color": "#000000"
+    },
+    "[\"529c1251-330e-4486-b4d7-aa65eeafcf0f:0\",1]": {
+      "slide": -36.00862599999999,
+      "color": "#000000"
+    },
+    "[\"eb974194-6948-4139-9fb7-a5102704e046:0\",0]": {
+      "slide": 36.00862599999998,
+      "color": "#000000"
+    },
+    "[\"eb974194-6948-4139-9fb7-a5102704e046:0\",1]": {
+      "slide": -35.80495700000001,
+      "color": "#000000"
+    },
+    "[\"3fc9f151-dd0a-4e15-8311-b9c2278a9d8e:0\",0]": {
+      "slide": 36.00862599999998,
+      "color": "#000000"
+    },
+    "[\"3a9f9c53-2d08-43a9-96a3-45cd31d45d4d:0\",0]": {
+      "slide": 36.008626000000035,
+      "color": "#000000"
+    },
+    "[\"3a9f9c53-2d08-43a9-96a3-45cd31d45d4d:0\",1]": {
+      "slide": -35.804957,
+      "color": "#000000"
+    },
+    "[\"58452949-8a2c-4aab-80ed-b0a16491632d:0\",0]": {
+      "slide": 36.008625999999985,
+      "color": "#000000"
+    },
+    "[\"25c50a4a-bed3-43f9-b6b2-6d92269da3c7:0\",0]": {
+      "slide": 35.804957,
+      "color": "#ffffff"
+    },
+    "[\"25c50a4a-bed3-43f9-b6b2-6d92269da3c7:0\",1]": {
+      "slide": -35.804957,
+      "color": "#ffffff"
+    },
+    "[\"43a1a7a5-4385-4292-a55e-e647841455b1:0\",1]": {
+      "slide": -35.804957,
+      "color": "#ffffff"
+    },
+    "[\"3b4845c9-b28f-458d-b582-a858254b5fba:0\",0]": {
+      "slide": 35.804957,
+      "color": "#ffffff"
+    },
+    "[\"4ddfb238-0904-4a01-9d41-30ea7d588b9f:0\",0]": {
+      "slide": 36.008625999999985,
+      "color": "#000000"
+    },
+    "[\"c49b4e67-f07e-406b-9b17-c1da38ce2dcd:0\",0]": {
+      "slide": 36.00862599999998,
+      "color": "#000000"
+    },
+    "[\"1cb81375-b963-4461-8e7d-566dd0747410:0\",0]": {
+      "slide": 35.804957,
+      "color": "#000000"
+    },
+    "[\"1cb81375-b963-4461-8e7d-566dd0747410:0\",1]": {
+      "slide": -35.804957,
+      "color": "#000000"
+    },
+    "[\"09bdefb1-0cc3-4d2f-ba5a-087797ce562c:0\",0]": {
+      "slide": 35.804957,
+      "color": "#000000"
+    },
+    "[\"734cc6ae-5264-42e7-8e2d-5eba3b9ba91e:0\",1]": {
+      "slide": -35.804957,
+      "color": "#000000"
+    },
+    "[\"97d78381-56ce-404b-b4d9-6a8144187358:0\",1]": {
+      "slide": -36.008625999999985,
+      "color": "#000000"
+    },
+    "[\"b84a300d-b56b-45a9-b6f2-a2484faa13c0:0\",0]": {
+      "slide": 35.804957,
+      "color": "#ffffff"
+    },
+    "[\"b84a300d-b56b-45a9-b6f2-a2484faa13c0:0\",1]": {
+      "slide": -35.804957,
+      "color": "#ffffff"
+    },
+    "[\"9319c567-27d1-4941-8d8b-d6c72eabfdd4:0\",1]": {
+      "slide": -35.80495700000001,
+      "color": "#ffffff"
+    },
+    "[\"0c899232-7eed-4867-bb37-9ae172742a76:0\",0]": {
+      "slide": 35.804957,
+      "color": "#ffffff"
+    },
+    "[\"2848355e-9480-4a47-9faf-9766b966acb2:0\",1]": {
+      "slide": -36.00862599999998,
+      "color": "#000000"
+    },
+    "[\"4df69da3-202a-4cb7-b95f-89d36d0e0cf3:0\",1]": {
+      "slide": -36.008625999999985,
+      "color": "#000000"
+    },
+    "[\"6b720f7d-ed8e-4676-9930-e4909eb55e8e:0\",0]": {
+      "slide": 35.804957,
+      "color": "#000000"
+    },
+    "[\"6b720f7d-ed8e-4676-9930-e4909eb55e8e:0\",1]": {
+      "slide": -35.80495700000001,
+      "color": "#000000"
+    },
+    "[\"1b13e590-3bbc-4b5a-b8a1-8e61530b138f:0\",0]": {
+      "slide": 35.804957,
+      "color": "#000000"
+    },
+    "[\"e2e29769-90fb-439f-9300-3e6f8322175e:0\",1]": {
+      "slide": -35.804957,
+      "color": "#000000"
+    },
+    "[\"b9c93d86-4520-4f21-bbad-041eaff82f53:0\",0]": {
+      "slide": 36.008625999999985,
+      "color": "#000000"
+    },
+    "[\"04345341-3479-4697-abda-a83c827b5596:0\",0]": {
+      "slide": 35.804957,
+      "color": "#ffffff"
+    },
+    "[\"3a3cee44-5056-40d0-980a-c20b3f36242d:0\",0]": {
+      "slide": 36.008625999999985,
+      "color": "#ffffff"
+    },
+    "[\"3a3cee44-5056-40d0-980a-c20b3f36242d:0\",1]": {
+      "slide": -36.00862599999998,
+      "color": "#ffffff"
+    },
+    "[\"a5af5c22-893f-43fe-94e0-7d65ba433bdf:0\",0]": {
+      "slide": 35.804957,
+      "color": "#ffffff"
+    },
+    "[\"8ea61763-eaf6-4fbb-aa56-cfdc071332ed:0\",0]": {
+      "slide": 36.008625999999985,
+      "color": "#ffffff"
+    },
+    "[\"51554118-79f7-48a8-8471-4a6147fc82d7:0\",1]": {
+      "slide": -36.008625999999985,
+      "color": "#ffffff"
+    },
+    "[\"20c3429e-a337-499a-8eff-869e489355e3:0\",0]": {
+      "slide": 36.00862599999998,
+      "color": "#ffffff"
+    },
+    "[\"e13c7c42-36dc-45e1-98cb-efa87e4ca7dc:0\",1]": {
+      "slide": -36.00862599999993,
+      "color": "#ffffff"
+    },
+    "[\"f884bad0-57c6-4587-98f0-ccf82935de46:0\",0]": {
+      "slide": 261.491374,
+      "color": "#000000"
+    },
+    "[\"f5e7124e-d3aa-4054-8a14-69fa97bd544a:0\",0]": {
+      "slide": -261.491374,
+      "color": "#000000"
+    },
+    "[\"f2745384-eef8-4d46-8849-041a5950d69c:0\",0]": {
+      "slide": 261.491374,
+      "color": "#000000"
+    },
+    "[\"18242d82-debb-44c7-b5e3-7684f66e6027:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"f7516272-e450-4b00-8798-071419a73056:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"e55796bc-1b32-430a-811e-30a4ac162a5b:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"7782c889-9ccc-49c7-a77b-b91ce630c0bb:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"7782c889-9ccc-49c7-a77b-b91ce630c0bb:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"58079328-8ca0-4ba1-af5d-b2d4a77083aa:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"58079328-8ca0-4ba1-af5d-b2d4a77083aa:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"9ed63ece-02d9-4ec0-a7fa-6edbe73b0f7a:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"f968121e-5d7d-4dea-b67a-165226963be9:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"331cbd78-892a-4da8-ab00-964c61c0a2e6:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"bfe15115-0d36-4862-8834-0076be337e77:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"bfe15115-0d36-4862-8834-0076be337e77:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"1f12cfe9-b4a5-411d-979a-174e3f4bf204:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"be18e98b-1f9f-441f-a3df-056c2501c311:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"732f7fbe-a786-4c24-a940-c1b3c423fe9f:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"732f7fbe-a786-4c24-a940-c1b3c423fe9f:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"f77cb1cf-b7af-4b53-a4e3-3f08663f2451:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"f77cb1cf-b7af-4b53-a4e3-3f08663f2451:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"a91aaefa-21d4-440f-a5bd-49be72152c24:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"496efffd-42db-4437-8bef-d41948d2a9af:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"d3a531eb-f635-478e-882b-1988f8d45408:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"80e974b7-5e24-42bd-966c-fda790a721b0:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"80e974b7-5e24-42bd-966c-fda790a721b0:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"09ec73f5-7394-4691-b5ae-9cd4d9bff479:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"1371719e-3bd3-401e-b535-f926713d7150:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"8282cea9-0a9b-4eaa-a38f-810352b02064:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"8282cea9-0a9b-4eaa-a38f-810352b02064:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"812ab670-6703-4329-9e9d-98861f78b272:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"812ab670-6703-4329-9e9d-98861f78b272:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"3a713167-3a66-48b4-857d-2a4597aeec2d:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"aee81f65-0f6a-48fc-b50a-5e1180806c83:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"d8a1765e-14bd-4d0a-96b9-29772ab832a2:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"50739de5-ac0c-40c4-8032-37b8e29276a8:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"f7d63b85-97b5-4bb0-93f6-ac04d6105e60:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"f7d63b85-97b5-4bb0-93f6-ac04d6105e60:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"7e72339a-4b55-47fe-9d12-72b3c6433955:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"747dfdc2-a1c7-446c-b3ba-49c4bc0d015c:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"5a9e0a7a-3500-45fb-9583-09b7871729d2:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"5a9e0a7a-3500-45fb-9583-09b7871729d2:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"529c1251-330e-4486-b4d7-aa65eeafcf0f:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"40b99e0c-5d8b-40cc-8423-6d0d9aa34555:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"3fc9f151-dd0a-4e15-8311-b9c2278a9d8e:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"58452949-8a2c-4aab-80ed-b0a16491632d:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"43a1a7a5-4385-4292-a55e-e647841455b1:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"3b4845c9-b28f-458d-b582-a858254b5fba:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"4ddfb238-0904-4a01-9d41-30ea7d588b9f:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"c49b4e67-f07e-406b-9b17-c1da38ce2dcd:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"a0fbc717-0498-48f3-9069-448f383e91f1:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"09bdefb1-0cc3-4d2f-ba5a-087797ce562c:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"734cc6ae-5264-42e7-8e2d-5eba3b9ba91e:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"97d78381-56ce-404b-b4d9-6a8144187358:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"9319c567-27d1-4941-8d8b-d6c72eabfdd4:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"0c899232-7eed-4867-bb37-9ae172742a76:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"2848355e-9480-4a47-9faf-9766b966acb2:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"4df69da3-202a-4cb7-b95f-89d36d0e0cf3:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"478e4d98-086a-4e5b-b491-1fe81b4d17e7:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"1b13e590-3bbc-4b5a-b8a1-8e61530b138f:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"e2e29769-90fb-439f-9300-3e6f8322175e:0\",0]": {
+      "color": "#000000"
+    },
+    "[\"b9c93d86-4520-4f21-bbad-041eaff82f53:0\",1]": {
+      "color": "#000000"
+    },
+    "[\"04345341-3479-4697-abda-a83c827b5596:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"39025ed9-e034-44f9-83f5-6332b369f377:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"39025ed9-e034-44f9-83f5-6332b369f377:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"a5af5c22-893f-43fe-94e0-7d65ba433bdf:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"8ea61763-eaf6-4fbb-aa56-cfdc071332ed:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"51554118-79f7-48a8-8471-4a6147fc82d7:0\",0]": {
+      "color": "#ffffff"
+    },
+    "[\"20c3429e-a337-499a-8eff-869e489355e3:0\",1]": {
+      "color": "#ffffff"
+    },
+    "[\"e13c7c42-36dc-45e1-98cb-efa87e4ca7dc:0\",0]": {
+      "color": "#ffffff"
+    }
+  },
+  "customColors": [
+    {
+      "id": "custom:#e8d5b5",
+      "name": "Custom #e8d5b5",
+      "color": "#e8d5b5"
+    }
+  ]
+}
