@@ -3,7 +3,7 @@ import { detectPreviewFurnishings,FurnishingPlacement } from '@/lib/preview-furn
 import { RepeatPreview } from '@/lib/preview-resize'
 import type { SnapSettings } from '@/lib/preview-snap'
 import type { CameraView,Connection,Panel,Side,Vec3 } from '@/lib/types'
-import { Box,Grid2X2,House,Link2,Move,PanelLeftOpen,Plus,RotateCw,Ruler,Scaling,SlidersHorizontal,Sun } from 'lucide-react'
+import { Box,Grid2X2,House,Move,PanelLeftOpen,Plus,RotateCw,Ruler,Scaling,SlidersHorizontal,Sun } from 'lucide-react'
 import { useMemo,useState,type Dispatch,type SetStateAction } from 'react'
 import { AttachmentSideGuideState } from './AttachmentSideGuide'
 import { ConstructionLayerProps } from './ConstructionObjectLayer'
@@ -48,8 +48,6 @@ interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'preview
   constraintEditing?: boolean
   constraintPicking?: boolean
   addPanel: () => void
-  onAutoConnect: () => void
-  autoConnectDisabled: boolean
   isAttaching: boolean
   attachmentSide: Side
   visibleBounds: ReturnType<typeof getProjectBounds>
@@ -83,7 +81,7 @@ export function AssemblyWorkspace({
   setLeftOpen, setRightOpen, setShowDimensions, setShowGrid,
   setView, setZoomSignal, setFitSignal, setExploded,
   onMoveCreation, onRotate, onRescale, addPanel,
-  onAutoConnect, autoConnectDisabled, isAttaching, attachmentSide,
+  isAttaching, attachmentSide,
   attachmentSideGuide, visibleBounds, hasVisiblePanels, onDrillIn,
   attachmentHandles, onAttachmentPreview, onAttachmentCommit, attachmentBoundsPanels,
   suppressedConnectionIds=[], suppressedPanelIds=[], editingAssembly, assemblyHint,
@@ -106,8 +104,6 @@ export function AssemblyWorkspace({
     constraintEditing={constraintEditing}
     snapSettings={snapSettings}
     setSnapSettings={setSnapSettings}
-    onAutoConnect={onAutoConnect}
-    autoConnectDisabled={autoConnectDisabled}
     panels={panels}
     realisticPreview={realisticPreview}
     setRealisticPreview={setRealisticPreview}
@@ -246,11 +242,11 @@ function getMovementStatus(constraintPicking: boolean|undefined,constraintEditin
 
 function WorkspaceToolbar({
   onConstraints, constraintEditing, constraintCount, constraintsOverviewOpen, snapSettings, setSnapSettings,
-  onAutoConnect, autoConnectDisabled, panels, realisticPreview,
+  panels, realisticPreview,
   setRealisticPreview, onMoveCreation, onRotate, onRescale,
   leftOpen, setLeftOpen, rightOpen, setRightOpen,
   showDimensions, setShowDimensions, showGrid, setShowGrid
-}: Pick<Props, 'constraintCount' | 'constraintsOverviewOpen' | 'onConstraints' | 'constraintEditing' | 'snapSettings' | 'setSnapSettings' | 'onAutoConnect' | 'autoConnectDisabled' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onMoveCreation' | 'onRotate' | 'onRescale' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
+}: Pick<Props, 'constraintCount' | 'constraintsOverviewOpen' | 'onConstraints' | 'constraintEditing' | 'snapSettings' | 'setSnapSettings' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onMoveCreation' | 'onRotate' | 'onRescale' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
   return <div className="workspace-top">
         <div className="preview-mode-switch" role="group" aria-label="Preview mode">
           <button aria-pressed={!realisticPreview} onClick={()=>setRealisticPreview(false)}><Box size={15}/>Studio</button>
@@ -269,7 +265,6 @@ function WorkspaceToolbar({
             </div>
           </details>
           <IconButton label="All constraints" className="constraints-toolbar-button" aria-pressed={!!constraintsOverviewOpen} aria-description={`${constraintCount ?? 0} saved constraints, including paused rules and enabled build space`} disabled={constraintEditing} onClick={onConstraints}><SlidersHorizontal size={18}/>{!!constraintCount && <span className="constraints-toolbar-badge" aria-hidden="true">{constraintCount}</span>}</IconButton>
-          <IconButton label="Auto-add connectors" disabled={autoConnectDisabled} onClick={onAutoConnect}><Link2 size={18}/></IconButton>
           <IconButton label="Move creation" disabled={constraintEditing||!panels.length} onClick={onMoveCreation}><Move size={18}/></IconButton>
           <IconButton label="Rescale creation" disabled={constraintEditing||!panels.length} onClick={onRescale}><Scaling size={18}/></IconButton>
           <IconButton label="Rotate creation" disabled={constraintEditing||!panels.length} onClick={onRotate}><RotateCw size={18}/></IconButton>

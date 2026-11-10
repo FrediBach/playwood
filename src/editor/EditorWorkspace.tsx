@@ -61,7 +61,6 @@ interface EditorWorkspaceProps {
   openConstraints: (add?: boolean) => void
   constraintsOverviewOpen: boolean
   pickingConstraint: boolean
-  addAutoConnectors: () => void
   panels: Panel[]
   commitWithInsertChecks: (change: (current: Project) => Project,options?: { group: string; repeat: boolean }) => boolean
   moveSelection: (delta: Vec3,repeat: boolean) => void
@@ -111,7 +110,7 @@ export function EditorWorkspace({
   constraints, modalOpen, clipboard, assembly,
   inspectorTab, realisticPreview, selectedConnectorIds, chooseConnector,
   selectedIds, choosePanel, setContextMenu, constraintPreviewProject,
-  displayPanels, openConstraints, pickingConstraint, addAutoConnectors, constraintsOverviewOpen,
+  displayPanels, openConstraints, pickingConstraint, constraintsOverviewOpen,
   panels, commitWithInsertChecks, moveSelection, movementEnabled,
   previewPanels, previewConnections, view, showGrid,
   showDimensions, exploded, fitSignal, frameSignal,
@@ -173,7 +172,6 @@ export function EditorWorkspace({
     resizeDistance={resize.distance}
     resizeLimited={resize.limited}
     repeatPreview={resize.repeatPreview}
-    onAutoConnect={addAutoConnectors}
     onMoveConnectors={(slides,repeat) => commitWithInsertChecks(current => {
       let next=current
       for(const [id,slide] of Object.entries(slides)) next=editConnectors(next,[id],{ slide })
@@ -324,7 +322,6 @@ function getWorkspaceInteractionProps({
   return {
     constructionLayer: { objects: displayedObjects,surfaces: objectPreview.surfaces,selectedIds: objects.selectedIds,active: objectMode&&!objectInteractionDisabled,movementEnabled: objectMode&&!objectInteractionDisabled&&!objects.editing,gesture: objectGesture,boxSelecting: boxSelectActive,step: snapSettings.grid? snapSettings.spacing:10,onSelect: chooseObject,onMove: objects.move },
     choosePanel: objectMode&&!realisticPreview? (id: string | null,additive?: boolean) => { if(!id) objects.select(null,additive) } :choosePanel,
-    autoConnectDisabled: constraints.editing||modalOpen||!!assembly.editingInstance||panels.length<2,
     attachmentSideGuide: inspectorTab==='attach'&&!modalOpen? attachmentSideGuide:undefined,
     editingAssembly: assembly.editingDefinition? { name: assembly.editingDefinition.name,instanceCount: assemblyCount(assembly.editingDefinition.id),onDone: assembly.done }:undefined
   }
