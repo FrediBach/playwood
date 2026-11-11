@@ -1,3 +1,4 @@
+import { ResizeShadowBudgetError, type ResizeShadowPolicy } from './resize-shadow-contract'
 import { createResizeIntent, assertLegacyResizeIntent, unwrapResizeResult, type ResizeIntent, type ResizeContext, type ResizeResult, type ResizeProblem, type ResizeDimensions as Dimensions, type PanelResizeDimensions as PanelDimensions, type InferredRelationship, type PanelEdgeResize } from './resize-intent'
 import { analyzeStructure, inspectResizeAnalysis, frame, extent, coordinate, findContacts, type Frame, type Contact } from './resize-analysis'
 import { solveWithBounds, SolverConflict, LIMIT_MESSAGE, CONSTRAINT_MESSAGE, type StructuralRow as Row, type RowProvenance, type NumericalDiagnostic } from './structural-solver'
@@ -26,7 +27,7 @@ type MovementScope = { panelIds: Set<string>; reference: number; preserveCuts?: 
 type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean; scope?: MovementScope; stretch?: readonly SelectionStretchEdge[] } | { kind: 'resize'; relaxedRelationship?: string; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 type ValidationContext = ResizeContext
-interface ResizeTrace { phase: 'request' | 'compile' | 'solve' | 'materialize'; problems: ResizeProblem[]; inspect: boolean }
+interface ResizeTrace { phase: 'request' | 'compile' | 'solve' | 'materialize'; problems: ResizeProblem[]; inspect: boolean; shadow?: ResizeShadowPolicy }
 
 const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 const position = (panel: Panel) => new Vector3(...panel.position)
@@ -91,7 +92,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   // shared T/cross joint without dragging the other branches along its seam.
   // A partial-depth branch also needs its own offset to follow its near end
   // without imposing the full-depth branch's cut on the shorter panel.
-  const offsetKey = (connection: Connection) => (edit.kind === 'move' || (edit.kind === 'resize' && edit.local) || edit.kind === 'fit'
+  const offsetKey = (connection: Connection) => (trace?.shadow || edit.kind === 'move' || (edit.kind === 'resize' && edit.local) || edit.kind === 'fit'
     || (seamFits.get(connection.id)?.retainedEnds.length ?? 2) < 2) ? connection.id : jointId(connection)
   const offsetVariables = new Map<string, number>()
   for (const connection of connections) if (!offsetVariables.has(offsetKey(connection))) {
@@ -554,6 +555,27 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     }
   }
 
+  if (trace?.shadow) {
+    // Shadow interpretations replace heuristics as a coherent group. Physical,
+    // authored, target and scope rows survive; defining rows never enter fallback.
+    for (let index = rows.length - 1; index >= 0; index--) {
+      if (rows[index].inferred || preferences.has(rows[index]) || cutPreferences.has(rows[index])) rows.splice(index, 1)
+    }
+    frames.forEach((item, index) => {
+      for (const [dimension, field] of (['width', 'height'] as const).entries()) {
+        if (!ids.has(item.panel.id) && !trace.shadow!.adaptingCuts.has(`${item.panel.id}/${field}`)) {
+          add(row(0, { kind: 'scope', panelIds: [item.panel.id] }), index * 5 + 3 + dimension, 1)
+        }
+      }
+    })
+    for (const equation of trace.shadow.equations) {
+      if (!equation.terms.some(term => indices.has(term.panelId))) continue
+      if (!equation.terms.every(term => indices.has(term.panelId))) throw new Error('Shadow reference crosses an unsupported solve component.')
+      const constraint = row(0, { kind: 'inferred', relationshipId: equation.id, panelIds: equation.terms.map(term => term.panelId) })
+      for (const term of equation.terms) edge(constraint, indices.get(term.panelId)!, new Vector3(...term.axis), term.side, term.scale)
+    }
+  }
+
   if (trace?.inspect) {
     const variables = frames.flatMap(item => ['local-x', 'local-y', 'local-z', 'width', 'height'].map(axis => `${item.panel.id}/${axis}`))
     for (const [key, index] of offsetVariables) variables[index] = `seam/${key}`
@@ -607,9 +629,16 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   }
   let changes: number[]
   try {
-    try { changes = solveChanges(rows) }
+    try {
+      if (trace?.shadow) {
+        if (trace.shadow.budget.remaining <= 0) throw new ResizeShadowBudgetError()
+        trace.shadow.budget.remaining--
+        trace.shadow.budget.used++
+        changes = solveWithBounds(rows, bounds, weights)
+      } else changes = solveChanges(rows)
+    }
     catch (error) {
-      if (!cutPreferences.size) throw error
+      if (trace?.shadow || !cutPreferences.size) throw error
       // Necessary spans may yield to joints and authored rules; preserving
       // unrelated cuts takes priority over incidental placement preferences.
       const retained = rows.filter(row => !cutPreferences.has(row))
@@ -623,6 +652,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       }
     }
   } catch (error) {
+    if (error instanceof ResizeShadowBudgetError) throw error
     const panelIds = error instanceof SolverConflict
       ? [...new Set(error.variables.flatMap(variable => frames[Math.floor(variable / 5)]
         ? [frames[Math.floor(variable / 5)].panel.id]
@@ -999,11 +1029,14 @@ export function movePanelsToPositions(project: Project, targets: Record<string, 
 }
 
 /** Structured, transient entry point. Inspection never changes equations or acceptance. */
-export function solveResizeIntent(intent: ResizeIntent, options: { inspect?: boolean } = {}): ResizeResult {
-  const trace: ResizeTrace = { phase: 'request', problems: [], inspect: options.inspect ?? false }
+export function solveResizeIntent(intent: ResizeIntent, options: { inspect?: boolean; shadow?: ResizeShadowPolicy } = {}): ResizeResult {
+  const trace: ResizeTrace = { phase: 'request', problems: [], inspect: options.inspect ?? false, shadow: options.shadow }
   let analysis: ReturnType<typeof inspectResizeAnalysis> | undefined
   try {
     assertLegacyResizeIntent(intent)
+    if (options.shadow && (intent.target.kind !== 'selection-dimensions' || intent.origin !== 'panel' || intent.releasedRelationshipId)) {
+      throw new Error('Shadow planning supports ordinary numeric resize only.')
+    }
     if (trace.inspect) analysis = inspectResizeAnalysis(intent.source)
     const project = applyResizeIntent(intent, trace)
     return { status: 'solved', intent, project, analysis, problems: Object.freeze(trace.problems) }
