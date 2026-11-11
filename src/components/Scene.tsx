@@ -190,14 +190,21 @@ function Dimensions({ bounds }: { bounds: THREE.Box3 }) {
 function CameraController({ bounds, vacuumDock, view, fitSignal, frameSignal, zoomSignal, realisticPreview, panMode }: Pick<SceneProps, 'view' | 'fitSignal' | 'frameSignal' | 'zoomSignal' | 'realisticPreview' | 'panMode'> & { bounds: THREE.Box3; vacuumDock?: VacuumPoint }) {
   const controls = useRef<OrbitControlsImpl>(null)
   const [roomMaxDistance, setRoomMaxDistance] = useState(100)
-  const { camera, size, invalidate } = useThree()
+  const { camera, gl, setSize, invalidate } = useThree()
   const boundsRef = useRef(bounds)
   const dockRef = useRef(vacuumDock)
   const lastZoomKey = useRef(0)
   const lastFrameSignal = useRef(frameSignal)
   const lastFitSignal = useRef(fitSignal)
   useLayoutEffect(() => { boundsRef.current = bounds; dockRef.current = vacuumDock }, [bounds, vacuumDock])
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // The sidebar layout has changed before Fiber's ResizeObserver catches up.
+    // Fit once against the actual viewport, not the previous mode's dimensions.
+    const viewport = gl.domElement.parentElement!.getBoundingClientRect()
+    const width = Math.max(1, viewport.width), height = Math.max(1, viewport.height)
+    setSize(width, height, viewport.top, viewport.left)
+    if (camera instanceof THREE.PerspectiveCamera) camera.aspect = width / height
+    // Fit before drawing the switched camera.
     // Clear pending inertia before fitting, so the view stays centered after a pan.
     if (controls.current) {
       controls.current.enableDamping = false
@@ -220,7 +227,7 @@ function CameraController({ bounds, vacuumDock, view, fitSignal, frameSignal, zo
       }
     }
     const center = cameraBounds.getCenter(new THREE.Vector3())
-    const direction = previousDirection ?? (realisticPreview ? new THREE.Vector3(0.33, size.width < size.height ? 0.1 : 0.22, 1).normalize() : view === 'front' ? new THREE.Vector3(0, 0, 1) : view === 'top' ? new THREE.Vector3(0, 1, 0.0001) : view === 'right' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(1.35, 0.9, 1.6).normalize())
+    const direction = previousDirection ?? (realisticPreview ? new THREE.Vector3(0.33, width < height ? 0.1 : 0.22, 1).normalize() : view === 'front' ? new THREE.Vector3(0, 0, 1) : view === 'top' ? new THREE.Vector3(0, 1, 0.0001) : view === 'right' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(1.35, 0.9, 1.6).normalize())
     const extent = cameraBounds.getSize(new THREE.Vector3()).length()
     camera.position.copy(center).addScaledVector(direction, Math.max(3, extent * 2.5))
     camera.up.set(0, 1, 0)
@@ -242,7 +249,7 @@ function CameraController({ bounds, vacuumDock, view, fitSignal, frameSignal, zo
         const offset = new THREE.Vector3(x, y, z).sub(center)
         const towardsCamera = offset.dot(direction)
         distance = Math.max(distance,
-          Math.abs(offset.dot(right)) / (tan * (size.width / Math.max(size.height, 1)) * 0.74) + towardsCamera,
+          Math.abs(offset.dot(right)) / (tan * (width / height) * 0.74) + towardsCamera,
           Math.abs(offset.dot(up)) / (tan * 0.74) + towardsCamera)
       }
       camera.position.copy(center).addScaledVector(direction, distance)
@@ -253,13 +260,13 @@ function CameraController({ bounds, vacuumDock, view, fitSignal, frameSignal, zo
         if (controls.current) controls.current.maxDistance = maxDistance
       }
     } else {
-      camera.zoom = Math.min(size.width / Math.max(maxX - minX, 0.1), size.height / Math.max(maxY - minY, 0.1)) * 0.74
+      camera.zoom = Math.min(width / Math.max(maxX - minX, 0.1), height / Math.max(maxY - minY, 0.1)) * 0.74
     }
     camera.updateProjectionMatrix()
     controls.current?.target.copy(center)
     controls.current?.update()
     invalidate()
-  }, [camera, view, fitSignal, frameSignal, size.width, size.height, invalidate, realisticPreview])
+  }, [camera, gl, setSize, view, fitSignal, frameSignal, invalidate, realisticPreview])
   useEffect(() => {
     if (!zoomSignal.key || zoomSignal.key === lastZoomKey.current) return
     lastZoomKey.current = zoomSignal.key
@@ -594,7 +601,7 @@ function SceneObjects({ layer, boxSelectActive, boxPreview }: { layer: NonNullab
 
 function SceneCamera({ props, realisticPreview }: { props: WorldProps; realisticPreview: boolean|undefined })  {
   return props.view==='perspective'
-    ? <PerspectiveCamera key={realisticPreview? 'room':'studio'} makeDefault fov={realisticPreview? 45:35} near={0.01} far={200} position={[2,1.5,2.5]} />
+    ? <PerspectiveCamera makeDefault fov={realisticPreview? 45:35} near={0.01} far={200} position={[2,1.5,2.5]} />
     :<OrthographicCamera makeDefault near={0.01} far={200} position={[2,1.5,2.5]} zoom={450} />
 }
 

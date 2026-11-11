@@ -182,6 +182,8 @@ The SVG uses black outside contours and white inside cuts for tools such as Shap
 
 ## Blender export
 
+3D export options load when the export dialog opens. Project and parts downloads remain available if those options fail to load; reload to retry 3D export.
+
 Choose **Export project → Construction · GLB** for the furniture alone, or **Realistic scene · GLB** for the furniture in the modern home. In Blender, choose **File → Import → glTF 2.0**, open the downloaded GLB, and save as `.blend` if desired.
 
 Exports include visible panels (with actual openings), installed connectors, TROFAST inserts, materials, embedded textures, and a fitted camera in meters. Hidden parts, source objects, editing guides, selection highlights, and temporary edits are excluded. Realistic scene adds the room and decor; enable **Include auto furnishings in realistic scene** to add generated books, accessories, and people independently of the viewport setting. The vacuum is docked and static. Exports use assembled positions even in exploded view. Shader-based finish blending and plywood edges, bump detail, reflections, ambient/area lighting, and shadows are not reproduced exactly in GLB; adjust lighting and materials in Blender. Export runs locally and leaves the project unchanged.

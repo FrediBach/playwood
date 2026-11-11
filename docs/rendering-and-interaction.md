@@ -4,6 +4,8 @@
 
 The editor combines a React DOM interface with one React Three Fiber viewport. Project geometry remains ordinary TypeScript data; the viewport receives resolved panels, connections, selection, and callbacks. It does not own the saved project. See [state and persistence](state-and-persistence.md) for commit and preview state, and [domain model and geometry](domain-model-and-geometry.md) for the construction rules behind the display.
 
+Room scenery stays in the initial scene module graph so camera, lighting, background, and scenery switch together. Perspective mode switches reuse the same camera, and fitting runs in a layout effect before drawing. [`LazyBlenderExport.tsx`](../src/components/LazyBlenderExport.tsx) defers only the export controls; project and parts downloads remain available if its module fails. See [startup performance](startup-performance.md) for the payload tradeoff and measurements.
+
 ## Component boundaries
 
 | Area | Entry points | Responsibility |
@@ -90,7 +92,7 @@ Room layout and `FurnishingPlacement` values already use meters. CAD connector g
 
 The `CameraController` in `Scene.tsx` uses perspective projection for the perspective view and orthographic projection for front, top, and right views. Room mode forces a perspective camera and uses its own field of view and orbit limits.
 
-Camera fitting projects the corners of the visible geometry's bounds into the current camera basis. Room fitting additionally includes scale-reference objects. `fitSignal` requests a normal fit; `frameSignal` can reframe while preserving the current viewing direction. Fitting clears pending control damping first so previous pan inertia does not move the result afterward.
+Camera fitting projects the corners of the visible geometry's bounds into the current camera basis. Room fitting additionally includes scale-reference objects. `fitSignal` requests a normal fit; `frameSignal` can reframe while preserving the current viewing direction. Fitting clears pending control damping first so previous pan inertia does not move the result afterward. On mode changes it measures the committed viewport DOM and synchronizes the renderer size before fitting, so a later ResizeObserver notification does not trigger a second recenter. Ordinary viewport resizing updates projection while preserving camera placement and target; use Fit/Reset view to reframe explicitly.
 
 `OrbitControls` handles ordinary camera gestures: left-drag orbits in perspective unless Pan view is enabled, right-drag pans, and the middle button dollies. In orthographic views, left-drag pans. The controls support touch gestures and screen-space panning. Zoom commands adjust perspective camera distance or orthographic zoom within their limits.
 

@@ -28,6 +28,8 @@ Directory Sync also remembers its File System Access handle per origin in Indexe
 | `npm run preview` | Serves an already-built `dist/` locally |
 | `npm test` | Runs the Vitest suite once |
 | `npm run test:e2e` | Runs Playwright browser tests |
+| `npm run profile:startup` | Builds and profiles three throttled, fresh-context production loads |
+| `npm run check:startup` | Builds, profiles, and enforces the startup JavaScript gzip budget; see [method and limits](startup-performance.md) |
 | `npm run doctor` | Runs the installed React Doctor with `--yes --no-score` |
 
 There is no `lint`, formatter, standalone `typecheck`, or library-build script. Do not refer to nonexistent commands in change reports or agent workflows. The build provides TypeScript checking for [tsconfig.json](../tsconfig.json)'s includes (`src` and `vite.config.ts`); it does not type-check the separate `tests/` directory through that configuration.
@@ -103,7 +105,7 @@ Screenshots are saved on failures, and some specs explicitly write diagnostic im
 | Local directory sync | `src/lib/directory-sync.test.ts` | `tests/directory-sync.spec.ts` |
 | Appearance and outlines | `src/lib/custom-colors.test.ts`, `src/lib/finish-coverage.test.ts`, `src/lib/custom-outline.test.ts` | `tests/custom-colors.spec.ts`, `tests/finish-coverage.spec.ts`, `tests/custom-outlines.spec.ts` |
 | List organization and hardware edits | `src/lib/list-groups.test.ts`, `src/lib/connector-selection.test.ts` | `tests/list-groups.spec.ts`, `tests/connector-selection.spec.ts` |
-| Realistic preview | `src/components/room-layout.test.ts`, `src/components/robot-vacuum-navigation.test.ts`, `src/components/robot-vacuum-motion.test.ts`, `src/components/robot-vacuum-recovery.test.ts`, `src/lib/preview-furnishings.test.ts` | `tests/realistic-preview.spec.ts`, `tests/robot-vacuum.spec.ts` |
+| Realistic preview | `src/components/room-layout.test.ts`, `src/components/robot-vacuum-navigation.test.ts`, `src/components/robot-vacuum-motion.test.ts`, `src/components/robot-vacuum-recovery.test.ts`, `src/lib/preview-furnishings.test.ts` | `tests/realistic-preview.spec.ts`, `tests/robot-vacuum.spec.ts`, `tests/deferred-preview.spec.ts`, `tests/scene-switching.spec.ts` |
 | Library and guide content | `src/lib/example-library.test.ts`, `src/lib/guide-scenes.test.ts` | `tests/library.spec.ts`, `tests/build-guide.spec.ts` |
 | Layout, focus, and inspector behavior | Relevant helper tests where applicable | `tests/sidebar-layout.spec.ts`, `tests/inspector-ux.spec.ts`, `tests/editor.spec.ts` |
 

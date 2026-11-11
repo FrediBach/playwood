@@ -12,12 +12,19 @@ interface VacuumState {
   dockCount: number
 }
 
+// Capture the exact Vite module URL outside the controlled browser clock.
+// Importing a queryless URL can create a different Fiber store after optimization.
+const fiberUrls = new WeakMap<Page, string>()
+test.beforeEach(async ({ page }) => {
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.endsWith('/@react-three_fiber.js')) fiberUrls.set(page, request.url())
+  })
+})
+
 async function vacuumState(page: Page): Promise<VacuumState | null> {
-  return page.locator('canvas').evaluate(async canvas => {
-    // Playwright's controlled performance clock omits native resource entries.
-    // Vite's entry re-exports the same shared R3F store with or without its query.
-    const url = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/@react-three_fiber.js'))
-      ?? '/node_modules/.vite/deps/@react-three_fiber.js'
+  const url = fiberUrls.get(page)
+  if (!url) return null
+  return page.locator('canvas').evaluate(async (canvas, url) => {
     const { _roots } = await import(url)
     const scene = _roots.get(canvas)?.store.getState().scene
     const vacuum = scene?.getObjectByName('Dreame X50 Ultra Complete')
@@ -26,7 +33,7 @@ async function vacuumState(page: Page): Promise<VacuumState | null> {
     scene.traverse((object: { name: string }) => { if (object.name === 'Dreame X50 Ultra Complete dock') dockCount++ })
     return { x: vacuum.position.x, z: vacuum.position.z, heading: vacuum.rotation.y, phase: vacuum.userData.phase,
       elapsed: vacuum.userData.elapsed, plan: vacuum.userData.plan, dockCount }
-  })
+  }, url)
 }
 
 async function exportedProject(page: Page) {
