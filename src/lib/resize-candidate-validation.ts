@@ -15,19 +15,53 @@ const changed = (a: Panel, b: Panel) => geometry(a).some((n, i) => Math.abs(n - 
   || JSON.stringify(a.customOutline) !== JSON.stringify(b.customOutline)
 const identities = (values: readonly string[]) => JSON.stringify([...values].sort())
 
+/** A validator belongs to one immutable source snapshot and validation mode.
+ * Cache only source facts, lazily in the original check order. Candidates and
+ * review acceptance still run every target, physical and no-worsening check. */
+export function prepareResizeCandidateValidator(initial: ResizeIntent) {
+  const source = initial.source, trofastWorld = initial.validation.trofastWorld
+  let panelIds: string | undefined, connectionIds: string | undefined, hardwareIds: string | undefined
+  let constraints: string | undefined, assemblies: string | undefined, assembliesRead = false
+  let before: Map<string, Panel> | undefined, physical: ReturnType<typeof analyzeStructure> | undefined
+  let issues: ValidationIssue[] | undefined
+  const baseline = {
+    get panelIds() { return panelIds ??= identities(source.panels.map(p => p.id)) },
+    get connectionIds() { return connectionIds ??= identities(source.connections.map(c => c.id)) },
+    get hardwareIds() { return hardwareIds ??= identities(getPhysicalConnectors(source).map(c => c.id)) },
+    get constraints() { return constraints ??= JSON.stringify([...(source.constraints ?? [])].sort((a, b) => a.id.localeCompare(b.id))) },
+    get assemblies() { if (!assembliesRead) { assemblies = JSON.stringify(source.assemblies); assembliesRead = true } return assemblies },
+    get before() { return before ??= new Map(resolvePanels(source).map(p => [p.id, p])) },
+    get physical() { return physical ??= analyzeStructure(source) },
+    get issues() { return issues ??= validateProject(source, initial.validation) },
+  }
+  return (intent: ResizeIntent, candidate: Project, equations: readonly ResizeShadowEquation[], adaptingCuts: ReadonlySet<string>) => {
+    if (intent.source !== source || intent.validation.trofastWorld !== trofastWorld) throw new Error('Prepare resize validation again for the changed source or validation mode.')
+    return validateCandidate(intent, candidate, equations, adaptingCuts, baseline)
+  }
+}
+
 /** Final acceptance for ordinary dimensions and connected edges, shared by planning and review.
  * Baseline issues cannot be declared non-worsening by ID alone. Measure fixed-axis
  * collision overlaps; otherwise keep involved geometry/hardware unchanged when
  * no existing domain-specific severity guard is available. */
 export function validateResizeCandidate(intent: ResizeIntent, candidate: Project, equations: readonly ResizeShadowEquation[], adaptingCuts: ReadonlySet<string>): Project {
+  return prepareResizeCandidateValidator(intent)(intent, candidate, equations, adaptingCuts)
+}
+
+type ValidationBaseline = {
+  readonly panelIds: string; readonly connectionIds: string; readonly hardwareIds: string
+  readonly constraints: string; readonly assemblies: string | undefined
+  readonly before: Map<string, Panel>; readonly physical: ReturnType<typeof analyzeStructure>; readonly issues: ValidationIssue[]
+}
+function validateCandidate(intent: ResizeIntent, candidate: Project, equations: readonly ResizeShadowEquation[], adaptingCuts: ReadonlySet<string>, baseline: ValidationBaseline): Project {
   const source = intent.source
-  if (identities(source.panels.map(p => p.id)) !== identities(candidate.panels.map(p => p.id))
-    || identities(source.connections.map(c => c.id)) !== identities(candidate.connections.map(c => c.id))
-    || identities(getPhysicalConnectors(source).map(c => c.id)) !== identities(getPhysicalConnectors(candidate).map(c => c.id))) throw new Error('This resize changed structural identities.')
-  if (JSON.stringify([...(source.constraints ?? [])].sort((a, b) => a.id.localeCompare(b.id))) !== JSON.stringify([...(candidate.constraints ?? [])].sort((a, b) => a.id.localeCompare(b.id))) || JSON.stringify(source.assemblies) !== JSON.stringify(candidate.assemblies)) {
+  if (baseline.panelIds !== identities(candidate.panels.map(p => p.id))
+    || baseline.connectionIds !== identities(candidate.connections.map(c => c.id))
+    || baseline.hardwareIds !== identities(getPhysicalConnectors(candidate).map(c => c.id))) throw new Error('This resize changed structural identities.')
+  if (baseline.constraints !== JSON.stringify([...(candidate.constraints ?? [])].sort((a, b) => a.id.localeCompare(b.id))) || baseline.assemblies !== JSON.stringify(candidate.assemblies)) {
     throw new Error('This resize changed saved rules or assembly ownership.')
   }
-  const before = new Map(resolvePanels(source).map(p => [p.id, p])), after = new Map(resolvePanels(candidate).map(p => [p.id, p]))
+  const before = baseline.before, after = new Map(resolvePanels(candidate).map(p => [p.id, p]))
   const target = intent.target
   if (target.kind !== 'selection-dimensions' && target.kind !== 'panel-edge') throw new Error('Resize acceptance requires dimensions or an edge target.')
   const selected = new Set(target.kind === 'panel-edge' ? [target.edge.panelId] : target.panelIds)
@@ -53,7 +87,7 @@ export function validateResizeCandidate(intent: ResizeIntent, candidate: Project
       - coordinate(frame(before.get(term.panelId)!), new Vector3(...term.axis), term.side)), 0)
     if (Math.abs(residual) > RESIZE_OUTCOME_TOLERANCE) throw new Error('This resize changed its chosen alignment or rigid section.')
   }
-  const physical = analyzeStructure(source)
+  const physical = baseline.physical
   for (const contact of physical.contacts) {
     const a = frame(after.get(physical.frames[contact.a].panel.id)!), b = frame(after.get(physical.frames[contact.b].panel.id)!)
     if (Math.abs(coordinate(b, contact.normal, -contact.sign) - coordinate(a, contact.normal, contact.sign)) > RESIZE_OUTCOME_TOLERANCE
@@ -63,7 +97,7 @@ export function validateResizeCandidate(intent: ResizeIntent, candidate: Project
     }
   }
   candidate = assertNoNewTrofastIssues(source, assertDesignConstraintEdit(source, candidate))
-  const previousIssues = validateProject(source, intent.validation), previousKeys = new Set(previousIssues.map(issueKey))
+  const previousIssues = baseline.issues, previousKeys = new Set(previousIssues.map(issueKey))
   const issue = validateProject(candidate, intent.validation).find(issue => !previousKeys.has(issueKey(issue)))
   if (issue) throw new Error(issue.message)
   for (const issue of previousIssues) {

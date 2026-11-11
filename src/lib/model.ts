@@ -55,7 +55,7 @@ function branchIndex(c: Connection) {
   return Number(c.id.match(/:(\d+)$/)?.[1] ?? 0)
 }
 
-function attachmentPose(parent: Panel, child: Panel, c: Connection): Pick<Panel, 'position' | 'rotation'> {
+export function getAttachmentPose(parent: Panel, child: Panel, c: Connection): Pick<Panel, 'position' | 'rotation'> {
   const seam = seamInfo(parent, c)
   const branch = branchIndex(c)
   const flatBranch = (c.type === 't' && branch === 1) || (c.type === 'cross' && branch === 2)
@@ -92,7 +92,7 @@ export function resolvePanels(project: Project): Panel[] {
     active.add(id)
     const c = incoming.get(id)
     const parent = c && resolve(c.parentId)
-    const result = parent && c ? { ...p, ...attachmentPose(parent, p, c) } : p
+    const result = parent && c ? { ...p, ...getAttachmentPose(parent, p, c) } : p
     active.delete(id)
     resolved.set(id, result)
     return result
@@ -369,7 +369,7 @@ export function validateProject(project: Project, options: { trofastWorld?: bool
     if (c.outlineEdge !== undefined) {
       if (!outlineConnectionAligned(parent, child, c)) issues.push({ id: `${c.id}-alignment`, severity: 'error', message: `The support joint between ${parent.name} and ${child.name} no longer aligns with its outline edge. Restore the outline or detach the joint.`, panelIds: [parent.id, child.id] })
     } else if (c.role === 'support') {
-      const expected = attachmentPose(parent, child, c)
+      const expected = getAttachmentPose(parent, child, c)
       const positionError = vec(expected.position).distanceTo(vec(child.position))
       const expectedRotation = quaternion({ ...child, rotation: expected.rotation })
       const actualRotation = quaternion(child)

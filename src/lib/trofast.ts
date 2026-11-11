@@ -123,8 +123,11 @@ export function getTrofastPlacementIssue(project: Project, panelId: string, inse
 }
 
 /** Source definitions can skip world orientation/floor checks; rebuilt instances cannot. */
-export function validateTrofastInserts(project: Project, panels = resolvePanels(project), world = true): ValidationIssue[] {
-  if (!panels.some(panel => panel.trofastInserts?.length)) return []
+export function validateTrofastInserts(project: Project, panels?: Panel[], world = true): ValidationIssue[] {
+  // Attachment resolution changes poses, never insert membership. Avoid resolving
+  // an entire graph when there is no insert to validate.
+  if (!(panels ?? project.panels).some(panel => panel.trofastInserts?.length)) return []
+  panels ??= resolvePanels(project)
   const context = { panels, hardware: connectorObbs(project, panels), world }
   return panels.flatMap(panel => {
     const inserts = panel.trofastInserts ?? []

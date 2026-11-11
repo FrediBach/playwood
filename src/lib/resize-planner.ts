@@ -1,4 +1,4 @@
-import { validateResizeCandidate } from './resize-candidate-validation'
+import { prepareResizeCandidateValidator } from './resize-candidate-validation'
 import type { ResizePriorityDiagnostic } from './resize-priority-solver'
 import { designConstraintPanelIds } from './design-constraints'
 import { Vector3 } from 'three'
@@ -70,6 +70,7 @@ export function prepareResizeCandidates(intent: ResizeIntent, options: { maxSolv
   if (!((intent.target.kind === 'selection-dimensions' && intent.origin === 'panel') || (intent.target.kind === 'panel-edge' && !intent.target.local)) || intent.releasedRelationshipId) {
     throw new Error('Intent planning supports ordinary dimensions and connected panel edges only.')
   }
+  const validate = prepareResizeCandidateValidator(intent)
   const target = intent.target
   const panelIds = target.kind === 'panel-edge' ? [target.edge.panelId] : target.panelIds
   const dimensions = target.kind === 'panel-edge' ? { [target.edge.dimension]: 0 } : target.dimensions
@@ -172,7 +173,7 @@ export function prepareResizeCandidates(intent: ResizeIntent, options: { maxSolv
       }
       let next = result.project
       try {
-        next = validateResizeCandidate(nextIntent, next, equations, adaptingCuts)
+        next = validate(nextIntent, next, equations, adaptingCuts)
       } catch (error) {
         attempts.push({ interpretation, status: 'candidate-invalid', message: error instanceof Error ? error.message : String(error) })
         continue

@@ -3,7 +3,7 @@ import { createResizeIntent, type PanelEdgeResize } from './resize-intent'
 import { prepareResizeCandidates } from './resize-planner'
 import { createResizeReview, ResizeReviewRequired } from './numeric-resize'
 import { resizePanelEdge } from './structure-edit'
-import { validateResizeCandidate } from './resize-candidate-validation'
+import { prepareResizeCandidateValidator } from './resize-candidate-validation'
 import type { Project } from './types'
 
 /** Connected drag is an explicit operation, not a numeric cut-preservation
@@ -16,6 +16,7 @@ export function prepareResizeGesture(source: Project, edge: Omit<PanelEdgeResize
   // The established compiler owns propagation/cut eligibility. The common final
   // validator independently checks targets, anchors, identities and physical fit.
   const adaptingCuts = new Set(source.panels.flatMap(item => [`${item.id}/width`, `${item.id}/height`]))
+  const validate = prepareResizeCandidateValidator(intentAt(0))
   const cache = new Map<number, Project | Error>([[0, source]])
   let plan: ReturnType<typeof prepareResizeCandidates> | undefined
   return {
@@ -28,7 +29,7 @@ export function prepareResizeGesture(source: Project, edge: Omit<PanelEdgeResize
       let outcome: Project | Error
       try {
         const candidate = resizePanelEdge(source, edge.panelId, edge.dimension, edge.side, distance, false, { origin: 'preview' })
-        outcome = validateResizeCandidate(intentAt(distance), candidate, [], adaptingCuts)
+        outcome = validate(intentAt(distance), candidate, [], adaptingCuts)
       } catch (error) { outcome = error instanceof Error ? error : new Error('This connected resize could not be solved.') }
       if (cache.size >= 256) cache.delete(cache.keys().next().value!)
       cache.set(distance, outcome)

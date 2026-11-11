@@ -8,7 +8,7 @@ import { analyzeStructure, analyzeStructureContacts, inspectResizeAnalysis, fram
 import { solveWithBounds, SolverConflict, LIMIT_MESSAGE, CONSTRAINT_MESSAGE, type StructuralRow as Row, type RowProvenance, type NumericalDiagnostic } from './structural-solver'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { Vector3 } from 'three'
-import { resolvePanels, validateProject } from './model'
+import { getAttachmentPose, resolvePanels, validateProject } from './model'
 import { connectorSlide, getConnectorRail, rescaleConnectorSlides } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { isPanelConnectedToAssembly } from './assemblies'
@@ -214,9 +214,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   for (const connection of connections) {
     const parentIndex = indices.get(connection.parentId)!, childIndex = indices.get(connection.childId)!
     const parent = frames[parentIndex].panel, child = frames[childIndex].panel
-    const expected = (p: Panel, c: Panel, offset: number) => position(resolvePanels({ version: 1, name: project.name,
-      panels: [p, c], connections: [{ ...connection, role: undefined, offset }],
-    })[1])
+    const expected = (p: Panel, c: Panel, offset: number) => new Vector3(...getAttachmentPose(p, c, { ...connection, offset }).position)
     const baseline = expected(parent, child, connection.offset)
     const changes = [
       expected({ ...parent, width: parent.width + 1 }, child, connection.offset).sub(baseline),

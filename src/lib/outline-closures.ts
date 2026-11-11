@@ -51,9 +51,10 @@ export function outlineConnectionAligned(parent: Panel, child: Panel, connection
 export function refitOutlineClosures(panels: readonly Panel[], connections: readonly Connection[]): Panel[] {
   const byId = new Map(panels.map(panel => [panel.id, panel]))
   return panels.map(panel => {
-    const joints = connections.filter(connection => connection.childId === panel.id && connection.outlineEdge !== undefined)
     const outline = panel.customOutline
-    if (!outline || new Set(joints.map(connection => connection.outlineEdge)).size !== outline.length) return panel
+    if (!outline) return panel
+    const joints = connections.filter(connection => connection.childId === panel.id && connection.outlineEdge !== undefined)
+    if (new Set(joints.map(connection => connection.outlineEdge)).size !== outline.length) return panel
     const inverse = rotation(panel).invert(), origin = new Vector3(...panel.position)
     const lines = outline.map((_, index) => {
       const joint = joints.find(connection => connection.outlineEdge === index)!

@@ -266,6 +266,8 @@ The connected compiler owns cut eligibility and its existing inferred-fit/recove
 
 The prepared semantic planner and its coefficient-keyed null-space cache remain available for numeric commands and reviewed alternatives. This correction does **not** claim that the new intent hierarchy has replaced the legacy connected compiler or eliminated its threshold/greedy-recovery limitations; that migration needs regression coverage for real connected structures before rollout.
 
+Prepared gesture and numeric-planner validators lazily reuse resolved source panels, physical contacts, identity sets, and baseline diagnostics for one immutable source snapshot and validation mode. Every candidate still runs target, anchor, contact, hardware, constraint, TROFAST, collision, and no-worsening checks. Public final acceptance creates a fresh validator. Joint finite differences call the same attachment-pose function used by `resolvePanels`, without constructing temporary two-panel projects.
+
 Continuation samples every 8 mm from the source, caches up to 256 candidate/failure entries per session cache, and brackets the first rejected interval. The maximum checked displacement is 1,024 mm per gesture; this engineering bound has a separate explanation and is not a physical maximum. It cannot guarantee that a narrower invalid interval between samples is absent. Larger ordinary edge gestures run in a cancellable worker; this preserves responsiveness without claiming the proposed 16 ms/200-panel performance gate is met.
 
 ### Active legacy solve policy
