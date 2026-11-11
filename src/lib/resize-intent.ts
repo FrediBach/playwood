@@ -1,3 +1,4 @@
+import { assertResizeEnvelopeCandidate, createResizeEnvelopeCandidate, type ResizeEnvelopeCandidate } from './resize-envelope'
 import type { ResizeAnalysis } from './resize-analysis'
 import type { NumericalDiagnostic, RowProvenance } from './structural-solver'
 import type { Panel, Project } from './types'
@@ -14,6 +15,8 @@ export interface InferredRelationship {
 export interface ResizeSessionIdentity { readonly id: string; readonly revision: number }
 export interface ResizeContext {
   trofastWorld?: boolean
+  /** Experimental explicit boundary candidate; ordinary callers leave this unset. */
+  envelope?: ResizeEnvelopeCandidate
   origin?: 'panel' | 'preview' | 'project-rescale' | 'assembly-parameters' | 'rim-alignment'
   session?: ResizeSessionIdentity
   /** Explicit legacy review only; never an authored rule or protected contact. */
@@ -40,7 +43,8 @@ export interface ResizeIntent {
   readonly target: ResizeTarget
   readonly origin: NonNullable<ResizeContext['origin']>
   readonly session?: ResizeSessionIdentity
-  readonly anchor: 'selected-average-per-component-preference' | 'exact-opposite-edge' | 'exact-opposite-edges'
+  readonly envelope?: ResizeEnvelopeCandidate
+  readonly anchor: 'explicit-envelope' | 'selected-average-per-component-preference' | 'exact-opposite-edge' | 'exact-opposite-edges'
   readonly scope: 'connected' | 'local'
   readonly hardware: 'proportional-rail-distribution' | 'fixed-world-positions' | 'fixed-except-refitted-outlines'
   readonly validation: Readonly<{ trofastWorld?: boolean }>
@@ -74,6 +78,7 @@ export function createResizeIntent(source: Project, target: ResizeTarget, contex
   return Object.freeze({ source, target: owned, origin: context.origin ?? (target.kind === 'panel-edges' ? 'rim-alignment' : 'panel'),
     session: context.session ? Object.freeze({ ...context.session }) : undefined,
     ...legacyPolicy(owned),
+    ...(context.envelope ? { anchor: 'explicit-envelope' as const, envelope: createResizeEnvelopeCandidate(context.envelope.placement, context.envelope.boundaries) } : {}),
     validation: Object.freeze({ trofastWorld: context.trofastWorld }), releasedRelationshipId: context.releasedRelationshipId,
     finalization: 'caller-owned', snap: 'resolved-by-caller', policy: 'legacy' })
 }
@@ -81,7 +86,13 @@ export function createResizeIntent(source: Project, target: ResizeTarget, contex
 /** Reject an unsupported interpretation rather than silently replacing its anchor or policy. */
 export function assertLegacyResizeIntent(intent: ResizeIntent): void {
   const expected = legacyPolicy(intent.target)
-  if (intent.anchor !== expected.anchor || intent.scope !== expected.scope || intent.hardware !== expected.hardware
+  if (intent.envelope) {
+    assertResizeEnvelopeCandidate(intent.envelope, intent.source)
+    if (intent.target.kind !== 'panel-dimensions' || !['project-rescale', 'assembly-parameters'].includes(intent.origin) || intent.releasedRelationshipId) {
+      throw new Error('Compiled envelope anchors support specialized simultaneous dimension requests only.')
+    }
+  }
+  if (intent.anchor !== (intent.envelope ? 'explicit-envelope' : expected.anchor) || intent.scope !== expected.scope || intent.hardware !== expected.hardware
     || intent.policy !== 'legacy' || intent.finalization !== 'caller-owned' || intent.snap !== 'resolved-by-caller') {
     throw new Error('This resize interpretation is not supported by the legacy solver adapter.')
   }

@@ -1,6 +1,7 @@
 import { validateResizeCandidate } from './resize-candidate-validation'
 import type { ShadowResizeCandidate } from './resize-planner'
 import { solveResizePriorities, type ResizePriorityTier } from './resize-priority-solver'
+import { compileResizeEnvelope, assertCompiledResizeEnvelope, type ResizeEnvelopeCandidate } from './resize-envelope'
 import { ResizeShadowBudgetError, type ResizeShadowPolicy } from './resize-shadow-contract'
 import { createResizeIntent, assertLegacyResizeIntent, unwrapResizeResult, type ResizeIntent, type ResizeContext, type ResizeResult, type ResizeProblem, type ResizeDimensions as Dimensions, type PanelResizeDimensions as PanelDimensions, type InferredRelationship, type PanelEdgeResize } from './resize-intent'
 import { analyzeStructure, analyzeStructureContacts, inspectResizeAnalysis, frame, extent, coordinate, analyzeStructuralJoints, structuralJointId, type Frame, type Contact } from './resize-analysis'
@@ -30,7 +31,7 @@ type MovementScope = { panelIds: Set<string>; reference: number; preserveCuts?: 
 type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean; scope?: MovementScope; stretch?: readonly SelectionStretchEdge[] } | { kind: 'resize'; relaxedRelationship?: string; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 type ValidationContext = ResizeContext
-interface ResizeTrace { phase: 'request' | 'compile' | 'solve' | 'materialize'; problems: ResizeProblem[]; inspect: boolean; shadow?: ResizeShadowPolicy }
+interface ResizeTrace { phase: 'request' | 'compile' | 'solve' | 'materialize'; problems: ResizeProblem[]; inspect: boolean; shadow?: ResizeShadowPolicy; envelope?: ResizeEnvelopeCandidate }
 
 const position = (panel: Panel) => new Vector3(...panel.position)
 /** The same implicit surface supports used by structural edits. */
@@ -414,6 +415,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     if (edit.centerDeltas) for (const item of selected) {
       for (const [dimension, axis] of worldAxes.entries()) center(row(edit.centerDeltas[item.panel.id]?.[dimension] ?? 0, { kind: 'anchor', panelIds: [item.panel.id] }), indices.get(item.panel.id)!, axis)
     } else for (const [dimension, axis] of worldAxes.entries()) {
+        if (trace?.envelope && trace.envelope.placement.references[dimension] !== 'authored') continue
         const constraint = edit.centerDelta || edit.local
           ? row(edit.centerDelta?.[dimension] ?? 0, { kind: 'anchor', panelIds: selected.map(item => item.panel.id) })
           : preference()
@@ -585,6 +587,15 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       if (!definingEquations.has(equation)) { rows.pop(); weakRows.push(constraint) }
     }
     if (policy.hierarchy) priorityTiers.push({ name: 'references', rows: weakRows })
+  }
+
+  if (trace?.envelope) {
+    const compiled = compileResizeEnvelope(trace.envelope)
+    for (const [equations, isBound] of [[compiled.rows, false], [compiled.bounds, true]] as const) for (const equation of equations) {
+      const constraint = row(equation.value, { kind: 'anchor', panelIds: equation.terms.map(term => term.panelId) })
+      for (const term of equation.terms) edge(constraint, indices.get(term.panelId)!, new Vector3(...term.axis), term.side, term.scale)
+      if (isBound) { rows.pop(); bounds.push(constraint) }
+    }
   }
 
   if (trace?.inspect) {
@@ -772,6 +783,8 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     const [first, ...rest] = designConstraintPanelIds(rule).map(id => indices.get(id))
     if (first !== undefined) for (const index of rest) if (index !== undefined) join(first, index)
   }
+  // A global envelope couples otherwise independent solve components.
+  if (trace?.envelope?.boundaries.length) panels.forEach((_, index) => join(0, index))
   const components = new Map<number, number[]>()
   panels.forEach((_, index) => { const key = root(index); components.set(key, [...components.get(key) ?? [], index]) })
   const affectedOutlineClosures = new Set<string>()
@@ -1047,7 +1060,7 @@ export function movePanelsToPositions(project: Project, targets: Record<string, 
 
 /** Structured, transient entry point. Inspection never changes equations or acceptance. */
 export function solveResizeIntent(intent: ResizeIntent, options: { inspect?: boolean; shadow?: ResizeShadowPolicy } = {}): ResizeResult {
-  const trace: ResizeTrace = { phase: 'request', problems: [], inspect: options.inspect ?? false, shadow: options.shadow }
+  const trace: ResizeTrace = { phase: 'request', problems: [], inspect: options.inspect ?? false, shadow: options.shadow, envelope: intent.envelope }
   let analysis: ReturnType<typeof inspectResizeAnalysis> | undefined
   try {
     assertLegacyResizeIntent(intent)
@@ -1056,6 +1069,16 @@ export function solveResizeIntent(intent: ResizeIntent, options: { inspect?: boo
     }
     if (trace.inspect) analysis = inspectResizeAnalysis(intent.source)
     const project = applyResizeIntent(intent, trace)
+    if (intent.envelope) {
+      trace.phase = 'materialize'
+      assertCompiledResizeEnvelope(intent.envelope, project)
+      if (intent.target.kind === 'panel-dimensions') for (const panel of resolvePanels(project)) {
+        const patch = intent.target.patches[panel.id]
+        if (patch && (['width', 'height', 'thickness'] as const).some(field => patch[field] !== undefined && Math.abs(panel[field] - patch[field]!) > 1e-4)) {
+          throw new Error('This resize did not achieve its requested dimensions after envelope materialization.')
+        }
+      }
+    }
     return { status: 'solved', intent, project, analysis, problems: Object.freeze(trace.problems) }
   } catch (error) {
     const structural = error instanceof StructureEditError ? error : undefined
