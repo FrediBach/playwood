@@ -10,6 +10,12 @@ async function importProject(page: Page, project: Project) {
   await page.goto('/')
   await page.getByLabel('Import project file').setInputFiles({ name: 'sliders.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
   await expect.poll(async () => (await saved(page))?.name, { timeout: 15000 }).toBe(project.name)
+  const disclosure = page.locator('.preview-rescale')
+  if (await disclosure.count()) {
+    await expect(disclosure).not.toHaveAttribute('open')
+    await expect(disclosure.locator('.preview-rescale-count')).toHaveText(String(await disclosure.locator('input[type="range"]').count()))
+    await disclosure.locator('summary').click()
+  }
 }
 async function input(slider: Locator, amount: number) {
   await slider.evaluate((element, value) => {
@@ -57,6 +63,7 @@ test('crossing dimensions stays separate during preview, commits once, and survi
   await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)', exact: true }).click()
   await expect.poll(() => saved(page)).toEqual(changed)
   await page.reload()
+  await page.locator('.preview-rescale > summary').click()
   await expect(group.getByRole('slider', { name: 'Rescale 350 mm dimension', exact: true })).toHaveValue('350')
 })
 
@@ -77,6 +84,13 @@ test('Escape cancels and keyboard changes use the configured step in both previe
   await page.setViewportSize({ width: 320, height: 720 })
   const group = page.getByRole('group', { name: 'Common dimensions' })
   await expect(group).toBeInViewport()
+  const heading = page.locator('.preview-rescale > summary')
+  await expect(heading).toContainText('Rescale')
+  await expect(heading.locator('.preview-rescale-count')).toHaveText('2')
+  await heading.click()
+  await expect(group).not.toBeVisible()
+  await heading.press('Enter')
+  await expect(group).toBeVisible()
   const bounds = await group.boundingBox()
   expect(bounds!.x).toBeGreaterThanOrEqual(0)
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320)

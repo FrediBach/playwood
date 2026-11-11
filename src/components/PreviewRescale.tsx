@@ -1,12 +1,15 @@
+import { ChevronRight } from 'lucide-react'
 import type { usePreviewRescale } from '@/hooks/use-preview-rescale'
 import './preview-rescale.css'
 
 export function PreviewRescale({ control, step = 1 }: { control: ReturnType<typeof usePreviewRescale>; step?: number }) {
   if (!control.values.length) return null
-  return <div className="preview-rescale" role="group" aria-label="Common dimensions" onKeyDown={event => {
+  return <details className="preview-rescale" onKeyDown={event => {
     event.stopPropagation()
     if (event.key === 'Escape') { event.preventDefault(); control.cancel() }
   }}>
+    <summary aria-description={`${control.values.length} sliders`}><ChevronRight size={14} aria-hidden="true"/>Rescale<span className="preview-rescale-count" aria-hidden="true">{control.values.length}</span></summary>
+    <div role="group" aria-label="Common dimensions">
     {control.values.map(value => {
       const amount = control.amount[value.id] ?? value.value
       const min = Math.ceil(value.min / step) * step
@@ -23,5 +26,6 @@ export function PreviewRescale({ control, step = 1 }: { control: ReturnType<type
       </label>
     })}
     {control.error && <p role="status">{control.error}</p>}
-  </div>
+    </div>
+  </details>
 }

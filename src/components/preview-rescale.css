@@ -7,3 +7,11 @@
 .preview-rescale-row input:disabled { cursor: default; opacity: .45; }
 .preview-rescale p { margin: 6px 0 0; font-size: 10px; line-height: 1.4; color: #b54b31; }
 .workspace-top:has(.preview-controls) { align-items: flex-start; }
+
+.preview-rescale > summary { display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; color: #4d5d3d; font-size: 12px; font-weight: 550; padding: 3px 0; }
+.preview-rescale > summary::-webkit-details-marker { display: none; }
+.preview-rescale > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+.preview-rescale[open] > summary { margin-bottom: 6px; }
+.preview-rescale[open] > summary svg { transform: rotate(90deg); }
+
+.preview-rescale-count { margin-left: auto; display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; background: #e5ebdc; color: #52633e; font-size: 10px; font-variant-numeric: tabular-nums; }
