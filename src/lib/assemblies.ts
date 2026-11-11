@@ -1,3 +1,4 @@
+import { savedNameWithSuffix } from './project-limits'
 import { Euler, Quaternion, Vector3 } from 'three'
 import type { AssemblyData, AssemblyDefinition, AssemblyEndpoint, AssemblyFinish, AssemblyInstance, AssemblyLink, AssemblyLoosePort, AssemblyParameter, AssemblyPort, AttachmentOptions, Connection, DesignConstraint, Panel, Project, Vec3 } from './types'
 import { attachPanel, getConnectorPlacements, getProjectBounds, parseProject, resolvePanels, validateProject } from './model'
@@ -239,7 +240,7 @@ function newInstance(data: AssemblyData, definition: AssemblyDefinition, source?
   // A clipboard copy may outlive a source control that was removed meanwhile.
   const parameterValues = source?.parameterValues && Object.fromEntries(Object.entries(source.parameterValues)
     .filter(([id]) => definition.parameters?.some(parameter => parameter.id === id)))
-  return { id: uid(), definitionId: definition.id, name: `${definition.name} ${number}`, position: source ? [...source.position] : [0, 0, 0], rotation: source ? [...source.rotation] : [0, 0, 0],
+  return { id: uid(), definitionId: definition.id, name: savedNameWithSuffix(definition.name,` ${number}`), position: source ? [...source.position] : [0, 0, 0], rotation: source ? [...source.rotation] : [0, 0, 0],
     panelIds: Object.fromEntries(definition.panels.map(panel => [panel.id, uid()])), connectionIds, ...(source?.finish ? { finish: { ...source.finish } } : {}),
     ...(parameterValues && Object.keys(parameterValues).length ? { parameterValues } : {}) }
 }

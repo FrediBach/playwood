@@ -1,3 +1,4 @@
+import { assertProjectCounts, MAX_SAVED_NAME_LENGTH, savedNameWithSuffix } from './project-limits'
 import { parseSpaceConstraint, spaceClearances } from './space-constraint'
 import { parseConstructionObjects } from './construction-objects'
 import { getOutlineError, panelCornerRadius, panelOutlineCorners } from './panel-shape'
@@ -104,8 +105,9 @@ export function attachPanel(project: Project, parentId: string, panel: Panel, op
   if (project.panels.some(p => p.id === panel.id)) throw new Error('The attached panel must have a unique ID.')
   const joint = uid()
   const branchCount = options.type === 'cross' ? 3 : options.type === 't' ? 2 : 1
+  assertProjectCounts(project.panels.length+branchCount,project.connections.length+branchCount)
   const children = Array.from({ length: branchCount }, (_, i) => i === 0 ? panel : createPanel({
-    ...panel, id: uid(), name: `${panel.name} ${i + 1}`,
+    ...panel, id: uid(), name: savedNameWithSuffix(panel.name,` ${i + 1}`),
   }))
   const connections = children.map((p, i): Connection => ({
     ...options, id: `${joint}:${i}`, parentId, childId: p.id, count: i === 0 ? options.count : 0,
@@ -219,8 +221,9 @@ export function removePanel(project: Project, id: string): Project {
 export function duplicatePanel(project: Project, id: string): Project {
   const panel = resolvePanels(project).find(p => p.id === id)
   if (!panel) return project
+  assertProjectCounts(project.panels.length+1,project.connections.length)
   const insertOffset = panel.trofastInserts?.length ? getProjectBounds(resolvePanels(project)).max[0] - getProjectBounds([panel]).min[0] + 100 : null
-  const duplicate = createPanel({ ...panel, id: uid(), name: `${panel.name} copy`, position: insertOffset === null
+  const duplicate = createPanel({ ...panel, id: uid(), name: savedNameWithSuffix(panel.name,' copy'), position: insertOffset === null
     ? [panel.position[0] + 100, panel.position[1] + 100, panel.position[2] + 100]
     : [panel.position[0] + insertOffset, panel.position[1], panel.position[2]] })
   const constraints = copyDesignConstraints(project.constraints, new Map([[id, duplicate.id]]))
@@ -440,7 +443,7 @@ function numberIn(v: unknown, min: number, max: number, field: string): number {
   if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max) throw new Error(`Invalid ${field}: expected ${min}–${max}.`)
   return v
 }
-function stringIn(v: unknown, field: string, max = 120): string {
+function stringIn(v: unknown, field: string, max = MAX_SAVED_NAME_LENGTH): string {
   if (typeof v !== 'string' || !v.trim() || v.length > max) throw new Error(`Invalid ${field}.`)
   return v
 }
@@ -459,7 +462,7 @@ function colorIn(v: unknown): string {
 
 export function parseProject(input: unknown): Project {
   if (!object(input) || input.version !== 1 || !Array.isArray(input.panels) || !Array.isArray(input.connections)) throw new Error('This is not a playwood. APP project (version 1).')
-  if (input.panels.length > 200 || input.connections.length > 400) throw new Error('Projects support up to 200 panels and 400 connections.')
+  assertProjectCounts(input.panels.length,input.connections.length)
   const panels = input.panels.map((raw): Panel => {
     if (!object(raw)) throw new Error('Invalid panel.')
     const p: Panel = {

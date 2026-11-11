@@ -1,3 +1,4 @@
+import { savedNameWithSuffix } from './project-limits'
 import { connectorId, getPhysicalConnectors, getDefaultConnectorColor } from './connector-selection'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { getAssemblyCopyPanelPlacement, getAssemblyAttachmentTargets, getAssemblyInstance, type AssemblyAttachmentTarget } from './assemblies'
@@ -60,7 +61,7 @@ export function getPasteTargets(project: Project, ids: string[], copied: CopiedI
   }
   const parents = resolvePanels(project).filter(panel => selected.has(panel.id))
   const oldErrors = new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id))
-  const child = copied.kind === 'panel' ? createPanel({ ...copied.panel, id: crypto.randomUUID(), name: preservePanelName ? copied.panel.name : `${copied.panel.name} copy`, visible: true }) : undefined
+  const child = copied.kind === 'panel' ? createPanel({ ...copied.panel, id: crypto.randomUUID(), name: preservePanelName ? copied.panel.name : savedNameWithSuffix(copied.panel.name,' copy'), visible: true }) : undefined
   const edges: { side: Side; position: (panel: Panel) => Vec3 }[] = [
     { side: 'left', position: p => [-p.width / 2, 0, 0] },
     { side: 'right', position: p => [p.width / 2, 0, 0] },
@@ -144,7 +145,7 @@ function getSelectionPasteTargets(project: Project, ids: string[], copied: Copie
       const panelMap = new Map(copied.panels.map(panel => [panel.id, panel.id === anchor.id ? placed.id : crypto.randomUUID()]))
       const rotation = new Quaternion().setFromEuler(new Euler(...placed.rotation))
         .multiply(new Quaternion().setFromEuler(new Euler(...anchor.rotation)).invert())
-      const panels = copied.panels.map(panel => ({ ...panel, id: panelMap.get(panel.id)!, name: `${panel.name} copy`, visible: true,
+      const panels = copied.panels.map(panel => ({ ...panel, id: panelMap.get(panel.id)!, name: savedNameWithSuffix(panel.name,' copy'), visible: true,
         position: new Vector3(...panel.position).sub(new Vector3(...anchor.position)).applyQuaternion(rotation).add(new Vector3(...placed.position)).toArray() as Vec3,
         rotation: new Euler().setFromQuaternion(rotation.clone().multiply(new Quaternion().setFromEuler(new Euler(...panel.rotation)))).toArray().slice(0, 3) as Vec3,
       }))

@@ -54,7 +54,7 @@ import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 export default function App() {
   useMaterialPrewarm()
   const importRequest=useRef(0)
-  const {project,documentId,getSnapshot,commit,undo,redo,canUndo,canRedo,saveStatus,repairNotice,recovery,resetRecovery}=useProject()
+  const {project,documentId,getSnapshot,commit,undo,redo,canUndo,canRedo,saveStatus,repairNotice,recovery,resetRecovery,saveConflict,loadBrowserSave}=useProject()
   const {
   overlapRepair, setOverlapRepair, equalSizes, setEqualSizes, assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds,
   connectorTypeError, setConnectorTypeError, selectedIds, setPanelSelection,
@@ -266,6 +266,12 @@ export default function App() {
     <EditorInspector {...editorInspectorProps}/>
 
     <ProjectStatus panelCount={project.panels.length} connectorCount={connectorCount} issueCount={issues.length} bounds={bounds} onParts={()=>setDialog('parts')} onHelp={()=>setDialog('help')}/>
+    {saveConflict&&recovery===null&&<div className="save-recovery" role="alert">
+      <strong>Another tab changed the browser save.</strong>
+      <p>Autosave is paused. This workspace has a separate backup on this device. Download it to keep a separate file, or open the browser save. Opening it keeps a backup of this workspace on this device and supports Undo.</p>
+      <button onClick={exportProject}>Download this workspace</button>
+      <button onClick={loadBrowserSave}>Open browser save</button>
+    </div>}
     {recovery!==null&&<div className="save-recovery" role="alert">
       <strong>Your browser save could not be opened.</strong>
       <p>The original is preserved. Autosave is paused while you work in the starter project. Download the original for recovery, or reset the browser save to this workspace. Reset keeps a backup on this device.</p>

@@ -4,6 +4,8 @@
 
 The editor stores a furniture design as serializable panels, connections, and optional reusable assembly metadata. Geometry operations calculate new `Project` values; React owns when those values become committed edits. The domain layer uses Three.js math classes, but its saved data consists of plain objects, arrays, strings, and numbers.
 
+Saved-format capacity and generated name suffixes use [`project-limits.ts`](../src/lib/project-limits.ts): 200 panels, 400 connection records, and 120 characters per saved name. Core attach/duplicate operations check capacity before returning candidates; the history boundary checks all committed candidates, including assembly definitions and instance names. These serialization bounds do not replace geometric diagnostics.
+
 The authoritative interfaces are in [`src/lib/types.ts`](../src/lib/types.ts). Most fundamental transforms, project parsing, geometric validation, and parts export live in [`src/lib/model.ts`](../src/lib/model.ts). The specialized modules below build on these functions rather than maintaining a separate geometry model.
 
 ## Coordinates and units

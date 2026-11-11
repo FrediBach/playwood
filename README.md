@@ -19,6 +19,8 @@ Choose **Import** beside **Export project** in the header to open a saved `.play
 
 If a browser save cannot be opened, a recovery notice appears and autosave pauses. **Download original save** preserves the original file for recovery. **Reset browser save** saves the current workspace after keeping a separate backup of the unreadable original on this device. Export your current work if you want to keep editing without resetting.
 
+When another tab changes the browser save, autosave pauses in this tab. **Download this workspace** keeps your version as a file; **Open browser save** switches to the newer save after keeping a local backup, with Undo available. Pending edits survive a reload in the same tab. Download conflicting work before closing its tab. Projects support up to 200 panels and 400 connection records; edits exceeding these limits leave the current project intact.
+
 ## Sync a local folder
 
 Choose **Sync** next to **New project**, then **Choose folder** and allow read/write access. The folder's project and assembly JSON files appear in the dialog. Folder access requires a browser that supports the File System Access directory picker, such as desktop Chrome or Edge. Browsers without it retain browser autosave and the existing import/download controls.
