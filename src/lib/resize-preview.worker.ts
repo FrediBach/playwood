@@ -17,7 +17,7 @@ self.onmessage = (event: MessageEvent<{ id: number; session?: PreviewResizeSessi
     if (request.finish) {
       const limited = result.limited
       result = finishPreviewResize(session, handleId, result, local)
-      reviewPreviewResize(session, handleId, result.distance, local, limited ? request.distance : undefined)
+      if (!result.groundLimited) reviewPreviewResize(session, handleId, result.distance, local, limited ? request.distance : undefined)
     }
     self.postMessage({ id: request.id, result })
   } catch (error) {

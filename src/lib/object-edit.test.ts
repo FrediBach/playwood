@@ -70,3 +70,13 @@ describe('object gesture geometry', () => {
     expect(snapObjectDelta(objects(), ['a'], [], [43, 0, 0], { ...grid, grid: false })).toEqual([43, 0, 0])
   })
 })
+
+it('stops a downward object resize at ground after snapping, unless disabled', () => {
+  const source = objects()
+  const edge = { axis: 1, side: -1 } as const
+  const result = previewObjectResize(source, ['a'], [], edge, 100, geometry)
+  expect(result.distance).toBe(0)
+  expect(constructionBounds(result.objects, ['a'])!.min[1]).toBe(0)
+  const free = previewObjectResize(source, ['a'], [], edge, 100, { ...geometry, keepAboveGround: false })
+  expect(constructionBounds(free.objects, ['a'])!.min[1]).toBe(-100)
+})

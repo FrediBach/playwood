@@ -62,6 +62,9 @@ export function previewObjectResize(objects: ConstructionObjects, ids: readonly 
   const handle = objectResizeHandles(objects, ids).find(handle => handle.axis === edge.axis && handle.side === edge.side)
   if (!handle) throw new Error('This object edge no longer exists.')
   const options = keyboard ? { ...settings, tolerance: Math.min(settings.tolerance, Math.abs(distance) * 0.45) } : settings
-  const snapped = snapDistance(handle.position, handle.direction, distance, objectSnapTargets(objects, ids, panels), options)
+  let snapped = snapDistance(handle.position, handle.direction, distance, objectSnapTargets(objects, ids, panels), options)
+  if (settings.keepAboveGround !== false && edge.axis === 1 && edge.side === -1) {
+    snapped = Math.min(snapped, Math.max(0, handle.position[1]))
+  }
   return { objects: resizeObjectEdge(objects, ids, edge, snapped), distance: snapped }
 }

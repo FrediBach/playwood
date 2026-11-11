@@ -4,12 +4,12 @@ import { getPhysicalConnectors } from './connector-selection'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import type { Panel, Project, Vec3 } from './types'
 
-export interface SnapSettings { grid: boolean; geometry: boolean; spacing: number; tolerance: number }
-export const DEFAULT_SNAP: SnapSettings = { grid: false, geometry: false, spacing: 50, tolerance: 10 }
+export interface SnapSettings { grid: boolean; geometry: boolean; spacing: number; tolerance: number; keepAboveGround?: boolean }
+export const DEFAULT_SNAP: SnapSettings = { grid: false, geometry: false, spacing: 50, tolerance: 10, keepAboveGround: true }
 export function readSnapSettings(): SnapSettings {
   try {
     const saved = JSON.parse(localStorage.getItem('playwood-snap') ?? '{}')
-    return { grid: saved.grid === true, geometry: saved.geometry === true,
+    return { grid: saved.grid === true, geometry: saved.geometry === true, keepAboveGround: saved.keepAboveGround !== false,
       spacing: Number.isFinite(saved.spacing) ? Math.max(1, Math.min(1000, saved.spacing)) : 50,
       tolerance: Number.isFinite(saved.tolerance) ? Math.max(1, Math.min(100, saved.tolerance)) : 10 }
   } catch { return DEFAULT_SNAP }
@@ -103,4 +103,18 @@ export function snapPanelDelta(panels: Panel[], ids: readonly string[], delta: V
 export function isGeometryGuideActive(point: Vec3, lineAxis: number, sources: readonly Vec3[], direction: Vec3): boolean {
   return direction.some((component, axis) => axis !== lineAxis && Math.abs(component) > 1e-6
     && sources.some(source => Math.abs(source[axis] - point[axis]) < 0.001))
+}
+
+/** Existing below-floor sources may improve without jumping when a drag begins. */
+export function clampGroundDelta(minY: number, delta: Vec3): Vec3 {
+  return [delta[0], Math.max(delta[1], -Math.max(0, minY)), delta[2]]
+}
+
+/** Per-panel floors allow imported below-ground geometry to improve without jumping. */
+export function panelGroundLimits(project: Project): Map<string, number> {
+  return new Map(resolvePanels(project).map(panel => [panel.id, Math.min(0, panelSnapPoints(panel)[0][1])]))
+}
+
+export function panelsAboveGround(project: Project, limits?: ReadonlyMap<string, number>): boolean {
+  return !limits || resolvePanels(project).every(panel => panelSnapPoints(panel)[0][1] >= (limits.get(panel.id) ?? 0) - 1e-6)
 }

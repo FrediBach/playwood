@@ -5,6 +5,7 @@ import { isPanelDimensionLocked } from './design-constraints'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
 import { resolvePanels } from './model'
+import { panelsAboveGround } from './preview-snap'
 import { roundNiceValue } from './nice-values'
 import { movePanels, resizePanelEdge, StructureEditError } from './structure-edit'
 import { prepareStructureRepeat } from './structure-repeat'
@@ -49,6 +50,7 @@ interface Driver { operation: Operation; scale: number }
 
 export interface PreviewResizeSession {
   original: Project
+  groundLimits?: Map<string, number>
   handles: PreviewResizeHandle[]
   selection: PreviewResizeSelection
   drivers: Map<string, Driver>
@@ -215,7 +217,9 @@ export function reviewPreviewResize(session: PreviewResizeSession, handleId: str
   if (!local) gestures.get(session)?.get(handleId)?.review(distance, requestedDistance)
 }
 
-interface PreviewResizeResult { project: Project; distance: number; limited: boolean; reason?: string; interpretation?: string }
+export const GROUND_RESIZE_LIMIT = 'Ground reached. Turn off Keep above ground to pull farther.'
+
+interface PreviewResizeResult { groundLimited?: boolean; project: Project; distance: number; limited: boolean; reason?: string; interpretation?: string }
 const attemptCaches = new WeakMap<PreviewResizeSession, Map<string, Project | Error>>()
 const lastMoves = new WeakMap<PreviewResizeSession, { handleId: string; distance: number; local: boolean; result: PreviewResizeResult }>()
 
@@ -247,6 +251,7 @@ function solvePreviewResize(session: PreviewResizeSession, handleId: string, dis
       const target = vector(handle.position).addScaledVector(vector(handle.direction), amount)
       if (!position || vector(position).distanceTo(target) > 0.01) throw new Error('The connector reached the end of this resize direction.')
     }
+    if (!panelsAboveGround(next, session.groundLimits)) throw new Error(GROUND_RESIZE_LIMIT)
     return next
   }
   let cache = attemptCaches.get(session)
@@ -284,7 +289,7 @@ function solvePreviewResize(session: PreviewResizeSession, handleId: string, dis
         try { project = attempt(middle); lower = middle }
         catch (failure) { upper = middle; limitError = failure }
       }
-      return { project, distance: lower, limited: true, interpretation: gesture?.label,
+      return { project, distance: lower, limited: true, groundLimited: limitError instanceof Error && limitError.message === GROUND_RESIZE_LIMIT, interpretation: gesture?.label,
         reason: limitError instanceof Error ? limitError.message : 'This direction reached a resize limit.' }
     }
     if (Math.abs(amount) >= maximum) break
@@ -298,7 +303,7 @@ function solvePreviewResize(session: PreviewResizeSession, handleId: string, dis
  * snapshot so its fixed edge and structural direction remain authoritative. */
 export function finishPreviewResize(session: PreviewResizeSession, handleId: string, result: ReturnType<typeof movePreviewResize>, local = false): ReturnType<typeof movePreviewResize> {
   const settings = session.original.niceValues
-  if (!settings?.enabled || Math.abs(result.distance) < 1e-6) return result
+  if (result.groundLimited || !settings?.enabled || Math.abs(result.distance) < 1e-6) return result
   const driver = session.drivers.get(handleId)
   if (!driver) return result
   const operation = driver.operation

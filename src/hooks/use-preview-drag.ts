@@ -30,7 +30,7 @@ export function usePreviewDrag({ project, selectedIds, commit, notify, select, s
     snap: current?.snap ?? null,
     start: () => {
       try {
-        session.current = preparePreviewDrag(project, selectedIds)
+        session.current = preparePreviewDrag(project, selectedIds, snapSettings.keepAboveGround !== false)
         latest.current = null
         lastDelta.current = [0, 0, 0]
         return !!session.current
@@ -44,7 +44,7 @@ export function usePreviewDrag({ project, selectedIds, commit, notify, select, s
         lastDelta.current = snapped
         setPreview(latest.current)
       } catch (error) {
-        if (session.current.original.constraints?.some(rule => rule.enabled)) {
+        if (session.current.groundLimits || session.current.original.constraints?.some(rule => rule.enabled)) {
           // Constraints outrank snapping. If the pointer itself is unavailable,
           // approach its limit from the last feasible candidate, never from an
           // already modified preview or a partially committed construction.

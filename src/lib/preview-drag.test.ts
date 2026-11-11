@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { createAssembly, disassembleAssembly, duplicateAssembly, getAssemblyAttachmentTargets, makeAssemblyIndependent, materializeAssemblies, updateAssemblyDefinition } from './assemblies'
 import { gridProject } from './example-geometry'
 import { attachPanel, createPanel, parseProject, resolvePanels, validateProject } from './model'
-import { movePreviewDrag, preparePreviewDrag } from './preview-drag'
+import { finishPreviewDrag, movePreviewDrag, preparePreviewDrag } from './preview-drag'
+import { panelSnapPoints } from './preview-snap'
 import { connectorId, getPhysicalConnectors } from './connector-selection'
 import type { AttachmentOptions, Project, Vec3 } from './types'
 
@@ -273,3 +274,54 @@ describe('preview dragging', () => {
   })
 })
 
+
+describe('ground-limited preview dragging', () => {
+  it('stops rotated stock exactly at ground, keeps lateral motion and rounds safely on release', () => {
+    const panel = createPanel({ id: 'moving', width: 400, height: 300, rotation: [0, 0, Math.PI / 4], position: [0, 500, 0] })
+    const project: Project = { version: 1, name: 'Ground', panels: [panel], connections: [], niceValues: { enabled: true, step: 50 } }
+    const session = preparePreviewDrag(project, [panel.id], true)!
+    const delta: Vec3 = [100, -1000, 30]
+    const result = movePreviewDrag(session, delta, 0)
+    expect(panelSnapPoints(result.project.panels[0])[0][1]).toBeCloseTo(0, 6)
+    expect(result.project.panels[0].position[0]).toBe(100)
+    const farther = movePreviewDrag(session, [100, -2000, 30], 0)
+    expect(farther.project.panels).toEqual(result.project.panels)
+    expect(panelSnapPoints(finishPreviewDrag(session, result, delta).project.panels[0])[0][1]).toBeCloseTo(0, 6)
+    expect(movePreviewDrag(session, [0, 10, 0], 0).project.panels[0].position[1]).toBe(510)
+    expect(project.panels[0]).toEqual(panel)
+  })
+
+  it('moves an entire assembly to the floor without changing its internal placement', () => {
+    const project = box()
+    const ids = project.panels.map(panel => panel.id)
+    const session = preparePreviewDrag(project, ids, true)!
+    const before = resolvePanels(project)
+    const result = movePreviewDrag(session, [20, -1000, 0], 0).project
+    const after = resolvePanels(result)
+    expect(Math.min(...after.map(panel => panelSnapPoints(panel)[0][1]))).toBeCloseTo(0, 6)
+    const dy = after[0].position[1] - before[0].position[1]
+    after.forEach((panel, index) => expectVector(panel.position, [before[index].position[0] + 20, before[index].position[1] + dy, before[index].position[2]]))
+    expect(materializeAssemblies(result).panels).toEqual(result.panels)
+  })
+
+  it('skips attachment snaps that would pull a grounded selection below the floor', () => {
+    const attached = corner()
+    const panels = resolvePanels(attached).map(panel => ({ ...panel, position: [panel.position[0], panel.position[1] - (panel.id === 'fixed' ? 400 : 0), panel.position[2]] as Vec3 }))
+    const project = { ...attached, panels, connections: [] }
+    const free = movePreviewDrag(preparePreviewDrag(project, ['moving'])!, [0, -350, 0], 250)
+    expect(free.snap).not.toBeNull()
+    expect(panelSnapPoints(resolvePanels(free.project).find(panel => panel.id === 'moving')!)[0][1]).toBeLessThan(0)
+    const limited = movePreviewDrag(preparePreviewDrag(project, ['moving'], true)!, [0, -350, 0], 250)
+    expect(limited.snap).toBeNull()
+    expect(panelSnapPoints(limited.project.panels.find(panel => panel.id === 'moving')!)[0][1]).toBeCloseTo(0, 6)
+  })
+
+  it('allows disabling the limit and lets existing below-ground parts move upward without jumping', () => {
+    const panel = createPanel({ id: 'moving', width: 400, height: 400, position: [0, 100, 0] })
+    const project: Project = { version: 1, name: 'Ground', panels: [panel], connections: [] }
+    const session = preparePreviewDrag(project, [panel.id], true)!
+    expect(movePreviewDrag(session, [0, -50, 0], 0).project.panels[0].position[1]).toBe(100)
+    expect(movePreviewDrag(session, [0, 50, 0], 0).project.panels[0].position[1]).toBe(150)
+    expect(movePreviewDrag(preparePreviewDrag(project, [panel.id], false)!, [0, -50, 0], 0).project.panels[0].position[1]).toBe(50)
+  })
+})

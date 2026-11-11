@@ -1,9 +1,9 @@
 import type { Notify } from '@/editor/editor-notifications'
 import { useEffect, useRef, useState } from 'react'
 import { resolvePanels } from '@/lib/model'
-import { moveConstructionSelection } from '@/lib/object-geometry'
+import { constructionBounds, moveConstructionSelection } from '@/lib/object-geometry'
 import { objectResizeHandles, previewObjectResize, snapObjectDelta, type ObjectResizeEdge } from '@/lib/object-edit'
-import type { SnapSettings } from '@/lib/preview-snap'
+import { clampGroundDelta, type SnapSettings } from '@/lib/preview-snap'
 import type { ConstructionObjects, Project, Vec3 } from '@/lib/types'
 
 interface Session {
@@ -47,9 +47,12 @@ export function useObjectGesture({ project, selectedIds, enabled, snapSettings, 
     if (!active || !enabled || active.source !== project || active.ids.join('/') !== signature) return
     try {
       const objects = active.source.constructionObjects!, panels = resolvePanels(active.source)
+      const snapped = typeof value !== 'number' ? snapObjectDelta(objects, active.ids, panels, value, active.settings) : null
+      const delta = snapped && active.settings.keepAboveGround !== false
+        ? clampGroundDelta(constructionBounds(objects, active.ids)?.min[1] ?? 0, snapped) : snapped
       const result = active.edge && typeof value === 'number'
         ? previewObjectResize(objects, active.ids, panels, active.edge, value, active.settings, keyboard)
-        : typeof value !== 'number' ? { objects: moveConstructionSelection(objects, active.ids, snapObjectDelta(objects, active.ids, panels, value, active.settings)) } : null
+        : delta ? { objects: moveConstructionSelection(objects, active.ids, delta) } : null
       if (!result) return
       const next = { ...active, candidate: result.objects, distance: 'distance' in result ? result.distance : undefined, limited: false }
       session.current = next; setPreview(next)

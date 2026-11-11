@@ -3,7 +3,7 @@ import { createResizePreviewWorker } from '@/lib/resize-preview-worker'
 import { ResizeReviewRequired } from '@/lib/numeric-resize'
 import type { ResizeReview } from '@/lib/structure-edit'
 import type { Notify } from '@/editor/editor-notifications'
-import { snapDistanceReference, snapTargets, type SnapSettings } from '@/lib/preview-snap'
+import { panelGroundLimits, panelsAboveGround, snapDistanceReference, snapTargets, type SnapSettings } from '@/lib/preview-snap'
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { finishPreviewResize, movePreviewResize, startPreviewResize, reviewPreviewResize, type PreviewResizeMode, type RepeatPreview } from '@/lib/preview-resize'
 import { moveStructureRepeat, prepareStructureRepeat, type StructureRepeatSession } from '@/lib/structure-repeat'
@@ -49,8 +49,8 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
     if (background && !preparations.hasResize(selection)) return null
     const cached = preparations.resize(selection)
     // A new activation must not revive a gesture from before a mode change.
-    return cached ? { ...cached } : null
-  }, [preparations, selection, panelId, panelIds, connectorId, enabled, background, loaded])
+    return cached ? { ...cached, groundLimits: snapSettings.keepAboveGround !== false ? panelGroundLimits(project) : undefined } : null
+  }, [preparations, selection, panelId, panelIds, connectorId, enabled, background, loaded, snapSettings.keepAboveGround, project])
   type Session = NonNullable<typeof prepared>
   type Result = ReturnType<typeof movePreviewResize> & { snap?: ReturnType<typeof snapDistanceReference>['reference']; count?: number; reason?: string; selectedPanelId?: string; reusedPanelIds?: string[] }
   const session = useRef<{ source: Session; handleId: string; mode: PreviewResizeMode; snapSettings: SnapSettings; worker?: ReturnType<typeof createResizePreviewWorker>; requestedDistance?: number; finishing?: boolean; repeat?: StructureRepeatSession; targets?: ReturnType<typeof snapTargets> } | null>(null)
@@ -147,7 +147,13 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
       if (!session.current || session.current.source !== prepared || session.current.finishing) return
       try {
         if (session.current.repeat) {
-          const result = moveStructureRepeat(session.current.repeat, keyboard ? Math.sign(distance) * session.current.repeat.pitch : distance)
+          const repeat = session.current.repeat
+          let amount = keyboard ? Math.sign(distance) * repeat.pitch : distance
+          let result = moveStructureRepeat(repeat, amount)
+          while (!panelsAboveGround(result.project, session.current.source.groundLimits) && Math.abs(amount) > 1e-6) {
+            amount = Math.sign(amount) * Math.max(0, Math.abs(amount) - repeat.pitch)
+            result = moveStructureRepeat(repeat, amount)
+          }
           latest.current = result
           setPreview(previous => previous?.project === result.project && previous.count === result.count && previous.limited === result.limited && previous.reason === result.reason ? previous : result)
           return
@@ -194,7 +200,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
               if (current !== active.source.original) throw new Error('The project changed during this drag. Try again.')
               return response.result!.project
             })
-            if (response.result.reason) notify(response.result.reason, 'error')
+            if (response.result.reason && !response.result.groundLimited) notify(response.result.reason, 'error')
           } catch (error) { notify(error instanceof Error ? error.message : 'This resize could not be applied.', 'error') }
         }
         active.worker.stop()
@@ -209,7 +215,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
           const source = session.current.source
           const finished = session.current.repeat ? latest.current
             : finishPreviewResize(source, session.current.handleId, latest.current, session.current.mode === 'panel')
-          if (!session.current.repeat) reviewPreviewResize(source, session.current.handleId, finished.distance, session.current.mode === 'panel', latest.current.limited ? active.requestedDistance : undefined)
+          if (!session.current.repeat && !finished.groundLimited) reviewPreviewResize(source, session.current.handleId, finished.distance, session.current.mode === 'panel', latest.current.limited ? active.requestedDistance : undefined)
           const candidate = finished.project
           const changed = JSON.stringify(candidate) !== JSON.stringify(source.original)
           commit(current => {
@@ -229,7 +235,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
           else notify(error instanceof Error ? error.message : 'This resize conflicts with a constraint.','error')
         }
       }
-      if (!cancel && latest.current?.reason && session.current?.source === prepared) notify(latest.current.reason,'error')
+      if (!cancel && latest.current?.reason && !latest.current.groundLimited && session.current?.source === prepared) notify(latest.current.reason,'error')
       session.current = null
       latest.current = null
       setPreview(null)

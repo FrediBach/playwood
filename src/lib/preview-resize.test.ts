@@ -1,3 +1,4 @@
+import { panelGroundLimits, panelSnapPoints } from './preview-snap'
 import { reviewPreviewResize } from './preview-resize'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
@@ -5,7 +6,7 @@ import { createAssembly } from './assemblies'
 import { connectorId, getPhysicalConnectors } from './connector-selection'
 import { connectorSlide, getConnectorRail } from './connector-movement'
 import { attachPanel, createPanel, createStarterProject, parseProject, resolvePanels, rotateProject, validateProject } from './model'
-import { movePreviewResize, preparePreviewResize, type PreviewResizeSession } from './preview-resize'
+import { finishPreviewResize, movePreviewResize, preparePreviewResize, type PreviewResizeSession } from './preview-resize'
 import { gridProject } from './example-geometry'
 import { moveStructureRepeat, prepareStructureRepeat } from './structure-repeat'
 import type { Project, Vec3 } from './types'
@@ -381,4 +382,37 @@ describe('connected corner shelf resize precision', () => {
     }
     expect(project).toEqual(before)
   })
+})
+
+describe('ground limits on preview arrows', () => {
+  it.each([false, true])('stops the bottom edge at the floor (local=%s), preserves the top and allows disabling', local => {
+    const panel = createPanel({ width: 400, height: 400, position: [0, 250, 0] })
+    const original: Project = { version: 1, name: 'Ground arrows', panels: [panel], connections: [], niceValues: { enabled: true, step: 100 } }
+    const session = { ...preparePreviewResize(original, { panelId: panel.id })!, groundLimits: panelGroundLimits(original) }
+    const handle = 'panel-height-negative'
+    const result = movePreviewResize(session, handle, 150, local)
+    expect(result.groundLimited).toBe(true)
+    expect(result.distance).toBeCloseTo(50, 4)
+    const bounds = panelSnapPoints(resolvePanels(result.project)[0])
+    expect(bounds[0][1]).toBeCloseTo(0, 4)
+    expect(bounds[1][1]).toBeCloseTo(450, 4)
+    expect(finishPreviewResize(session, handle, result, local)).toBe(result)
+    expect(movePreviewResize(session, handle, 300, local).distance).toBeCloseTo(50, 4)
+    expect(movePreviewResize(session, handle, 20, local).distance).toBe(20)
+    const disabled = preparePreviewResize(original, { panelId: panel.id })!
+    expect(panelSnapPoints(resolvePanels(movePreviewResize(disabled, handle, 150, local).project)[0])[0][1]).toBeLessThan(-90)
+    expect(original.panels[0]).toEqual(panel)
+  })
+})
+
+it('stops a connected shelf movement arrow when its stock reaches the floor', () => {
+  const project = createStarterProject('shelf')
+  const panel = named(project, 'Bottom shelf')
+  const session = { ...preparePreviewResize(project, { panelId: panel.id })!, groundLimits: panelGroundLimits(project) }
+  const handle = along(session, [0, -1, 0])
+  expect(handle.blocked).toBeUndefined()
+  const result = movePreviewResize(session, handle.id, 100)
+  expect(result.groundLimited).toBe(true)
+  expect(panelSnapPoints(resolvePanels(result.project).find(item => item.id === panel.id)!)[0][1]).toBeCloseTo(0, 4)
+  valid(result.project)
 })

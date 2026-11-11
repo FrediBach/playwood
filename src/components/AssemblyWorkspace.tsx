@@ -3,7 +3,7 @@ import { detectPreviewFurnishings,FurnishingPlacement } from '@/lib/preview-furn
 import { RepeatPreview } from '@/lib/preview-resize'
 import type { SnapSettings } from '@/lib/preview-snap'
 import type { CameraView,Connection,Panel,Side,Vec3 } from '@/lib/types'
-import { Box,Grid2X2,House,Move,PanelLeftOpen,Plus,RotateCw,Ruler,Scaling,SlidersHorizontal,Sun } from 'lucide-react'
+import { ArrowDownToLine,Box,Grid2X2,House,Move,PanelLeftOpen,Plus,RotateCw,Ruler,Scaling,SlidersHorizontal,Sun } from 'lucide-react'
 import { useMemo,useState,type Dispatch,type SetStateAction } from 'react'
 import { AttachmentSideGuideState } from './AttachmentSideGuide'
 import { ConstructionLayerProps } from './ConstructionObjectLayer'
@@ -268,6 +268,7 @@ function WorkspaceToolbar({
               <p>World-axis grid from the origin. Align panel boundaries, or connector centers when moving connectors. Object edits align source-box and panel boundaries. Both modes can be combined. In Studio, arrows move one grid spacing (Shift: ×10). Show grid displays panel guides. Joint limits take priority for furniture edits.</p>
             </div>
           </details>
+          <IconButton className="ground-limit-toggle" label="Keep above ground" tooltipLabel={snapSettings.keepAboveGround !== false ? 'Keep above ground: ON · stop dragging and resize arrows at the floor' : 'Keep above ground: OFF · allow dragging and resize arrows below the floor'} aria-pressed={snapSettings.keepAboveGround !== false} onClick={()=>setSnapSettings(value=>({...value,keepAboveGround:value.keepAboveGround === false}))}><ArrowDownToLine size={18}/></IconButton>
           <IconButton label="All constraints" className="constraints-toolbar-button" aria-pressed={!!constraintsOverviewOpen} aria-description={`${constraintCount ?? 0} saved constraints, including paused rules and enabled build space`} disabled={constraintEditing} onClick={onConstraints}><SlidersHorizontal size={18}/>{!!constraintCount && <span className="constraints-toolbar-badge" aria-hidden="true">{constraintCount}</span>}</IconButton>
           <IconButton label="Move creation" disabled={constraintEditing||!panels.length} onClick={onMoveCreation}><Move size={18}/></IconButton>
           <IconButton label="Rescale creation" tooltipLabel={niceValueStep ? `Rescale creation · Only nice values enabled · ${niceValueStep} mm step` : 'Rescale creation'} className="constraints-toolbar-button" aria-description={niceValueStep ? `Only nice values enabled · ${niceValueStep} mm step` : 'Only nice values disabled'} disabled={constraintEditing||!panels.length} onClick={onRescale}><Scaling size={18}/>{!!niceValueStep && <span className="constraints-toolbar-badge" aria-hidden="true">{niceValueStep}</span>}</IconButton>

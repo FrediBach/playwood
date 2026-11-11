@@ -1,3 +1,4 @@
+import { panelSnapPoints } from '../src/lib/preview-snap'
 import { expect, test, type Page } from './browser-fixture'
 import { createPanel, createStarterProject, getProjectBounds, parseProject, resolvePanels, validateProject } from '../src/lib/model'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
@@ -474,4 +475,22 @@ for (const example of ['H-table', 'Island display']) for (const [worker, viewpor
   await expect.poll(() => savedProject(page)).toEqual(after)
   await page.reload()
   expect(await savedProject(page)).toEqual(after)
+})
+
+for (const worker of [false, true]) test(`pulling a downward arrow stops at ground (worker=${worker}) and the toggle releases it`, async ({ page }) => {
+  const project = freePanelProject()
+  project.panels[0].position[1] = 250
+  if (worker) for (let index = 0; index < 11; index++) project.panels.push(createPanel({ name: `Hidden ${index}`, visible: false, position: [2000 + index * 500, 1000, 0] }))
+  await openProject(page, project)
+  const id = project.panels[0].id
+  const handle = directionHandle(project, { panelId: id }, [0, -1, 0])
+  await beginResize(page, handle, 150)
+  await page.mouse.up()
+  await expect.poll(async () => panelSnapPoints(resolvePanels(await savedProject(page)).find(panel => panel.id === id)!)[0][1]).toBeCloseTo(0, 3)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(project)
+  await page.getByRole('button', { name: 'Keep above ground', exact: true }).click()
+  await beginResize(page, handle, 150)
+  await page.mouse.up()
+  await expect.poll(async () => panelSnapPoints(resolvePanels(await savedProject(page)).find(panel => panel.id === id)!)[0][1]).toBeLessThan(-90)
 })

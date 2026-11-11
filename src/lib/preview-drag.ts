@@ -6,6 +6,7 @@ import { CONNECTOR_PROFILES } from './connector-profile'
 import { getConnectorPlacements, resolvePanels, validateProject } from './model'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { movePanels } from './structure-edit'
+import { clampGroundDelta, panelSnapPoints } from './preview-snap'
 import { roundNiceValue } from './nice-values'
 import type { Connection, ConnectorType, Project, Side, Vec3 } from './types'
 
@@ -36,11 +37,12 @@ export interface PreviewDragSession {
   instanceIds: string[]
   panelTargets: PanelTarget[]
   assemblyTargets: AssemblyTarget[]
+  groundLimits?: Map<string, number>
   previousErrors: Set<string>
 }
 
 /** Release external joints in a preview; explicit rules can still move related peers. */
-export function preparePreviewDrag(original: Project, selectedIds: readonly string[]): PreviewDragSession | null {
+export function preparePreviewDrag(original: Project, selectedIds: readonly string[], keepAboveGround = false): PreviewDragSession | null {
   const defaultColor = getDefaultConnectorColor(original)
   const wanted = new Set(selectedIds)
   const moving = original.panels.filter(panel => wanted.has(panel.id))
@@ -130,6 +132,7 @@ export function preparePreviewDrag(original: Project, selectedIds: readonly stri
     }
   }
   const session: PreviewDragSession = { original, project, movingIds: moving.map(panel => panel.id), instanceIds, panelTargets, assemblyTargets,
+    groundLimits: keepAboveGround ? new Map(panels.map(panel => [panel.id, Math.min(0, panelSnapPoints(panel)[0][1])])) : undefined,
     previousErrors: new Set(validateProject(project).filter(issue => issue.severity === 'error').map(issue => issue.id)),
   }
   // Shared walls can be aligned by translation even when corner-frame matching
@@ -170,9 +173,20 @@ function translate(session: PreviewDragSession, delta: Vec3): Project {
   })
 }
 
+function aboveGround(session: PreviewDragSession, project: Project): boolean {
+  return !session.groundLimits || resolvePanels(project).every(panel =>
+    panelSnapPoints(panel)[0][1] >= (session.groundLimits!.get(panel.id) ?? 0) - 1e-6)
+}
+
 /** Total translation from pointer-down, with a true world-space attachment radius. */
 export function movePreviewDrag(session: PreviewDragSession, delta: Vec3, snapDistance = 30): { project: Project; snap: PreviewDragSnap | null } {
+  if (session.groundLimits) {
+    const wanted = new Set(session.movingIds)
+    const moving = resolvePanels(session.project).filter(panel => wanted.has(panel.id))
+    delta = clampGroundDelta(Math.min(...moving.map(panel => panelSnapPoints(panel)[0][1])), delta)
+  }
   const project = translate(session, delta)
+  if (!aboveGround(session, project)) throw new Error('This move would pull a panel below ground.')
   if (!Number.isFinite(snapDistance) || snapDistance <= 0) return { project, snap: null }
   const wanted = new Set(session.movingIds)
   const panels = resolvePanels(project)
@@ -199,13 +213,17 @@ export function movePreviewDrag(session: PreviewDragSession, delta: Vec3, snapDi
     : Number(!!b.assembly) - Number(!!a.assembly) || Number(!!a.assembly?.snap.warning) - Number(!!b.assembly?.snap.warning))
   for (const option of options) {
     if (option.assembly) {
-      try { return { project: assertDesignConstraintEdit(session.original, option.assembly.project), snap: option.assembly.snap } }
+      try {
+        if (!aboveGround(session, option.assembly.project)) continue
+        return { project: assertDesignConstraintEdit(session.original, option.assembly.project), snap: option.assembly.snap }
+      }
       catch { continue }
     }
     const target = option.target!
     let next: Project
     try { next = translate(session, vector(delta).add(vector(option.correction!)).toArray()) }
     catch { continue }
+    if (!aboveGround(session, next)) continue
     const nextPanels = resolvePanels(next)
     const nextById = new Map(nextPanels.map(panel => [panel.id, panel]))
     const parent = nextById.get(target.connection.parentId)!, child = nextById.get(target.connection.childId)!
@@ -233,6 +251,7 @@ export function movePreviewDrag(session: PreviewDragSession, delta: Vec3, snapDi
     }
     if (validateProject(snapped).some(issue => (issue.severity === 'error' && !session.previousErrors.has(issue.id))
       || (issue.id.startsWith('collision-') && issue.panelIds.some(id => wanted.has(id)) && issue.panelIds.some(id => !wanted.has(id))))) continue
+    if (!aboveGround(session, snapped)) continue
     try { assertDesignConstraintEdit(session.original, snapped) } catch { continue }
     return { project: snapped, snap: { label: wanted.has(parent.id) ? child.name : parent.name,
       position: getConnectorPlacements({ ...connection, count: 1 }, parent, child)[0].position, panelIds, warning } }
@@ -247,10 +266,16 @@ export function finishPreviewDrag(session: PreviewDragSession, result: ReturnTyp
   if (!settings?.enabled || result.snap) return result
   const id = session.movingIds[0]
   const before = resolvePanels(session.project).find(panel => panel.id === id)!
-  const after = resolvePanels(result.project).find(panel => panel.id === id)!
+  const resolved = resolvePanels(result.project)
+  const after = resolved.find(panel => panel.id === id)!
+  const movingIds = new Set(session.movingIds)
+  const atGround = session.groundLimits && resolved.some(panel => movingIds.has(panel.id)
+    && Math.abs(panelSnapPoints(panel)[0][1] - (session.groundLimits!.get(panel.id) ?? 0)) < 1e-6)
   const rounded = delta.map((value, axis) => Math.abs(value) > 1e-6
     ? roundNiceValue(after.position[axis], settings.step, -100000, 100000) - before.position[axis]
     : value) as Vec3
+  // Exact floor contact outranks nice-value rounding in either direction.
+  if (atGround) rounded[1] = after.position[1] - before.position[1]
   if (rounded.every(value => Math.abs(value) < 1e-6)) return { project: session.original, snap: null }
   if (rounded.every((value, axis) => Math.abs(value - delta[axis]) < 1e-6)) return result
   return movePreviewDrag(session, rounded, 0)

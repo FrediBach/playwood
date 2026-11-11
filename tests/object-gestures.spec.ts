@@ -260,3 +260,23 @@ test('resizing keeps both object surfaces visible on every frame', async ({ page
   expect(samples.every(frame => Math.abs(frame.fixedX! - .3) < 1e-6)).toBe(true)
   expect(samples.some(frame => Math.abs(frame.movingMax! - .18) < 1e-6)).toBe(true)
 })
+
+test('object dragging stops at ground and can be released by the preview toggle', async ({ page }) => {
+  const project = source()
+  await open(page, project)
+  const moveDown = async () => {
+    const start = await point(page, [0, 300, 50]), end = await point(page, [0, 100, 50])
+    await page.mouse.move(start.x, start.y)
+    await page.keyboard.down('Control')
+    await page.mouse.down()
+    await page.mouse.move(end.x, end.y, { steps: 10 })
+    await release(page)
+  }
+  await moveDown()
+  await expect.poll(async () => constructionBounds((await saved(page)).constructionObjects!, ['a'])!.min[1]).toBeCloseTo(0, 4)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => saved(page)).toEqual(project)
+  await page.getByRole('button', { name: 'Keep above ground', exact: true }).click()
+  await moveDown()
+  await expect.poll(async () => constructionBounds((await saved(page)).constructionObjects!, ['a'])!.min[1]).toBeLessThan(0)
+})
