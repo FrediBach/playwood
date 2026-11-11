@@ -328,7 +328,12 @@ export function validateProject(project: Project, options: { trofastWorld?: bool
   }
   const panels = resolvePanels(project)
   const byId = new Map(panels.map(p => [p.id, p]))
-  const jointQuantities = new Map(project.connections.filter(c => c.count > 0).map(c => [jointId(c), c.count]))
+  // Removed pieces retain their indices and structural branches, but consume no seam space.
+  const jointQuantities = new Map<string,number>()
+  for (const piece of getPhysicalConnectors(project)) {
+    const id = jointId(piece.connection)
+    jointQuantities.set(id,(jointQuantities.get(id) ?? 0)+1)
+  }
   for (const p of panels) {
     const outlineError = p.customOutline === undefined ? null : getOutlineError(p.customOutline)
     if (outlineError) issues.push({ id: `${p.id}-outline`, severity: 'error', message: `${p.name}: ${outlineError}`, panelIds: [p.id] })
@@ -353,8 +358,8 @@ export function validateProject(project: Project, options: { trofastWorld?: bool
     if (!seam.face && c.inset > 0 && c.inset < parentRadialLength && c.count > 0) issues.push({ id: `${c.id}-edge-access`, severity: 'error', message: `${parent.name} needs an exposed edge for this connector. Use a T joint with separate panels instead of an interior inset.`, panelIds: [parent.id, child.id] })
     const usableSeam = getConnectorSeam(c, parent, child)
     const overlap = usableSeam.upper - usableSeam.lower + 40
-    const quantity = jointQuantities.get(jointId(c)) ?? 1
-    if (overlap < quantity * 40) issues.push({ id: `${c.id}-overlap`, severity: 'error', message: `Not enough shared edge for ${quantity} connector${quantity > 1 ? 's' : ''}. Reduce the offset, corner radius, or connector count.`, panelIds: [parent.id, child.id] })
+    const quantity = jointQuantities.get(jointId(c)) ?? 0
+    if (quantity > 0 && overlap < quantity * 40) issues.push({ id: `${c.id}-overlap`, severity: 'error', message: `Not enough shared edge for ${quantity} connector${quantity > 1 ? 's' : ''}. Reduce the offset, corner radius, or connector count.`, panelIds: [parent.id, child.id] })
     if (seam.face && c.count > 0) issues.push({ id: `${c.id}-face`, severity: 'warning', message: 'This face attachment needs an accessible panel edge. Check clamp access before making.', panelIds: [parent.id, child.id] })
     if (c.outlineEdge !== undefined) {
       if (!outlineConnectionAligned(parent, child, c)) issues.push({ id: `${c.id}-alignment`, severity: 'error', message: `The support joint between ${parent.name} and ${child.name} no longer aligns with its outline edge. Restore the outline or detach the joint.`, panelIds: [parent.id, child.id] })
@@ -383,8 +388,9 @@ export function validateProject(project: Project, options: { trofastWorld?: bool
     })
     if (seams.length !== branches.length) continue
     const span = Math.min(...seams.map(seam => seam.upper)) - Math.max(...seams.map(seam => seam.lower))
-    if (span < (first.count - 1) * 40 - 1e-7) issues.push({ id: `${jointId(first)}-shared-overlap`, severity: 'error',
-      message: `Not enough shared edge across all panels for ${first.count} connector${first.count > 1 ? 's' : ''}. Reduce the offsets, corner radii, or connector count.`,
+    const quantity = jointQuantities.get(jointId(first)) ?? 0
+    if (quantity > 0 && span < (quantity - 1) * 40 - 1e-7) issues.push({ id: `${jointId(first)}-shared-overlap`, severity: 'error',
+      message: `Not enough shared edge across all panels for ${quantity} connector${quantity > 1 ? 's' : ''}. Reduce the offsets, corner radii, or connector count.`,
       panelIds: [parent.id, ...branches.map(c => c.childId)] })
   }
   const boxes = panels.map(panelObb)

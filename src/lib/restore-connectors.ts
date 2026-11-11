@@ -19,7 +19,7 @@ export function restoreRemovedConnectors(source: Project, selectedIds: readonly 
     if (selected.size && selectedMembers < Math.min(2, selected.size)) continue
     const rail = getConnectorRail(connection, panels, source.connections)
     if (!rail || rail.upper < rail.lower) continue
-    if (validateProject({ version: 1, name: '', panels: panels.filter(panel => members.has(panel.id)), connections: group })
+    if (validateProject({ version: 1, name: '', panels: panels.filter(panel => members.has(panel.id)), connections: group, connectorOverrides: project.connectorOverrides })
       .some(issue => issue.severity === 'error')) continue
     for (let index = 0; index < connection.count; index++) {
       const id = connectorId(connection.id, index)

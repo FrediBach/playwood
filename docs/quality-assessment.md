@@ -119,3 +119,11 @@ Validation for this first implementation batch: five delayed-import Vitest tests
 - QA-04 through QA-07 remain outstanding. Recovery backups currently have no in-app browser; export conflicting work for a readily reopenable copy.
 
 Second-batch final checks: **9 Playwright tests passed**, covering conflicting and unchanged tabs, queued simultaneous autosaves, pending-edit reload, the 200-panel boundary, unreadable-save recovery, and new-project flows. Production build passed with the existing bundle-size warning. React Doctor changed-file scan reported no issues; whitespace checks passed. The full browser suite was not run.
+
+### Third implementation batch — removed hardware and shrinking
+
+**QA-04 addressed.** Single-seam and shared T/cross seam-capacity checks now count installed hardware, preserving nominal counts, stable piece IDs, slides, and removal/appearance overrides. Fully removed joints have no hardware capacity requirement; topology, thickness, and support/outline alignment checks remain. The existing actual-position spacing check still rejects crowding during connected resize. Auto-add restoration now includes removal overrides in its initial joint validation, allowing only the pieces whose saved positions still fit to return on a shortened seam.
+
+Seven new domain cases cover 90°, T, and cross shrinking, partial restoration, expansion and complete restoration, fully removed joints, alignment rejection, source immutability, saved-format round trips, and actual-position crowding. The browser regression verifies a shortened T joint through Undo, Redo, and reload. User and architecture documentation and the illustrated guide were updated. QA-05 through QA-07 remain outstanding.
+
+Third-batch validation: **142 focused unit tests and 2 browser tests passed**. Full Vitest: **1,911 passed, 3 failed**, with the same three previously baseline-confirmed failures recorded above. Production build and whitespace checks passed; the existing bundle-size warning remains. No React component changes were made.
