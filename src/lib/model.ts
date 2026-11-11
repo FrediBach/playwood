@@ -296,9 +296,13 @@ function panelObb(p: Panel) {
     new Matrix3().setFromMatrix4(new Matrix4().makeRotationFromQuaternion(quaternion(p))))
 }
 
-function jointStructureIssues(connections: Connection[]): ValidationIssue[] {
+function connectionGroups(connections: Connection[]) {
   const groups = new Map<string, Connection[]>()
   for (const c of connections) { const id = jointId(c); groups.set(id, [...(groups.get(id) ?? []), c]) }
+  return groups
+}
+
+function jointStructureIssues(connections: Connection[], groups = connectionGroups(connections)): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   for (const [id, group] of groups) {
     const first = group[0]
@@ -322,7 +326,8 @@ function jointStructureIssues(connections: Connection[]): ValidationIssue[] {
 }
 
 export function validateProject(project: Project, options: { trofastWorld?: boolean } = {}): ValidationIssue[] {
-  const issues: ValidationIssue[] = jointStructureIssues(project.connections)
+  const groups = connectionGroups(project.connections)
+  const issues: ValidationIssue[] = jointStructureIssues(project.connections, groups)
   if (project.spaceConstraint?.enabled) for (const row of spaceClearances(project.spaceConstraint, resolvePanels(project))) {
     if (row.clearance < -0.1) issues.push({ id: `${row.panel.id}-space`, severity: 'error', message: `${row.panel.name} exceeds the build space.`, panelIds: [row.panel.id] })
   }
@@ -381,7 +386,7 @@ export function validateProject(project: Project, options: { trofastWorld?: bool
   for (const first of project.connections.filter(c => c.count > 0 && (c.type === 't' || c.type === 'cross'))) {
     const parent = byId.get(first.parentId)
     if (!parent) continue
-    const branches = project.connections.filter(c => jointId(c) === jointId(first))
+    const branches = groups.get(jointId(first))!
     const seams = branches.flatMap(c => {
       const child = byId.get(c.childId)
       return child ? [getConnectorSeam(c, parent, child)] : []

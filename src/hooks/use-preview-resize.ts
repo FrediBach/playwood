@@ -1,9 +1,10 @@
+import { createResizePreparationWorker } from '@/lib/resize-preparation-worker'
 import { createResizePreviewWorker } from '@/lib/resize-preview-worker'
 import { ResizeReviewRequired } from '@/lib/numeric-resize'
 import type { ResizeReview } from '@/lib/structure-edit'
 import type { Notify } from '@/editor/editor-notifications'
 import { snapDistanceReference, snapTargets, type SnapSettings } from '@/lib/preview-snap'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { finishPreviewResize, movePreviewResize, startPreviewResize, reviewPreviewResize, type PreviewResizeMode, type RepeatPreview } from '@/lib/preview-resize'
 import { moveStructureRepeat, prepareStructureRepeat, type StructureRepeatSession } from '@/lib/structure-repeat'
 import { resolvePanels } from '@/lib/model'
@@ -26,12 +27,30 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
   const connectorId = selectedConnectorIds.length === 1 && !selectedIds.length ? selectedConnectorIds[0] : undefined
   const panelIds = selectedIds.length > 1 && !selectedConnectorIds.length ? selectedIds : undefined
   const preparations = useMemo(() => createSelectionPreparations(project), [project])
+  const selection = useMemo(() => ({ panelId, panelIds, connectorId }), [panelId, panelIds, connectorId])
+  const background = project.panels.length >= 12
+  const [loaded, setLoaded] = useState<{ preparations: typeof preparations; selection: typeof selection } | null>(null)
+  const preparationError = useEffectEvent((message: string) => notify(message, 'error'))
+  useEffect(() => {
+    if (!background || !enabled || (!panelId && !connectorId && !panelIds) || preparations.hasResize(selection)) return
+    const job = createResizePreparationWorker({ kind: 'handles', project, selection })
+    let active = true
+    void job.result.then(result => {
+      if (!active || !result) return
+      if (result.kind === 'error') { preparationError(result.message); return }
+      if (result.kind !== 'handles') return
+      preparations.storeResize(selection, result.session)
+      setLoaded({ preparations, selection })
+    })
+    return () => { active = false; job.stop() }
+  }, [background, enabled, panelId, connectorId, panelIds, preparations, project, selection])
   const prepared = useMemo(() => {
     if (!enabled || (!panelId && !connectorId && !panelIds)) return null
-    const cached = preparations.resize({ panelId, panelIds, connectorId })
+    if (background && !preparations.hasResize(selection)) return null
+    const cached = preparations.resize(selection)
     // A new activation must not revive a gesture from before a mode change.
     return cached ? { ...cached } : null
-  }, [preparations, panelId, panelIds, connectorId, enabled])
+  }, [preparations, selection, panelId, panelIds, connectorId, enabled, background, loaded])
   type Session = NonNullable<typeof prepared>
   type Result = ReturnType<typeof movePreviewResize> & { snap?: ReturnType<typeof snapDistanceReference>['reference']; count?: number; reason?: string; selectedPanelId?: string; reusedPanelIds?: string[] }
   const session = useRef<{ source: Session; handleId: string; mode: PreviewResizeMode; snapSettings: SnapSettings; worker?: ReturnType<typeof createResizePreviewWorker>; requestedDistance?: number; finishing?: boolean; repeat?: StructureRepeatSession; targets?: ReturnType<typeof snapTargets> } | null>(null)

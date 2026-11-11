@@ -22,9 +22,12 @@ function remember<T>(cache: Map<string, T>, key: string, compute: () => T): T {
 export function createSelectionPreparations(project: Project) {
   const resize = new Map<string, ReturnType<typeof preparePreviewResize>>()
   const ground = new Map<string, ReturnType<typeof getPanelGroundExtension>>()
+  const resizeKey = (selection: PreviewResizeSelection) => JSON.stringify([selection.panelId, selection.panelIds, selection.connectorId])
   return {
+    hasResize: (selection: PreviewResizeSelection) => resize.has(resizeKey(selection)),
+    storeResize: (selection: PreviewResizeSelection, result: ReturnType<typeof preparePreviewResize>) => remember(resize, resizeKey(selection), () => result),
     resize: (selection: PreviewResizeSelection) => remember(resize,
-      JSON.stringify([selection.panelId, selection.panelIds, selection.connectorId]),
+      resizeKey(selection),
       () => preparePreviewResize(project, selection)),
     ground: (panelId: string) => remember(ground, panelId, () => getPanelGroundExtension(project, panelId)),
   }

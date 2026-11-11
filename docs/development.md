@@ -157,3 +157,19 @@ Generated `dist/`, `node_modules/`, `*.tsbuildinfo`, and test artifacts are igno
 `npm test -- src/lib/trofast.test.ts src/components/trofast-geometry.test.ts src/components/scene-geometry.test.ts src/lib/preview-furnishings.test.ts` checks fit, parsing, assemblies, fixed-size geometry, real openings and furnishing clearance. `npm run test:e2e -- tests/trofast.spec.ts tests/trofast-renders.spec.ts` covers placement drafts, colors, undo/reload/export, clearance failures, narrow inspectors, and all catalog renders in both preview modes. The tests use real file import/export controls.
 
 Stage 4 resize gesture checks: `npm test -- src/lib/resize-gesture.test.ts src/lib/resize-preview-worker.test.ts src/lib/preview-resize.test.ts src/lib/resize-planner.test.ts`. To record local preparation and twelve successive 8 mm samples for single-panel, threshold-seam, and synth/storage cases, run `RESIZE_GESTURE_REPORT=/private/tmp/resize-gesture.json npm test -- src/lib/resize-gesture.test.ts`. The optional timing test is skipped otherwise. Browser transaction coverage lives in `tests/preview-resize.spec.ts`, including H-Table and Island Display propagation on the main thread and worker, cancellation, history, and reload. `src/lib/connected-resize-intent.test.ts` checks connected propagation versus local Shift-resize, both edge sides, grow/shrink, and rotated constructions.
+
+## Resize performance investigation
+
+Run `RESCALE_PERFORMANCE_REPORT=/tmp/rescale-profile.json npm test -- src/lib/resize-performance.test.ts` to record grouping, first common-dimension solve, range discovery, arrow preparation, and three successive source-relative arrow samples. The optional test writes JSON plus a `.cpuprofile` that can be loaded in DevTools. It is skipped in ordinary runs and imposes no machine-dependent timing threshold.
+
+On 11 November 2026, paired instrumented Node 25/macOS runs identified synchronous range discovery and handle preparation, repeated joint scans, and sparse matrix products as major costs. Observed before/after CPU timings for the same fixtures were:
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Synth/storage (27 panels), arrow preparation | 230 ms | 88 ms |
+| Synth/storage, three successive arrow samples | 90–110 ms | 44–53 ms |
+| Grid (178 panels), arrow preparation | 189 ms | 94 ms |
+| Grid, three successive arrow samples | 44–45 ms | 23–24 ms |
+| Grid, common-dimension range discovery | 1,249 ms | 570 ms |
+
+These are single paired local CPU profiles, not browser p95 or frame-rate guarantees. The seven-panel shelf showed noisy small timings, so no small-project speedup is claimed. The solver keeps operation order, tolerances, objectives, and recovery policies; 100 deterministic systems matched the committed prior kernel exactly with and without bounds. Per-call/batch joint indices remove repeated scans without persistent model caches. Separately, projects with at least 12 panels prepare arrow handles and slider ranges in cancellable workers, so these CPU costs no longer block the UI. Drag solving retains its existing worker/coalescing policy. Remaining costs include geometry validation, rendering, worker startup, and synchronous slider samples.

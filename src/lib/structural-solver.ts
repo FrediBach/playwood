@@ -52,14 +52,26 @@ export function solve(rows: Row[], weights: number[], dual?: number[]): number[]
     return { entries: entries.map(([index, value]) => [index, value / norm] as const), value: row.value / norm, sourceIndex, norm }
   }).filter(row => row.entries.length)
   const count = equations.length
+  // Flatten once per solve. Keep row/entry accumulation order unchanged while
+  // avoiding tuple destructuring and callbacks in every CG iteration.
+  const offsets = new Int32Array(count + 1)
+  for (let i = 0; i < count; i++) offsets[i + 1] = offsets[i] + equations[i].entries.length
+  const columns = new Int32Array(offsets[count]), coefficients = new Float64Array(offsets[count])
+  for (let i = 0; i < count; i++) equations[i].entries.forEach(([column, coefficient], j) => {
+    columns[offsets[i] + j] = column; coefficients[offsets[i] + j] = coefficient
+  })
+  const temporary = new Float64Array(size), product = new Float64Array(count)
   const multiply = (values: Float64Array): Float64Array => {
-    const temporary = new Float64Array(size)
-    equations.forEach((row, i) => { for (const [index, coefficient] of row.entries) temporary[index] += coefficient * values[i] })
-    const output = new Float64Array(count)
-    equations.forEach((row, i) => { for (const [index, coefficient] of row.entries) output[i] += coefficient * temporary[index] })
-    return output
+    temporary.fill(0); product.fill(0)
+    for (let i = 0; i < count; i++) for (let j = offsets[i]; j < offsets[i + 1]; j++) temporary[columns[j]] += coefficients[j] * values[i]
+    for (let i = 0; i < count; i++) for (let j = offsets[i]; j < offsets[i + 1]; j++) product[i] += coefficients[j] * temporary[columns[j]]
+    return product
   }
-  const dot = (a: Float64Array, b: Float64Array) => a.reduce((sum, value, index) => sum + value * b[index], 0)
+  const dot = (a: Float64Array, b: Float64Array) => {
+    let sum = 0
+    for (let i = 0; i < a.length; i++) sum += a[i] * b[i]
+    return sum
+  }
   const solution = new Float64Array(count)
   let residual = Float64Array.from(equations, row => row.value)
   let direction = residual.slice()

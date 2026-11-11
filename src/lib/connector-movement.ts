@@ -8,11 +8,25 @@ import { getPanelMovementDelta } from './panel-movement-direction'
 
 /** The rail shared by every panel clamped by this piece of hardware. */
 export function getConnectorRail(connection: Connection, panels: Panel[], connections: Connection[]) {
+  const id = connection.id.replace(/:\d+$/, '')
+  return connectorRail(connection, new Map(panels.map(panel => [panel.id, panel])),
+    connections.filter(item => item.id.replace(/:\d+$/, '') === id))
+}
+
+/** Batch-local indices: never retain geometry across project edits. */
+function railsFor(panels: Panel[], connections: Connection[]) {
   const panelsById = new Map(panels.map(panel => [panel.id, panel]))
-  const parent = panelsById.get(connection.parentId)
-  const child = panelsById.get(connection.childId)
-  const joint = (item: Connection) => item.id.replace(/:\d+$/, '')
-  const branches = connections.filter(item => joint(item) === joint(connection))
+  const groups = new Map<string, Connection[]>()
+  for (const connection of connections) {
+    const id = connection.id.replace(/:\d+$/, ''), group = groups.get(id)
+    if (group) group.push(connection)
+    else groups.set(id, [connection])
+  }
+  return (connection: Connection) => connectorRail(connection, panelsById, groups.get(connection.id.replace(/:\d+$/, '')) ?? [])
+}
+
+function connectorRail(connection: Connection, panelsById: Map<string, Panel>, branches: Connection[]) {
+  const parent = panelsById.get(connection.parentId), child = panelsById.get(connection.childId)
   if (!parent?.visible || !child?.visible) return null
   let lower = -Infinity, upper = Infinity
   for (const branch of branches) {
@@ -73,6 +87,7 @@ export function rescaleConnectorSlides(before: Project, after: Project, beforePa
   // Hidden stock still has installed hardware and must resize identically.
   const visibleBefore = beforePanels.map(panel => ({ ...panel, visible: true }))
   const visibleAfter = afterPanels.map(panel => ({ ...panel, visible: true }))
+  const beforeRail = railsFor(visibleBefore, before.connections), afterRail = railsFor(visibleAfter, after.connections)
   const connections = new Map(after.connections.map(connection => [connection.id, connection]))
   const overrides = { ...after.connectorOverrides }
   let changed = false
@@ -80,8 +95,8 @@ export function rescaleConnectorSlides(before: Project, after: Project, beforePa
     if (!connection.count) continue
     const nextConnection = connections.get(connection.id)
     if (!nextConnection || nextConnection.count !== connection.count) continue
-    const oldRail = getConnectorRail(connection, visibleBefore, before.connections)
-    const newRail = getConnectorRail(nextConnection, visibleAfter, after.connections)
+    const oldRail = beforeRail(connection)
+    const newRail = afterRail(nextConnection)
     if (!oldRail || !newRail) continue
     const oldSpan = oldRail.upper - oldRail.lower, newSpan = newRail.upper - newRail.lower
     if (oldSpan <= 1e-6 || newSpan < 0 || Math.abs(newSpan - oldSpan) < 1e-6) continue

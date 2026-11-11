@@ -12,6 +12,7 @@ async function importProject(page: Page, project: Project) {
   await expect.poll(async () => (await saved(page))?.name, { timeout: 15000 }).toBe(project.name)
   const disclosure = page.locator('.preview-rescale')
   if (await disclosure.count()) {
+    await expect(disclosure.getByRole('group', { name: 'Common dimensions', includeHidden: true })).toHaveAttribute('aria-busy', 'false', { timeout: 15000 })
     await expect(disclosure).not.toHaveAttribute('open')
     await expect(disclosure.locator('.preview-rescale-count')).toHaveText(String(await disclosure.locator('input[type="range"]').count()))
     await disclosure.locator('summary').click()
@@ -37,7 +38,7 @@ test('crossing dimensions stays separate during preview, commits once, and survi
   source.panels.forEach(panel => { panel.height = 400 })
   await importProject(page, source)
   const original = await saved(page)
-  const group = page.getByRole('group', { name: 'Common dimensions' })
+  const group = page.getByRole('group', { name: 'Common dimensions', includeHidden: true })
   await expect(group.getByRole('slider')).toHaveCount(2)
   const width = group.getByRole('slider', { name: 'Rescale 600 mm dimension', exact: true })
   const height = group.getByRole('slider', { name: 'Rescale 400 mm dimension', exact: true })
@@ -82,7 +83,7 @@ test('Escape cancels and keyboard changes use the configured step in both previe
   await slider.press('ArrowLeft')
   await expect.poll(async () => (await saved(page)).panels[0].width).toBe(600)
   await page.setViewportSize({ width: 320, height: 720 })
-  const group = page.getByRole('group', { name: 'Common dimensions' })
+  const group = page.getByRole('group', { name: 'Common dimensions', includeHidden: true })
   await expect(group).toBeInViewport()
   const heading = page.locator('.preview-rescale > summary')
   await expect(heading).toContainText('Rescale')
@@ -101,7 +102,7 @@ test('exposes at most four repeated dimensions and omits unique cuts', async ({ 
   const project = construction()
   project.panels = [100, 200, 300, 400, 500, 600].map((size, i) => createPanel({ width: size, height: size, position: [i * 1000, 500, 0] }))
   await importProject(page, project)
-  const sliders = page.getByRole('group', { name: 'Common dimensions' }).getByRole('slider')
+  const sliders = page.getByRole('group', { name: 'Common dimensions', includeHidden: true }).getByRole('slider')
   await expect(sliders).toHaveCount(4)
   project.name = 'No repeating dimensions'
   project.panels = [createPanel({ width: 400, height: 500 })]
@@ -153,7 +154,7 @@ test('hides dimensions locked by constraints and shows them again when unlocked'
   const source = construction()
   source.constraints = [{ id: 'locked-width', kind: 'dimension', enabled: true, panelId: source.panels[0].id, dimension: 'width', value: 600 }]
   await importProject(page, source)
-  const group = page.getByRole('group', { name: 'Common dimensions' })
+  const group = page.getByRole('group', { name: 'Common dimensions', includeHidden: true })
   await expect(group.getByRole('slider')).toHaveCount(1)
   await expect(group.getByRole('slider', { name: 'Rescale 300 mm dimension', exact: true })).toBeVisible()
   source.name = 'Unlocked cuts'

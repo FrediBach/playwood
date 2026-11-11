@@ -3,13 +3,14 @@ import type { usePreviewRescale } from '@/hooks/use-preview-rescale'
 import './preview-rescale.css'
 
 export function PreviewRescale({ control, step = 1 }: { control: ReturnType<typeof usePreviewRescale>; step?: number }) {
-  if (!control.values.length) return null
+  if (!control.values.length && !control.pending && !control.error) return null
   return <details className="preview-rescale" onKeyDown={event => {
     event.stopPropagation()
     if (event.key === 'Escape') { event.preventDefault(); control.cancel() }
   }}>
     <summary aria-description={`${control.values.length} sliders`}><ChevronRight size={14} aria-hidden="true"/>Rescale<span className="preview-rescale-count" aria-hidden="true">{control.values.length}</span></summary>
-    <div role="group" aria-label="Common dimensions">
+    <div role="group" aria-label="Common dimensions" aria-busy={control.pending}>
+    {control.pending && <p role="status">Preparing dimensions…</p>}
     {control.values.map(value => {
       const amount = control.amount[value.id] ?? value.value
       const min = Math.ceil(value.min / step) * step

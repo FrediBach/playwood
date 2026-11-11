@@ -1,5 +1,6 @@
+import { createResizePreparationWorker } from '@/lib/resize-preparation-worker'
 import { getPreviewRescaleValues } from '@/lib/preview-rescale-values'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { rescaleProject, type RescaleValue } from '@/lib/project-rescale'
 import type { Project } from '@/lib/types'
 
@@ -16,7 +17,21 @@ export function usePreviewRescale(project: Project, disabled: boolean, commit: (
   const [draft, setDraft] = useState<Session | null>(null)
   const latest = useRef<Session | null>(null)
   const session = !disabled && draft?.source === project ? draft : null
-  const discovered = useMemo(() => getPreviewRescaleValues(project), [project])
+  const background = project.panels.length >= 12
+  const [ranges, setRanges] = useState<{ source: Project; values: RescaleValue[]; error?: string } | null>(null)
+  useEffect(() => {
+    if (!background) return
+    const job = createResizePreparationWorker({ kind: 'ranges', project })
+    let active = true
+    void job.result.then(result => {
+      if (!active || !result) return
+      if (result.kind === 'ranges') setRanges({ source: project, values: result.values })
+      else if (result.kind === 'error') setRanges({ source: project, values: [], error: result.message })
+    })
+    return () => { active = false; job.stop() }
+  }, [project, background])
+  const pending = background && ranges?.source !== project
+  const discovered = useMemo(() => background ? ranges?.values ?? [] : getPreviewRescaleValues(project), [project, background, ranges])
   const values = session?.values ?? discovered
   const update = (next: Session | null) => { latest.current = next; setDraft(next) }
   const cancel = () => update(null)
@@ -31,11 +46,11 @@ export function usePreviewRescale(project: Project, disabled: boolean, commit: (
     }
   }
   return {
-    values, disabled, active: !!session, project: session?.candidate,
-    amount: session ? { [session.id]: session.amount } : {}, error: session?.error,
+    values, pending, disabled: disabled || pending, active: !!session, project: session?.candidate,
+    amount: session ? { [session.id]: session.amount } : {}, error: session?.error ?? (ranges?.source === project ? ranges.error : undefined),
     cancel, finish,
     change: (id: string, amount: number) => {
-      if (disabled) return
+      if (disabled || pending) return
       const value = values.find(value => value.id === id)
       if (!value) return
       const previous = latest.current
