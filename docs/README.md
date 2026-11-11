@@ -30,4 +30,6 @@ These documents describe the implementation in this repository. Source links poi
 
 ## Documentation maintenance
 
+Proposed work: [Resize solver intent and improvement plan](plans/resize-solver-intent.md) analyzes the current solver and describes a staged approach to predicting resize intent, building on the [constraints system improvement plan](plans/constraints-system-improvements.md).
+
 Update the relevant document when changing a persisted field, operation boundary, input rule, storage key, asset pipeline, or development command. Keep the root agent guide concise and link here for detail. Document implemented behavior and limitations; mark proposals explicitly rather than presenting them as current architecture.
