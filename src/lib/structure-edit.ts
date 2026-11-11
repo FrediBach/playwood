@@ -704,6 +704,11 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       const retained = rows.filter(row => !cutPreferences.has(row))
       changes = solveChanges(retained)
       for (const preserve of cutPreferences) {
+        // The current weighted minimum remains a minimum after adding an
+        // equality it already satisfies. Retain it for subsequent trials without
+        // rerunning the entire preference fallback for each unchanged cut.
+        const residual = [...preserve.entries].reduce((sum, [index, value]) => sum + value * changes[index], 0) - preserve.value
+        if (Math.abs(residual) <= 1e-10) { retained.push(preserve); continue }
         try {
           const candidate = solveChanges([...retained, preserve])
           retained.push(preserve)
