@@ -1,3 +1,6 @@
+import { validateResizeCandidate } from './resize-candidate-validation'
+import type { ShadowResizeCandidate } from './resize-planner'
+import { solveResizePriorities, type ResizePriorityTier } from './resize-priority-solver'
 import { ResizeShadowBudgetError, type ResizeShadowPolicy } from './resize-shadow-contract'
 import { createResizeIntent, assertLegacyResizeIntent, unwrapResizeResult, type ResizeIntent, type ResizeContext, type ResizeResult, type ResizeProblem, type ResizeDimensions as Dimensions, type PanelResizeDimensions as PanelDimensions, type InferredRelationship, type PanelEdgeResize } from './resize-intent'
 import { analyzeStructure, inspectResizeAnalysis, frame, extent, coordinate, findContacts, type Frame, type Contact } from './resize-analysis'
@@ -555,7 +558,12 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     }
   }
 
+  const priorityTiers: ResizePriorityTier[] = []
   if (trace?.shadow) {
+    const policy = trace.shadow
+    if (policy.hierarchy) {
+      priorityTiers.push({ name: 'cuts', rows: [...cutPreferences] }, { name: 'placement', rows: [...preferences] })
+    }
     // Shadow interpretations replace heuristics as a coherent group. Physical,
     // authored, target and scope rows survive; defining rows never enter fallback.
     for (let index = rows.length - 1; index >= 0; index--) {
@@ -568,12 +576,16 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         }
       }
     })
-    for (const equation of trace.shadow.equations) {
+    const weakRows: Row[] = []
+    const definingEquations = new Set(policy.equations)
+    for (const equation of [...policy.equations, ...(policy.hierarchy ? policy.softReferences ?? [] : [])]) {
       if (!equation.terms.some(term => indices.has(term.panelId))) continue
       if (!equation.terms.every(term => indices.has(term.panelId))) throw new Error('Shadow reference crosses an unsupported solve component.')
       const constraint = row(0, { kind: 'inferred', relationshipId: equation.id, panelIds: equation.terms.map(term => term.panelId) })
       for (const term of equation.terms) edge(constraint, indices.get(term.panelId)!, new Vector3(...term.axis), term.side, term.scale)
+      if (!definingEquations.has(equation)) { rows.pop(); weakRows.push(constraint) }
     }
+    if (policy.hierarchy) priorityTiers.push({ name: 'references', rows: weakRows })
   }
 
   if (trace?.inspect) {
@@ -631,10 +643,17 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   try {
     try {
       if (trace?.shadow) {
-        if (trace.shadow.budget.remaining <= 0) throw new ResizeShadowBudgetError()
-        trace.shadow.budget.remaining--
-        trace.shadow.budget.used++
-        changes = solveWithBounds(rows, bounds, weights)
+        const policy = trace.shadow
+        const consume = () => {
+          if (policy.budget.remaining <= 0) throw new ResizeShadowBudgetError()
+          policy.budget.remaining--
+          policy.budget.used++
+        }
+        if (policy.hierarchy) {
+          const result = solveResizePriorities(rows, bounds, weights, priorityTiers, consume)
+          changes = result.values
+          policy.diagnostics?.push(...result.diagnostics)
+        } else { consume(); changes = solveWithBounds(rows, bounds, weights) }
       } else changes = solveChanges(rows)
     }
     catch (error) {
@@ -1115,11 +1134,14 @@ export function resizePanels(project: Project, ids: readonly string[], patch: Di
 }
 
 export interface ResizeAlternative {
+  candidate?: ShadowResizeCandidate
+  explanation?: string
+  outsideSize?: { before: number[]; after: number[] }
   relaxed: InferredRelationship
   project: Project
   changes: { before: Panel; after: Panel }[]
 }
-export interface ResizeReview { source: Project; requestedDimensions: Dimensions; alternatives: ResizeAlternative[] }
+export interface ResizeReview { intent?: ResizeIntent; incomplete?: boolean; selectedIndex?: number; source: Project; requestedDimensions: Dimensions; alternatives: ResizeAlternative[] }
 
 /** Explicit review only: ordinary resizing never silently drops an inferred fit.
  * Search a bounded set of single-relationship alternatives after a failed solve.
@@ -1156,10 +1178,10 @@ export function getResizeAlternatives(project: Project, ids: readonly string[], 
 }
 
 export function acceptResizeAlternative(current: Project, review: ResizeReview, index: number): Project {
-  if (current !== review.source) throw new Error('The project changed. Try the resize again to review current alternatives.')
+  if (current !== review.source || (review.intent && current !== review.intent.source)) throw new Error('The project changed. Try the resize again to review current alternatives.')
   const alternative = review.alternatives[index]
   if (!alternative) throw new Error('Choose a resize alternative.')
-  return alternative.project
+  return review.intent && alternative.candidate ? validateResizeCandidate(review.intent, alternative.project, alternative.candidate.equations, alternative.candidate.adaptingCuts) : alternative.project
 }
 
 /** Pull one panel edge, anchoring its opposite edge. Local edits also fix other panels and hardware. */

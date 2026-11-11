@@ -1,3 +1,4 @@
+import { ResizeReviewRequired, resizePanelsWithReview } from '@/lib/numeric-resize'
 import type { Notify } from '@/editor/editor-notifications'
 import type { ListGroupingProps } from '@/components/GroupedList'
 import type { BoxSelection } from '@/components/PreviewBoxSelection'
@@ -20,7 +21,7 @@ import { mergePanels } from '@/lib/panel-merge'
 import { distributePanels } from '@/lib/panel-distribution'
 import { splitParallelPanels } from '@/lib/parallel-panels'
 import { getSharedPanelFields,panelValuesEqual,selectPanelIds,updateSelectedPanels } from '@/lib/selection'
-import { getResizeAlternatives,MovementReviewRequired,movePanelsWithReview,movePanels,resizePanelDimensions,resizePanels,type MovementReview,type ResizeReview } from '@/lib/structure-edit'
+import { MovementReviewRequired,movePanelsWithReview,movePanels,resizePanelDimensions,resizePanels,type MovementReview,type ResizeReview } from '@/lib/structure-edit'
 import { assertNoNewTrofastIssues } from '@/lib/trofast'
 import type { ConnectorType,ListKind,Panel,Project,Vec3 } from '@/lib/types'
 import { type SetStateAction } from 'react'
@@ -41,11 +42,6 @@ interface CreatePanelEditCommandsOptions {
 }
 
 export function createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds, setResizeReview, setMovementReview }: CreatePanelEditCommandsOptions) {
-  const offerResizeReview=(source: Project, ids: string[], patch: Partial<Panel>) => {
-    if(!Object.keys(patch).every(key => key==='width'||key==='height')) return
-    const review=getResizeAlternatives(source,ids,patch)
-    if(review) setResizeReview(review)
-  }
   const checkLoosePanelPatch=(patch: Partial<Panel>) => {
     if(selectedPanels.some(panel => isPanelConnectedToAssembly(project,panel.id)&&(['position','rotation','thickness'] as const).some(key => patch[key]!==undefined&&!panelValuesEqual(panel[key],patch[key])))) {
       throw new Error('These panels still connect to an assembly. Detach the panels before changing their placement or thickness.')
@@ -54,12 +50,11 @@ export function createPanelEditCommands({ selectedPanels, project, selectedId, a
   const updatePanel=(patch: Partial<Panel>) => {
     if(!selectedId) return false
     if(assembly.hasMembers) return assembly.editingInstance? assembly.updateDefinition(patch):false
-    let source=project
     try {
       checkLoosePanelPatch(patch)
       const { width,height,thickness,position,...rest }=patch
       commit(current => {
-        source=current
+        if(Object.keys(patch).every(key=>key==='width'||key==='height')) return resizePanelsWithReview(current,[selectedId],{ width,height })
         if(patch.position&&Object.keys(patch).length===1) {
           const before=resolvePanels(current).find(panel=>panel.id===selectedId)!
           return assertNoNewTrofastIssues(current,movePanelsWithReview(current,[selectedId],patch.position.map((value,axis)=>value-before.position[axis]) as Vec3))
@@ -74,18 +69,17 @@ export function createPanelEditCommands({ selectedPanels, project, selectedId, a
       })
       setPanelEditError(null)
       return true
-    } catch(error) { if(error instanceof MovementReviewRequired) { setMovementReview(error.review); return false } const message=error instanceof Error? error.message:'This panel size cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message,'error'); offerResizeReview(source,[selectedId],patch); return false}
+    } catch(error) { if(error instanceof ResizeReviewRequired) { setPanelEditError(null); setResizeReview(error.review); return false } if(error instanceof MovementReviewRequired) { setMovementReview(error.review); return false } const message=error instanceof Error? error.message:'This panel size cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message,'error'); return false}
   }
   const updateMultiplePanels=(patch: Partial<Panel>) => {
     if(assembly.hasMembers) return assembly.editingInstance? assembly.updateDefinition(patch):false
-    let source=project
     try {
       checkLoosePanelPatch(patch)
       const { width,height,thickness,position,...rest }=patch
       const shared=getSharedPanelFields(selectedPanels)
       const dimensions={ width: shared.has('width')? width:undefined,height: shared.has('height')? height:undefined }
       commit(current => {
-        source=current
+        if(Object.keys(patch).every(key=>key==='width'||key==='height')) return resizePanelsWithReview(current,selectedIds,dimensions)
         const constrained=current.constraints?.some(rule => rule.enabled)
         let base=updateSelectedPanels(current,selectedIds,!constrained&&thickness!==undefined? { ...rest,thickness }:rest)
         if(position) { const before=resolvePanels(base).find(panel => panel.id===selectedIds[0])!; base=constrained? movePanels(base,selectedIds,position.map((value,axis) => value-before.position[axis]) as Vec3):updateSelectedPanels(base,selectedIds,{ position })}
@@ -94,7 +88,7 @@ export function createPanelEditCommands({ selectedPanels, project, selectedId, a
       })
       setPanelEditError(null)
       return true
-    } catch(error) { const message=error instanceof Error? error.message:'These panel sizes cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message,'error'); if(Object.keys(patch).every(key => key==='width'||key==='height')) { const shared=getSharedPanelFields(selectedPanels); offerResizeReview(source,selectedIds,{ width:shared.has('width')?patch.width:undefined,height:shared.has('height')?patch.height:undefined }) } return false}
+    } catch(error) { if(error instanceof ResizeReviewRequired) { setPanelEditError(null); setResizeReview(error.review); return false } const message=error instanceof Error? error.message:'These panel sizes cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message,'error'); return false}
   }
   return { updatePanel,updateMultiplePanels }
 }

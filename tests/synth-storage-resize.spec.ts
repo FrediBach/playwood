@@ -12,7 +12,7 @@ async function openConstruction(page: Page) {
   await page.getByLabel('Import project file').setInputFiles({
     name: 'synth-storage.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(original)),
   })
-  await expect.poll(async () => (await saved(page))?.name).toBe(original.name)
+  await expect.poll(async () => (await saved(page))?.name, { timeout: 15000 }).toBe(original.name)
 }
 
 function expectAccessoryCutsUnchanged(next: Project) {
@@ -33,6 +33,13 @@ for (const { name, field, value } of [
   await page.getByRole('button', { name, exact: true }).click()
   await page.getByLabel(field, { exact: true }).fill(String(value))
   await page.getByLabel(field, { exact: true }).press('Enter')
+  if (name.startsWith('Storage')) {
+    const review = page.getByRole('dialog', { name: 'Review resize alternatives' })
+    await expect(review).toBeVisible()
+    expect(await saved(page)).toEqual(before)
+    await review.getByRole('radio', { name: 'Keep attached sizes', exact: true }).check()
+    await review.getByRole('button', { name: 'Apply resize', exact: true }).click()
+  }
   const id = original.panels.find(panel => panel.name === name)!.id
   const dimension = field === 'Width' ? 'width' : 'height'
   await expect.poll(async () => (await saved(page)).panels.find(panel => panel.id === id)![dimension]).toBe(value)

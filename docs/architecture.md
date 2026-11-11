@@ -65,7 +65,10 @@ This diagram groups responsibilities; it is not a strict module dependency graph
 | [src/lib/resize-intent.ts](../src/lib/resize-intent.ts) | Transient resize targets, anchor/scope/hardware contracts, results, and source/session acceptance |
 | [src/lib/resize-analysis.ts](../src/lib/resize-analysis.ts) | Shared resolved frames/protected contacts and optional immutable physical inspection |
 | [src/lib/resize-evidence.ts](../src/lib/resize-evidence.ts) | Immutable seam, compartment, span, and dependent-section evidence for shadow planning |
-| [src/lib/resize-planner.ts](../src/lib/resize-planner.ts) | Development-only semantic candidates, bounded comparison, explanations, and lexicographic ranking |
+| [src/lib/resize-planner.ts](../src/lib/resize-planner.ts) | Shared semantic candidates, bounded shadow comparison, explanations, and lexicographic ranking |
+| [src/lib/resize-priority-solver.ts](../src/lib/resize-priority-solver.ts) | Lexicographic least-squares priorities and numerical diagnostics |
+| [src/lib/resize-candidate-validation.ts](../src/lib/resize-candidate-validation.ts) | Shared materialized numeric-candidate validation and measured overlap guard |
+| [src/lib/numeric-resize.ts](../src/lib/numeric-resize.ts) | Ordinary inspector resize decisions and source-bound review transactions |
 | [src/lib/structural-solver.ts](../src/lib/structural-solver.ts) | Sparse weighted equality/bound kernel, row provenance, and numerical failure diagnostics |
 | [src/lib/construction-objects.ts](../src/lib/construction-objects.ts), [object-geometry.ts](../src/lib/object-geometry.ts), [object-edit.ts](../src/lib/object-edit.ts) | Snapping and edge scaling, saved source-volume forest, immutable object commands, orthogonal transforms, and bounded Boolean surface evaluation |
 | [src/hooks/use-construction-editor.ts](../src/hooks/use-construction-editor.ts), [use-object-preview.ts](../src/hooks/use-object-preview.ts), [use-object-gesture.ts](../src/hooks/use-object-gesture.ts) | Object selection/clipboard/drafts, gesture transactions, and cancellable worker previews, separate from panel editing |

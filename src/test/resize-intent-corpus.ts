@@ -99,8 +99,8 @@ export const resizeIntentCorpus: ResizeBenchmarkCase[] = [
     id: 'unrelated-equal-cut', family: 'Equal numbers without topology',
     source: () => { const project = seam(200); return { ...project, panels: [...project.panels, createPanel({ id: 'peer', name: 'Peer', width: 600, height: 400, position: [3000, 800, 0] })] } },
     target: { panel: 'Parent', dimension: 'height', value: 500 }, operation: 'numeric', anchor: 'Selected parent center',
-    allowedAdaptingCuts: ['Parent.height'], invariants: physical, acceptableAlternatives: ['Peer stays fixed; child travels without recutting'],
-    ambiguity: 'none', policy: 'compatibility', current: { reviewCount: 0, cuts: { 'Parent.height': 500, 'Peer.height': 400, 'Child.height': 200 } },
+    allowedAdaptingCuts: ['Parent.height', 'Child.height'], invariants: physical, acceptableAlternatives: ['Peer stays fixed; child travels without recutting', 'Peer stays fixed; preserve both child setbacks with explicit review'],
+    ambiguity: 'review', policy: 'compatibility', current: { reviewCount: 0, cuts: { 'Parent.height': 500, 'Peer.height': 400, 'Child.height': 200 } },
   },
   {
     id: 'angled-trays', family: 'Real synth/storage fixture', source: () => parseProject(synthStorage),

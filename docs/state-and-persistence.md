@@ -88,7 +88,7 @@ Selecting a full library build opens its replacement confirmation immediately. [
 
 ### Reviewed resize alternatives
 
-Failed numeric Width/Height edits on ordinary panels can open `ResizeAlternativesDialog` through `createPanelEditCommands`. `useEditorState.resizeReview` holds the source project and fully validated candidate alternatives outside project history. Radio choices only change the displayed review table. Cancel/Escape restores focus and leaves the committed project unchanged; Apply uses a functional source-identity check and commits one candidate as one undoable edit. Project changes invalidate the review, and modal guards prevent keyboard and canvas commands from editing behind it. Compound property patches, gesture resizing, and shared assembly editing do not enter this review workflow.
+Ordinary numeric Width/Height patches now call `resizePanelsWithReview` inside the existing functional `commit` callback. A high-confidence result returns one fully validated project; `ResizeReviewRequired` interrupts the callback before history changes when outcomes differ materially (including successful-but-ambiguous edits). `useEditorState.resizeReview` holds the source, intent, candidates, and selected review index outside history. Radio choices change the table and affected-panel highlights only. Cancel/Escape restores focus and leaves the committed project unchanged; Apply checks both source identities and reruns centralized candidate validation before committing one undoable edit. Source changes invalidate the review and modal guards block background edits. Compound patches, gestures, rescale, and shared assembly controls keep their existing APIs/policies. No semantic interpretation is saved as a hidden rule.
 
 ### Reviewed movement stages
 

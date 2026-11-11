@@ -225,7 +225,8 @@ export default function App() {
     connect, connectAvailable, toggleConnect,
     objectMode, displayedObjects, objectPreview, objects, objectInteractionDisabled, objectGesture, boxSelectActive,
     snapSettings, chooseObject, project, boxSelectAvailable, selectionKind, toggleBoxSelect, selectBox, cancelBoxSelect,
-    resolveBoxPanelIds, resolveBoxConnectorIds, resize, drag, setSnapSettings, constraints, modalOpen, clipboard,
+    resolveBoxPanelIds, resolveBoxConnectorIds, resize, drag, setSnapSettings, constraints: resizeReview?.source===project
+      ? {...constraints,highlightedPanelIds:resizeReview.alternatives[resizeReview.selectedIndex??0].changes.map(change=>change.after.id)}:constraints, modalOpen, clipboard,
     assembly, inspectorTab, realisticPreview, selectedConnectorIds, chooseConnector, selectedIds, choosePanel,
     setContextMenu, constraintPreviewProject, displayPanels, openConstraints, pickingConstraint,
     constraintsOverviewOpen: projectConstraintsOpen && rightOpen,
@@ -300,7 +301,7 @@ export default function App() {
       try { commit(current=>acceptMovementAlternative(current,movementReview,index)); setMovementReview(null); setPanelEditError(null); notify('Movement applied. Undo is available.') }
       catch(error) { setMovementReview(null); notify(error instanceof Error?error.message:'This move could not be applied.','error') }
     }}/>}
-    {resizeReview&&resizeReview.source===project&&<ResizeAlternativesDialog review={resizeReview} onCancel={()=>setResizeReview(null)} onConfirm={index=>{
+    {resizeReview&&resizeReview.source===project&&<ResizeAlternativesDialog review={resizeReview} onPreview={index=>setResizeReview({...resizeReview,selectedIndex:index})} onCancel={()=>setResizeReview(null)} onConfirm={index=>{
       try { commit(current=>acceptResizeAlternative(current,resizeReview,index)); setResizeReview(null); setPanelEditError(null); notify('Resize applied. Undo is available.') }
       catch(error) { setResizeReview(null); notify(error instanceof Error?error.message:'This resize could not be applied.','error') }
     }}/>}
