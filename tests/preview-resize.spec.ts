@@ -426,9 +426,10 @@ for (const distance of [-50, 50]) test(`moving the H-table desktop arrow by ${di
   await expect.poll(() => savedProject(page)).toEqual(project)
 })
 
-for (const example of ['H-table', 'Island display']) for (const [worker, viewport] of [[false, 1440], [true, 1440], [false, 390], [true, 390]] as const) test(`${example} connected edge ${worker ? 'worker' : 'main thread'} at ${viewport}px grows the structure and commits once`, async ({ page }) => {
+for (const example of ['H-table', 'Island display', 'Island depth']) for (const [worker, viewport] of [[false, 1440], [true, 1440], [false, 390], [true, 390]] as const) test(`${example} connected edge ${worker ? 'worker' : 'main thread'} at ${viewport}px grows the structure and commits once`, async ({ page }) => {
   await page.setViewportSize({ width: viewport, height: 900 })
   let project = example === 'H-table' ? hTableProject('H-table', 1800) : islandProject()
+  const dimension = example === 'Island depth' ? 'height' : 'width'
   const name = example === 'H-table' ? 'Desktop' : 'Island base'
   if (worker) project = { ...project, panels: [...project.panels, ...Array.from({ length: 12 - project.panels.length }, (_, i) =>
     createPanel({ id: `unrelated-${i}`, visible: false, position: [5000 + i * 1000, 800, 0] }))] }
@@ -442,7 +443,7 @@ for (const example of ['H-table', 'Island display']) for (const [worker, viewpor
     const closeInspector = page.getByRole('button', { name: 'Collapse inspector', exact: true })
     if (await closeInspector.isVisible()) await closeInspector.click()
   }
-  const handle = preparePreviewResize(project, { panelId: panel.id })!.handles.find(item => item.id === 'panel-width-positive')!
+  const handle = preparePreviewResize(project, { panelId: panel.id })!.handles.find(item => item.id === `panel-${dimension}-positive`)!
   const button = page.locator(`[data-resize-handle="${handle.id}"]`)
   await button.click()
   expect(await savedProject(page)).toEqual(project)
@@ -454,10 +455,10 @@ for (const example of ['H-table', 'Island display']) for (const [worker, viewpor
   await beginResize(page, handle, 100)
   expect(await savedProject(page)).toEqual(project)
   await page.mouse.up()
-  await expect.poll(async () => (await savedProject(page)).panels.find(p => p.id === panel.id)!.width).toBeGreaterThan(panel.width + 50)
+  await expect.poll(async () => (await savedProject(page)).panels.find(p => p.id === panel.id)![dimension]).toBeGreaterThan(panel[dimension] + 50)
   await expect(page.getByRole('dialog', { name: 'Review resize alternatives' })).toHaveCount(0)
   const after = await savedProject(page)
-  const growth = after.panels.find(p => p.id === panel.id)!.width - panel.width
+  const growth = after.panels.find(p => p.id === panel.id)![dimension] - panel[dimension]
   if (example === 'H-table') {
     for (const side of ['Left', 'Right']) {
       const pair = (source: Project) => source.panels.filter(p => [`${side} front leg`, `${side} rear leg`].includes(p.name)).reduce((sum, p) => sum + p.width, 0)
@@ -467,9 +468,16 @@ for (const example of ['H-table', 'Island display']) for (const [worker, viewpor
         expect(after.panels.find(p => p.id === old.id)!.width - old.width).toBeCloseTo(growth / 2, 4)
       }
     }
-  } else for (const name of ['Island middle platform', 'Island upper shelf']) {
+  } else for (const name of dimension === 'height' ? ['Island middle platform'] : ['Island middle platform', 'Island upper shelf']) {
     const old = project.panels.find(p => p.name === name)!, current = after.panels.find(p => p.name === name)!
-    expect(current.width - old.width, name).toBeCloseTo(growth, 4)
+    expect(current[dimension] - old[dimension], name).toBeCloseTo(growth, 4)
+  }
+  if (example !== 'H-table') {
+    const panels = resolvePanels(after), upper = panels.find(p => p.name === 'Island upper shelf')!
+    const base = panels.find(p => p.id === panel.id)!
+    expect(upper.position[0]).toBeCloseTo(base.position[0], 4)
+    expect(upper.position[2]).toBeCloseTo(base.position[2], 4)
+    expect(upper.height).toBeCloseTo(350, 4)
   }
   expectAnglesAndJoints(project, after)
   await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()

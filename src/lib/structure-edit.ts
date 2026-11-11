@@ -248,6 +248,15 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       && Math.abs(frames[parentIndex].axes[seamDimension].dot(movementAxis)) > 1 - EPSILON
     if ((edit.kind === 'resize' && !edit.local) || movingSpan) {
       const { dimension, childDimension, retainedEnds } = seamFits.get(connection.id)!
+      // A narrow panel centered on a longer seam should follow its midpoint,
+      // even when neither distant end qualifies as a retained setback.
+      // Movement/local resizing can intentionally break this source inference.
+      if (edit.kind === 'resize' && retainedEnds.length < 2 && Math.abs(connection.offset) < CONTACT_TOLERANCE) {
+        const centered = inferred('alignment', [connection.id, 'seam-center'], parentIndex, childIndex,
+          'keep centered along the shared joint')
+        add(centered, offsetVariables.get(offsetKey(connection))!, 1)
+        preferences.add(centered)
+      }
       // Equal coplanar continuations at a T/cross joint describe a centered
       // split. Preserve that midpoint when resizing the surrounding structure,
       // but let direct edits to either half (and movement) break the inference.

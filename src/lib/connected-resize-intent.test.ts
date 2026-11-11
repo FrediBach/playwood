@@ -12,6 +12,7 @@ const cases = [
   { name: 'H-table depth', create: () => hTableProject('H-table', 1800), panel: 'Desktop', dimension: 'width' as const, changed: [] },
   { name: 'Island depth', create: islandProject, panel: 'Island base', dimension: 'height' as const, changed: ['Island middle platform'] },
   { name: 'Island width', create: islandProject, panel: 'Island base', dimension: 'width' as const, changed: ['Island middle platform', 'Island upper shelf'] },
+  { name: 'Island middle depth', create: islandProject, panel: 'Island middle platform', dimension: 'height' as const, changed: ['Island base'] },
 ]
 it.each(cases.flatMap(scenario => [0, 27].flatMap(angle => [-1, 1].flatMap(side => [-80, 100].map(distance => ({ ...scenario, angle, side: side as -1 | 1, distance }))))))('$name propagates a $distance mm edge drag (rotation $angle, side $side)', ({ create, panel: name, dimension, changed, angle, side, distance }) => {
   const source = rotateProject(create(), 'y', angle), snapshot = JSON.stringify(source)
@@ -25,6 +26,11 @@ it.each(cases.flatMap(scenario => [0, 27].flatMap(angle => [-1, 1].flatMap(side 
   const axis = new Vector3(dimension === 'width' ? 1 : 0, dimension === 'height' ? 1 : 0, 0).applyEuler(new Euler(...panel.rotation))
   const anchor = (p: typeof panel) => new Vector3(...p.position).addScaledVector(axis, -side * p[dimension] / 2)
   expect(anchor(selected).distanceTo(anchor(panel))).toBeLessThan(1e-4)
+  if (name.startsWith('Island')) {
+    const upper = after.find(p => p.name === 'Island upper shelf')!
+    expect(new Vector3(...upper.position).sub(new Vector3(...selected.position)).dot(axis)).toBeCloseTo(0, 4)
+    expect(upper.height).toBeCloseTo(350, 4)
+  }
   for (const name of changed) {
     const old = before.find(item => item.name === name)!, next = after.find(item => item.name === name)!
     expect(Math.max(Math.abs(next.width - old.width), Math.abs(next.height - old.height)), name).toBeGreaterThan(1)
@@ -104,4 +110,40 @@ it('allows directly resizing a split half to break symmetry', () => {
   expect(panels.find(p => p.id === leg.id)!.width).toBeCloseTo(leg.width + 60, 4)
   expect(Math.abs(panels.find(p => p.id === leg.id)!.width
     - panels.find(p => p.name === 'Left rear leg')!.width)).toBeGreaterThan(1)
+})
+
+it('retains island centering through successive depth edits and reload', () => {
+  let project = islandProject()
+  const base = project.panels.find(p => p.name === 'Island base')!
+  for (const side of [-1, 1, -1] as const) {
+    project = roundTripProject(resizePanelEdge(project, base.id, 'height', side, 80))
+    const panels = resolvePanels(project)
+    expect(panels.find(p => p.name === 'Island upper shelf')!.position[2])
+      .toBeCloseTo(panels.find(p => p.id === base.id)!.position[2], 4)
+    expect(panels.find(p => p.name === 'Island upper shelf')!.height).toBeCloseTo(350, 4)
+  }
+  expect(project.constraints ?? []).toEqual([])
+})
+
+it('allows moving the island upper tier off center before resizing', () => {
+  const source = islandProject()
+  const tier = source.panels.filter(p => p.name.includes('upper'))
+  const moved = roundTripProject(movePanels(source, tier.map(p => p.id), [0, 0, 60]))
+  const upper = resolvePanels(moved).find(p => p.name === 'Island upper shelf')!
+  expect(upper.position[2]).toBeCloseTo(60, 4)
+  const base = moved.panels.find(p => p.name === 'Island base')!
+  const panels = resolvePanels(resizePanelEdge(moved, base.id, 'height', 1, 80))
+  expect(Math.abs(panels.find(p => p.id === upper.id)!.position[2]
+    - panels.find(p => p.id === base.id)!.position[2])).toBeGreaterThan(1)
+})
+
+it('lets a saved upper shelf position override inferred seam centering', () => {
+  const source = islandProject()
+  const upper = resolvePanels(source).find(p => p.name === 'Island upper shelf')!
+  source.constraints = [{ id: 'fixed-upper', enabled: true, kind: 'position', panelId: upper.id,
+    axis: 'z', reference: 'center', value: upper.position[2] }]
+  const base = source.panels.find(p => p.name === 'Island base')!
+  const panels = resolvePanels(resizePanelEdge(source, base.id, 'height', 1, 100))
+  expect(panels.find(p => p.id === upper.id)!.position[2]).toBeCloseTo(upper.position[2], 4)
+  expect(panels.find(p => p.id === base.id)!.height).toBeCloseTo(base.height + 100, 4)
 })
