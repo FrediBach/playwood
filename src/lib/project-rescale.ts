@@ -166,7 +166,7 @@ export function rescaleProject(project: Project, changes: Record<string, number>
     // Validate the whole draft together: increasing hole spacing can make a
     // larger perforated panel valid, and smaller radii can preserve its clamps.
     const prepared = details.size ? { ...source, panels: source.panels.map(panel => details.has(panel.id) ? { ...panel, ...details.get(panel.id) } : panel) } : source
-    return resizePanelDimensions(prepared, dimensions, { trofastWorld })
+    return resizePanelDimensions(prepared, dimensions, { trofastWorld, origin: 'project-rescale' })
   }
 
   let next: Project

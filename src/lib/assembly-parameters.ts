@@ -81,7 +81,7 @@ export function evaluateAssemblyDefinition(definition: AssemblyDefinition, value
       else (patches[binding.panelId] ??= {})[binding.dimension] = exact
     }
   }
-  let edited = resizePanelDimensions(source, patches, { trofastWorld: false })
+  let edited = resizePanelDimensions(source, patches, { trofastWorld: false, origin: 'assembly-parameters' })
   edited = { ...edited, panels: edited.panels.map(panel => thickness.has(panel.id) ? { ...panel, thickness: thickness.get(panel.id)! } : panel) }
   const before = getProjectBounds(source.panels), after = getProjectBounds(edited.panels)
   const shift: Vec3 = [(before.min[0] + before.max[0] - after.min[0] - after.max[0]) / 2,

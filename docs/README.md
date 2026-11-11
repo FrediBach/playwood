@@ -30,6 +30,6 @@ These documents describe the implementation in this repository. Source links poi
 
 ## Documentation maintenance
 
-Ongoing work: [Resize solver intent and improvement plan](plans/resize-solver-intent.md) analyzes the current solver and describes a staged approach to predicting resize intent, building on the [constraints system improvement plan](plans/constraints-system-improvements.md). The [stage 0 benchmark](plans/resize-solver-benchmark.md) records labeled cases and current outputs; solver policy remains unchanged.
+Ongoing work: [Resize solver intent and improvement plan](plans/resize-solver-intent.md) analyzes the current solver and describes a staged approach to predicting resize intent, building on the [constraints system improvement plan](plans/constraints-system-improvements.md). The [stage 0 benchmark](plans/resize-solver-benchmark.md) records labeled cases and current outputs. Stage 1 extracts transient requests, physical analysis, and the numerical kernel; solver policy remains unchanged.
 
 Update the relevant document when changing a persisted field, operation boundary, input rule, storage key, asset pipeline, or development command. Keep the root agent guide concise and link here for detail. Document implemented behavior and limitations; mark proposals explicitly rather than presenting them as current architecture.

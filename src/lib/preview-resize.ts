@@ -61,7 +61,7 @@ const changesSize = (original: Panel[], project: Project) => project.panels.some
   return before && (Math.abs(panel.width - before.width) > 1e-6 || Math.abs(panel.height - before.height) > 1e-6)
 })
 const apply = (project: Project, operation: Operation, distance: number) => operation.kind === 'edge'
-  ? resizePanelEdge(project, operation.panelId, operation.dimension, operation.side, distance)
+  ? resizePanelEdge(project, operation.panelId, operation.dimension, operation.side, distance, false, { origin: 'preview' })
   : operation.kind === 'stretch' ? moveSelectionStretch(project, operation.panelIds, operation.plan, distance)
     : movePanels(project, [operation.panelId], vector(operation.direction).multiplyScalar(distance).toArray() as Vec3)
 
@@ -221,7 +221,7 @@ function solvePreviewResize(session: PreviewResizeSession, handleId: string, dis
   const attempt = (amount: number) => {
     if (local && (!session.selection.panelId || driver.operation.kind !== 'edge')) throw new Error('Only panel edges can resize independently.')
     const next = local && driver.operation.kind === 'edge'
-      ? resizePanelEdge(session.original, driver.operation.panelId, driver.operation.dimension, driver.operation.side, amount, true)
+      ? resizePanelEdge(session.original, driver.operation.panelId, driver.operation.dimension, driver.operation.side, amount, true, { origin: 'preview' })
       : apply(session.original, driver.operation, amount / driver.scale)
     if (session.selection.connectorId) {
       const position = connectorPosition(next, session.selection.connectorId)

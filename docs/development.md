@@ -67,7 +67,7 @@ Use `roundTripProject` from [`src/test/project-round-trip.ts`](../src/test/proje
 
 ### Resize intent benchmark
 
-The test-only [resize corpus](../src/test/resize-intent-corpus.ts) separates physical/compatibility invariants from current inference-policy characterization. Run `npm test -- src/lib/resize-intent-benchmark.test.ts`. To record geometry, alternatives, validity, hardware movement, and timings, run `RESIZE_BENCHMARK_REPORT=/tmp/resize-baseline.json npm test -- src/lib/resize-intent-benchmark.test.ts`. Reports are optional; no timing threshold runs in CI. See [the recorded baseline and coverage limits](plans/resize-solver-benchmark.md) before treating passing current-output tests as desired intent behavior.
+The test-only [resize corpus](../src/test/resize-intent-corpus.ts) separates physical/compatibility invariants from current inference-policy characterization. Run `npm test -- src/lib/resize-intent-benchmark.test.ts`. To record geometry, alternatives, validity, hardware movement, and timings, run `RESIZE_BENCHMARK_REPORT=/tmp/resize-baseline.json npm test -- src/lib/resize-intent-benchmark.test.ts`. Reports are optional; no timing threshold runs in CI. `npm test -- src/lib/resize-intent.test.ts src/lib/structural-solver.test.ts` covers the transient adapters, selection-average/edge anchors, simultaneous targets, source/session guards, row provenance, and numerical diagnostic distinctions. See [the recorded baseline and coverage limits](plans/resize-solver-benchmark.md) before treating passing current-output tests as desired intent behavior.
 
 ### Browser tests
 

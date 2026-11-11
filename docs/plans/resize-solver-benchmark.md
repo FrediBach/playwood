@@ -215,7 +215,7 @@ This is the initial corpus, not the release gate for a new planner. The real 27-
 
 The existing H-table, rotated synth/storage, T/cross removed-hardware, and preview suites remain regression coverage; keep their project families outside planner tuning as an initial holdout. Future stages must add labeled multi-selection-average anchors, arbitrary supported permutations/ID renaming, equivalent driving forests, rotated anchors, compartment alternatives, build-space cascades, fitted outlines/TROFAST, and linked assemblies before claiming those intent gates. No permutation failure, global continuity, exhaustive search, 50/200-panel performance, or real-user intent accuracy is established here.
 
-Next is stage 1: introduce transient request/analysis/result boundaries and adapter-equivalence coverage while retaining this baseline policy. Stage 2 can evaluate semantic alternatives against the labels without changing active behavior. The threshold cases must eventually expose ambiguity or a documented coherent choice, rather than merely continuing to pass the current-output assertions.
+At stage 0 completion, the next step was stage 1: introduce transient request/analysis/result boundaries and adapter-equivalence coverage while retaining this baseline policy. Stage 1 is now implemented; see the [implementation plan](resize-solver-intent.md#implementation-sequence-and-completion-gates) for the extracted contracts. Stage 2 can evaluate semantic alternatives against the labels without changing active behavior. The threshold cases must eventually expose ambiguity or a documented coherent choice, rather than merely continuing to pass the current-output assertions.
 
 ## Verification for this session
 

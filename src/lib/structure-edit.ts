@@ -1,5 +1,8 @@
+import { createResizeIntent, assertLegacyResizeIntent, unwrapResizeResult, type ResizeIntent, type ResizeContext, type ResizeResult, type ResizeProblem, type ResizeDimensions as Dimensions, type PanelResizeDimensions as PanelDimensions, type InferredRelationship, type PanelEdgeResize } from './resize-intent'
+import { analyzeStructure, inspectResizeAnalysis, frame, extent, coordinate, findContacts, type Frame, type Contact } from './resize-analysis'
+import { solveWithBounds, SolverConflict, LIMIT_MESSAGE, CONSTRAINT_MESSAGE, type StructuralRow as Row, type RowProvenance, type NumericalDiagnostic } from './structural-solver'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
-import { Euler, Quaternion, Vector3 } from 'three'
+import { Vector3 } from 'three'
 import { resolvePanels, validateProject } from './model'
 import { connectorSlide, getConnectorRail, rescaleConnectorSlides } from './connector-movement'
 import { getPhysicalConnectors } from './connector-selection'
@@ -9,206 +12,32 @@ import { refitOutlineClosures } from './outline-closures'
 import { assertNoNewTrofastIssues } from './trofast'
 import type { Connection, ConstraintReference, Panel, Project, Vec3 } from './types'
 
+export type { InferredRelationship, PanelEdgeResize } from './resize-intent'
+
 const EPSILON = 1e-6
 const CONTACT_TOLERANCE = 1e-4
-const LIMIT_MESSAGE = 'This move would exceed the panel size limits (40–4,000 mm). Try a smaller step.'
-const CONSTRAINT_MESSAGE = 'These panels cannot move in that direction while keeping their joints connected. Try another direction or select the whole assembly.'
-
-export interface InferredRelationship {
-  id: string
-  kind: 'setback' | 'alignment' | 'compartment-fit'
-  description: string
-  panelIds: string[]
-}
 
 /** Transient diagnostics for rejected edits; never part of a saved project. */
 export class StructureEditError extends Error {
-  constructor(message: string, public panelIds: string[], public connectionIds: string[] = [], public inferredRelationships: InferredRelationship[] = []) { super(message) }
+  constructor(message: string, public panelIds: string[], public connectionIds: string[] = [], public inferredRelationships: InferredRelationship[] = [], public numerical?: NumericalDiagnostic) { super(message) }
 }
-class SolverConflict extends Error {
-  constructor(public variables: number[], message = CONSTRAINT_MESSAGE) { super(message) }
-}
-
-type Dimensions = Partial<Pick<Panel, 'width' | 'height'>>
-type PanelDimensions = Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>
-type Row = { entries: Map<number, number>; value: number; stockBound?: boolean; inferred?: InferredRelationship }
-type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
-type Contact = { a: number; b: number; normal: Vector3; sign: number }
 export interface SelectionStretchEdge { panelId: string; dimension: 'width' | 'height'; side: -1 | 1 }
 type MovementScope = { panelIds: Set<string>; reference: number; preserveCuts?: Set<string> }
 type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean; scope?: MovementScope; stretch?: readonly SelectionStretchEdge[] } | { kind: 'resize'; relaxedRelationship?: string; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
-interface ValidationContext { trofastWorld?: boolean }
+type ValidationContext = ResizeContext
+interface ResizeTrace { phase: 'request' | 'compile' | 'solve' | 'materialize'; problems: ResizeProblem[]; inspect: boolean }
 
 const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 const position = (panel: Panel) => new Vector3(...panel.position)
-const frame = (panel: Panel): Frame => {
-  const rotation = new Quaternion().setFromEuler(new Euler(...panel.rotation))
-  return { panel, axes: [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)].map(axis => axis.applyQuaternion(rotation)), half: [panel.width / 2, panel.height / 2, panel.thickness / 2] }
-}
-const extent = (item: Frame, axis: Vector3) => item.axes.reduce((sum, own, index) => sum + Math.abs(own.dot(axis)) * item.half[index], 0)
-const coordinate = (item: Frame, axis: Vector3, side = 0) => position(item.panel).dot(axis) + side * extent(item, axis)
-
-/** Existing surface contacts are implicit supports for the library's loose inserts. */
-function findContacts(frames: Frame[]): Contact[] {
-  const contacts: Contact[] = []
-  for (let a = 0; a < frames.length; a++) for (let b = a + 1; b < frames.length; b++) {
-    const first = frames[a], second = frames[b]
-    const separation = position(second.panel).sub(position(first.panel))
-    for (const normal of first.axes) {
-      if (!second.axes.some(axis => Math.abs(axis.dot(normal)) > 1 - EPSILON)) continue
-      const distance = separation.dot(normal)
-      if (Math.abs(Math.abs(distance) - extent(first, normal) - extent(second, normal)) > CONTACT_TOLERANCE) continue
-      const tangents = [...first.axes, ...second.axes].filter(axis => Math.abs(axis.dot(normal)) < EPSILON)
-      const hasArea = tangents.every(axis => Math.min(coordinate(first, axis, 1), coordinate(second, axis, 1))
-        - Math.max(coordinate(first, axis, -1), coordinate(second, axis, -1)) > CONTACT_TOLERANCE)
-      if (hasArea) { contacts.push({ a, b, normal, sign: Math.sign(distance) }); break }
-    }
-  }
-  return contacts
-}
-
 /** The same implicit surface supports used by structural edits. */
 export function panelSurfaceContacts(project: Project): { panelIds: [string, string]; normal: Vec3 }[] {
-  const frames = resolvePanels(project).map(frame)
-  const outlines = new Set(project.connections.filter(connection => connection.outlineEdge !== undefined).map(connection => connection.childId))
-  return findContacts(frames).filter(contact => !outlines.has(frames[contact.a].panel.id) && !outlines.has(frames[contact.b].panel.id))
-    .map(contact => ({ panelIds: [frames[contact.a].panel.id, frames[contact.b].panel.id], normal: contact.normal.toArray() as Vec3 }))
+  const { frames, contacts } = analyzeStructure(project)
+  return contacts.map(contact => ({ panelIds: [frames[contact.a].panel.id, frames[contact.b].panel.id], normal: contact.normal.toArray() as Vec3 }))
 }
 
-/**
- * Minimum weighted change subject to sparse, exact linear constraints. Rotations
- * and connector seats stay fixed, so this is a linear problem, including angled
- * connectors. Solve A W^-1 Aᵀ λ = b with conjugate gradients; redundant support
- * rows are harmless and do not require a dense cubic matrix decomposition.
- */
-function solve(rows: Row[], weights: number[], dual?: number[]): number[] {
-  const size = weights.length
-  const inverseScale = weights.map(weight => 1 / Math.sqrt(weight))
-  const equations = rows.map((row, sourceIndex) => {
-    const entries = [...row.entries].filter(([, value]) => Math.abs(value) > 1e-10)
-      .map(([index, value]) => [index, value * inverseScale[index]] as const)
-    const norm = Math.hypot(...entries.map(([, value]) => value))
-    if (norm < 1e-10) {
-      if (Math.abs(row.value) > EPSILON) throw new SolverConflict([...row.entries.keys()])
-      return { entries: [], value: 0, sourceIndex, norm: 1 }
-    }
-    return { entries: entries.map(([index, value]) => [index, value / norm] as const), value: row.value / norm, sourceIndex, norm }
-  }).filter(row => row.entries.length)
-  const count = equations.length
-  const multiply = (values: Float64Array): Float64Array => {
-    const temporary = new Float64Array(size)
-    equations.forEach((row, i) => { for (const [index, coefficient] of row.entries) temporary[index] += coefficient * values[i] })
-    const output = new Float64Array(count)
-    equations.forEach((row, i) => { for (const [index, coefficient] of row.entries) output[i] += coefficient * temporary[index] })
-    return output
-  }
-  const dot = (a: Float64Array, b: Float64Array) => a.reduce((sum, value, index) => sum + value * b[index], 0)
-  const solution = new Float64Array(count)
-  let residual = Float64Array.from(equations, row => row.value)
-  let direction = residual.slice()
-  let error = dot(residual, residual)
-  // Keep the best iterate: tiny imported rotation/offset drift can make a
-  // redundant closed loop diverge after it already reached a usable solution.
-  let bestError = error
-  let bestSolution = solution.slice()
-  const threshold = Math.max(1e-18, error * 1e-22)
-  for (let iteration = 0; error > threshold && iteration < Math.max(200, count * 6); iteration++) {
-    const product = multiply(direction)
-    const denominator = dot(direction, product)
-    if (!Number.isFinite(denominator) || denominator < 1e-24) break
-    const alpha = error / denominator
-    for (let i = 0; i < count; i++) { solution[i] += alpha * direction[i]; residual[i] -= alpha * product[i] }
-    const nextError = dot(residual, residual)
-    if (nextError < bestError) { bestError = nextError; bestSolution = solution.slice() }
-    const beta = nextError / error
-    for (let i = 0; i < count; i++) direction[i] = residual[i] + beta * direction[i]
-    error = nextError
-  }
-  const result = () => {
-    const output = Array<number>(size).fill(0)
-    equations.forEach((row, i) => { for (const [index, coefficient] of row.entries) output[index] += coefficient * solution[i] * inverseScale[index] })
-    return output
-  }
-  const valid = (output: number[]) => output.every(Number.isFinite) && rows.every(row =>
-    Math.abs([...row.entries].reduce((sum, [index, value]) => sum + value * output[index], 0) - row.value) <= 1e-5)
-  let output = result()
-  if (!valid(output)) {
-    solution.set(bestSolution)
-    output = result()
-    // The fallback must satisfy the same original equations and tolerance.
-    if (!valid(output)) throw new SolverConflict([...new Set(rows.filter(row =>
-      Math.abs(rowValue(row, output) - row.value) > 1e-5).flatMap(row => [...row.entries.keys()]))])
-  }
-  if (dual) {
-    dual.length = rows.length
-    dual.fill(0)
-    equations.forEach((row, index) => { dual[row.sourceIndex] = solution[index] / row.norm })
-  }
-  return output
-}
-
-const rowValue = (row: Row, values: number[]) => [...row.entries].reduce((sum, [index, coefficient]) => sum + coefficient * values[index], 0)
-
-/** Dual coordinate projections enforce lower bounds without making slack bounds
- * equalities. A multiplier can return to zero, releasing a previously active
- * bound. Directions preserve every hard equality and are computed lazily. */
-function solveWithBounds(rows: Row[], bounds: Row[], weights: number[]): number[] {
-  const output = solve(rows, weights)
-  if (!bounds.length) return output
-  const directions = new Map<number, number[]>()
-  const multipliers = bounds.map(() => 0)
-  const homogeneous = rows.map(row => ({ ...row, value: 0 }))
-  for (let iteration = 0; iteration < 256; iteration++) {
-    let largestChange = 0
-    for (const [index, bound] of bounds.entries()) {
-      const deficit = bound.value - rowValue(bound, output)
-      const next = Math.max(0, multipliers[index] + deficit)
-      const change = next - multipliers[index]
-      if (Math.abs(change) < 1e-8) continue
-      let direction = directions.get(index)
-      if (!direction) {
-        try { direction = solve([...homogeneous, { ...bound, value: 1 }], weights) }
-        catch (error) {
-          if (bound.stockBound && error instanceof SolverConflict) throw new SolverConflict(error.variables, LIMIT_MESSAGE)
-          throw error
-        }
-        directions.set(index, direction)
-      }
-      multipliers[index] = next
-      direction.forEach((value, variable) => { output[variable] += change * value })
-      largestChange = Math.max(largestChange, Math.abs(change))
-    }
-    // Once projections identify the active set, solve it together. The dual
-    // signs certify that none of these bounds should release; this avoids slow
-    // one-neighbor-at-a-time convergence through long chains of minimum gaps.
-    if (iteration % 8 === 0 && multipliers.some(value => value > 1e-8)) {
-      const active = new Set(bounds.flatMap((_, index) => multipliers[index] > 1e-8 ? [index] : []))
-      try {
-        for (let expansion = 0; expansion <= bounds.length; expansion++) {
-          const activeIndices = [...active]
-          const dual: number[] = []
-          const candidate = solve([...rows, ...activeIndices.map(index => bounds[index])], weights, dual)
-          const negative = activeIndices.filter((_, index) => dual[rows.length + index] < -1e-7)
-          if (negative.length) { negative.forEach(index => active.delete(index)); continue }
-          const violated = bounds.flatMap((bound, index) => rowValue(bound, candidate) < bound.value - 1e-5 && !active.has(index) ? [index] : [])
-          if (!violated.length) return candidate
-          violated.forEach(index => active.add(index))
-        }
-      } catch { /* Keep projecting: a redundant or incompatible active set can release. */ }
-    }
-    if (largestChange < 1e-7 && output.every(Number.isFinite)
-      && rows.every(row => Math.abs(rowValue(row, output) - row.value) <= 1e-5)
-      && bounds.every(bound => rowValue(bound, output) >= bound.value - 1e-5)) return output
-  }
-  throw new SolverConflict([...new Set([
-    ...rows.filter(row => Math.abs(rowValue(row, output) - row.value) > 1e-5),
-    ...bounds.filter(bound => rowValue(bound, output) < bound.value - 1e-5),
-  ].flatMap(row => [...row.entries.keys()]))], bounds.some(bound => bound.stockBound && rowValue(bound, output) < bound.value - 1e-5)
-    ? LIMIT_MESSAGE : CONSTRAINT_MESSAGE)
-}
-
-function editComponent(project: Project, frames: Frame[], contacts: Contact[], ids: Set<string>, edit: Edit): Project {
+function editComponent(project: Project, frames: Frame[], contacts: Contact[], ids: Set<string>, edit: Edit, trace?: ResizeTrace): Project {
+  if (trace) trace.phase = 'compile'
   const indices = new Map(frames.map((item, index) => [item.panel.id, index]))
   const selected = frames.filter(item => ids.has(item.panel.id))
   if (!selected.length) return project
@@ -277,17 +106,17 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   const bounds: Row[] = []
   const thicknessChange = (index: number) => edit.kind === 'resize'
     ? (edit.patches?.[frames[index].panel.id]?.thickness ?? frames[index].panel.thickness) - frames[index].panel.thickness : 0
-  const row = (value = 0): Row => { const next = { entries: new Map<number, number>(), value }; rows.push(next); return next }
+  const row = (value = 0, provenance: RowProvenance = { kind: 'scope' }): Row => { const next = { entries: new Map<number, number>(), value, provenance }; rows.push(next); return next }
   const inferred = (kind: InferredRelationship['kind'], key: unknown[], a: number, b: number, detail: string): Row => {
     const first = frames[a].panel, second = frames[b].panel
     const relationship: InferredRelationship = { id: JSON.stringify([kind, first.id, second.id, ...key]), kind,
       description: `${first.name} / ${second.name}: ${detail}`, panelIds: [first.id, second.id] }
-    const next: Row = { entries: new Map(), value: 0, inferred: relationship }
+    const next: Row = { entries: new Map(), value: 0, inferred: relationship, provenance: { kind: 'inferred', relationshipId: relationship.id, panelIds: relationship.panelIds } }
     if (edit.kind !== 'resize' || edit.relaxedRelationship !== relationship.id) rows.push(next)
     return next
   }
   const edgeName = (dimension: number, side: number) => dimension === 2 ? `${side < 0 ? 'negative' : 'positive'} thickness face` : `${dimension === 0 ? (side < 0 ? 'left' : 'right') : (side < 0 ? 'bottom' : 'top')} cut edge`
-  const preference = (value = 0): Row => { const next = row(value); preferences.add(next); return next }
+  const preference = (value = 0): Row => { const next = row(value, { kind: 'placement-preference' }); preferences.add(next); return next }
   const add = (target: Row, index: number, value: number) => target.entries.set(index, (target.entries.get(index) ?? 0) + value)
   const center = (target: Row, index: number, axis: Vector3, scale = 1) => {
     frames[index].axes.forEach((own, dimension) => add(target, index * 5 + dimension, own.dot(axis) * scale))
@@ -320,7 +149,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     }
     // Build the change in the measured quantity once. Edge contributions also
     // subtract prescribed thickness changes from the right-hand side.
-    const target = row(-evaluation.actual)
+    const target = row(-evaluation.actual, { kind: 'authored-rule', ruleId: rule.id, panelIds: designConstraintPanelIds(rule) })
     if (rule.kind === 'position') {
       edge(target, indices.get(rule.panelId)!, worldAxes[['x', 'y', 'z'].indexOf(rule.axis)], referenceSide(rule.reference))
     } else if (rule.kind === 'setback') {
@@ -341,7 +170,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         edge(target, b, axis, -1, factor)
         edge(target, a, axis, 1, -factor)
         const gap = designConstraintCoordinate(frames[b].panel, 'min', rule.axis) - designConstraintCoordinate(frames[a].panel, 'max', rule.axis)
-        const nonnegative = { entries: new Map<number, number>(), value: -gap }
+        const nonnegative: Row = { entries: new Map<number, number>(), value: -gap, provenance: target.provenance }
         edge(nonnegative, b, axis, -1)
         edge(nonnegative, a, axis, 1, -1)
         bounds.push(nonnegative)
@@ -357,8 +186,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     if (limits.min !== undefined && limits.min === limits.max) target.value += limits.min
     else {
       rows.pop()
-      if (limits.min !== undefined) bounds.push({ entries: target.entries, value: target.value + limits.min })
-      if (limits.max !== undefined) bounds.push({ entries: new Map([...target.entries].map(([index, value]) => [index, -value])), value: -target.value - limits.max })
+      if (limits.min !== undefined) bounds.push({ provenance: target.provenance, entries: target.entries, value: target.value + limits.min })
+      if (limits.max !== undefined) bounds.push({ provenance: target.provenance, entries: new Map([...target.entries].map(([index, value]) => [index, -value])), value: -target.value - limits.max })
     }
   }
   // A relation between loose panels should move its peer, not make that panel
@@ -371,8 +200,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       if (constraints.length && preservesOwnSize && !controlledDimensions.has(`${item.panel.id}/${field}`)) add(row(), index * 5 + 3 + dimension, 1)
       // Bounds belong in the same solve, so another feasible placement can be
       // found instead of rejecting an unconstrained optimum beyond stock limits.
-      bounds.push({ entries: new Map([[index * 5 + 3 + dimension, 1]]), value: 40 - item.panel[field], stockBound: true },
-        { entries: new Map([[index * 5 + 3 + dimension, -1]]), value: item.panel[field] - 4000, stockBound: true })
+      bounds.push({ entries: new Map([[index * 5 + 3 + dimension, 1]]), value: 40 - item.panel[field], stockBound: true, provenance: { kind: 'stock-bound', panelIds: [item.panel.id] } },
+        { entries: new Map([[index * 5 + 3 + dimension, -1]]), value: item.panel[field] - 4000, stockBound: true, provenance: { kind: 'stock-bound', panelIds: [item.panel.id] } })
     }
   }
 
@@ -395,7 +224,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     const thicknessShift = expected({ ...parent, thickness: parent.thickness + thicknessChange(parentIndex) },
       { ...child, thickness: child.thickness + thicknessChange(childIndex) }, connection.offset).sub(baseline)
     worldAxes.forEach(axis => {
-      const constraint = row(thicknessShift.dot(axis) + (edit.kind === 'fit' && connection.id === edit.connection.id ? baseline.clone().sub(position(child)).dot(axis) : 0))
+      const constraint = row(thicknessShift.dot(axis) + (edit.kind === 'fit' && connection.id === edit.connection.id ? baseline.clone().sub(position(child)).dot(axis) : 0), { kind: 'joint', connectionId: connection.id, panelIds: [parent.id, child.id] })
       center(constraint, childIndex, axis)
       center(constraint, parentIndex, axis, -1)
       add(constraint, parentIndex * 5 + 3, -changes[0].dot(axis))
@@ -429,7 +258,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   }
 
   for (const contact of contacts) {
-    const constraint = row()
+    const constraint = row(0, { kind: 'protected-contact', panelIds: [frames[contact.a].panel.id, frames[contact.b].panel.id] })
     edge(constraint, contact.b, contact.normal, -contact.sign)
     edge(constraint, contact.a, contact.normal, contact.sign, -1)
     if (edit.kind === 'resize' && !edit.local) {
@@ -556,7 +385,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       const independentFreeEnd = edit.kind === 'resize' && freeEndPanels.has(index)
         && radialCuts.has(index * 2 + dimension)
       if (transverse || independentSeam || independentFreeEnd) {
-        const preserve = row()
+        const preserve = row(0, { kind: 'cut-preference', panelIds: [item.panel.id] })
         cutPreferences.add(preserve)
         add(preserve, index * 5 + 3 + dimension, 1)
       }
@@ -571,18 +400,20 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       // A parameter can drive any mixture of local panel axes. Keep every
       // bound value exact in the same solve, including unchanged controls.
       if (edit.kind === 'resize' && edit.patches && patch?.[field] === undefined) continue
-      const target = row(patch?.[field] !== undefined ? patch[field]! - item.panel[field] : 0)
+      const target = row(patch?.[field] !== undefined ? patch[field]! - item.panel[field] : 0, { kind: 'target', panelIds: [item.panel.id] })
       add(target, index * 5 + 3 + dimension, 1)
     }
-    if (edit.kind === 'move') worldAxes.forEach((axis, dimension) => center(row((edit.deltas?.[item.panel.id] ?? edit.delta)[dimension]), index, axis))
+    if (edit.kind === 'move') worldAxes.forEach((axis, dimension) => center(row((edit.deltas?.[item.panel.id] ?? edit.delta)[dimension], { kind: 'target', panelIds: [item.panel.id] }), index, axis))
   }
   if (edit.kind === 'resize') {
     // An edge pull shifts the center by half the growth to anchor its opposite
     // edge. Numeric dimension edits keep the selected center stationary.
     if (edit.centerDeltas) for (const item of selected) {
-      for (const [dimension, axis] of worldAxes.entries()) center(row(edit.centerDeltas[item.panel.id]?.[dimension] ?? 0), indices.get(item.panel.id)!, axis)
+      for (const [dimension, axis] of worldAxes.entries()) center(row(edit.centerDeltas[item.panel.id]?.[dimension] ?? 0, { kind: 'anchor', panelIds: [item.panel.id] }), indices.get(item.panel.id)!, axis)
     } else for (const [dimension, axis] of worldAxes.entries()) {
-        const constraint = (edit.centerDelta || edit.local ? row : preference)(edit.centerDelta?.[dimension] ?? 0)
+        const constraint = edit.centerDelta || edit.local
+          ? row(edit.centerDelta?.[dimension] ?? 0, { kind: 'anchor', panelIds: selected.map(item => item.panel.id) })
+          : preference()
         selected.forEach(item => center(constraint, indices.get(item.panel.id)!, axis, 1 / selected.length))
       }
   } else if (edit.kind === 'move' && edit.stretch) {
@@ -723,6 +554,17 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     }
   }
 
+  if (trace?.inspect) {
+    const variables = frames.flatMap(item => ['local-x', 'local-y', 'local-z', 'width', 'height'].map(axis => `${item.panel.id}/${axis}`))
+    for (const [key, index] of offsetVariables) variables[index] = `seam/${key}`
+    const snapshot = (row: Row) => Object.freeze({ entries: Object.freeze([...row.entries].map(entry => Object.freeze(entry))), value: row.value,
+      relationship: row.inferred ? Object.freeze({ ...row.inferred, panelIds: Object.freeze([...row.inferred.panelIds]) }) : undefined,
+      provenance: Object.freeze({ ...row.provenance, panelIds: Object.freeze([...(row.provenance.panelIds ?? [...new Set([...row.entries.keys()]
+        .flatMap(index => frames[Math.floor(index / 5)] ? [frames[Math.floor(index / 5)].panel.id] : []))])]) }) })
+    trace.problems.push(Object.freeze({ panelIds: Object.freeze(frames.map(item => item.panel.id)), variables: Object.freeze(variables),
+      weights: Object.freeze([...weights]), rows: Object.freeze(rows.map(snapshot)), bounds: Object.freeze(bounds.map(snapshot)) }))
+  }
+  if (trace) trace.phase = 'solve'
   const solveChanges = (rows: Row[]): number[] => {
     let changes: number[]
     try {
@@ -792,8 +634,9 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     const affectedPanelIds = new Set(panelIds)
     throw new StructureEditError(message, panelIds, project.connections.filter(connection =>
       affectedPanelIds.has(connection.parentId) && affectedPanelIds.has(connection.childId)).map(connection => connection.id),
-      rows.flatMap(row => row.inferred ? [row.inferred] : []))
+      rows.flatMap(row => row.inferred ? [row.inferred] : []), error instanceof SolverConflict ? error.diagnostic : undefined)
   }
+  if (trace) trace.phase = 'materialize'
   const changedPanels = new Map(frames.map((item, index) => {
     if (edit.kind === 'move' && edit.stretch) {
       const span = edit.stretch.find(edge => edge.panelId === item.panel.id)
@@ -832,7 +675,8 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   }
 }
 
-function editStructure(project: Project, ids: readonly string[], edit: Edit, validation: ValidationContext = {}): Project {
+function editStructure(project: Project, ids: readonly string[], edit: Edit, validation: ValidationContext = {}, trace?: ResizeTrace): Project {
+  if (trace) trace.phase = 'compile'
   const wanted = new Set(ids)
   if (project.assemblies?.instances.length) {
     const managed = new Set(project.assemblies.instances.flatMap(instance => Object.values(instance.panelIds)))
@@ -855,19 +699,15 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     const loose: Project = { version: 1, name: project.name, spaceConstraint: project.spaceConstraint, connectorOverrides: project.connectorOverrides, panels: project.panels.filter(panel => !managed.has(panel.id) && !boundary.has(panel.id)),
       connections: looseConnections.filter(connection => !boundary.has(connection.parentId) && !boundary.has(connection.childId)),
       constraints: project.constraints?.filter(rule => designConstraintPanelIds(rule).every(id => !managed.has(id) && !boundary.has(id))) }
-    const edited = editStructure(loose, ids, edit, validation)
+    const edited = editStructure(loose, ids, edit, validation, trace)
     const byId = new Map(edited.panels.map(panel => [panel.id, panel]))
     const connectionById = new Map(edited.connections.map(connection => [connection.id, connection]))
     return { ...project, connectorOverrides: edited.connectorOverrides, panels: project.panels.map(panel => byId.get(panel.id) ?? panel), connections: project.connections.map(connection => connectionById.get(connection.id) ?? connection) }
   }
-  const panels = resolvePanels(project)
+  const { panels, frames, outlineClosures, contacts: protectedContacts } = analyzeStructure(project)
   if (!panels.some(panel => wanted.has(panel.id))) return project
-  // A fitted polygon follows its surrounding edge planes. Its rectangular
-  // stock bounds are neither physical contacts nor independent solver spans.
-  const outlineClosures = new Set(project.connections.filter(connection => connection.outlineEdge !== undefined).map(connection => connection.childId))
-  const frames = panels.map(frame)
-  const contacts = findContacts(frames).filter(contact => !outlineClosures.has(frames[contact.a].panel.id) && !outlineClosures.has(frames[contact.b].panel.id))
-    .filter(contact => edit.kind !== 'move' || !edit.releaseContacts
+  // Fitted polygon stock bounds are excluded from the protected surface contacts.
+  const contacts = protectedContacts.filter(contact => edit.kind !== 'move' || !edit.releaseContacts
       || wanted.has(frames[contact.a].panel.id) === wanted.has(frames[contact.b].panel.id))
   const indices = new Map(panels.map((panel, index) => [panel.id, index]))
   const groups = panels.map((_, index) => index)
@@ -891,8 +731,9 @@ function editStructure(project: Project, ids: readonly string[], edit: Edit, val
     const independent = component.filter(index => !outlineClosures.has(panels[index].id))
     const local = new Map(independent.map((index, localIndex) => [index, localIndex]))
     next = editComponent(next, independent.map(index => frames[index]), contacts.filter(contact => local.has(contact.a) && local.has(contact.b))
-      .map(contact => ({ ...contact, a: local.get(contact.a)!, b: local.get(contact.b)! })), wanted, edit)
+      .map(contact => ({ ...contact, a: local.get(contact.a)!, b: local.get(contact.b)! })), wanted, edit, trace)
   }
+  if (trace) trace.phase = 'materialize'
   if (edit.kind === 'resize' && edit.patches) next = { ...next, panels: next.panels.map(panel => affectedOutlineClosures.has(panel.id)
     && edit.patches?.[panel.id]?.thickness !== undefined ? { ...panel, thickness: edit.patches[panel.id].thickness! } : panel) }
   next = { ...next, panels: refitOutlineClosures(resolvePanels(next), next.connections.filter(connection => connection.outlineEdge === undefined
@@ -1157,12 +998,87 @@ export function movePanelsToPositions(project: Project, targets: Record<string, 
   return next
 }
 
+/** Structured, transient entry point. Inspection never changes equations or acceptance. */
+export function solveResizeIntent(intent: ResizeIntent, options: { inspect?: boolean } = {}): ResizeResult {
+  const trace: ResizeTrace = { phase: 'request', problems: [], inspect: options.inspect ?? false }
+  let analysis: ReturnType<typeof inspectResizeAnalysis> | undefined
+  try {
+    assertLegacyResizeIntent(intent)
+    if (trace.inspect) analysis = inspectResizeAnalysis(intent.source)
+    const project = applyResizeIntent(intent, trace)
+    return { status: 'solved', intent, project, analysis, problems: Object.freeze(trace.problems) }
+  } catch (error) {
+    const structural = error instanceof StructureEditError ? error : undefined
+    const numerical = structural?.numerical
+    // Only an inconsistent constant row establishes infeasibility here. A failed
+    // residual check or bounded iteration search is not proof of conflicting intent.
+    const status = numerical?.termination === 'inconsistent-constant' && numerical.context !== 'bound-direction' ? 'infeasible'
+      : numerical ? 'numerical-failure' : trace.phase === 'request' ? 'invalid-request'
+        : trace.phase === 'materialize' ? 'candidate-invalid' : 'rejected'
+    return { status, intent, analysis, problems: Object.freeze(trace.problems), error,
+      diagnostic: { message: error instanceof Error ? error.message : CONSTRAINT_MESSAGE,
+        panelIds: structural?.panelIds ?? [], connectionIds: structural?.connectionIds ?? [],
+        inferredRelationships: structural?.inferredRelationships ?? [], numerical } }
+  }
+}
+
+/** Compile the explicit request using the established policy and validation order. */
+function applyResizeIntent(intent: ResizeIntent, trace: ResizeTrace): Project {
+  const project = intent.source, target = intent.target, validation = intent.validation
+  if (target.kind === 'selection-dimensions') {
+    const ids = target.panelIds, patch = target.dimensions
+    if (Object.values(patch).some(value => value !== undefined && (!Number.isFinite(value) || value < 40 || value > 4000))) throw new Error(LIMIT_MESSAGE)
+    const wanted = new Set(ids)
+    if (!project.panels.some(panel => wanted.has(panel.id) && (['width', 'height'] as const).some(field => patch[field] !== undefined && Math.abs(panel[field] - patch[field]!) > EPSILON))) return project
+    return editStructure(project, ids, { kind: 'resize', patch, relaxedRelationship: intent.releasedRelationshipId }, validation, trace)
+  }
+  if (target.kind === 'panel-edge') {
+    const { panelId: id, dimension, side, distance } = target.edge, local = target.local
+    if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
+    if (Math.abs(distance) < EPSILON) return project
+    const panel = resolvePanels(project).find(panel => panel.id === id)
+    if (!panel) return project
+    const size = panel[dimension] + distance
+    if (size < 40 || size > 4000) throw new StructureEditError(LIMIT_MESSAGE, [panel.id])
+    const axis = frame(panel).axes[dimension === 'width' ? 0 : 1]
+    return editStructure(project, [id], { kind: 'resize', patch: { [dimension]: size }, local,
+      centerDelta: axis.multiplyScalar(side * distance / 2).toArray() as Vec3 }, validation, trace)
+  }
+  if (target.kind === 'panel-edges') {
+    const { edges, refitOutlinePanelIds } = target
+    const panels = new Map(resolvePanels(project).map(panel => [panel.id, panel]))
+    if (new Set(edges.map(edge => edge.panelId)).size !== edges.length) throw new Error('Adjust each panel edge once.')
+    const patches: Record<string, PanelDimensions> = Object.create(null), centerDeltas: Record<string, Vec3> = Object.create(null)
+    for (const edge of edges) {
+      if (!Number.isFinite(edge.distance) || (edge.side !== -1 && edge.side !== 1)) throw new Error('Panel movement must be a finite distance.')
+      const panel = panels.get(edge.panelId)
+      if (!panel) throw new Error('A rim panel is no longer available.')
+      const size = panel[edge.dimension] + edge.distance
+      if (size < 40 || size > 4000) throw new Error(LIMIT_MESSAGE)
+      if (Math.abs(edge.distance) < EPSILON) continue
+      patches[panel.id] = { width: panel.width, height: panel.height, [edge.dimension]: size }
+      centerDeltas[panel.id] = frame(panel).axes[edge.dimension === 'width' ? 0 : 1].multiplyScalar(edge.side * edge.distance / 2).toArray() as Vec3
+    }
+    if (!Object.keys(patches).length) return project
+    return editStructure(project, Object.keys(patches), { kind: 'resize', patch: {}, patches, centerDeltas, local: true, refitOutlinePanelIds }, validation, trace)
+  }
+  const patches = target.patches
+  for (const patch of Object.values(patches)) for (const [field, value] of Object.entries(patch)) {
+    if (value === undefined) continue
+    if (!Number.isFinite(value) || value < (field === 'thickness' ? 3 : 40) || value > (field === 'thickness' ? 100 : 4000)) {
+      throw new Error(field === 'thickness' ? 'Panel thickness must be between 3 and 100 mm.' : LIMIT_MESSAGE)
+    }
+  }
+  const ids = Object.keys(patches)
+  if (ids.some(id => !project.panels.some(panel => panel.id === id))) throw new Error('A configurable dimension refers to a missing panel.')
+  const ownPatches: Record<string, PanelDimensions> = Object.assign(Object.create(null), patches)
+  if (!project.panels.some(panel => (['width', 'height', 'thickness'] as const).some(field => ownPatches[panel.id]?.[field] !== undefined && Math.abs(panel[field] - ownPatches[panel.id][field]!) > EPSILON))) return project
+  return editStructure(project, ids, { kind: 'resize', patch: {}, patches: ownPatches }, validation, trace)
+}
+
 /** Resize a selection while keeping structural joints and existing inserts fitted. */
 export function resizePanels(project: Project, ids: readonly string[], patch: Dimensions, validation: ValidationContext = {}): Project {
-  if (Object.values(patch).some(value => value !== undefined && (!Number.isFinite(value) || value < 40 || value > 4000))) throw new Error(LIMIT_MESSAGE)
-  const wanted = new Set(ids)
-  if (!project.panels.some(panel => wanted.has(panel.id) && (['width', 'height'] as const).some(field => patch[field] !== undefined && Math.abs(panel[field] - patch[field]!) > EPSILON))) return project
-  return editStructure(project, ids, { kind: 'resize', patch }, validation)
+  return unwrapResizeResult(solveResizeIntent(createResizeIntent(project, { kind: 'selection-dimensions', panelIds: ids, dimensions: patch }, validation)))
 }
 
 export interface ResizeAlternative {
@@ -1191,7 +1107,7 @@ export function getResizeAlternatives(project: Project, ids: readonly string[], 
   const ordered = [...relationships].sort((a, b) => Number(b.panelIds.some(id => requestedIds.has(id))) - Number(a.panelIds.some(id => requestedIds.has(id))))
   for (const relaxed of ordered.slice(0, 16)) {
     try {
-      const next = assertNoNewTrofastIssues(project, editStructure(project, ids, { kind: 'resize', patch, relaxedRelationship: relaxed.id }))
+      const next = assertNoNewTrofastIssues(project, unwrapResizeResult(solveResizeIntent(createResizeIntent(project, { kind: 'selection-dimensions', panelIds: ids, dimensions: patch }, { releasedRelationshipId: relaxed.id }))))
       if (validateProject(next).some(issue => issue.id.startsWith('collision-') && !collisions.has(issue.id))) continue
       const changes = resolvePanels(next).flatMap(after => {
         const before = previous.get(after.id)!
@@ -1214,54 +1130,20 @@ export function acceptResizeAlternative(current: Project, review: ResizeReview, 
 }
 
 /** Pull one panel edge, anchoring its opposite edge. Local edits also fix other panels and hardware. */
-export function resizePanelEdge(project: Project, id: string, dimension: 'width' | 'height', side: -1 | 1, distance: number, local = false): Project {
-  if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
-  if (Math.abs(distance) < EPSILON) return project
-  const panel = resolvePanels(project).find(panel => panel.id === id)
-  if (!panel) return project
-  const size = panel[dimension] + distance
-  if (size < 40 || size > 4000) throw new StructureEditError(LIMIT_MESSAGE, [panel.id])
-  const axis = frame(panel).axes[dimension === 'width' ? 0 : 1]
-  return editStructure(project, [id], { kind: 'resize', patch: { [dimension]: size }, local,
-    centerDelta: axis.multiplyScalar(side * distance / 2).toArray() as Vec3 })
+export function resizePanelEdge(project: Project, id: string, dimension: 'width' | 'height', side: -1 | 1, distance: number, local = false, context: ResizeContext = {}): Project {
+  return unwrapResizeResult(solveResizeIntent(createResizeIntent(project, { kind: 'panel-edge', edge: { panelId: id, dimension, side, distance }, local }, context)))
 }
-
-export interface PanelEdgeResize { panelId: string; dimension: 'width' | 'height'; side: -1 | 1; distance: number }
 
 /** Extend several reviewed rim edges atomically while anchoring their opposite
  * edges. Explicit dependent caps may follow; all other panels and hardware stay.
  */
 export function resizePanelEdges(project: Project, edges: readonly PanelEdgeResize[], refitOutlinePanelIds: readonly string[] = []): Project {
-  const panels = new Map(resolvePanels(project).map(panel => [panel.id, panel]))
-  if (new Set(edges.map(edge => edge.panelId)).size !== edges.length) throw new Error('Adjust each panel edge once.')
-  const patches: Record<string, PanelDimensions> = Object.create(null), centerDeltas: Record<string, Vec3> = Object.create(null)
-  for (const edge of edges) {
-    if (!Number.isFinite(edge.distance) || (edge.side !== -1 && edge.side !== 1)) throw new Error('Panel movement must be a finite distance.')
-    const panel = panels.get(edge.panelId)
-    if (!panel) throw new Error('A rim panel is no longer available.')
-    const size = panel[edge.dimension] + edge.distance
-    if (size < 40 || size > 4000) throw new Error(LIMIT_MESSAGE)
-    if (Math.abs(edge.distance) < EPSILON) continue
-    patches[panel.id] = { width: panel.width, height: panel.height, [edge.dimension]: size }
-    centerDeltas[panel.id] = frame(panel).axes[edge.dimension === 'width' ? 0 : 1].multiplyScalar(edge.side * edge.distance / 2).toArray() as Vec3
-  }
-  if (!Object.keys(patches).length) return project
-  return editStructure(project, Object.keys(patches), { kind: 'resize', patch: {}, patches, centerDeltas, local: true, refitOutlinePanelIds })
+  return unwrapResizeResult(solveResizeIntent(createResizeIntent(project, { kind: 'panel-edges', edges, refitOutlinePanelIds })))
 }
 
 /** Simultaneous independent targets, used by assembly instance parameters. */
 export function resizePanelDimensions(project: Project, patches: Record<string, PanelDimensions>, validation: ValidationContext = {}): Project {
-  for (const patch of Object.values(patches)) for (const [field, value] of Object.entries(patch)) {
-    if (value === undefined) continue
-    if (!Number.isFinite(value) || value < (field === 'thickness' ? 3 : 40) || value > (field === 'thickness' ? 100 : 4000)) {
-      throw new Error(field === 'thickness' ? 'Panel thickness must be between 3 and 100 mm.' : LIMIT_MESSAGE)
-    }
-  }
-  const ids = Object.keys(patches)
-  if (ids.some(id => !project.panels.some(panel => panel.id === id))) throw new Error('A configurable dimension refers to a missing panel.')
-  const ownPatches: Record<string, PanelDimensions> = Object.assign(Object.create(null), patches)
-  if (!project.panels.some(panel => (['width', 'height', 'thickness'] as const).some(field => ownPatches[panel.id]?.[field] !== undefined && Math.abs(panel[field] - ownPatches[panel.id][field]!) > EPSILON))) return project
-  return editStructure(project, ids, { kind: 'resize', patch: {}, patches: ownPatches }, validation)
+  return unwrapResizeResult(solveResizeIntent(createResizeIntent(project, { kind: 'panel-dimensions', patches }, validation)))
 }
 
 /** Close a compatible seam by solving both radial lengths together. Other
