@@ -155,3 +155,5 @@ Wood grain, metal detail, and room materials are generated procedurally. App-own
 For setup, verification, and asset regeneration commands, see [development and verification](development.md).
 
 Selected-root cuboid/orthogonal-prism conversion uses `object-conversion.ts` for the validated append transaction and `object-conversion.worker.ts` for cancellable computation. The inspector imports its lightweight selection eligibility check from `construction-objects.ts`, keeping the conversion solvers out of the initial editor bundle. `ObjectConversionDialog` owns transient inputs and a separate preview Scene; App checks the original project identity during acceptance and selects the resulting ordinary panels.
+
+The connected edge gesture path adds `resize-gesture.ts` (source-bound connected replay and explicit alternatives after a limit), `resize-preview-worker.ts` (coalesced worker client), and `resize-preview.worker.ts` (background solve/finalization). `use-preview-resize.ts` owns their transaction lifetime. The prepared planner and numerical null-space caches are transient; serialization and project ownership boundaries are unchanged.

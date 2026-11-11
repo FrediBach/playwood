@@ -1,14 +1,18 @@
+import { createResizePreviewWorker } from '@/lib/resize-preview-worker'
+import { ResizeReviewRequired } from '@/lib/numeric-resize'
+import type { ResizeReview } from '@/lib/structure-edit'
 import type { Notify } from '@/editor/editor-notifications'
-import { snapDistance, snapTargets, type SnapSettings } from '@/lib/preview-snap'
-import { useMemo, useRef, useState } from 'react'
-import { finishPreviewResize, movePreviewResize, type PreviewResizeMode, type RepeatPreview } from '@/lib/preview-resize'
+import { snapDistanceReference, snapTargets, type SnapSettings } from '@/lib/preview-snap'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { finishPreviewResize, movePreviewResize, startPreviewResize, reviewPreviewResize, type PreviewResizeMode, type RepeatPreview } from '@/lib/preview-resize'
 import { moveStructureRepeat, prepareStructureRepeat, type StructureRepeatSession } from '@/lib/structure-repeat'
 import { resolvePanels } from '@/lib/model'
 import type { Project } from '@/lib/types'
 import { createSelectionPreparations } from './selection-preparations'
 
 /** Keep transient geometry out of autosave and commit each gesture once. */
-export function usePreviewResize({ project, selectedIds, selectedConnectorIds, enabled, commit, notify, snapSettings, select }: {
+export function usePreviewResize({ project, selectedIds, selectedConnectorIds, enabled, commit, notify, snapSettings, select, onReview }: {
+  onReview: (review: ResizeReview) => void
   snapSettings: SnapSettings
   project: Project
   selectedIds: readonly string[]
@@ -29,10 +33,27 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
     return cached ? { ...cached } : null
   }, [preparations, panelId, panelIds, connectorId, enabled])
   type Session = NonNullable<typeof prepared>
-  type Result = ReturnType<typeof movePreviewResize> & { count?: number; reason?: string; selectedPanelId?: string; reusedPanelIds?: string[] }
-  const session = useRef<{ source: Session; handleId: string; mode: PreviewResizeMode; repeat?: StructureRepeatSession; targets?: ReturnType<typeof snapTargets> } | null>(null)
+  type Result = ReturnType<typeof movePreviewResize> & { snap?: ReturnType<typeof snapDistanceReference>['reference']; count?: number; reason?: string; selectedPanelId?: string; reusedPanelIds?: string[] }
+  const session = useRef<{ source: Session; handleId: string; mode: PreviewResizeMode; snapSettings: SnapSettings; worker?: ReturnType<typeof createResizePreviewWorker>; requestedDistance?: number; finishing?: boolean; repeat?: StructureRepeatSession; targets?: ReturnType<typeof snapTargets> } | null>(null)
   const latest = useRef<Result | null>(null)
   const [preview, setPreview] = useState<Result | null>(null)
+  useEffect(() => {
+    const cancelPending = (event: KeyboardEvent | FocusEvent) => {
+      if (!session.current?.finishing || (event instanceof KeyboardEvent && event.key !== 'Escape')) return
+      event.preventDefault()
+      session.current.worker?.stop()
+      session.current = null
+      latest.current = null
+      setPreview(null)
+    }
+    window.addEventListener('keydown', cancelPending)
+    window.addEventListener('blur', cancelPending)
+    return () => {
+      window.removeEventListener('keydown', cancelPending)
+      window.removeEventListener('blur', cancelPending)
+      if (session.current?.source === prepared) { session.current.worker?.stop(); session.current = null }
+    }
+  }, [prepared])
   const current = session.current?.source === prepared ? preview : null
   const panels = useMemo(() => current ? resolvePanels(current.project) : null, [current])
   const repeatPreview = useMemo<RepeatPreview | undefined>(() => {
@@ -62,7 +83,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
         return (['width', 'height'] as const).filter(dimension => before && Math.abs(panel[dimension] - before[dimension]) > 1e-6)
           .map(dimension => ({ label: `${panel.name} · ${dimension === 'width' ? 'Width' : 'Height'}`, value: panel[dimension] }))
       })
-    return { ...handle, sizes, position, limitReason: current.reason }
+    return { ...handle, sizes, position, limitReason: current.reason, interpretation: current.interpretation }
   }), [prepared, current, panels])
 
   return {
@@ -87,9 +108,16 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
           if (!panelId) throw new Error('Control-pull repeats a compartment from a panel arrow. Select a panel first.')
           repeat = prepareStructureRepeat(project, panelId, handle.direction)
         }
-        session.current = { source: prepared, handleId, mode, repeat }
+        session.current?.worker?.stop()
+        const worker = mode === 'connected' && handle.panelEdge && project.panels.length >= 12
+          ? createResizePreviewWorker(prepared, handleId, false) : undefined
+        const interpretation = mode !== 'repeat' && !worker ? startPreviewResize(prepared, handleId, mode === 'panel')?.label : undefined
+        session.current = { source: prepared, handleId, mode, repeat, worker, snapSettings: { ...snapSettings } }
+        if (worker) void worker.request(0).then(response => {
+          if (session.current?.worker === worker && response?.error) notify(response.error, 'error')
+        })
         latest.current = null
-        setPreview({ project, distance: 0, limited: false, ...(repeat ? { count: 0 } : {}) })
+        setPreview({ project, distance: 0, limited: false, interpretation, ...(repeat ? { count: 0 } : {}) })
         return true
       } catch (error) {
         notify(error instanceof Error ? error.message : 'This panel arrow cannot repeat a compartment.','error')
@@ -97,7 +125,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
       }
     },
     move: (distance: number, keyboard = false) => {
-      if (!session.current || session.current.source !== prepared) return
+      if (!session.current || session.current.source !== prepared || session.current.finishing) return
       try {
         if (session.current.repeat) {
           const result = moveStructureRepeat(session.current.repeat, keyboard ? Math.sign(distance) * session.current.repeat.pitch : distance)
@@ -107,23 +135,63 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
         }
         const source = session.current.source
         const handle = source.handles.find(item => item.id === session.current!.handleId)!
-        const targets = snapSettings.geometry
+        const settings = session.current.snapSettings
+        const targets = settings.geometry
           ? session.current.targets ??= snapTargets(source.original, [...selectedIds, ...handle.affectedPanelIds ?? []], selectedConnectorIds, !!connectorId)
           : []
-        const snapped = snapDistance(handle.position, handle.direction, Math.round(distance), targets, keyboard ? { ...snapSettings, tolerance: Math.min(snapSettings.tolerance, Math.abs(distance) * 0.45) } : snapSettings)
-        const result = movePreviewResize(source, session.current.handleId, snapped, session.current.mode === 'panel')
-        latest.current = result
-        setPreview(result)
+        const snapped = snapDistanceReference(handle.position, handle.direction, Math.round(distance), targets, keyboard ? { ...settings, tolerance: Math.min(settings.tolerance, Math.abs(distance) * 0.45) } : settings)
+        const active = session.current
+        active.requestedDistance = snapped.distance
+        const publish = (result: Result) => {
+          if (session.current !== active || active.finishing) return
+          const snappedResult = { ...result, snap: Math.abs(result.distance - snapped.distance) < 1e-4 ? snapped.reference : undefined }
+          latest.current = snappedResult
+          setPreview(snappedResult)
+        }
+        if (active.worker) {
+          void active.worker.request(snapped.distance).then(response => {
+            if (!response || session.current !== active || active.finishing) return
+            if (response.error) notify(response.error, 'error')
+            else if (response.result) publish(response.result)
+          })
+        } else publish(movePreviewResize(source, active.handleId, snapped.distance, active.mode === 'panel'))
       } catch (error) {
         notify(error instanceof Error ? error.message : 'This direction cannot preserve the connected panels.','error')
       }
     },
-    end: (cancel: boolean) => {
-      if (!cancel && latest.current && session.current?.source === prepared && Math.abs(latest.current.distance) > 1e-6) {
+    end: async (cancel: boolean) => {
+      const active = session.current
+      if (!active || active.source !== prepared) return
+      if (active.worker && !cancel) {
+        if (active.finishing) return
+        active.finishing = true
+        const response = await active.worker.request(active.requestedDistance ?? 0, true)
+        if (session.current !== active) return
+        if (response?.review) onReview(response.review)
+        else if (response?.error) notify(response.error, 'error')
+        else if (response?.result && Math.abs(response.result.distance) > 1e-6) {
+          try {
+            commit(current => {
+              if (current !== active.source.original) throw new Error('The project changed during this drag. Try again.')
+              return response.result!.project
+            })
+            if (response.result.reason) notify(response.result.reason, 'error')
+          } catch (error) { notify(error instanceof Error ? error.message : 'This resize could not be applied.', 'error') }
+        }
+        active.worker.stop()
+        session.current = null
+        latest.current = null
+        setPreview(null)
+        return
+      }
+      active.worker?.stop()
+      if (!cancel && latest.current && session.current?.source === prepared && (Math.abs(latest.current.distance) > 1e-6 || latest.current.limited)) {
         try {
           const source = session.current.source
-          const candidate = session.current.repeat ? latest.current.project
-            : finishPreviewResize(source, session.current.handleId, latest.current, session.current.mode === 'panel').project
+          const finished = session.current.repeat ? latest.current
+            : finishPreviewResize(source, session.current.handleId, latest.current, session.current.mode === 'panel')
+          if (!session.current.repeat) reviewPreviewResize(source, session.current.handleId, finished.distance, session.current.mode === 'panel', latest.current.limited ? active.requestedDistance : undefined)
+          const candidate = finished.project
           const changed = JSON.stringify(candidate) !== JSON.stringify(source.original)
           commit(current => {
             if (current !== source.original) throw new Error('The project changed during this drag. Try again.')
@@ -137,7 +205,10 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
                 : `Added ${latest.current.count} ${latest.current.count === 1 ? 'bay' : 'bays'}. Undo is available.`)
           }
         }
-        catch (error) { notify(error instanceof Error ? error.message : 'This resize conflicts with a constraint.','error') }
+        catch (error) {
+          if (error instanceof ResizeReviewRequired) onReview(error.review)
+          else notify(error instanceof Error ? error.message : 'This resize conflicts with a constraint.','error')
+        }
       }
       if (!cancel && latest.current?.reason && session.current?.source === prepared) notify(latest.current.reason,'error')
       session.current = null

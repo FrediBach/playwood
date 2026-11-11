@@ -134,7 +134,11 @@ function minimize(rows: StructuralRow[], bounds: StructuralRow[], objective: Str
 
 /** Solve only in the remaining degrees of freedom. Most furniture variables
  * are fixed by joints/cuts; a dense KKT system over all of them is unnecessary. */
-function nullSpace(rows: StructuralRow[], size: number): number[][] {
+export type ResizeNumericalCache = Map<string, number[][]>
+function nullSpace(rows: StructuralRow[], size: number, cache?: ResizeNumericalCache): number[][] {
+  const key = cache ? JSON.stringify([size, rows.map(row => [...row.entries])]) : undefined
+  const cached = key && cache?.get(key)
+  if (cached) return cached
   const basis: number[][] = []
   const append = (candidate: number[], target: number[][]) => {
     for (let pass = 0; pass < 2; pass++) for (const group of [basis, target]) for (const own of group) {
@@ -154,9 +158,13 @@ function nullSpace(rows: StructuralRow[], size: number): number[][] {
   }
   const freedom: number[][] = []
   for (let i = 0; i < size; i++) append(Array.from({ length: size }, (_, j) => i === j ? 1 : 0), freedom)
+  if (cache && key) {
+    if (cache.size >= 32) cache.delete(cache.keys().next().value!)
+    cache.set(key, freedom)
+  }
   return freedom
 }
-function minimizeReduced(rows: StructuralRow[], bounds: StructuralRow[], objective: StructuralRow[], start: number[], name: string, freedom: number[][]) {
+function minimizeReduced(rows: StructuralRow[], bounds: StructuralRow[], objective: StructuralRow[], start: number[], name: string, freedom: number[][], cache?: ResizeNumericalCache) {
   const started = performance.now()
   const reduce = (row: StructuralRow): StructuralRow => ({ ...row,
     entries: new Map(freedom.map((vector, i) => [i, [...row.entries].reduce((sum, [j, coefficient]) => sum + coefficient * vector[j], 0)])),
@@ -169,7 +177,7 @@ function minimizeReduced(rows: StructuralRow[], bounds: StructuralRow[], objecti
   if (maxEqualityResidual > FEASIBILITY_TOLERANCE || maxBoundViolation > FEASIBILITY_TOLERANCE) throw new SolverConflict([], 'The resize priority residual check failed.', {
     termination: 'residual-check-failed', iterations: reduced?.diagnostic.iterations ?? 0, maxEqualityResidual, maxBoundViolation,
   })
-  const remaining = nullSpace(objective.map(reduce), freedom.length)
+  const remaining = nullSpace(objective.map(reduce), freedom.length, cache)
   const nextFreedom = remaining.map(vector => start.map((_, i) => vector.reduce((sum, n, j) => sum + n * freedom[j][i], 0)))
   return { values, freedom: nextFreedom, diagnostic: { name, elapsedMs: performance.now() - started, degreesOfFreedom: freedom.length, squaredError: objective.reduce((sum, row) => sum + (value(row, values) - row.value) ** 2, 0),
     iterations: reduced?.diagnostic.iterations ?? 0, activeBounds: reduced?.diagnostic.activeBounds ?? [], maxEqualityResidual, maxBoundViolation, termination: 'optimal' as const } }
@@ -182,10 +190,10 @@ function minimizeReduced(rows: StructuralRow[], bounds: StructuralRow[], objecti
  * arbitrary geometry from the previous tier. Lower tiers keep its null space.
  */
 export function solveResizePriorities(rows: StructuralRow[], bounds: StructuralRow[], weights: number[], tiers: ResizePriorityTier[],
-  beforeSolve: () => void = () => {}) {
+  beforeSolve: () => void = () => {}, cache?: ResizeNumericalCache) {
   beforeSolve()
   let values = solveWithBounds(rows, bounds, weights)
-  let freedom = nullSpace(rows, weights.length)
+  let freedom = nullSpace(rows, weights.length, cache)
   const retained = [...rows], diagnostics: ResizePriorityDiagnostic[] = []
   const displacement: ResizePriorityTier = { name: 'displacement', rows: weights.map((weight, index) => ({
     entries: new Map([[index, Math.sqrt(weight)]]), value: 0, provenance: { kind: 'placement-preference' },
@@ -193,7 +201,7 @@ export function solveResizePriorities(rows: StructuralRow[], bounds: StructuralR
   for (const tier of [...tiers, displacement]) {
     if (!tier.rows.length) continue
     beforeSolve()
-    const result = minimizeReduced(retained, bounds, tier.rows, values, tier.name, freedom)
+    const result = minimizeReduced(retained, bounds, tier.rows, values, tier.name, freedom, cache)
     values = result.values
     freedom = result.freedom
     diagnostics.push(result.diagnostic)

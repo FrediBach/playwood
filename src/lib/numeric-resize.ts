@@ -10,7 +10,7 @@ import type { ResizeReview } from './structure-edit'
 export class ResizeReviewRequired extends Error {
   constructor(public review: ResizeReview) { super('Choose what this resize should preserve.') }
 }
-const labels = { 'preserve-cuts': 'Keep attached sizes', 'negative-end': 'Keep lower / left end aligned',
+export const resizeInterpretationLabels = { 'preserve-cuts': 'Keep attached sizes', 'negative-end': 'Keep lower / left end aligned',
   'positive-end': 'Keep upper / right end aligned', 'fitted-clearances': 'Keep both margins' }
 const descriptions = { 'preserve-cuts': 'Attached panels keep their sizes and move together as needed.',
   'negative-end': 'Keep attached panel sizes and follow their lower or left end references.',
@@ -55,12 +55,22 @@ export function resizePanelsWithReview(source: Project, ids: readonly string[], 
   if (report.status === 'complete' && (report.candidates.length === 1 || (decisiveFit && fitted))) {
     return acceptNumericResize(source, intent, decisiveFit && fitted ? fitted : best)
   }
+  throw new ResizeReviewRequired(createResizeReview(intent, report.candidates, report.status !== 'complete'))
+}
+
+export function createResizeReview(intent: ResizeIntent, candidates: readonly ShadowResizeCandidate[], incomplete = false): ResizeReview {
+  const source = intent.source
+  const target = intent.target
+  const panel = target.kind === 'panel-edge' ? source.panels.find(p => p.id === target.edge.panelId) : undefined
+  if (target.kind === 'panel-edge' && !panel) throw new Error('The resized panel no longer exists.')
+  const dimensions = target.kind === 'selection-dimensions' ? target.dimensions : target.kind === 'panel-edge' && panel
+    ? { [target.edge.dimension]: panel[target.edge.dimension] + target.edge.distance } : {}
   const outsideBefore = size(source)
-  const review: ResizeReview = { source, requestedDimensions: { ...dimensions }, intent, incomplete: report.status !== 'complete',
-    alternatives: report.candidates.map(candidate => ({
-      relaxed: { id: candidate.interpretation, kind: 'alignment', description: labels[candidate.interpretation], panelIds: candidate.project.panels.map(p => p.id) },
+  const review: ResizeReview = { source, requestedDimensions: { ...dimensions }, intent, incomplete,
+    alternatives: candidates.map(candidate => ({
+      relaxed: { id: candidate.interpretation, kind: 'alignment', description: resizeInterpretationLabels[candidate.interpretation], panelIds: candidate.project.panels.map(p => p.id) },
       project: candidate.project, changes: changes(source, candidate.project), candidate,
       explanation: descriptions[candidate.interpretation], outsideSize: { before: outsideBefore, after: size(candidate.project) },
     })) }
-  throw new ResizeReviewRequired(review)
+  return review
 }

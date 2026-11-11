@@ -1,3 +1,4 @@
+import { prepareResizeGesture } from './resize-gesture'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { isPanelDimensionLocked } from './design-constraints'
 import { connectorSlide, getConnectorRail } from './connector-movement'
@@ -22,6 +23,7 @@ export interface PreviewResizeHandle {
   panelEdge?: boolean
   panelHandle?: boolean
   affectedPanelIds?: string[]
+  interpretation?: string
   limitReason?: string
 }
 
@@ -198,11 +200,27 @@ export function preparePreviewResize(project: Project, selection: PreviewResizeS
   return session.handles.length ? session : null
 }
 
-interface PreviewResizeResult { project: Project; distance: number; limited: boolean; reason?: string }
+const gestures = new WeakMap<PreviewResizeSession, Map<string, ReturnType<typeof prepareResizeGesture>>>()
+export function startPreviewResize(session: PreviewResizeSession, handleId: string, local = false) {
+  const operation = session.drivers.get(handleId)?.operation
+  if (local || !session.selection.panelId || operation?.kind !== 'edge') return undefined
+  let prepared = gestures.get(session)
+  if (!prepared) { prepared = new Map(); gestures.set(session, prepared) }
+  let gesture = prepared.get(handleId)
+  if (!gesture) { gesture = prepareResizeGesture(session.original, operation); prepared.set(handleId, gesture) }
+  return gesture
+}
+
+export function reviewPreviewResize(session: PreviewResizeSession, handleId: string, distance: number, local = false, requestedDistance?: number) {
+  if (!local) gestures.get(session)?.get(handleId)?.review(distance, requestedDistance)
+}
+
+interface PreviewResizeResult { project: Project; distance: number; limited: boolean; reason?: string; interpretation?: string }
+const attemptCaches = new WeakMap<PreviewResizeSession, Map<string, Project | Error>>()
 const lastMoves = new WeakMap<PreviewResizeSession, { handleId: string; distance: number; local: boolean; result: PreviewResizeResult }>()
 
 /** Repeated rounded/snapped pointer positions reuse one immutable candidate.
- * Retain only the latest result, and release it with its source session. */
+ * The last-result shortcut complements bounded source-relative checkpoint caches. */
 export function movePreviewResize(session: PreviewResizeSession, handleId: string, distance: number, local = false): PreviewResizeResult {
   if (!Number.isFinite(distance)) throw new Error('Panel movement must be a finite distance.')
   const previous = lastMoves.get(session)
@@ -218,11 +236,12 @@ function solvePreviewResize(session: PreviewResizeSession, handleId: string, dis
   const handle = session.handles.find(item => item.id === handleId)
   const driver = session.drivers.get(handleId)
   if (!handle || !driver || (handle.sizeLocked || (handle.blocked && !local)) || Math.abs(distance) < 1e-6) return { project: session.original, distance: 0, limited: false }
-  const attempt = (amount: number) => {
+  const gesture = startPreviewResize(session, handleId, local)
+  const solve = (amount: number) => {
     if (local && (!session.selection.panelId || driver.operation.kind !== 'edge')) throw new Error('Only panel edges can resize independently.')
     const next = local && driver.operation.kind === 'edge'
       ? resizePanelEdge(session.original, driver.operation.panelId, driver.operation.dimension, driver.operation.side, amount, true, { origin: 'preview' })
-      : apply(session.original, driver.operation, amount / driver.scale)
+      : gesture ? gesture.solve(amount) : apply(session.original, driver.operation, amount / driver.scale)
     if (session.selection.connectorId) {
       const position = connectorPosition(next, session.selection.connectorId)
       const target = vector(handle.position).addScaledVector(vector(handle.direction), amount)
@@ -230,20 +249,49 @@ function solvePreviewResize(session: PreviewResizeSession, handleId: string, dis
     }
     return next
   }
-  try { return { project: attempt(distance), distance, limited: false } }
-  catch (error) {
-    let lower = 0, upper = 1, project = session.original
-    let limitError = error
-    // Bisection also handles support/contact limits, which need not coincide
-    // with the individual panel dimension limits.
-    for (let iteration = 0; iteration < 20; iteration++) {
-      const middle = (lower + upper) / 2
-      try { const next = attempt(distance * middle); project = next; lower = middle }
-      catch (failure) { upper = middle; limitError = failure }
+  let cache = attemptCaches.get(session)
+  if (!cache) { cache = new Map(); attemptCaches.set(session, cache) }
+  const attempt = (amount: number) => {
+    const key = `${handleId}/${local}/${amount}`
+    const cached = cache.get(key)
+    if (cached instanceof Error) throw cached
+    if (cached) return cached
+    try {
+      const next = solve(amount)
+      if (cache.size >= 256) cache.delete(cache.keys().next().value!)
+      cache.set(key, next)
+      return next
+    } catch (error) {
+      if (cache.size >= 256) cache.delete(cache.keys().next().value!)
+      if (error instanceof Error) cache.set(key, error)
+      throw error
     }
-    return { project, distance: distance * lower, limited: true,
-      ...(driver.operation.kind === 'stretch' && limitError instanceof Error ? { reason: limitError.message } : {}) }
   }
+  // Walk a fixed lattice from the original snapshot, never jump straight to
+  // a feasible endpoint beyond an intervening invalid region. Cached lattice
+  // points make many samples equivalent to one. This is bounded sampling, not
+  // a proof of continuous or globally maximal feasibility.
+  let lower = 0, project = session.original
+  const maximum = Math.min(Math.abs(distance), 1024)
+  for (let index = 1; ; index++) {
+    const amount = Math.sign(distance) * Math.min(index * 8, maximum)
+    try { project = attempt(amount); lower = amount }
+    catch (error) {
+      let upper = amount
+      let limitError = error
+      for (let iteration = 0; iteration < 20; iteration++) {
+        const middle = (lower + upper) / 2
+        try { project = attempt(middle); lower = middle }
+        catch (failure) { upper = middle; limitError = failure }
+      }
+      return { project, distance: lower, limited: true, interpretation: gesture?.label,
+        reason: limitError instanceof Error ? limitError.message : 'This direction reached a resize limit.' }
+    }
+    if (Math.abs(amount) >= maximum) break
+  }
+  return { project, distance: lower, limited: Math.abs(distance) > maximum, interpretation: gesture?.label,
+    ...(Math.abs(distance) > maximum ? { reason: 'This drag reached its preview search limit. Release and start another drag to continue.' } : {}) }
+
 }
 
 /** Round only the released cut, then replay the gesture from its original

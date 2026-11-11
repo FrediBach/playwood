@@ -40,21 +40,25 @@ export function snapTargets(project: Project, excludedPanels: readonly string[] 
   })
 }
 /** Snap along a constrained direction; never move a handle off its rail. */
-export function snapDistance(origin: Vec3, direction: Vec3, distance: number, targets: Vec3[], settings: SnapSettings): number {
-  if (!settings.grid && !settings.geometry) return distance
+export function snapDistanceReference(origin: Vec3, direction: Vec3, distance: number, targets: Vec3[], settings: SnapSettings): { distance: number; reference?: { kind: 'geometry' | 'grid'; index: number; axis: number; value: number } } {
+  if (!settings.grid && !settings.geometry) return { distance }
   let result = distance, best = Infinity
+  let reference: ReturnType<typeof snapDistanceReference>['reference']
   for (let axis = 0; axis < 3; axis++) {
     if (Math.abs(direction[axis]) < 1e-6) continue
     const coordinate = origin[axis] + direction[axis] * distance
     const values = settings.geometry ? targets.map(point => point[axis]) : []
     if (settings.grid) values.push(Math.round(coordinate / settings.spacing) * settings.spacing)
-    for (const value of values) {
+    for (const [index, value] of values.entries()) {
       const candidate = (value - origin[axis]) / direction[axis]
       const error = Math.abs(candidate - distance)
-      if (error <= settings.tolerance && error < best) { best = error; result = candidate }
+      if (error <= settings.tolerance && error < best) { best = error; result = candidate; reference = { kind: settings.geometry && index < targets.length ? 'geometry' : 'grid', index, axis, value } }
     }
   }
-  return result
+  return { distance: result, reference }
+}
+export function snapDistance(origin: Vec3, direction: Vec3, distance: number, targets: Vec3[], settings: SnapSettings): number {
+  return snapDistanceReference(origin, direction, distance, targets, settings).distance
 }
 export function snapPanelDelta(panels: Panel[], ids: readonly string[], delta: Vec3, settings: SnapSettings, constrained = false): Vec3 {
   if (!settings.grid && !settings.geometry) return delta

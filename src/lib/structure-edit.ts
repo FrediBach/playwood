@@ -650,7 +650,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
           policy.budget.used++
         }
         if (policy.hierarchy) {
-          const result = solveResizePriorities(rows, bounds, weights, priorityTiers, consume)
+          const result = solveResizePriorities(rows, bounds, weights, priorityTiers, consume, policy.numericalCache)
           changes = result.values
           policy.diagnostics?.push(...result.diagnostics)
         } else { consume(); changes = solveWithBounds(rows, bounds, weights) }
@@ -672,11 +672,14 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
     }
   } catch (error) {
     if (error instanceof ResizeShadowBudgetError) throw error
-    const panelIds = error instanceof SolverConflict
+    const implicatedPanelIds = error instanceof SolverConflict
       ? [...new Set(error.variables.flatMap(variable => frames[Math.floor(variable / 5)]
         ? [frames[Math.floor(variable / 5)].panel.id]
         : connections.filter(connection => offsetVariables.get(offsetKey(connection)) === variable).flatMap(connection => [connection.parentId, connection.childId])))]
       : [...new Set(constraints.flatMap(designConstraintPanelIds))]
+    // Bound failures can name only the target variable even when a saved
+    // relationship locks it through another panel. Include the cited rules.
+    const panelIds = [...new Set([...implicatedPanelIds, ...constraints.flatMap(designConstraintPanelIds)])]
     const message = constraints.length
       ? `This edit cannot keep the design rules and joints satisfied. ${constraints.slice(0, 3).map(rule => describeDesignConstraint(rule, frames.map(item => item.panel))).join('; ')}. Edit or pause a rule first.`
       : error instanceof Error ? error.message : CONSTRAINT_MESSAGE
@@ -1053,8 +1056,8 @@ export function solveResizeIntent(intent: ResizeIntent, options: { inspect?: boo
   let analysis: ReturnType<typeof inspectResizeAnalysis> | undefined
   try {
     assertLegacyResizeIntent(intent)
-    if (options.shadow && (intent.target.kind !== 'selection-dimensions' || intent.origin !== 'panel' || intent.releasedRelationshipId)) {
-      throw new Error('Shadow planning supports ordinary numeric resize only.')
+    if (options.shadow && (!((intent.target.kind === 'selection-dimensions' && intent.origin === 'panel') || (intent.target.kind === 'panel-edge' && !intent.target.local)) || intent.releasedRelationshipId)) {
+      throw new Error('Intent planning supports ordinary dimensions and connected panel edges only.')
     }
     if (trace.inspect) analysis = inspectResizeAnalysis(intent.source)
     const project = applyResizeIntent(intent, trace)

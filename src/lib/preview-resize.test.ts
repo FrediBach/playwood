@@ -1,3 +1,4 @@
+import { reviewPreviewResize } from './preview-resize'
 import { describe, expect, it } from 'vitest'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { createAssembly } from './assemblies'
@@ -77,10 +78,22 @@ describe('preview structural resize handles', () => {
     expect(session.handles.find(handle => handle.id === 'panel-height-positive')?.blocked).toBeUndefined()
   })
 
+  it('highlights both panels when a saved equality and neighbor lock block an edge', () => {
+    const project = parseProject(cornerShelf)
+    const selected = named(project, 'Right side copy'), neighbor = named(project, 'Left side copy')
+    project.constraints = [
+      { id: 'fixed', kind: 'dimension', enabled: true, panelId: neighbor.id, dimension: 'height', value: neighbor.height },
+      { id: 'equal', kind: 'equal-dimension', enabled: true, panelIds: [selected.id, neighbor.id], dimension: 'height' },
+    ]
+    const session = preparePreviewResize(project, { panelId: selected.id })!
+    const handle = along(session, [-1, 0, 0])
+    expect(handle.blocked?.panelIds).toEqual(expect.arrayContaining([selected.id, neighbor.id]))
+    expect(handle.blocked?.reason).toMatch(/design rules/)
+  })
+
   it('extends the corner shelf independently with every installed connector fixed', () => {
     const project = parseProject(cornerShelf)
-    // Keep connected growth genuinely blocked now that imported-loop roundoff
-    // no longer blocks this fixture by itself.
+    // A saved neighbor size stays fixed in both connected and local modes.
     const neighbor = named(project, 'Left side copy')
     project.constraints = [{ id: 'fixed-neighbor', kind: 'dimension', enabled: true, panelId: neighbor.id, dimension: 'height', value: neighbor.height }]
     const panel = named(project, 'Right side copy')
@@ -179,15 +192,16 @@ describe('preview structural resize handles', () => {
   it.each([
     { distance: 200, rotated: false }, { distance: -80, rotated: false },
     { distance: 200, rotated: true }, { distance: -80, rotated: true },
-  ])('preserves everyday shelf setbacks for a $distance mm edge pull (rotated: $rotated)', ({ distance, rotated }) => {
+  ])('preserves everyday shelf setbacks throughout the drag for a $distance mm edge pull (rotated: $rotated)', ({ distance, rotated }) => {
     const loaded = parseProject(everydayShelf)
     const project = rotated ? rotateProject(rotateProject(loaded, 'y', 27), 'z', 15) : loaded
     const before = resolvePanels(project)
     const selected = named(project, 'Right upper side')
     const session = preparePreviewResize(project, { panelId: selected.id })!
     const handle = session.handles.find(handle => handle.id === 'panel-height-negative')!
-    const result = movePreviewResize(session, handle.id, distance)
+    const result = { ...movePreviewResize(session, handle.id, distance) }
     expect(result.limited).toBe(false)
+    expect(() => reviewPreviewResize(session, handle.id, distance)).not.toThrow()
     const direction = new Vector3(...handle.direction)
     for (const old of before.filter(panel => panel.height > 300)) {
       const next = result.project.panels.find(panel => panel.id === old.id)!

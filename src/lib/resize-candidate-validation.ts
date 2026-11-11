@@ -15,7 +15,7 @@ const changed = (a: Panel, b: Panel) => geometry(a).some((n, i) => Math.abs(n - 
   || JSON.stringify(a.customOutline) !== JSON.stringify(b.customOutline)
 const identities = (values: readonly string[]) => JSON.stringify([...values].sort())
 
-/** Final acceptance for ordinary numeric resize, shared by planning and review.
+/** Final acceptance for ordinary dimensions and connected edges, shared by planning and review.
  * Baseline issues cannot be declared non-worsening by ID alone. Measure fixed-axis
  * collision overlaps; otherwise keep involved geometry/hardware unchanged when
  * no existing domain-specific severity guard is available. */
@@ -29,14 +29,21 @@ export function validateResizeCandidate(intent: ResizeIntent, candidate: Project
   }
   const before = new Map(resolvePanels(source).map(p => [p.id, p])), after = new Map(resolvePanels(candidate).map(p => [p.id, p]))
   const target = intent.target
-  if (target.kind !== 'selection-dimensions') throw new Error('Numeric resize acceptance requires dimension targets.')
-  const selected = new Set(target.panelIds)
+  if (target.kind !== 'selection-dimensions' && target.kind !== 'panel-edge') throw new Error('Resize acceptance requires dimensions or an edge target.')
+  const selected = new Set(target.kind === 'panel-edge' ? [target.edge.panelId] : target.panelIds)
+  const dimensions = target.kind === 'panel-edge' ? { [target.edge.dimension]: before.get(target.edge.panelId)![target.edge.dimension] + target.edge.distance } : target.dimensions
+  if (target.kind === 'panel-edge') {
+    const { panelId, dimension, side, distance } = target.edge
+    const previous = frame(before.get(panelId)!), next = after.get(panelId)!
+    const expected = new Vector3(...previous.panel.position).addScaledVector(previous.axes[dimension === 'width' ? 0 : 1], side * distance / 2)
+    if (expected.distanceTo(new Vector3(...next.position)) > RESIZE_OUTCOME_TOLERANCE) throw new Error('This resize moved its fixed opposite edge.')
+  }
   for (const [id, panel] of after) {
     const previous = before.get(id)!
     if (geometry(panel).some(n => !Number.isFinite(n)) || panel.rotation.some((n, i) => Math.abs(n - previous.rotation[i]) > RESIZE_OUTCOME_TOLERANCE)
       || Math.abs(panel.thickness - previous.thickness) > RESIZE_OUTCOME_TOLERANCE) throw new Error('This resize changed a fixed physical input.')
     for (const dimension of ['width', 'height'] as const) {
-      const expected = selected.has(id) ? target.dimensions[dimension] ?? previous[dimension]
+      const expected = selected.has(id) ? dimensions[dimension] ?? previous[dimension]
         : adaptingCuts.has(`${id}/${dimension}`) ? undefined : previous[dimension]
       if (expected !== undefined && Math.abs(panel[dimension] - expected) > RESIZE_OUTCOME_TOLERANCE) throw new Error('This resize missed a requested or preserved cut.')
     }

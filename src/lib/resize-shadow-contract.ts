@@ -1,4 +1,4 @@
-import type { ResizePriorityDiagnostic } from './resize-priority-solver'
+import type { ResizePriorityDiagnostic, ResizeNumericalCache } from './resize-priority-solver'
 import type { Vec3 } from './types'
 
 /** Internal candidate compiler input shared by shadow comparisons and numeric planning; never saved. */
@@ -9,6 +9,7 @@ export interface ResizeShadowEquation {
 export interface ResizeShadowPolicy {
   equations: readonly ResizeShadowEquation[]
   hierarchy?: boolean
+  numericalCache?: ResizeNumericalCache
   softReferences?: readonly ResizeShadowEquation[]
   diagnostics?: ResizePriorityDiagnostic[]
   adaptingCuts: ReadonlySet<string>

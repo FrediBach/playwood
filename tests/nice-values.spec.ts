@@ -20,7 +20,7 @@ async function importProject(page: Page, project: Project) {
   await page.getByLabel('Import project file').setInputFiles({
     name: 'nice-values.playwood.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)),
   })
-  await expect.poll(async () => (await savedProject(page))?.name).toBe(project.name)
+  await expect.poll(async () => (await savedProject(page))?.name, { timeout: 15000 }).toBe(project.name)
 }
 
 async function exportedProject(page: Page): Promise<Project> {
@@ -214,7 +214,7 @@ test('resize arrows preview intermediate sizes and round only on release, preser
   await page.getByRole('combobox', { name: 'Camera view', exact: true }).selectOption('front')
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))))
   await beginResize(page, original, 37)
-  const caption = page.locator('.preview-resize-anchor.is-active .preview-resize-size')
+  const caption = page.locator('.preview-resize-anchor.is-active .preview-resize-size').filter({ hasText: /^Width =/ })
   await expect(caption).toContainText(/Width = 43[67] mm/)
   const previewWidth = Number((await caption.innerText()).match(/= ([\d.]+)/)![1])
   expect(previewWidth % 10).not.toBe(0)

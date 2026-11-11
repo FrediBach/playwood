@@ -4,7 +4,7 @@ import { designConstraintPanelIds } from './design-constraints'
 import { Vector3 } from 'three'
 import { analyzeResizeEvidence, type ResizeEvidence } from './resize-evidence'
 import { frame, coordinate } from './resize-analysis'
-import { createResizeIntent, assertLegacyResizeIntent, type ResizeIntent, type ResizeResult } from './resize-intent'
+import { createResizeIntent, assertLegacyResizeIntent, type ResizeIntent, type ResizeTarget, type ResizeResult } from './resize-intent'
 import { solveResizeIntent } from './structure-edit'
 import { resolvePanels } from './model'
 import { ResizeShadowBudgetError, type ResizeShadowEquation } from './resize-shadow-contract'
@@ -57,25 +57,31 @@ const fingerprint = (project: Project) => JSON.stringify({
   overrides: project.connectorOverrides,
 })
 
+const targetSignature = (target: ResizeTarget) => JSON.stringify(target.kind === 'panel-edge'
+  ? [target.kind, target.edge.panelId, target.edge.dimension, target.edge.side, target.local]
+  : target.kind === 'selection-dimensions' ? [target.kind, [...target.panelIds].sort(), Object.keys(target.dimensions).filter(key => target.dimensions[key as 'width' | 'height'] !== undefined).sort()]
+    : [target.kind])
+
 /** Shared bounded semantic search. Candidate-defining rows never enter greedy
  * preference recovery. Ordinary numeric edits enable true priorities; the shadow
  * wrapper retains the stage 2 comparison policy. Neither path commits history. */
-export function planResizeCandidates(intent: ResizeIntent, options: { maxSolves?: number; maxInterpretations?: number; hierarchy?: boolean } = {}) {
+export function prepareResizeCandidates(intent: ResizeIntent, options: { maxSolves?: number; maxInterpretations?: number; hierarchy?: boolean } = {}) {
   assertLegacyResizeIntent(intent)
-  if (intent.target.kind !== 'selection-dimensions' || intent.origin !== 'panel' || intent.releasedRelationshipId) {
-    throw new Error('Shadow planning supports ordinary numeric resize only.')
+  if (!((intent.target.kind === 'selection-dimensions' && intent.origin === 'panel') || (intent.target.kind === 'panel-edge' && !intent.target.local)) || intent.releasedRelationshipId) {
+    throw new Error('Intent planning supports ordinary dimensions and connected panel edges only.')
   }
   const target = intent.target
-  const analysis = analyzeResizeEvidence(intent.source, target.panelIds)
+  const panelIds = target.kind === 'panel-edge' ? [target.edge.panelId] : target.panelIds
+  const dimensions = target.kind === 'panel-edge' ? { [target.edge.dimension]: 0 } : target.dimensions
+  const analysis = analyzeResizeEvidence(intent.source, panelIds)
   // Canonical compilation removes incidental input-array ordering. IDs are never
   // used to select among materially distinct outcomes: all contenders survive.
   const source: Project = { ...intent.source, panels: [...intent.source.panels].sort((a, b) => a.id.localeCompare(b.id)),
     connections: [...intent.source.connections].sort((a, b) => a.id.localeCompare(b.id)),
     constraints: intent.source.constraints ? [...intent.source.constraints].sort((a, b) => a.id.localeCompare(b.id)) : undefined }
-  const request = createResizeIntent(source, { ...target, panelIds: [...target.panelIds].sort() }, { ...intent.validation, session: intent.session })
   const original = new Map(resolvePanels(source).map(panel => [panel.id, panel]))
-  const selected = new Set(target.panelIds)
-  const requestedCuts = new Set(target.panelIds.flatMap(id => Object.entries(target.dimensions).filter(([, value]) => value !== undefined).map(([dimension]) => `${id}/${dimension}`)))
+  const selected = new Set(panelIds)
+  const requestedCuts = new Set(panelIds.flatMap(id => Object.entries(dimensions).filter(([, value]) => value !== undefined).map(([dimension]) => `${id}/${dimension}`)))
   const activeCuts = new Set(requestedCuts)
   const relevant = new Set<ResizeEvidence>()
   const spanningBoundaries = new Set<string>()
@@ -122,113 +128,126 @@ export function planResizeCandidates(intent: ResizeIntent, options: { maxSolves?
     const root = componentRoot(id)
     anchorGroups.set(root, [...anchorGroups.get(root) ?? [], id])
   }
-  const canonicalBudget = (value: number | undefined, fallback: number) => Number.isFinite(value) ? Math.max(0, Math.min(fallback, Math.floor(value!))) : fallback
-  const budget = { remaining: canonicalBudget(options.maxSolves, 32), used: 0 }
-  const interpretationLimit = canonicalBudget(options.maxInterpretations, 8)
-  const kinds: ResizeInterpretation[] = evidence.some(item => item.detector !== 'structural-span') ? ['preserve-cuts', 'negative-end', 'positive-end', 'fitted-clearances'] : ['preserve-cuts']
-  const candidates: ShadowResizeCandidate[] = [], attempts: ShadowResizeAttempt[] = []
-  let exhausted = false
-  for (const interpretation of kinds) {
-    if (attempts.length >= interpretationLimit || budget.remaining <= 0) { exhausted = true; break }
-    const equations: ResizeShadowEquation[] = []
-    const adaptingCuts = new Set([...(interpretation === 'fitted-clearances' ? activeCuts : [...requestedCuts, ...evidence.filter(item => item.detector === 'structural-span').flatMap(item => item.cuts)]),
-      ...authoredCuts, ...analysis.physical.outlinePanelIds.flatMap(id => [`${id}/width`, `${id}/height`])])
-    // A numeric anchor is a conservative candidate choice, not a new public rule.
-    // The candidate is rejected if it conflicts with an authored reference.
-    if (!options.hierarchy) for (const axis of axes) for (const ids of anchorGroups.values()) equations.push({ id: `anchor/${ids.join('/')}/${axis.join()}`,
-      terms: ids.map(id => ({ panelId: id, axis, side: 0, scale: 1 / ids.length })) })
-    for (const item of evidence) {
-      if (interpretation === 'fitted-clearances' || item.detector === 'structural-span') equations.push(...item.equations)
-      else if (interpretation !== 'preserve-cuts') equations.push(item.equations[interpretation === 'negative-end' ? 0 : 1])
-    }
-    if (interpretation !== 'fitted-clearances') for (const section of sections) {
-      const [first, ...rest] = section.panelIds
-      for (const id of rest) for (const axis of axes) equations.push({ id: `rigid/${first}/${id}/${axis.join()}`,
-        terms: [{ panelId: first, axis, side: 0, scale: 1 }, { panelId: id, axis, side: 0, scale: -1 }] })
-    }
-    const diagnostics: ResizePriorityDiagnostic[] = []
-    const hardIds = new Set(equations.map(equation => equation.id))
-    const softReferences = evidence.flatMap(item => item.equations).filter(equation => !hardIds.has(equation.id))
-    const result = solveResizeIntent(request, { shadow: { equations, adaptingCuts, budget, hierarchy: options.hierarchy, softReferences, diagnostics } })
-    if (result.status !== 'solved') {
-      const budgetError = result.error instanceof ResizeShadowBudgetError
-      attempts.push({ interpretation, status: budgetError ? 'search-budget-exhausted' : result.status, message: result.diagnostic.message })
-      if (budgetError) { exhausted = true; break }
-      continue
-    }
-    let next = result.project
-    try {
-      next = validateResizeCandidate(intent, next, equations, adaptingCuts)
-    } catch (error) {
-      attempts.push({ interpretation, status: 'candidate-invalid', message: error instanceof Error ? error.message : String(error) })
-      continue
-    }
-    attempts.push({ interpretation, status: 'solved' })
-    const after = new Map(resolvePanels(next).sort((a, b) => a.id.localeCompare(b.id)).map(panel => [panel.id, panel]))
-    const changedCuts = new Set<string>()
-    let normalizedCutChange = 0, translation = 0, outsideRegion = 0, outsideReferenceChange = 0
-    for (const [id, panel] of after) {
-      const before = original.get(id)!
-      const travel = magnitude(panel.position.map((value, axis) => value - before.position[axis]))
-      translation += travel
-      let recut = false
-      for (const dimension of ['width', 'height'] as const) {
-        const delta = Math.abs(panel[dimension] - before[dimension])
-        if (delta > 1e-4) { recut = true; changedCuts.add(`${id}/${dimension}`); normalizedCutChange += delta / before[dimension] }
+  const numericalCache = new Map<string, number[][]>()
+  return (nextIntent: ResizeIntent, only?: ResizeInterpretation) => {
+    assertLegacyResizeIntent(nextIntent)
+    if (nextIntent.source !== intent.source || targetSignature(nextIntent.target) !== targetSignature(target)
+      || nextIntent.origin !== intent.origin || nextIntent.releasedRelationshipId !== intent.releasedRelationshipId
+      || JSON.stringify(nextIntent.validation) !== JSON.stringify(intent.validation)
+      || JSON.stringify(nextIntent.session) !== JSON.stringify(intent.session)) throw new Error('The resize source or target changed during this gesture.')
+    const request = createResizeIntent(source, nextIntent.target, { ...nextIntent.validation, origin: nextIntent.origin, session: nextIntent.session })
+    const canonicalBudget = (value: number | undefined, fallback: number) => Number.isFinite(value) ? Math.max(0, Math.min(fallback, Math.floor(value!))) : fallback
+    const budget = { remaining: canonicalBudget(options.maxSolves, 32), used: 0 }
+    const interpretationLimit = canonicalBudget(options.maxInterpretations, 8)
+    const kinds: ResizeInterpretation[] = evidence.some(item => item.detector !== 'structural-span') ? ['preserve-cuts', 'negative-end', 'positive-end', 'fitted-clearances'] : ['preserve-cuts']
+    const candidates: ShadowResizeCandidate[] = [], attempts: ShadowResizeAttempt[] = []
+    let exhausted = false
+    for (const interpretation of only ? [only] : kinds) {
+      if (attempts.length >= interpretationLimit || budget.remaining <= 0) { exhausted = true; break }
+      const equations: ResizeShadowEquation[] = []
+      const adaptingCuts = new Set([...(interpretation === 'fitted-clearances' ? activeCuts : [...requestedCuts, ...evidence.filter(item => item.detector === 'structural-span').flatMap(item => item.cuts)]),
+        ...authoredCuts, ...analysis.physical.outlinePanelIds.flatMap(id => [`${id}/width`, `${id}/height`])])
+      // A numeric anchor is a conservative candidate choice, not a new public rule.
+      // The candidate is rejected if it conflicts with an authored reference.
+      if (!options.hierarchy && target.kind === 'selection-dimensions') for (const axis of axes) for (const ids of anchorGroups.values()) equations.push({ id: `anchor/${ids.join('/')}/${axis.join()}`,
+        terms: ids.map(id => ({ panelId: id, axis, side: 0, scale: 1 / ids.length })) })
+      for (const item of evidence) {
+        if (interpretation === 'fitted-clearances' || item.detector === 'structural-span') equations.push(...item.equations)
+        else if (interpretation !== 'preserve-cuts') equations.push(item.equations[interpretation === 'negative-end' ? 0 : 1])
       }
-      if (!region.has(id) && (recut || travel > 1e-4)) outsideRegion++
-      // References on panels outside the semantic region are meaningful scope costs.
-      if (!region.has(id)) outsideReferenceChange += travel
+      if (interpretation !== 'fitted-clearances') for (const section of sections) {
+        const [first, ...rest] = section.panelIds
+        for (const id of rest) for (const axis of axes) equations.push({ id: `rigid/${first}/${id}/${axis.join()}`,
+          terms: [{ panelId: first, axis, side: 0, scale: 1 }, { panelId: id, axis, side: 0, scale: -1 }] })
+      }
+      const diagnostics: ResizePriorityDiagnostic[] = []
+      const hardIds = new Set(equations.map(equation => equation.id))
+      const softReferences = evidence.flatMap(item => item.equations).filter(equation => !hardIds.has(equation.id))
+      const result = solveResizeIntent(request, { shadow: { equations, adaptingCuts, budget, hierarchy: options.hierarchy, softReferences, diagnostics, numericalCache } })
+      if (result.status !== 'solved') {
+        const budgetError = result.error instanceof ResizeShadowBudgetError
+        attempts.push({ interpretation, status: budgetError ? 'search-budget-exhausted' : result.status, message: result.diagnostic.message })
+        if (budgetError) { exhausted = true; break }
+        continue
+      }
+      let next = result.project
+      try {
+        next = validateResizeCandidate(nextIntent, next, equations, adaptingCuts)
+      } catch (error) {
+        attempts.push({ interpretation, status: 'candidate-invalid', message: error instanceof Error ? error.message : String(error) })
+        continue
+      }
+      attempts.push({ interpretation, status: 'solved' })
+      const after = new Map(resolvePanels(next).sort((a, b) => a.id.localeCompare(b.id)).map(panel => [panel.id, panel]))
+      const changedCuts = new Set<string>()
+      let normalizedCutChange = 0, translation = 0, outsideRegion = 0, outsideReferenceChange = 0
+      for (const [id, panel] of after) {
+        const before = original.get(id)!
+        const travel = magnitude(panel.position.map((value, axis) => value - before.position[axis]))
+        translation += travel
+        let recut = false
+        for (const dimension of ['width', 'height'] as const) {
+          const delta = Math.abs(panel[dimension] - before[dimension])
+          if (delta > 1e-4) { recut = true; changedCuts.add(`${id}/${dimension}`); normalizedCutChange += delta / before[dimension] }
+        }
+        if (!region.has(id) && (recut || travel > 1e-4)) outsideRegion++
+        // References on panels outside the semantic region are meaningful scope costs.
+        if (!region.has(id)) outsideReferenceChange += travel
+      }
+      const groups = new Map([...changedCuts].map(cut => [cut, cut]))
+      const root = (cut: string): string => groups.get(cut) === cut ? cut : root(groups.get(cut)!)
+      if (interpretation === 'fitted-clearances') for (const item of evidence) {
+        const cuts = item.cuts.filter(cut => changedCuts.has(cut))
+        for (const cut of cuts.slice(1)) groups.set(root(cut), root(cuts[0]))
+      }
+      const independentGroups = new Set([...changedCuts].map(root)).size
+      const strongFit = options.hierarchy ? hasDecisiveResizeFit(evidence) : evidence.some(item => item.detector === 'opposing-faces' && !item.contrary.length)
+      const endPenalties = new Map<string, number>()
+      for (const item of evidence.filter(item => item.detector === 'connected-seam')) {
+        const [negative, positive] = item.residuals.map(Math.abs)
+        const asymmetry = Math.abs(negative - positive) / (1 + negative + positive)
+        const preservesNearEnd = interpretation === (negative < positive ? 'negative-end' : 'positive-end')
+        const penalty = preservesNearEnd ? 0 : asymmetry
+        const key = item.jointIds[0] ?? item.id
+        endPenalties.set(key, Math.max(endPenalties.get(key) ?? 0, penalty))
+      }
+      const evidencePenalty = strongFit ? (interpretation === 'fitted-clearances' ? 0 : 1)
+        : interpretation === 'fitted-clearances' ? 1 : Math.max(0, ...endPenalties.values())
+      let remainingReferenceError = 0
+      const jointErrors = new Map<string, number>()
+      for (const item of evidence) {
+        const residual = item.equations.reduce((sum, equation) => sum + Math.abs(equation.terms.reduce((total, term) => total + term.scale
+          * (coordinate(frame(after.get(term.panelId)!), new Vector3(...term.axis), term.side)
+            - coordinate(frame(original.get(term.panelId)!), new Vector3(...term.axis), term.side)), 0)), 0)
+        // Branch count does not amplify the same physical joint's evidence.
+        const key = item.jointIds[0] ?? item.id
+        jointErrors.set(key, Math.max(jointErrors.get(key) ?? 0, residual))
+      }
+      remainingReferenceError = [...jointErrors.values()].reduce((sum, value) => sum + value, 0)
+      const beforeConnections = new Map(source.connections.map(c => [c.id, c]))
+      const seamSlide = next.connections.reduce((sum, c) => sum + Math.abs(c.offset - beforeConnections.get(c.id)!.offset), 0)
+      const candidate: ShadowResizeCandidate = { interpretation, project: next, equations, adaptingCuts, diagnostics, evidenceIds: evidence.map(item => item.id),
+        explanations: [interpretation === 'fitted-clearances' ? 'Preserve paired measured clearances; only identified spanning cuts may adapt.'
+          : interpretation === 'preserve-cuts' ? 'Keep dependent cuts and rigid sections; minimize remaining displacement.'
+            : `Keep dependent cuts and the ${interpretation === 'negative-end' ? 'negative' : 'positive'} measured end references.`,
+        strongFit ? 'Opposing orthogonal faces with small margins support a fitted span.' : 'No decisive opposing-face fit; prefer fixed cuts and the nearer end when margins are asymmetric.',
+        'Targets, joints, protected contacts, saved rules and candidate references remain hard.'],
+        score: { evidencePenalty, outsideRegion, outsideReferenceChange, changedCutGroups: independentGroups, normalizedCutChange,
+          remainingReferenceError, translation, seamSlide } }
+      const equivalent = candidates.findIndex(existing => fingerprint(existing.project) === fingerprint(next))
+      if (equivalent < 0) candidates.push(candidate)
+      else if (compareResizeConsequences(candidate.score, candidates[equivalent].score) < 0) candidates[equivalent] = candidate
     }
-    const groups = new Map([...changedCuts].map(cut => [cut, cut]))
-    const root = (cut: string): string => groups.get(cut) === cut ? cut : root(groups.get(cut)!)
-    if (interpretation === 'fitted-clearances') for (const item of evidence) {
-      const cuts = item.cuts.filter(cut => changedCuts.has(cut))
-      for (const cut of cuts.slice(1)) groups.set(root(cut), root(cuts[0]))
-    }
-    const independentGroups = new Set([...changedCuts].map(root)).size
-    const strongFit = options.hierarchy ? hasDecisiveResizeFit(evidence) : evidence.some(item => item.detector === 'opposing-faces' && !item.contrary.length)
-    const endPenalties = new Map<string, number>()
-    for (const item of evidence.filter(item => item.detector === 'connected-seam')) {
-      const [negative, positive] = item.residuals.map(Math.abs)
-      const asymmetry = Math.abs(negative - positive) / (1 + negative + positive)
-      const preservesNearEnd = interpretation === (negative < positive ? 'negative-end' : 'positive-end')
-      const penalty = preservesNearEnd ? 0 : asymmetry
-      const key = item.jointIds[0] ?? item.id
-      endPenalties.set(key, Math.max(endPenalties.get(key) ?? 0, penalty))
-    }
-    const evidencePenalty = strongFit ? (interpretation === 'fitted-clearances' ? 0 : 1)
-      : interpretation === 'fitted-clearances' ? 1 : Math.max(0, ...endPenalties.values())
-    let remainingReferenceError = 0
-    const jointErrors = new Map<string, number>()
-    for (const item of evidence) {
-      const residual = item.equations.reduce((sum, equation) => sum + Math.abs(equation.terms.reduce((total, term) => total + term.scale
-        * (coordinate(frame(after.get(term.panelId)!), new Vector3(...term.axis), term.side)
-          - coordinate(frame(original.get(term.panelId)!), new Vector3(...term.axis), term.side)), 0)), 0)
-      // Branch count does not amplify the same physical joint's evidence.
-      const key = item.jointIds[0] ?? item.id
-      jointErrors.set(key, Math.max(jointErrors.get(key) ?? 0, residual))
-    }
-    remainingReferenceError = [...jointErrors.values()].reduce((sum, value) => sum + value, 0)
-    const beforeConnections = new Map(source.connections.map(c => [c.id, c]))
-    const seamSlide = next.connections.reduce((sum, c) => sum + Math.abs(c.offset - beforeConnections.get(c.id)!.offset), 0)
-    const candidate: ShadowResizeCandidate = { interpretation, project: next, equations, adaptingCuts, diagnostics, evidenceIds: evidence.map(item => item.id),
-      explanations: [interpretation === 'fitted-clearances' ? 'Preserve paired measured clearances; only identified spanning cuts may adapt.'
-        : interpretation === 'preserve-cuts' ? 'Keep dependent cuts and rigid sections; minimize remaining displacement.'
-          : `Keep dependent cuts and the ${interpretation === 'negative-end' ? 'negative' : 'positive'} measured end references.`,
-      strongFit ? 'Opposing orthogonal faces with small margins support a fitted span.' : 'No decisive opposing-face fit; prefer fixed cuts and the nearer end when margins are asymmetric.',
-      'Targets, joints, protected contacts, saved rules and candidate references remain hard.'],
-      score: { evidencePenalty, outsideRegion, outsideReferenceChange, changedCutGroups: independentGroups, normalizedCutChange,
-        remainingReferenceError, translation, seamSlide } }
-    const equivalent = candidates.findIndex(existing => fingerprint(existing.project) === fingerprint(next))
-    if (equivalent < 0) candidates.push(candidate)
-    else if (compareResizeConsequences(candidate.score, candidates[equivalent].score) < 0) candidates[equivalent] = candidate
+    candidates.sort((a, b) => compareResizeConsequences(a.score, b.score))
+    // This is a comparison report, never a proof that the search was complete or infeasible.
+    return { source: intent.source, analysis, candidates, attempts, numericalSolves: budget.used,
+      status: exhausted ? 'search-budget-exhausted' as const : 'complete' as const,
+      ambiguous: candidates.length > 1 }
   }
-  candidates.sort((a, b) => compareResizeConsequences(a.score, b.score))
-  // This is a comparison report, never a proof that the search was complete or infeasible.
-  return { source: intent.source, analysis, candidates, attempts, numericalSolves: budget.used,
-    status: exhausted ? 'search-budget-exhausted' as const : 'complete' as const,
-    ambiguous: candidates.length > 1 }
+}
+
+export function planResizeCandidates(intent: ResizeIntent, options: { maxSolves?: number; maxInterpretations?: number; hierarchy?: boolean } = {}) {
+  return prepareResizeCandidates(intent, options)(intent)
 }
 
 /** Stage 2 comparison stays available without activating hierarchy or UI policy. */

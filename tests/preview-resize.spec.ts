@@ -2,6 +2,8 @@ import { expect, test, type Page } from './browser-fixture'
 import { createPanel, createStarterProject, getProjectBounds, parseProject, resolvePanels, validateProject } from '../src/lib/model'
 import { getPhysicalConnectors } from '../src/lib/connector-selection'
 import { preparePreviewResize } from '../src/lib/preview-resize'
+import { hTableProject } from '../src/lib/example-geometry'
+import { islandProject } from '../src/lib/platform-examples'
 import { autoConnect } from '../src/lib/auto-connect'
 import endShelves from '../src/test/fixtures/h-table-end-shelves.json' with { type: 'json' }
 import fixedCuts from '../src/test/fixtures/h-table-fixed-cuts.json' with { type: 'json' }
@@ -311,6 +313,7 @@ test('blocked arrows show blockers on hover and keyboard focus without editing t
   const neighbor = project.panels.find(panel => panel.name === 'Left side copy')!
   project.constraints = [{ id: 'fixed-neighbor', kind: 'dimension', enabled: true, panelId: neighbor.id, dimension: 'height', value: neighbor.height }]
   const selected = project.panels.find(panel => panel.name === 'Right side copy')!
+  project.constraints.push({ id: 'equal-neighbors', kind: 'equal-dimension', enabled: true, panelIds: [selected.id, neighbor.id], dimension: 'height' })
   const handle = directionHandle(project, { panelId: selected.id }, [-1, 0, 0])
   await openProject(page, project)
   await page.locator('.panel-list-select').filter({ hasText: /^Right side copy$/ }).click()
@@ -341,7 +344,7 @@ test('blocked arrows show blockers on hover and keyboard focus without editing t
   await expect.poll(highlights).toEqual({ panel: false, connectors: [] })
 })
 
-test('Shift-drag extends a corner shelf edge when connected resizing is blocked', async ({ page }) => {
+test('Shift-drag keeps a corner shelf neighbor and its hardware fixed', async ({ page }) => {
   const project = parseProject(cornerShelf)
   const neighbor = project.panels.find(panel => panel.name === 'Left side copy')!
   project.constraints = [{ id: 'fixed-neighbor', kind: 'dimension', enabled: true, panelId: neighbor.id, dimension: 'height', value: neighbor.height }]
@@ -350,9 +353,6 @@ test('Shift-drag extends a corner shelf edge when connected resizing is blocked'
   expect(handle.repeatOnly).toBe(true)
   await openProject(page, project)
   await page.locator('.panel-list-select').filter({ hasText: /^Right side copy$/ }).click()
-  await beginResize(page, handle, 100)
-  await page.mouse.up()
-  expect(await savedProject(page)).toEqual(project)
   await page.keyboard.down('Shift')
   await beginResize(page, handle, 100)
   await page.keyboard.press('Escape')
@@ -379,7 +379,7 @@ test('Shift-drag extends a corner shelf edge when connected resizing is blocked'
 })
 
 
-test('the smaller top of a connected corner shelf grows with its wing', async ({ page }) => {
+test('a connected corner wing grows its attached side panels', async ({ page }) => {
   const project = parseProject(JSON.parse(readFileSync(new URL('../src/lib/fixtures/everyday-shelf-connected-corner.json', import.meta.url), 'utf8')))
   const panel = project.panels.find(panel => panel.name === 'Bottom shelf copy')!
   const handle = directionHandle(project, { panelId: panel.id }, [1, 0, 0])
@@ -423,4 +423,55 @@ for (const distance of [-50, 50]) test(`moving the H-table desktop arrow by ${di
   expectAnglesAndJoints(project, await savedProject(page))
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(project)
+})
+
+for (const example of ['H-table', 'Island display']) for (const [worker, viewport] of [[false, 1440], [true, 1440], [false, 390], [true, 390]] as const) test(`${example} connected edge ${worker ? 'worker' : 'main thread'} at ${viewport}px grows the structure and commits once`, async ({ page }) => {
+  await page.setViewportSize({ width: viewport, height: 900 })
+  let project = example === 'H-table' ? hTableProject('H-table', 1800) : islandProject()
+  const name = example === 'H-table' ? 'Desktop' : 'Island base'
+  if (worker) project = { ...project, panels: [...project.panels, ...Array.from({ length: 12 - project.panels.length }, (_, i) =>
+    createPanel({ id: `unrelated-${i}`, visible: false, position: [5000 + i * 1000, 800, 0] }))] }
+  project = parseProject(project)
+  const panel = project.panels.find(p => p.name === name)!
+  await openProject(page, project, 'perspective')
+  if (viewport < 680) await page.getByRole('button', { name: 'Open panel list', exact: true }).click()
+  await page.getByRole('button', { name, exact: true }).click()
+  if (viewport < 680) {
+    await page.getByRole('button', { name: 'Collapse panel list', exact: true }).click()
+    const closeInspector = page.getByRole('button', { name: 'Collapse inspector', exact: true })
+    if (await closeInspector.isVisible()) await closeInspector.click()
+  }
+  const handle = preparePreviewResize(project, { panelId: panel.id })!.handles.find(item => item.id === 'panel-width-positive')!
+  const button = page.locator(`[data-resize-handle="${handle.id}"]`)
+  await button.click()
+  expect(await savedProject(page)).toEqual(project)
+  await beginResize(page, handle, 100)
+  await page.keyboard.press('Escape')
+  await page.mouse.up()
+  expect(await savedProject(page)).toEqual(project)
+  await expect(page.locator('.preview-resize-anchor.is-active')).toHaveCount(0)
+  await beginResize(page, handle, 100)
+  expect(await savedProject(page)).toEqual(project)
+  await page.mouse.up()
+  await expect.poll(async () => (await savedProject(page)).panels.find(p => p.id === panel.id)!.width).toBeGreaterThan(panel.width + 50)
+  await expect(page.getByRole('dialog', { name: 'Review resize alternatives' })).toHaveCount(0)
+  const after = await savedProject(page)
+  const growth = after.panels.find(p => p.id === panel.id)!.width - panel.width
+  if (example === 'H-table') {
+    for (const side of ['Left', 'Right']) {
+      const pair = (source: Project) => source.panels.filter(p => [`${side} front leg`, `${side} rear leg`].includes(p.name)).reduce((sum, p) => sum + p.width, 0)
+      expect(pair(after) - pair(project), `${side} split-leg span`).toBeCloseTo(growth, 4)
+    }
+  } else for (const name of ['Island middle platform', 'Island upper shelf']) {
+    const old = project.panels.find(p => p.name === name)!, current = after.panels.find(p => p.name === name)!
+    expect(current.width - old.width, name).toBeCloseTo(growth, 4)
+  }
+  expectAnglesAndJoints(project, after)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect.poll(() => savedProject(page)).toEqual(project)
+  await expect(page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Redo (⌘/Ctrl Shift Z)' }).click()
+  await expect.poll(() => savedProject(page)).toEqual(after)
+  await page.reload()
+  expect(await savedProject(page)).toEqual(after)
 })

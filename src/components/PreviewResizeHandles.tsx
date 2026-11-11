@@ -71,10 +71,8 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     document.body.style.cursor = current.previousCursor
     setActiveId(null)
     setRequestedDistance(0)
-    if (current.started) {
-      if (!cancel && current.mode === 'repeat') repeatFocus.current = { direction: current.axis.toArray(), target: current.target }
-      onResizeEnd(cancel)
-    }
+    if (current.started && !cancel && current.mode === 'repeat') repeatFocus.current = { direction: current.axis.toArray(), target: current.target }
+    onResizeEnd(cancel || !current.started)
     invalidate()
   })
   const down = (event: PointerEvent<HTMLButtonElement>, handle: PreviewResizeHandle) => {
@@ -97,10 +95,12 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     const plane = new Plane().setFromNormalAndCoplanarPoint(normal.normalize(), rootPosition)
     const point = pointAt(event.clientX, event.clientY, plane)
     if (!point) return
+    const mode = repeat ? 'repeat' : event.shiftKey && handle.panelEdge ? 'panel' : 'connected'
+    if (!onResizeStart(handle.id, mode)) return
     const orbit = controls as OrbitControls | undefined
     gesture.current = {
       handleId: handle.id, pointerId: event.pointerId, target: event.currentTarget,
-      x: event.clientX, y: event.clientY, point, plane, axis, started: false, mode: repeat ? 'repeat' : event.shiftKey && handle.panelEdge ? 'panel' : 'connected',
+      x: event.clientX, y: event.clientY, point, plane, axis, started: false, mode,
       controls: orbit, controlsEnabled: orbit?.enabled ?? true, previousCursor: document.body.style.cursor,
       arm: Number(event.currentTarget.parentElement?.dataset.resizeArm) || ARM,
     }
@@ -119,7 +119,6 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
     event.stopImmediatePropagation()
     if (!current.started) {
       if (Math.hypot(event.clientX - current.x, event.clientY - current.y) < 3) return
-      if (!onResizeStart(current.handleId, current.mode)) { finish(true); return }
       current.started = true
     }
     const point = pointAt(event.clientX, event.clientY, current.plane)
@@ -270,6 +269,7 @@ export function PreviewResizeHandles({ handles, enabled = true, keyboardStep = 1
             {!!handle.repeat?.reused && <span className="preview-resize-size">{handle.repeat.reused} existing {handle.repeat.reused === 1 ? 'panel' : 'panels'} reused</span>}
             {(handle.affectedPanelIds ? handle.sizes?.slice(0, 6) : handle.sizes)?.map((size, index) => <span className="preview-resize-size" key={index}>{size.label} = {Math.round(size.value * 100) / 100} mm</span>)}
             {handle.affectedPanelIds && (handle.sizes?.length ?? 0) > 6 && <span className="preview-resize-size">And {handle.sizes!.length - 6} more changed cuts</span>}
+            {handle.interpretation && <span className="preview-resize-size">{handle.interpretation} · opposite edge fixed</span>}
             {handle.limitReason && <span className="preview-resize-size">{handle.limitReason}</span>}
             {handle.repeat && <span className="preview-resize-size">{handle.repeat.reason ?? `${Math.round(handle.repeat.pitch * 100) / 100} mm per bay`}</span>}
             <small>{handle.repeat ? 'Release to apply' : 'Release to resize'} · Esc to cancel</small></> : <>{handle.sizeLocked && <LockKeyhole size={13} aria-label="Size locked" />}{handle.label}{handle.affectedPanelIds && !handle.blocked && <span className="preview-resize-size">{handle.affectedPanelIds.length} connecting {handle.affectedPanelIds.length === 1 ? 'panel' : 'panels'}</span>}{handle.blocked && <span className="preview-resize-size">{handle.blocked.reason}</span>}{handle.repeatOnly && <small>{handle.panelEdge && !handle.sizeLocked ? 'Shift-pull: panel edge · Control-pull: repeat' : 'Fixed size · Control-pull to repeat'}</small>}</>}

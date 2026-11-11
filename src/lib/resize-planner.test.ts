@@ -133,10 +133,10 @@ it('measures opposed faces in a construction-local frame, including whole-build 
   rotatedFits.forEach((fit, i) => fit.residuals.forEach((value, j) => expect(value).toBeCloseTo(fits[i].residuals[j], 4)))
 })
 
-it('rejects unsupported gesture policy and never guesses oblique compartments', () => {
+it('rejects local gesture planning and never guesses oblique compartments', () => {
   const source = opening()
-  const intent = createResizeIntent(source, { kind: 'panel-edge', edge: { panelId: 'back', dimension: 'width', side: 1, distance: 100 }, local: false })
-  expect(() => planResizeShadow(intent)).toThrow(/ordinary numeric/)
+  const intent = createResizeIntent(source, { kind: 'panel-edge', edge: { panelId: 'back', dimension: 'width', side: 1, distance: 100 }, local: true })
+  expect(() => planResizeShadow(intent)).toThrow(/connected panel edges/)
   const oblique = { ...source, panels: source.panels.map(panel => panel.id === 'insert' ? { ...panel, rotation: [0, 0, 0.2] as [number, number, number] } : panel) }
   expect(analyzeResizeEvidence(oblique, ['back']).evidence.filter(e => e.detector === 'opposing-faces')).toEqual([])
 })
