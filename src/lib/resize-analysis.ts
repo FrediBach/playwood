@@ -1,12 +1,40 @@
 import { Euler, Quaternion, Vector3 } from 'three'
 import { resolvePanels } from './model'
 import { getPhysicalConnectors } from './connector-selection'
-import type { Panel, Project } from './types'
+import type { Connection, Panel, Project } from './types'
 
 const EPSILON = 1e-6
 const CONTACT_TOLERANCE = 1e-4
 export type Frame = { panel: Panel; axes: Vector3[]; half: number[] }
 export type Contact = { a: number; b: number; normal: Vector3; sign: number }
+/** A complete structural joint, including support branches and joints whose
+ * installed pieces have all been removed. Hardware visibility is separate. */
+export interface StructuralJoint {
+  readonly id: string
+  readonly panelIds: readonly string[]
+  readonly connectionIds: readonly string[]
+  readonly supportConnectionIds: readonly string[]
+}
+export const structuralJointId = (connection: Pick<Connection, 'id'>) => connection.id.replace(/:\d+$/, '')
+
+/** Preserve source order: movement's staged search and connector handle ordering
+ * must not change when callers share these physical facts. No geometry scan or
+ * installed-hardware collection is needed for joint-only callers. */
+export function analyzeStructuralJoints(project: Project): readonly StructuralJoint[] {
+  const joints = new Map<string, Connection[]>()
+  for (const connection of project.connections) {
+    const id = structuralJointId(connection)
+    const members = joints.get(id)
+    if (members) members.push(connection)
+    else joints.set(id, [connection])
+  }
+  return Object.freeze([...joints].map(([id, connections]) => Object.freeze({ id,
+    panelIds: Object.freeze([...new Set(connections.flatMap(connection => [connection.parentId, connection.childId]))]),
+    connectionIds: Object.freeze(connections.map(connection => connection.id)),
+    supportConnectionIds: Object.freeze(connections.filter(connection => connection.role === 'support').map(connection => connection.id)),
+  })))
+}
+
 const position = (panel: Panel) => new Vector3(...panel.position)
 
 export const frame = (panel: Panel): Frame => {
@@ -35,20 +63,28 @@ export function findContacts(frames: Frame[]): Contact[] {
   return contacts
 }
 
+/** Analyze contacts only after a caller's cheap eligibility checks. */
+export function analyzeStructureContacts(project: Project, frames: Frame[]) {
+  const outlineClosures = new Set(project.connections.filter(connection => connection.outlineEdge !== undefined).map(connection => connection.childId))
+  const surfaceContacts = findContacts(frames)
+  const contacts = surfaceContacts.filter(contact => !outlineClosures.has(frames[contact.a].panel.id) && !outlineClosures.has(frames[contact.b].panel.id))
+  // Movement uses all contacts to detect when an outline requires its legacy
+  // fallback; the resize compiler protects only contacts outside fitted outlines.
+  return { contacts, surfaceContacts, outlineClosures }
+}
+
 /** Geometry consumed by the legacy compiler, in its original ordering. */
 export function analyzeStructure(project: Project) {
   const panels = resolvePanels(project)
   const frames = panels.map(frame)
-  const outlineClosures = new Set(project.connections.filter(connection => connection.outlineEdge !== undefined).map(connection => connection.childId))
-  const contacts = findContacts(frames).filter(contact => !outlineClosures.has(frames[contact.a].panel.id) && !outlineClosures.has(frames[contact.b].panel.id))
-  return { panels, frames, contacts, outlineClosures }
+  return { panels, frames, ...analyzeStructureContacts(project, frames) }
 }
 
 /** Read-only, source-bound physical facts; semantic evidence/propagation comes in stage 2. */
 export interface ResizeAnalysis {
   readonly source: Project
   readonly panels: readonly { readonly id: string; readonly width: number; readonly height: number; readonly thickness: number; readonly position: readonly number[]; readonly rotation: readonly number[] }[]
-  readonly joints: readonly { readonly id: string; readonly panelIds: readonly string[]; readonly connectionIds: readonly string[]; readonly supportConnectionIds: readonly string[] }[]
+  readonly joints: readonly StructuralJoint[]
   readonly contacts: readonly { readonly panelIds: readonly string[]; readonly normal: readonly number[]; readonly protected: true }[]
   readonly installedConnectorIds: readonly string[]
   readonly ownership: readonly { readonly instanceId: string; readonly panelIds: readonly string[] }[]
@@ -57,19 +93,10 @@ export interface ResizeAnalysis {
 
 /** Inspection is optional; the solver does not pay to collect hardware metadata per pointer sample. */
 export function inspectResizeAnalysis(project: Project, geometry = analyzeStructure(project)): ResizeAnalysis {
-  const joints = new Map<string, typeof project.connections>()
-  for (const connection of project.connections) {
-    const id = connection.id.replace(/:\d+$/, '')
-    joints.set(id, [...joints.get(id) ?? [], connection])
-  }
   return Object.freeze({ source: project,
     panels: Object.freeze(geometry.panels.map(panel => Object.freeze({ id: panel.id, width: panel.width, height: panel.height, thickness: panel.thickness,
       position: Object.freeze([...panel.position]), rotation: Object.freeze([...panel.rotation]) }))),
-    joints: Object.freeze([...joints].map(([id, connections]) => Object.freeze({ id,
-      panelIds: Object.freeze([...new Set(connections.flatMap(connection => [connection.parentId, connection.childId]))]),
-      connectionIds: Object.freeze(connections.map(connection => connection.id)),
-      supportConnectionIds: Object.freeze(connections.filter(connection => connection.role === 'support').map(connection => connection.id)),
-    }))),
+    joints: analyzeStructuralJoints(project),
     contacts: Object.freeze(geometry.contacts.map(contact => Object.freeze({
       panelIds: Object.freeze([geometry.panels[contact.a].id, geometry.panels[contact.b].id]),
       normal: Object.freeze(contact.normal.toArray()), protected: true as const,

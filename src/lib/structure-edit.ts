@@ -3,7 +3,7 @@ import type { ShadowResizeCandidate } from './resize-planner'
 import { solveResizePriorities, type ResizePriorityTier } from './resize-priority-solver'
 import { ResizeShadowBudgetError, type ResizeShadowPolicy } from './resize-shadow-contract'
 import { createResizeIntent, assertLegacyResizeIntent, unwrapResizeResult, type ResizeIntent, type ResizeContext, type ResizeResult, type ResizeProblem, type ResizeDimensions as Dimensions, type PanelResizeDimensions as PanelDimensions, type InferredRelationship, type PanelEdgeResize } from './resize-intent'
-import { analyzeStructure, inspectResizeAnalysis, frame, extent, coordinate, findContacts, type Frame, type Contact } from './resize-analysis'
+import { analyzeStructure, analyzeStructureContacts, inspectResizeAnalysis, frame, extent, coordinate, analyzeStructuralJoints, structuralJointId, type Frame, type Contact } from './resize-analysis'
 import { solveWithBounds, SolverConflict, LIMIT_MESSAGE, CONSTRAINT_MESSAGE, type StructuralRow as Row, type RowProvenance, type NumericalDiagnostic } from './structural-solver'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { Vector3 } from 'three'
@@ -32,7 +32,6 @@ type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseC
 type ValidationContext = ResizeContext
 interface ResizeTrace { phase: 'request' | 'compile' | 'solve' | 'materialize'; problems: ResizeProblem[]; inspect: boolean; shadow?: ResizeShadowPolicy }
 
-const jointId = (connection: Connection) => connection.id.replace(/:\d+$/, '')
 const position = (panel: Panel) => new Vector3(...panel.position)
 /** The same implicit surface supports used by structural edits. */
 export function panelSurfaceContacts(project: Project): { panelIds: [string, string]; normal: Vec3 }[] {
@@ -96,7 +95,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
   // A partial-depth branch also needs its own offset to follow its near end
   // without imposing the full-depth branch's cut on the shorter panel.
   const offsetKey = (connection: Connection) => (trace?.shadow || edit.kind === 'move' || (edit.kind === 'resize' && edit.local) || edit.kind === 'fit'
-    || (seamFits.get(connection.id)?.retainedEnds.length ?? 2) < 2) ? connection.id : jointId(connection)
+    || (seamFits.get(connection.id)?.retainedEnds.length ?? 2) < 2) ? connection.id : structuralJointId(connection)
   const offsetVariables = new Map<string, number>()
   for (const connection of connections) if (!offsetVariables.has(offsetKey(connection))) {
     offsetVariables.set(offsetKey(connection), weights.length)
@@ -922,15 +921,11 @@ export function movePanelsWithReview(project: Project, ids: readonly string[], d
   const selected = frameById.get(ids[0])
   const axis = new Vector3(...delta).normalize()
   if (!selected || Math.abs(selected.axes[2].dot(axis)) < 1 - EPSILON) return movePanels(project, ids, delta)
+  const { surfaceContacts } = analyzeStructureContacts(project, frames)
   const neighbors = new Map(frames.map(item => [item.panel.id, new Set<string>()]))
   const join = (a: string, b: string) => { neighbors.get(a)?.add(b); neighbors.get(b)?.add(a) }
-  const joints = new Map<string, Set<string>>()
-  for (const connection of project.connections) {
-    const key = jointId(connection), members = joints.get(key) ?? new Set<string>()
-    members.add(connection.parentId); members.add(connection.childId); joints.set(key, members)
-  }
-  for (const members of joints.values()) for (const a of members) for (const b of members) if (a !== b) join(a, b)
-  for (const contact of findContacts(frames)) join(frames[contact.a].panel.id, frames[contact.b].panel.id)
+  for (const joint of analyzeStructuralJoints(project)) for (const a of joint.panelIds) for (const b of joint.panelIds) if (a !== b) join(a, b)
+  for (const contact of surfaceContacts) join(frames[contact.a].panel.id, frames[contact.b].panel.id)
   const connected = new Set(ids)
   for (const id of connected) for (const neighbor of neighbors.get(id) ?? []) connected.add(neighbor)
   const component = frames.filter(item => connected.has(item.panel.id))

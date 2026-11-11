@@ -15,6 +15,10 @@ for (const width of [1440, 390]) test(`wider movement is reviewed and undoable a
   await expect.poll(async () => (await saved(page))?.name).toBe(project.name)
   if (width < 680) await page.getByRole('button', { name: 'Open panel list', exact: true }).click()
   await page.getByRole('button', { name: 'Shelf 1.2', exact: true }).click()
+  if (width < 680) {
+    await page.getByRole('button', { name: 'Collapse panel list', exact: true }).click()
+    await page.getByRole('button', { name: 'Collapse inspector', exact: true }).click()
+  }
   await page.getByRole('combobox', { name: 'Camera view' }).selectOption('front')
   const before = await saved(page)
   const request = async () => { await page.locator('canvas').focus(); await page.keyboard.press('Shift+ArrowUp') }

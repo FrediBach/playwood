@@ -1,3 +1,4 @@
+import { analyzeStructuralJoints, structuralJointId } from './resize-analysis'
 import { prepareResizeGesture } from './resize-gesture'
 import { Euler, Quaternion, Vector3 } from 'three'
 import { isPanelDimensionLocked } from './design-constraints'
@@ -176,9 +177,8 @@ export function preparePreviewResize(project: Project, selection: PreviewResizeS
     const piece = getPhysicalConnectors(project).find(item => item.id === selection.connectorId)
     const position = connectorPosition(project, selection.connectorId!)
     if (!piece || !position) return null
-    const joint = (id: string) => id.replace(/:\d+$/, '')
-    const connections = project.connections.filter(connection => joint(connection.id) === joint(piece.connection.id))
-    const memberIds = new Set(connections.flatMap(connection => [connection.parentId, connection.childId]))
+    const joint = analyzeStructuralJoints(project).find(item => item.id === structuralJointId(piece.connection))!
+    const memberIds = new Set(joint.panelIds)
     const members = panels.filter(panel => memberIds.has(panel.id) && panel.visible)
     if (members.length !== memberIds.size) return null
     for (const panel of members) for (const side of [-1, 1] as const) {
