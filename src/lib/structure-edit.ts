@@ -1,3 +1,4 @@
+import { structuralContradiction } from './structural-consistency'
 import { validateResizeCandidate } from './resize-candidate-validation'
 import type { ShadowResizeCandidate } from './resize-planner'
 import { solveResizePriorities, type ResizePriorityTier } from './resize-priority-solver'
@@ -640,16 +641,32 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       weights: Object.freeze([...weights]), rows: Object.freeze(rows.map(snapshot)), bounds: Object.freeze(bounds.map(snapshot)) }))
   }
   if (trace) trace.phase = 'solve'
+  const boundedSource = frames.every(item => item.panel.position.every(value => Math.abs(value) <= 100000)
+    && item.panel.width >= 40 && item.panel.width <= 4000 && item.panel.height >= 40 && item.panel.height <= 4000)
+    && connections.every(connection => Math.abs(connection.offset) <= 10000)
+  const skippedSolves = new Map<SolverConflict, Row[]>()
+  const solve = (equations: Row[]) => {
+    // Materialization bounds world coordinates to ±100,000 mm and seam
+    // offsets to ±10,000 mm. 1e6 also bounds their source-relative local-axis
+    // changes, stock cuts, and every valid candidate this command can accept.
+    const conflict = edit.kind === 'resize' && !edit.local && cutPreferences.size && boundedSource ? structuralContradiction(equations, 1e6) : undefined
+    if (conflict) {
+      const error = new SolverConflict(conflict.variables)
+      skippedSolves.set(error, equations)
+      throw error
+    }
+    return solveWithBounds(equations, bounds, weights)
+  }
   const solveChanges = (rows: Row[]): number[] => {
     let changes: number[]
     try {
-      try { changes = solveWithBounds(rows, bounds, weights) }
+      try { changes = solve(rows) }
       catch (error) {
         if (!interiorPreferences.size) throw error
         // Shared grid boundaries may have to move with the selected shelf.
         // Relax only local anchors before the established outer-boundary solve.
         const outerRows = rows.filter(row => !interiorPreferences.has(row))
-        changes = solveWithBounds(outerRows, bounds, weights)
+        changes = solve(outerRows)
       }
     }
     catch (error) {
@@ -660,9 +677,9 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       const groups = boundaryPreferences.filter(group => group.rows.size).sort((a, b) => b.distance - a.distance)
       try {
         if (!groups.length) throw error
-        changes = solveWithBounds([...hardRows, ...groups.flatMap(group => [...group.rows])], bounds, weights)
+        changes = solve([...hardRows, ...groups.flatMap(group => [...group.rows])])
       } catch {
-        changes = solveWithBounds(hardRows, bounds, weights)
+        changes = solve(hardRows)
         // Keep feasible boundary groups, farthest from the selected panels first.
         // A rule may force one end to follow the selection; that must not release
         // the other end too. Every trial retains hard rules and stock bounds.
@@ -670,7 +687,7 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
         for (const group of groups) {
           const candidate = [...retained, ...group.rows]
           try {
-            const anchored = solveWithBounds(candidate, bounds, weights)
+            const anchored = solve(candidate)
             retained.push(...group.rows)
             changes = anchored
           } catch { /* This boundary must yield to the edit and its hard rules. */ }
@@ -717,6 +734,13 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       }
     }
   } catch (error) {
+    // If no preference fallback succeeds, retain the kernel's existing public
+    // diagnostics. Only rejected intermediate trials use the cheap certificate.
+    const skipped = error instanceof SolverConflict ? skippedSolves.get(error) : undefined
+    if (skipped) {
+      try { solveWithBounds(skipped, bounds, weights) }
+      catch (diagnostic) { error = diagnostic }
+    }
     if (error instanceof ResizeShadowBudgetError) throw error
     const implicatedPanelIds = error instanceof SolverConflict
       ? [...new Set(error.variables.flatMap(variable => frames[Math.floor(variable / 5)]
