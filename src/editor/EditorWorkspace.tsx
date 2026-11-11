@@ -1,3 +1,5 @@
+import { PreviewRescale } from '@/components/PreviewRescale'
+import { usePreviewRescale } from '@/hooks/use-preview-rescale'
 import { PastePlacementChooser } from '@/components/PastePlacementChooser'
 import { AssemblyWorkspace } from '@/components/AssemblyWorkspace'
 import type { AttachmentSideGuideState } from '@/components/AttachmentSideGuide'
@@ -15,7 +17,7 @@ import { useConnectStroke } from '@/hooks/use-connect-stroke'
 import { usePreviewResize } from '@/hooks/use-preview-resize'
 import { AssemblyAttachmentTarget } from '@/lib/assemblies'
 import { editConnectors } from '@/lib/connector-selection'
-import { getProjectBounds } from '@/lib/model'
+import { getProjectBounds, resolvePanels } from '@/lib/model'
 import { getNiceValueStep } from '@/lib/nice-values'
 import { SnapSettings } from '@/lib/preview-snap'
 import type { AttachmentOptions,CameraView,Connection,ConstructionObjects,DesignConstraint,Panel,Project,Vec3 } from '@/lib/types'
@@ -122,11 +124,14 @@ export function EditorWorkspace({
   validTargets, assemblyHint, attachmentSummary, attachmentWarning,
   assemblyCount
 }: EditorWorkspaceProps)  {
+  const rescale = usePreviewRescale(project, modalOpen || constraints.editing || drag.active || resize.active || clipboard.active || assembly.placementActive || !!assembly.editingDefinition || inspectorTab === 'attach' || exploded || objectMode || connect.gesture.active || boxSelectActive, commitWithInsertChecks)
   const workspaceParts = getWorkspaceParts({ resize, drag, constraintPreviewProject, clipboard, assembly, project, displayPanels, previewPanels, previewConnections })
   const workspaceInteraction = getWorkspaceInteractionProps({ displayedObjects, objectPreview, objects, objectMode, objectInteractionDisabled, objectGesture, boxSelectActive, snapSettings, chooseObject, realisticPreview, choosePanel, constraints, modalOpen, assembly, panels, inspectorTab, attachmentSideGuide, assemblyCount })
   return <AssemblyWorkspace
     {...workspaceInteraction}
     {...workspaceParts}
+    {...(rescale.project ? { panels: resolvePanels(rescale.project), connections: rescale.project.connections, connectorOverrides: rescale.project.connectorOverrides } : {})}
+    rescaleSliders={<PreviewRescale control={rescale} step={getNiceValueStep(project.niceValues)}/> }
     connect={connect}
     connectDisabled={!connectAvailable}
     onToggleConnect={toggleConnect}
@@ -164,7 +169,7 @@ export function EditorWorkspace({
     onDragEnd={drag.end}
     dragging={drag.active}
     dragSnap={drag.snap}
-    resizeHandles={resize.handles}
+    resizeHandles={rescale.active ? [] : resize.handles}
     onResizeStart={resize.start}
     onResizeMove={resize.move}
     onResizeEnd={resize.end}
@@ -178,7 +183,7 @@ export function EditorWorkspace({
       return next
     },{ group: 'connector-move',repeat })}
     onMove={moveSelection}
-    movementEnabled={movementEnabled}
+    movementEnabled={movementEnabled && !rescale.active}
     view={view}
     showGrid={showGrid}
     showDimensions={showDimensions}

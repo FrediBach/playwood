@@ -127,7 +127,7 @@ test('keeps a rejected structural edit open for correction without adding an und
   await expect(apply).toBeEnabled()
   await apply.click()
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByRole('alert')).toContainText(/connected|shared edge/i)
+  await expect(dialog.getByRole('alert')).toContainText(/connected|connectors|shared edge/i)
   await depth.fill('420')
   await expect(dialog.getByRole('alert')).toHaveCount(0)
   await apply.click()

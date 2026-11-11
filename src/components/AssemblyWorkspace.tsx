@@ -16,6 +16,7 @@ import { Tooltip } from './ui/tooltip'
 
 type Setter<T> = Dispatch<SetStateAction<T>>
 interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'previewConnections'> {
+  rescaleSliders?: React.ReactNode
   attachmentChooser?: React.ReactNode
   objectPreviewStatus?: string
   boxSelectDisabled?: boolean
@@ -80,7 +81,7 @@ export function AssemblyWorkspace({
   zoomSignal, setRealisticPreview, leftOpen, rightOpen,
   setLeftOpen, setRightOpen, setShowDimensions, setShowGrid,
   setView, setZoomSignal, setFitSignal, setExploded,
-  onMoveCreation, onRotate, onRescale, addPanel,
+  onMoveCreation, onRotate, onRescale, addPanel, rescaleSliders,
   isAttaching, attachmentSide,
   attachmentSideGuide, visibleBounds, hasVisiblePanels, onDrillIn,
   attachmentHandles, onAttachmentPreview, onAttachmentCommit, attachmentBoundsPanels,
@@ -98,6 +99,7 @@ export function AssemblyWorkspace({
   const notice = getWorkspaceNotice(boxSelectActive,dragging,dragSnap,realisticPreview,assemblyHint,attachmentSummary,attachmentWarning)
   return <main className="workspace" aria-label="3D assembly workspace">
       <WorkspaceToolbar
+    rescaleSliders={rescaleSliders}
     niceValueStep={niceValueStep}
     constraintCount={constraintCount}
     constraintsOverviewOpen={constraintsOverviewOpen}
@@ -243,16 +245,17 @@ function getMovementStatus(constraintPicking: boolean|undefined,constraintEditin
 
 function WorkspaceToolbar({
   onConstraints, constraintEditing, constraintCount, constraintsOverviewOpen, niceValueStep, snapSettings, setSnapSettings,
-  panels, realisticPreview,
+  panels, realisticPreview, rescaleSliders,
   setRealisticPreview, onMoveCreation, onRotate, onRescale,
   leftOpen, setLeftOpen, rightOpen, setRightOpen,
   showDimensions, setShowDimensions, showGrid, setShowGrid
-}: Pick<Props, 'niceValueStep' | 'constraintCount' | 'constraintsOverviewOpen' | 'onConstraints' | 'constraintEditing' | 'snapSettings' | 'setSnapSettings' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onMoveCreation' | 'onRotate' | 'onRescale' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
+}: Pick<Props, 'rescaleSliders' | 'niceValueStep' | 'constraintCount' | 'constraintsOverviewOpen' | 'onConstraints' | 'constraintEditing' | 'snapSettings' | 'setSnapSettings' | 'panels' | 'realisticPreview' | 'setRealisticPreview' | 'onMoveCreation' | 'onRotate' | 'onRescale' | 'leftOpen' | 'setLeftOpen' | 'rightOpen' | 'setRightOpen' | 'showDimensions' | 'setShowDimensions' | 'showGrid' | 'setShowGrid'>) {
   return <div className="workspace-top">
-        <div className="preview-mode-switch" role="group" aria-label="Preview mode">
+        <div className="preview-controls"><div className="preview-mode-switch" role="group" aria-label="Preview mode">
           <button aria-pressed={!realisticPreview} onClick={()=>setRealisticPreview(false)}><Box size={15}/>Studio</button>
           <button aria-pressed={realisticPreview} onClick={()=>setRealisticPreview(true)}><House size={15}/>Realistic preview</button>
         </div>
+        {rescaleSliders}</div>
         <div className="workspace-options">
           <details className="snap-controls" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.open=false}}} onBlur={event=>{if(event.relatedTarget&&!event.currentTarget.contains(event.relatedTarget))event.currentTarget.open=false}}>
             <summary aria-label="Snapping settings">Snap · {snapSettings.grid || snapSettings.geometry ? 'On' : 'Off'}</summary>
