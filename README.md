@@ -4,6 +4,8 @@ A local, full-window furniture design workspace built with Vite, React, TypeScri
 
 For implementation details, see the [architecture and development documentation](docs/README.md). Coding agents should start with [AGENTS.md](AGENTS.md).
 
+On narrow screens, **Open panel list** and **Open inspector** open keyboard-accessible drawers. Tab and Shift+Tab stay inside the drawer; Escape cancels a nested task first, then closes the drawer and returns focus to its opener. Background controls are inactive until the drawer closes. Desktop sidebars keep ordinary navigation.
+
 ## Run
 
 Requires Node.js 22.12+ (tested with Node 25).

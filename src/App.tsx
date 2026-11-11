@@ -1,3 +1,4 @@
+import { useSidebarDrawers } from '@/hooks/use-sidebar-drawers'
 import { nextVisibility } from '@/lib/visibility'
 import { createPreviewShortcutHandler,flattenPreviewMenuActions } from '@/lib/preview-shortcuts'
 import { PanelOverlapDialog } from '@/components/PanelOverlapDialog'
@@ -145,6 +146,14 @@ export default function App() {
   const objectControlsDisabled=objectInteractionDisabled||objectGesture.active
   const { chooseObject,changeAssemblyTab }=createObjectSelectionCommands({ objectControlsDisabled, objects, setRightOpen, setLeftOpen, drag, resize, objectGesture, modalOpen, clipboard, assembly, constraints, setProjectConstraintsOpen, setPickingConstraint, constraintPicker, setSelectedIds, setExploded, setAssemblyTab, setInspectorTab, closeContextMenu, selectedPanels, selectedConnectors })
   const canAttachPanel=!connectMode&&panelAttachmentAvailable({ selectedPanels, inspectingConnectors, assembly, clipboard, constraints, modalOpen, drag, resize, boxSelectActive, inspectorTab })
+  useSidebarDrawers({leftOpen,rightOpen,realisticPreview,setLeftOpen,setRightOpen,cancelTask:side=>{
+    if(side!=='right')return false
+    if(inspectorTab==='attach') {setInspectorTab('panel');return true}
+    if(objects.editing) {objects.cancel();return true}
+    if(constraints.editing) {constraints.cancel();return true}
+    if(projectConstraintsOpen) {closeProjectConstraints();return true}
+    return false
+  }})
   const [previewShortcutHandler]=useState(createPreviewShortcutHandler)
   useEffect(()=>{
     const onKey=createEditorKeyHandler({ connectMode, cancelConnect, previewShortcut: e => previewShortcutHandler(e,flattenPreviewMenuActions(menuActions),closeContextMenu), previewShortcutsEnabled: !objectMode&&!modalOpen&&!constraints.editing&&!drag.active&&!resize.active&&!clipboard.active&&!assembly.target&&!assembly.placementActive&&!boxSelectActive&&inspectorTab!=='attach', modalOpen, constraints, pickingConstraint, constraintPicker, setPickingConstraint, setRightOpen, projectConstraintsOpen, closeProjectConstraints, objectMode, realisticPreview, redo, undo, objects, objectControlsDisabled, toggleBoxSelect, boxSelectActive, setSnapSettings, setFitSignal, boxSelectAvailable, canAttachPanel, startAttach, clipboard, inspectingConnectors, movementEnabled, drag, resize, assembly, selectedPanels, commit, selectedIds, notify, setRealisticPreview, selectAll, duplicateSelected, deleteSelected, setInspectorTab, setSelectedId })

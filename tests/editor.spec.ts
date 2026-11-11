@@ -95,7 +95,7 @@ test('phone layout opens both drawers and keeps the viewport fixed', async ({ pa
   await expect(page.locator('.panel-list-row')).toHaveCount(7)
   await page.getByRole('button',{name:'Collapse panel list'}).click()
   await page.getByRole('button',{name:'Open inspector'}).click()
-  await expect(page.getByRole('complementary',{name:'Inspector'})).toBeVisible()
+  await expect(page.getByRole('dialog',{name:'Inspector'})).toBeVisible()
   await page.getByRole('button',{name:'Collapse inspector'}).click()
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight)).toBe(true)
   await page.screenshot({path:'test-results/studio-mobile.png'})

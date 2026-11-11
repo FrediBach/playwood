@@ -272,10 +272,10 @@ function WorkspaceToolbar({
           <IconButton label="Move creation" disabled={constraintEditing||!panels.length} onClick={onMoveCreation}><Move size={18}/></IconButton>
           <IconButton label="Rescale creation" tooltipLabel={niceValueStep ? `Rescale creation · Only nice values enabled · ${niceValueStep} mm step` : 'Rescale creation'} className="constraints-toolbar-button" aria-description={niceValueStep ? `Only nice values enabled · ${niceValueStep} mm step` : 'Only nice values disabled'} disabled={constraintEditing||!panels.length} onClick={onRescale}><Scaling size={18}/>{!!niceValueStep && <span className="constraints-toolbar-badge" aria-hidden="true">{niceValueStep}</span>}</IconButton>
           <IconButton label="Rotate creation" disabled={constraintEditing||!panels.length} onClick={onRotate}><RotateCw size={18}/></IconButton>
-          {!realisticPreview&&!leftOpen&&<IconButton label="Open panel list" onClick={()=>setLeftOpen(true)}><PanelLeftOpen size={18}/></IconButton>}
+          {!realisticPreview&&!leftOpen&&<IconButton label="Open panel list" tooltipSide="bottom" onClick={()=>setLeftOpen(true)}><PanelLeftOpen size={18}/></IconButton>}
           <Tooltip label="Show dimensions"><button className={`canvas-toggle ${showDimensions?'active':''}`} aria-label="Show dimensions" aria-pressed={showDimensions} onClick={()=>setShowDimensions(v=>!v)}><Ruler size={18}/></button></Tooltip>
           {!realisticPreview&&<Tooltip label="Show grid"><button className={`canvas-toggle ${showGrid?'active':''}`} aria-label="Show grid" aria-pressed={showGrid} onClick={()=>setShowGrid(v=>!v)}><Grid2X2 size={17}/></button></Tooltip>}
-          {!realisticPreview&&!rightOpen&&<IconButton label="Open inspector" onClick={()=>setRightOpen(true)}><SlidersHorizontal size={18}/></IconButton>}
+          {!realisticPreview&&!rightOpen&&<IconButton label="Open inspector" tooltipSide="bottom" onClick={()=>setRightOpen(true)}><SlidersHorizontal size={18}/></IconButton>}
         </div>
       </div>
 }

@@ -70,7 +70,7 @@ export function createEditorKeyHandler({
 }: CreateEditorKeyHandlerOptions) {
   return (e: KeyboardEvent) => {
     const target=e.target as HTMLElement
-    if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||target.closest('dialog,[role="dialog"]')||modalOpen) return
+    if(e.defaultPrevented||e.isComposing||target.matches('input:not([type=checkbox]):not([type=radio]),select,textarea')||target.isContentEditable||target.closest('dialog,[role="dialog"]')||modalOpen||document.querySelector('[data-editor-drawer]')) return
     if(connectMode) {
       if(e.key==='Escape') { e.preventDefault(); cancelConnect?.(); document.querySelector<HTMLButtonElement>('button[aria-label="Connect mode"]')?.focus() }
       else if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z') { e.preventDefault(); e.shiftKey?redo():undo() }

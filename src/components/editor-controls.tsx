@@ -2,5 +2,5 @@ import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
 import type { ConnectorType } from '@/lib/types'
 
-export function IconButton({label,tooltipLabel,children,...props}: React.ComponentProps<typeof Button>&{label:string;tooltipLabel?:string}) {return <Tooltip label={tooltipLabel ?? label}><Button variant="ghost" size="icon" aria-label={label} {...props}>{children}</Button></Tooltip>}
+export function IconButton({label,tooltipLabel,tooltipSide,children,...props}: React.ComponentProps<typeof Button>&{label:string;tooltipLabel?:string;tooltipSide?:'top'|'right'|'bottom'|'left'}) {return <Tooltip label={tooltipLabel ?? label} side={tooltipSide}><Button variant="ghost" size="icon" aria-label={label} {...props}>{children}</Button></Tooltip>}
 export function ConnectorGlyph({type}: {type:ConnectorType}) {return <svg viewBox="0 0 36 36" fill="none" aria-hidden="true"><g stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">{type==='90'?<path d="M10 7v19h19"/>:type==='105'?<path d="M8 7 13.091 26H29"/>:type==='150'?<path d="m5 14 12 12h15"/>:type==='t'?<path d="M5 12h26M18 12v19"/>:<path d="M5 18h26M18 5v26"/>}</g></svg>}

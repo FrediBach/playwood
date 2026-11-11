@@ -27,6 +27,12 @@ Panel and connector lists share filter defaults, active-filter counting, and mat
 
 `MovementAlternativesDialog` reviews a wider staged movement with the same `PanelChangeTable` used by resize review. Radio choices update only the review, which also shows outside-size changes along the requested movement. The committed main scene stays unchanged. Existing modal keyboard guards, focus restoration, and scroll containment apply on desktop and narrow drawers.
 
+## Narrow sidebar drawers
+
+[`use-sidebar-drawers.ts`](../src/hooks/use-sidebar-drawers.ts) applies a modal keyboard lifecycle to the panel list at widths up to 900 px and the inspector up to 680 px, matching the CSS breakpoints. An open overlay receives dialog semantics and initial focus; its app-shell siblings (including header, canvas, other sidebar, and status bar) become inert. Tab/Shift+Tab wrap within visible, enabled controls. Desktop sidebars retain their ordinary complementary roles and navigation.
+
+Document-level bubbling lets nested React forms, popovers, and portalled dialogs consume Escape first. Attachment, object, and constraint tasks cancel before the containing drawer closes. The editor's global shortcut guard also recognizes an active drawer, including when a removed control temporarily leaves focus on the body. Closing restores focus to the remounted opener. At phone widths, an opened inspector closes the panel-list overlay. Breakpoint changes and effect cleanup release inert state and listeners; nested modal focus is not redirected into the underlying drawer.
+
 ## From project data to a frame
 
 ### Construction objects
