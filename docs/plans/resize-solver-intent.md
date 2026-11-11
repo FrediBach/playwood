@@ -1,6 +1,6 @@
 # Resize solver: infer intent before solving geometry
 
-Status: proposed, not implemented. Analysis date: 11 November 2026. Source baseline: `5706d2b`.
+Status: stage 0 behavioral benchmark completed; solver architecture and policy changes remain proposed. Analysis date: 11 November 2026. Source baseline: `5706d2b`. See the [stage 0 measurements and coverage](resize-solver-benchmark.md).
 
 ## Recommendation
 
