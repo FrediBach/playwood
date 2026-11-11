@@ -1,3 +1,4 @@
+import type { EditorNotification, Notify } from './editor-notifications'
 import { PanelPaletteProvider } from '@/components/PanelColorField'
 import { type ProjectDialog } from '@/components/ProjectDialogs'
 import { INITIAL_ATTACHMENT } from '@/editor/editor-defaults'
@@ -49,11 +50,11 @@ export function useEditorState(project: Project) {
     window.addEventListener('resize',closeOverlappingSidebar)
     return()=>window.removeEventListener('resize',closeOverlappingSidebar)
   },[])
-  const [toast,setToast]=useState(''),[importError,setImportError]=useState('')
+  const [importError,setImportError]=useState('')
   const importRef=useRef<HTMLInputElement>(null)
   const assemblyImportRef=useRef<HTMLInputElement>(null)
   const [assemblyImportError,setAssemblyImportError]=useState('')
-  return { ...reviews, assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds, connectorTypeError, setConnectorTypeError, selectedIds, setPanelSelection, setSelectedIds, setSelectedId, contextMenu, setContextMenu, constraintFooter, setConstraintFooter, projectConstraintsOpen, setProjectConstraintsOpen, constraintPicker, pickingConstraint, setPickingConstraint, panelEditError, setPanelEditError, closeContextMenu, toolRequest, setToolRequest, inspectorTab, setInspectorTab, trofastPreview, previewTrofast, draft, setDraft, attachTarget, setAttachTarget, attachment, setAttachment, attachmentSideHighlight, setAttachmentSideHighlight, view, setView, boxSelectActive, setBoxSelectActive, realisticPreview, setRealisticPreview, showGrid, setShowGrid, showDimensions, setShowDimensions, exploded, setExploded, fitSignal, setFitSignal, zoomSignal, setZoomSignal, frameSignal, setFrameSignal, leftOpen, setLeftOpen, rightOpen, setRightOpen, toast, setToast, importError, setImportError, importRef, assemblyImportRef, assemblyImportError, setAssemblyImportError }
+  return { ...reviews, assemblyTab, setAssemblyTab, selectedConnectorIds, setSelectedConnectorIds, connectorTypeError, setConnectorTypeError, selectedIds, setPanelSelection, setSelectedIds, setSelectedId, contextMenu, setContextMenu, constraintFooter, setConstraintFooter, projectConstraintsOpen, setProjectConstraintsOpen, constraintPicker, pickingConstraint, setPickingConstraint, panelEditError, setPanelEditError, closeContextMenu, toolRequest, setToolRequest, inspectorTab, setInspectorTab, trofastPreview, previewTrofast, draft, setDraft, attachTarget, setAttachTarget, attachment, setAttachment, attachmentSideHighlight, setAttachmentSideHighlight, view, setView, boxSelectActive, setBoxSelectActive, realisticPreview, setRealisticPreview, showGrid, setShowGrid, showDimensions, setShowDimensions, exploded, setExploded, fitSignal, setFitSignal, zoomSignal, setZoomSignal, frameSignal, setFrameSignal, leftOpen, setLeftOpen, rightOpen, setRightOpen, importError, setImportError, importRef, assemblyImportRef, assemblyImportError, setAssemblyImportError }
 }
 
 /** Discard a review before children can render it against another project. */
@@ -113,9 +114,22 @@ export function createPaletteActions(commit: ReturnType<typeof useProject>['comm
   }
 }
 
-export function useEditorNotifications(repairNotice: string,notify: (message: string) => void,toast: string,setToast: React.Dispatch<React.SetStateAction<string>>) {
-  useEffect(() => { if(repairNotice) notify(repairNotice) },[repairNotice,notify])
-  useEffect(() => { if(toast) { const t=setTimeout(() => setToast(''),3500); return () => clearTimeout(t)}  },[toast,setToast])
+export function useEditorNotifications(repairNotice:string) {
+  const [toast,setToast]=useState<EditorNotification|null>(null)
+  const [error,setError]=useState<EditorNotification|null>(null)
+  const notify=useCallback<Notify>((message,severity='info')=>{
+    const notification={message,severity}
+    if(severity==='error')setError(notification)
+    else setToast(notification)
+  },[])
+  const dismissError=useCallback(()=>setError(null),[])
+  useEffect(()=>{if(repairNotice)notify(repairNotice)},[repairNotice,notify])
+  useEffect(()=>{
+    if(!toast)return
+    const timer=window.setTimeout(()=>setToast(null),3500)
+    return ()=>window.clearTimeout(timer)
+  },[toast])
+  return {toast,error,notify,dismissError}
 }
 
 export function useSelectionPruning(setPanelSelection: React.Dispatch<React.SetStateAction<string[]>>,project: Project,setSelectedConnectorIds: React.Dispatch<React.SetStateAction<string[]>>,physicalConnectors: ReturnType<typeof orderedConnectors>) {

@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import {
   AssemblyAttachmentTarget, acceptAssemblyParameterBatch,
   createAssembly,
@@ -21,7 +22,7 @@ interface Options {
   selectedIds: string[]
   setSelectedIds: (ids: string[]) => void
   commit: (project: Project | ((current: Project) => Project)) => void
-  notify: (message: string) => void
+  notify: Notify
   prepareSelection: () => void
   fit: () => void
 }
@@ -68,7 +69,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
       }
       if (message) notify(message)
       return true
-    } catch (error) { notify(error instanceof Error ? error.message : 'This assembly could not be changed.'); return false }
+    } catch (error) { notify(error instanceof Error ? error.message : 'This assembly could not be changed.','error'); return false }
   }
   const edit = (id: string) => {
     const instance = instances.find(item => item.id === id)
@@ -109,7 +110,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
         clearPlacement()
         notify('Coordinated assembly values applied.')
         return true
-      } catch (error) { notify(error instanceof Error ? error.message : 'These values could not be applied.'); return false }
+      } catch (error) { notify(error instanceof Error ? error.message : 'These values could not be applied.','error'); return false }
     },
     resetParameters: (id: string) => run(() => resetAssemblyParameterValues(project, id)),
     insert: (id: string) => run(() => instantiateAssembly(project, id), 'Linked instance added.', true),
@@ -127,7 +128,7 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
         setSelectedIds([...new Set([...selectedIds, ...instances.filter(instance => selected.has(instance.id)).flatMap(instance => Object.values(instance.panelIds))])])
         prepareSelection()
         notify(instanceIds.length === 1 ? 'Assembly disassembled. Its panels are editable separately. Undo to restore the instance.' : `${instanceIds.length} assemblies disassembled. Their panels are editable separately. Undo to restore the instances.`)
-      } catch (error) { notify(error instanceof Error ? error.message : 'These assemblies could not be disassembled.') }
+      } catch (error) { notify(error instanceof Error ? error.message : 'These assemblies could not be disassembled.','error') }
     },
     rename: (id: string, name: string) => run(() => renameAssembly(project, id, name)),
     finish: (id: string, finish: AssemblyFinish) => run(() => updateAssemblyFinish(project, id, finish)),
@@ -143,10 +144,10 @@ export function useAssemblyEditor({ project, selectedIds, setSelectedIds, commit
   }
 }
 
-function createAttachmentCommand(targets: AssemblyAttachmentTarget[],notify: (message: string) => void,sourceInstanceId: string|undefined,instances: AssemblyInstance[],commit: (project: Project | ((current: Project) => Project)) => void,select: (id: string,next?: Project) => void,close: () => void,setSelectedIds: (ids: string[]) => void,sourceIds: Set<string>,existingIds: Set<string>,prepareSelection: () => void,fit: () => void) {
+function createAttachmentCommand(targets: AssemblyAttachmentTarget[],notify: Notify,sourceInstanceId: string|undefined,instances: AssemblyInstance[],commit: (project: Project | ((current: Project) => Project)) => void,select: (id: string,next?: Project) => void,close: () => void,setSelectedIds: (ids: string[]) => void,sourceIds: Set<string>,existingIds: Set<string>,prepareSelection: () => void,fit: () => void) {
   return (id: string) => {
     const candidate=targets.find(item => item.id===id)
-    if(!candidate?.project) { if(candidate?.error) notify(candidate.error); return}
+    if(!candidate?.project) { if(candidate?.error) notify(candidate.error,'error'); return}
     const next=candidate.project
     const placed=sourceInstanceId? next.assemblies?.instances.find(instance => instance.id===sourceInstanceId)
       :next.assemblies?.instances.find(instance => !instances.some(previous => previous.id===instance.id))

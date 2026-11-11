@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import { snapDistance, snapTargets, type SnapSettings } from '@/lib/preview-snap'
 import { useMemo, useRef, useState } from 'react'
 import { finishPreviewResize, movePreviewResize, type PreviewResizeMode, type RepeatPreview } from '@/lib/preview-resize'
@@ -14,7 +15,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
   selectedConnectorIds: readonly string[]
   enabled: boolean
   commit: (project: Project | ((current: Project) => Project)) => void
-  notify: (message: string) => void
+  notify: Notify
   select: (panelId: string) => void
 }) {
   const panelId = selectedIds.length === 1 && !selectedConnectorIds.length ? selectedIds[0] : undefined
@@ -91,7 +92,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
         setPreview({ project, distance: 0, limited: false, ...(repeat ? { count: 0 } : {}) })
         return true
       } catch (error) {
-        notify(error instanceof Error ? error.message : 'This panel arrow cannot repeat a compartment.')
+        notify(error instanceof Error ? error.message : 'This panel arrow cannot repeat a compartment.','error')
         return false
       }
     },
@@ -114,7 +115,7 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
         latest.current = result
         setPreview(result)
       } catch (error) {
-        notify(error instanceof Error ? error.message : 'This direction cannot preserve the connected panels.')
+        notify(error instanceof Error ? error.message : 'This direction cannot preserve the connected panels.','error')
       }
     },
     end: (cancel: boolean) => {
@@ -136,9 +137,9 @@ export function usePreviewResize({ project, selectedIds, selectedConnectorIds, e
                 : `Added ${latest.current.count} ${latest.current.count === 1 ? 'bay' : 'bays'}. Undo is available.`)
           }
         }
-        catch (error) { notify(error instanceof Error ? error.message : 'This resize conflicts with a constraint.') }
+        catch (error) { notify(error instanceof Error ? error.message : 'This resize conflicts with a constraint.','error') }
       }
-      if (!cancel && latest.current?.reason && session.current?.source === prepared) notify(latest.current.reason)
+      if (!cancel && latest.current?.reason && session.current?.source === prepared) notify(latest.current.reason,'error')
       session.current = null
       latest.current = null
       setPreview(null)

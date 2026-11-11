@@ -12,7 +12,8 @@ The main entry points are [App.tsx](../src/App.tsx), [use-project.ts](../src/hoo
 | --- | --- | --- |
 | `useProject` | Current project, past/future snapshots, repeat-group token, save status, startup repair notice | Current project only |
 | `useDirectorySync` | Folder access, file listing, active filename and expected disk content, dirty state, disk autosave, and pending open confirmation | No; only the directory handle is remembered separately in IndexedDB |
-| `App` through `useEditorState` | Panel and connector selections, inspector/list tabs, dialogs, new-panel draft, attachment options, camera-view choice, sidebar visibility, exploded/realistic preview switches, context menu, notifications | No |
+| `App` through `useEditorState` | Panel and connector selections, inspector/list tabs, dialogs, new-panel draft, attachment options, camera-view choice, sidebar visibility, exploded/realistic preview switches, context menu | No |
+| `useEditorNotifications` | Transient information/success toast and separately retained latest error notice | No |
 | `useAssemblyEditor` | Which instance is being edited, assembly placement mode, hovered placement target | No |
 | `useCopyPaste` | In-memory copied panels/connectors/assembly, insertion candidates, hovered candidate | No |
 | `usePreviewDrag` / `usePreviewResize` | Gesture source, latest candidate project, transient displayed geometry | No |
@@ -344,3 +345,11 @@ Resolved rectangular panel bounds, including hidden/rotated/custom-outline stock
 `ConnectorOrderDialog` holds color substitutions only for its open lifetime. `connector-order.ts` groups `getPhysicalConnectors` by effective type/material/color, validates substitutions against a dated manufacturer catalog, merges resulting order items, and calculates integer-cent EUR estimates. Metal silver maps to the shop’s Gray variant. The text download includes the catalog date, product links, and estimate limitations. This flow never commits project changes or changes saved formats; reopening resets substitutions. Entry unit prices exclude volume discounts, shipping, and supplier minimum quantities.
 
 Panel and construction-object visibility retains the version 1 `visible` boolean and adds optional `wireframe?: boolean` (omitted means false). Semi-visible items store `visible: false, wireframe: true`; hidden items have both false. Parsers validate the optional boolean. Copies retain the field through normal object spreads; paste placement keeps its existing behavior of making pasted panels fully visible. Project history, autosave, and JSON retain both fields. Assembly rebuilds preserve materialized panel visibility locally; standalone assembly files retain source visibility, rather than local instance display choices.
+
+## Command feedback
+
+[`editor-notifications.ts`](../src/editor/editor-notifications.ts) defines explicit `info`, `success`, and `error` severities. `useEditorNotifications` retains the latest error independently from its transient confirmation. Information and success notices expire after 3.5 seconds; each notification starts a fresh timer, even when its text repeats. Errors remain until explicitly dismissed or replaced by a later error, and later confirmations do not erase them. Unclassified existing notifications default to neutral information rather than a success icon.
+
+Selection movement/distribution/merge, panel edits, attachment/capacity failures, connector edits, rotation, assembly and clipboard operations, constraint commands, object edits, and gesture rejection paths now explicitly identify failures. Existing form-specific errors and review dialogs remain in place. Notifications never change project history or saved data.
+
+[`EditorNotifications.tsx`](../src/components/EditorNotifications.tsx) renders errors as an accessible “Action not applied” alert with a warning icon and Dismiss error control. A narrow drawer hosts the notice inside its focus scope; otherwise the notice appears over the workspace. Dismissal returns keyboard focus to the drawer or canvas. Notices do not open a modal or take focus on arrival. The latest error is session-only, not a persisted log of all failures.

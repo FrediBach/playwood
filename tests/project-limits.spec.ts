@@ -11,7 +11,7 @@ test('adding panel 201 is rejected and the 200-panel project survives reload',as
   await page.getByRole('button',{name:'Clear',exact:true}).click()
   await page.getByRole('button',{name:'Add a panel',exact:false}).first().click()
   await page.getByRole('button',{name:'Add to workspace',exact:true}).click()
-  await expect(page.getByRole('status').filter({hasText:'Projects support up to 200 panels'})).toBeVisible()
+  await expect(page.getByRole('alert').filter({hasText:'Projects support up to 200 panels'})).toBeVisible()
   await expect(page.locator('.panel-list-row')).toHaveCount(200)
   await page.reload()
   await expect(page.locator('.panel-list-row')).toHaveCount(200)

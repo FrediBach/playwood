@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import { useMemo, useRef, useState } from 'react'
 import type { PreviewConnectGestureProps } from '@/components/PreviewConnectGesture'
 import { getConnectStrokeCandidate, type ConnectStrokeResult } from '@/lib/connect-stroke'
@@ -15,7 +16,7 @@ export function useConnectStroke({ project, enabled, commit, notify, cancel }: {
   project: Project
   enabled: boolean
   commit: (change: (current: Project) => Project) => void
-  notify: (message: string) => void
+  notify: Notify
   cancel: () => void
 }) {
   const session = useRef<{ source: Project; panelId: string; point: Vec3 } | null>(null)
@@ -70,8 +71,8 @@ export function useConnectStroke({ project, enabled, commit, notify, cancel }: {
             return candidate.candidate!
           })
           notify('Connector added. Undo is available.')
-        } catch (error) { notify(error instanceof Error ? error.message : 'This connector could not be added.') }
-      } else if (!canceled && candidate?.reason) notify(candidate.reason)
+        } catch (error) { notify(error instanceof Error ? error.message : 'This connector could not be added.','error') }
+      } else if (!canceled && candidate?.reason) notify(candidate.reason,'error')
       clear()
     },
     onCancel: () => { clear(); cancel() },

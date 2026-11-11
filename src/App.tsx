@@ -1,3 +1,4 @@
+import { EditorNotifications } from '@/components/EditorNotifications'
 import { useSidebarDrawers } from '@/hooks/use-sidebar-drawers'
 import { nextVisibility } from '@/lib/visibility'
 import { createPreviewShortcutHandler,flattenPreviewMenuActions } from '@/lib/preview-shortcuts'
@@ -49,7 +50,6 @@ import { resolvePanels } from '@/lib/model'
 import { readSnapSettings } from '@/lib/preview-snap'
 import { assertNoNewTrofastIssues } from '@/lib/trofast'
 import type { Project } from '@/lib/types'
-import { CheckCheck } from 'lucide-react'
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 
 export default function App() {
@@ -74,7 +74,7 @@ export default function App() {
   setShowDimensions, exploded, setExploded, fitSignal,
   setFitSignal, zoomSignal, setZoomSignal, frameSignal,
   setFrameSignal, leftOpen, setLeftOpen, rightOpen,
-  setRightOpen, toast, setToast, importError,
+  setRightOpen, importError,
   setImportError, importRef, assemblyImportRef, assemblyImportError,
   setAssemblyImportError
 } = useEditorState(project)
@@ -93,7 +93,7 @@ export default function App() {
   infillReason, openConnectorInfill, connectorCount, connectorSummary,
   selectionKind, managingProjectConstraints
 }=useConnectorSelectionDetails({ project, selectedConnectorIds, selectedPanels, assemblyTab, projectConstraintsOpen, setConnectorInfill })
-  const notify=useCallback((message:string)=>setToast(message),[setToast])
+  const {toast,error:notificationError,notify,dismissError}=useEditorNotifications(repairNotice)
   const [snapSettings,setSnapSettings]=useState(readSnapSettings)
   const [connectMode,setConnectMode]=useState(false)
   const cancelConnect=useCallback(()=>setConnectMode(false),[])
@@ -106,7 +106,7 @@ export default function App() {
   }
   const commitWithInsertChecks=(change:(current:Project)=>Project,options?:{group:string;repeat:boolean})=>{
     try { commit(current=>assertNoNewTrofastIssues(current,change(current)),options);return true }
-    catch(error){notify(error instanceof Error?error.message:'This edit needs more clearance for the TROFAST inserts.');return false}
+    catch(error){notify(error instanceof Error?error.message:'This edit needs more clearance for the TROFAST inserts.','error');return false}
   }
   useEffect(()=>{try{localStorage.setItem('playwood-snap',JSON.stringify(snapSettings))}catch{/* Storage may be unavailable. */}},[snapSettings])
   const drag=usePreviewDrag({project,selectedIds:inspectingConnectors?[]:selectedIds,commit,notify,snapSettings,select:setSelectedIds})
@@ -118,7 +118,6 @@ export default function App() {
     prepare:()=>{assembly.clearPlacement();setInspectorTab('panel');setExploded(false);setRealisticPreview(false);setFrameSignal(v=>v+1)},
     select:ids=>{assembly.close();setSelectedIds(ids);setInspectorTab('panel');setRightOpen(true);setFrameSignal(v=>v+1)}})
   const assemblyCount=(definitionId:string)=>assembly.instances.filter(instance=>instance.definitionId===definitionId).length
-  useEditorNotifications(repairNotice,notify,toast,setToast)
   useSelectionPruning(setPanelSelection,project,setSelectedConnectorIds,physicalConnectors)
   const { removeSelectedConnectors,selectConnectors,separateSelectedConnectors,chooseConnector,updateConnectorType }=createConnectorEditCommands({ modalOpen, assembly, commitWithInsertChecks, selectedConnectorIds, notify, commit, setSelectedConnectorIds, setConnectorTypeError, project, constraints, objectMode, objects, setAssemblyTab, clipboard, setPanelSelection, setInspectorTab, setRightOpen, setLeftOpen })
   const { updatePanel,updateMultiplePanels }=createPanelEditCommands({ selectedPanels, project, selectedId, assembly, commit, setPanelEditError, selectionKey, notify, selectedIds, setResizeReview, setMovementReview })
@@ -146,7 +145,7 @@ export default function App() {
   const objectControlsDisabled=objectInteractionDisabled||objectGesture.active
   const { chooseObject,changeAssemblyTab }=createObjectSelectionCommands({ objectControlsDisabled, objects, setRightOpen, setLeftOpen, drag, resize, objectGesture, modalOpen, clipboard, assembly, constraints, setProjectConstraintsOpen, setPickingConstraint, constraintPicker, setSelectedIds, setExploded, setAssemblyTab, setInspectorTab, closeContextMenu, selectedPanels, selectedConnectors })
   const canAttachPanel=!connectMode&&panelAttachmentAvailable({ selectedPanels, inspectingConnectors, assembly, clipboard, constraints, modalOpen, drag, resize, boxSelectActive, inspectorTab })
-  useSidebarDrawers({leftOpen,rightOpen,realisticPreview,setLeftOpen,setRightOpen,cancelTask:side=>{
+  const activeDrawer=useSidebarDrawers({leftOpen,rightOpen,realisticPreview,setLeftOpen,setRightOpen,cancelTask:side=>{
     if(side!=='right')return false
     if(inspectorTab==='attach') {setInspectorTab('panel');return true}
     if(objects.editing) {objects.cancel();return true}
@@ -287,23 +286,23 @@ export default function App() {
       <button onClick={()=>download(recovery,'playwood-recovery.json','application/json')}>Download original save</button>
       <button onClick={resetRecovery}>Reset browser save</button>
     </div>}
-    {toast&&<div className="toast" role="status"><CheckCheck size={18}/>{toast}</div>}
+    <EditorNotifications toast={toast} error={notificationError} dismissError={dismissError} drawer={activeDrawer}/>
 
     {overlapRepair&&overlapRepair.source===project&&<PanelOverlapDialog {...overlapRepair} onCancel={()=>setOverlapRepair(null)} onApply={candidate=>{
       try { commit(current=>{if(current!==overlapRepair.source)throw new Error('The project changed. Reopen the overlap repair.');return candidate});setOverlapRepair(null);notify('Panel overlaps repaired. Undo is available.') }
-      catch(error) { notify(error instanceof Error?error.message:'Could not repair panel overlaps.') }
+      catch(error) { notify(error instanceof Error?error.message:'Could not repair panel overlaps.','error') }
     }}/>}
     {equalSizes&&equalSizes.source===project&&<EqualPanelSizesDialog {...equalSizes} onCancel={()=>setEqualSizes(null)} onApply={candidate=>{
       try { commit(current=>{if(current!==equalSizes.source)throw new Error('The project changed. Reopen Make sizes equal.');return candidate});setEqualSizes(null);notify('Panel sizes updated. Undo is available.') }
-      catch(error) { notify(error instanceof Error?error.message:'These sizes could not be applied.') }
+      catch(error) { notify(error instanceof Error?error.message:'These sizes could not be applied.','error') }
     }}/> }
     {movementReview&&movementReview.source===project&&<MovementAlternativesDialog review={movementReview} onCancel={()=>setMovementReview(null)} onConfirm={index=>{
       try { commit(current=>acceptMovementAlternative(current,movementReview,index)); setMovementReview(null); setPanelEditError(null); notify('Movement applied. Undo is available.') }
-      catch(error) { setMovementReview(null); notify(error instanceof Error?error.message:'This move could not be applied.') }
+      catch(error) { setMovementReview(null); notify(error instanceof Error?error.message:'This move could not be applied.','error') }
     }}/>}
     {resizeReview&&resizeReview.source===project&&<ResizeAlternativesDialog review={resizeReview} onCancel={()=>setResizeReview(null)} onConfirm={index=>{
       try { commit(current=>acceptResizeAlternative(current,resizeReview,index)); setResizeReview(null); setPanelEditError(null); notify('Resize applied. Undo is available.') }
-      catch(error) { setResizeReview(null); notify(error instanceof Error?error.message:'This resize could not be applied.') }
+      catch(error) { setResizeReview(null); notify(error instanceof Error?error.message:'This resize could not be applied.','error') }
     }}/>}
     <PanelConnectionFitDialog adjustments={pendingConnectionFit?.fit.adjustments} adjustment={pendingConnectionFit?.fit.adjustment} operations={pendingConnectionFit?.fit.result} onConfirm={acceptConnectionFit} onCancel={()=>setPendingConnectionFit(null)}/>
     <EditorDialogs {...editorDialogsProps} dialog={dialog==='sync'?null:dialog}/>

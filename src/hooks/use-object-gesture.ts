@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import { useEffect, useRef, useState } from 'react'
 import { resolvePanels } from '@/lib/model'
 import { moveConstructionSelection } from '@/lib/object-geometry'
@@ -22,7 +23,7 @@ export function useObjectGesture({ project, selectedIds, enabled, snapSettings, 
   enabled: boolean;
   snapSettings: SnapSettings;
   commit: (next: (current: Project) => Project) => void;
-  notify: (message: string) => void;
+  notify: Notify;
 }) {
   const session = useRef<Session | null>(null)
   const [preview, setPreview] = useState<Session | null>(null)
@@ -65,7 +66,7 @@ export function useObjectGesture({ project, selectedIds, enabled, snapSettings, 
         if (current !== active.source) throw new Error('The project changed during the object gesture. Try again.')
         return { ...current, constructionObjects: active.candidate }
       })
-    } catch (error) { notify(error instanceof Error ? error.message : 'Could not apply this object gesture.') }
+    } catch (error) { notify(error instanceof Error ? error.message : 'Could not apply this object gesture.','error') }
   }
   return { active: !!current, objects: current?.candidate, distance: current?.distance, limited: current?.limited,
     resizing: !!current?.edge, handles: project.constructionObjects ? objectResizeHandles(current?.candidate ?? project.constructionObjects, selectedIds) : [],

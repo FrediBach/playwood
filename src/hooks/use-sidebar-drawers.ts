@@ -14,11 +14,8 @@ export function useSidebarDrawers({leftOpen,rightOpen,realisticPreview,setLeftOp
   cancelTask:(side:'left'|'right')=>boolean
 }) {
   const size=useSyncExternalStore(subscribe,viewport)
-  const active=realisticPreview?null:size==='phone'&&rightOpen?'right':size!=='desktop'&&leftOpen?'left':null
+  const active=realisticPreview?null:size!=='desktop'&&leftOpen?'left':size==='phone'&&rightOpen?'right':null
   const cancel=useEffectEvent(cancelTask)
-  useLayoutEffect(()=>{
-    if(size==='phone'&&leftOpen&&rightOpen)setLeftOpen(false)
-  },[size,leftOpen,rightOpen,setLeftOpen])
   useLayoutEffect(()=>{
     if(!active)return
     const drawer=document.querySelector<HTMLElement>(`.${active}-sidebar`)
@@ -72,4 +69,5 @@ export function useSidebarDrawers({leftOpen,rightOpen,realisticPreview,setLeftOp
       })
     }
   },[active,setLeftOpen,setRightOpen])
+  return active
 }

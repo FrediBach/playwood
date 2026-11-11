@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import type { ListGroupingProps } from '@/components/GroupedList'
 import type { BoxSelection } from '@/components/PreviewBoxSelection'
 import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
@@ -35,7 +36,7 @@ interface CreatePanelEditCommandsOptions {
   commit: ReturnType<typeof useProject>['commit']
   setPanelEditError: React.Dispatch<React.SetStateAction<{ selection: string; message: string; } | null>>
   selectionKey: string
-  notify: (message: string) => void
+  notify: Notify
   selectedIds: string[]
 }
 
@@ -73,7 +74,7 @@ export function createPanelEditCommands({ selectedPanels, project, selectedId, a
       })
       setPanelEditError(null)
       return true
-    } catch(error) { if(error instanceof MovementReviewRequired) { setMovementReview(error.review); return false } const message=error instanceof Error? error.message:'This panel size cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message); offerResizeReview(source,[selectedId],patch); return false}
+    } catch(error) { if(error instanceof MovementReviewRequired) { setMovementReview(error.review); return false } const message=error instanceof Error? error.message:'This panel size cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message,'error'); offerResizeReview(source,[selectedId],patch); return false}
   }
   const updateMultiplePanels=(patch: Partial<Panel>) => {
     if(assembly.hasMembers) return assembly.editingInstance? assembly.updateDefinition(patch):false
@@ -93,7 +94,7 @@ export function createPanelEditCommands({ selectedPanels, project, selectedId, a
       })
       setPanelEditError(null)
       return true
-    } catch(error) { const message=error instanceof Error? error.message:'These panel sizes cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message); if(Object.keys(patch).every(key => key==='width'||key==='height')) { const shared=getSharedPanelFields(selectedPanels); offerResizeReview(source,selectedIds,{ width:shared.has('width')?patch.width:undefined,height:shared.has('height')?patch.height:undefined }) } return false}
+    } catch(error) { const message=error instanceof Error? error.message:'These panel sizes cannot keep the joints aligned.'; setPanelEditError({ selection: selectionKey,message }); notify(message,'error'); if(Object.keys(patch).every(key => key==='width'||key==='height')) { const shared=getSharedPanelFields(selectedPanels); offerResizeReview(source,selectedIds,{ width:shared.has('width')?patch.width:undefined,height:shared.has('height')?patch.height:undefined }) } return false}
   }
   return { updatePanel,updateMultiplePanels }
 }
@@ -103,7 +104,7 @@ interface CreateSelectionCommandsOptions {
   assembly: ReturnType<typeof useAssemblyEditor>
   commit: ReturnType<typeof useProject>['commit']
   selectedIds: string[]
-  notify: (message: string) => void
+  notify: Notify
   project: Project
   setSelectedIds: (next: SetStateAction<string[]>) => void
   setInspectorTab: React.Dispatch<React.SetStateAction<"panel" | "attach">>
@@ -124,31 +125,31 @@ export function createSelectionCommands({ assembly, commit, selectedIds, notify,
         const next=instanceIds.length? moveAssemblies(current,instanceIds,delta):current
         return looseIds.length? (instanceIds.length?movePanels(next,looseIds,delta):movePanelsWithReview(next,looseIds,delta)):next
       },{ group: 'panel-move',repeat })
-    } catch(error) { if(error instanceof MovementReviewRequired) { setMovementReview(error.review); return } notify(error instanceof Error? error.message:'This move cannot keep the joints aligned.')}
+    } catch(error) { if(error instanceof MovementReviewRequired) { setMovementReview(error.review); return } notify(error instanceof Error? error.message:'This move cannot keep the joints aligned.','error')}
   }
   const distributeSelection=() => {
     try { commit(current => distributePanels(current,selectedIds))}
-    catch(error) { notify(error instanceof Error? error.message:'These panels cannot be distributed while keeping their joints aligned.')}
+    catch(error) { notify(error instanceof Error? error.message:'These panels cannot be distributed while keeping their joints aligned.','error')}
   }
   const mergeSelection=() => {
     if(assembly.hasMembers||assembly.editingInstance||inspectingConnectors) return
-    try { commit(current => mergePanels(current,selectedIds)); setSelectedIds([selectedIds[0]]); notify('Panels merged. Undo is available.') }
-    catch(error) { notify(error instanceof Error? error.message:'These panels cannot be merged.') }
+    try { commit(current => mergePanels(current,selectedIds)); setSelectedIds([selectedIds[0]]); notify('Panels merged. Undo is available.','success') }
+    catch(error) { notify(error instanceof Error? error.message:'These panels cannot be merged.','error') }
   }
   const splitSelection=(count=1) => {
     try {
       const result=splitParallelPanels(project,selectedIds,count)
       commit(result.project); setSelectedIds(result.panelIds)
       notify(`Panels split into ${count+1} equal sections each with ${count} ${count===1? 'divider':'dividers'} and ${result.connectors} new connectors. Undo is available.`)
-    } catch(error) { notify(error instanceof Error? error.message:'These panels could not be split.')}
+    } catch(error) { notify(error instanceof Error? error.message:'These panels could not be split.','error')}
   }
   const detachSelection=() => {
     try { commit(current => selectedIds.reduce((next,id) => detachPanel(next,id),current)); setInspectorTab('panel'); notify('Panels detached. Their positions are unchanged.')}
-    catch(error) { notify(error instanceof Error? error.message:'These panels could not be detached.')}
+    catch(error) { notify(error instanceof Error? error.message:'These panels could not be detached.','error')}
   }
   const deleteSelected=() => {
     if(inspectingConnectors) { removeSelectedConnectors(); return}
-    if(assembly.editingInstance||assembly.memberInstance&&!assembly.selectedInstance) { notify('Select the whole instance to remove it.'); return}
+    if(assembly.editingInstance||assembly.memberInstance&&!assembly.selectedInstance) { notify('Select the whole instance to remove it.','error'); return}
     if(!selectedIds.length) return
     const removedRules=project.constraints?.filter(rule => designConstraintPanelIds(rule).some(id => selectedIdSet.has(id))).length??0
     try {
@@ -158,11 +159,11 @@ export function createSelectionCommands({ assembly, commit, selectedIds, notify,
         const next=instanceIds.reduce((p,id) => removeAssembly(p,id),current)
         return looseIds.reduce((p,id) => removePanel(p,id),next)
       }); assembly.clearPlacement(); notify(`Selection removed.${removedRules? ` Removed ${removedRules} dependent ${removedRules===1? 'constraint':'constraints'}.`:''} Undo to bring it back.`)
-    } catch(error) { notify(error instanceof Error? error.message:'This selection could not be removed.')}
+    } catch(error) { notify(error instanceof Error? error.message:'This selection could not be removed.','error')}
   }
   const duplicateSelected=() => {
     if(inspectingConnectors) return
-    if(assembly.editingInstance||assembly.memberInstance&&!assembly.selectedInstance) { notify('Select the whole instance to duplicate it.'); return}
+    if(assembly.editingInstance||assembly.memberInstance&&!assembly.selectedInstance) { notify('Select the whole instance to duplicate it.','error'); return}
     if(!selectedIds.length) return
     try {
       let next=project; const copies: string[]=[]; const copied=new Set<string>(); const copiedPanels=new Map<string,string>()
@@ -177,7 +178,7 @@ export function createSelectionCommands({ assembly, commit, selectedIds, notify,
       if(copiedRules.length) next={ ...next,constraints: [...next.constraints??[],...copiedRules] }
       const omittedRules=project.constraints?.filter(rule => designConstraintPanelIds(rule).some(id => copiedPanels.has(id))&&(rule.kind==='floor'||rule.kind==='position'||designConstraintPanelIds(rule).some(id => !copiedPanels.has(id)))).length??0
       commit(next); assembly.close(); setSelectedIds(copies); if(copied.size) setFrameSignal(v => v+1); notify(`${copied.size? 'Linked instances duplicated':'Panels duplicated'}${omittedRules? `. ${omittedRules} absolute-position or external ${omittedRules===1? 'constraint stays':'constraints stay'} with the originals.`:''}`)
-    } catch(error) { notify(error instanceof Error? error.message:'This selection could not be duplicated.')}
+    } catch(error) { notify(error instanceof Error? error.message:'This selection could not be duplicated.','error')}
   }
   return { duplicateSelected,deleteSelected,detachSelection,mergeSelection,splitSelection,distributeSelection,moveSelection }
 }
@@ -187,7 +188,7 @@ interface CreateConnectorEditCommandsOptions {
   assembly: ReturnType<typeof useAssemblyEditor>
   commitWithInsertChecks: (change: (current: Project) => Project,options?: { group: string; repeat: boolean }) => boolean
   selectedConnectorIds: string[]
-  notify: (message: string) => void
+  notify: Notify
   commit: ReturnType<typeof useProject>['commit']
   setSelectedConnectorIds: React.Dispatch<React.SetStateAction<string[]>>
   setConnectorTypeError: React.Dispatch<React.SetStateAction<{ source: Project; selection: string; message: string; } | null>>
@@ -229,7 +230,7 @@ export function createConnectorEditCommands({
       setConnectorTypeError(null)
     } catch(error) {
       const message=error instanceof Error? error.message:'This connector angle cannot keep the joints aligned.'
-      setConnectorTypeError({ source: project,selection: selectedConnectorIds.join('/'),message }); notify(message)
+      setConnectorTypeError({ source: project,selection: selectedConnectorIds.join('/'),message }); notify(message,'error')
     }
   }
   const selectConnectors=(next: SetStateAction<string[]>,revealInspector=true,additive=false) => {

@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { useConstructionEditor } from '@/hooks/use-construction-editor'
 import { useCopyPaste } from '@/hooks/use-copy-paste'
@@ -46,7 +47,7 @@ interface CreateEditorKeyHandlerOptions {
   selectedPanels: Panel[]
   commit: ReturnType<typeof useProject>['commit']
   selectedIds: string[]
-  notify: (message: string) => void
+  notify: Notify
   setRealisticPreview: React.Dispatch<React.SetStateAction<boolean>>
   selectAll: (includeConnectors?: boolean) => void
   duplicateSelected: () => void
@@ -126,7 +127,7 @@ export function createEditorKeyHandler({
         e.preventDefault()
         if(!e.repeat) {
           try { commit(current => e.shiftKey? mirrorSelection(current,selectedIds,axis):rotateSelection(current,selectedIds,axis))}
-          catch(error) { notify(error instanceof Error? error.message:'This selection cannot rotate while keeping its joints aligned.')}
+          catch(error) { notify(error instanceof Error? error.message:'This selection cannot rotate while keeping its joints aligned.','error')}
         }
       }
       return

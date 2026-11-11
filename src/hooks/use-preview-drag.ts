@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import { snapPanelDelta, type SnapSettings } from '@/lib/preview-snap'
 import { useMemo, useRef, useState } from 'react'
 import { finishPreviewDrag, movePreviewDrag, preparePreviewDrag, type PreviewDragSession } from '@/lib/preview-drag'
@@ -9,7 +10,7 @@ export function usePreviewDrag({ project, selectedIds, commit, notify, select, s
   project: Project
   selectedIds: string[]
   commit: (project: Project) => void
-  notify: (message: string) => void
+  notify: Notify
   select?: (ids: string[]) => void
 }) {
   const session = useRef<PreviewDragSession | null>(null)
@@ -33,7 +34,7 @@ export function usePreviewDrag({ project, selectedIds, commit, notify, select, s
         latest.current = null
         lastDelta.current = [0, 0, 0]
         return !!session.current
-      } catch (error) { notify(error instanceof Error ? error.message : 'This selection cannot be moved.'); return false }
+      } catch (error) { notify(error instanceof Error ? error.message : 'This selection cannot be moved.','error'); return false }
     },
     move: (delta: Vec3, snapDistance: number) => {
       if (!session.current || session.current.original !== project) return
@@ -64,7 +65,7 @@ export function usePreviewDrag({ project, selectedIds, commit, notify, select, s
           }
           setPreview(latest.current ?? { project: session.current.original, snap: null })
         } else { latest.current = null; setPreview(null) }
-        notify(error instanceof Error ? error.message : 'This position is unavailable.')
+        notify(error instanceof Error ? error.message : 'This position is unavailable.','error')
       }
     },
     end: (cancel: boolean) => {
@@ -76,7 +77,7 @@ export function usePreviewDrag({ project, selectedIds, commit, notify, select, s
             if (snap.warning) select?.(snap.panelIds)
             notify(`Attached to ${snap.label}.${snap.warning ? ` ${snap.warning.replace(/^Requires disassembly:/, 'Disassembled:')}` : ''} Undo is available.`)
           }
-        } catch (error) { notify(error instanceof Error ? error.message : 'This position is unavailable.') }
+        } catch (error) { notify(error instanceof Error ? error.message : 'This position is unavailable.','error') }
       }
       session.current = null
       latest.current = null

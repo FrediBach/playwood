@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import { useMemo, useState } from 'react'
 import { groupPasteLocations } from '@/lib/paste-locations'
 import { copySelection, getPasteTargets, getInsertionTargets, type CopiedItem } from '@/lib/clipboard'
@@ -12,7 +13,7 @@ interface Options {
   commit: (project: Project) => void
   select: (ids: string[]) => void
   prepare: () => void
-  notify: (message: string) => void
+  notify: Notify
 }
 
 export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commit, select, prepare, notify }: Options) {
@@ -63,7 +64,7 @@ export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commi
         }
         prepare(); setPlacement({ project, selection, targets: valid, insertion: item.kind })
         notify('')
-      } catch (error) { notify((error as Error).message) }
+      } catch (error) { notify((error as Error).message,'error') }
     },
     copy: () => {
       try {
@@ -72,17 +73,17 @@ export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commi
         const ids=new Set(item.kind === 'selection' ? item.panels.map(panel => panel.id) : item.kind === 'assembly' ? Object.values(item.instance.panelIds) : [item.panel.id])
         const omitted=project.constraints?.filter(rule=>designConstraintPanelIds(rule).some(id=>ids.has(id))&&(rule.kind==='floor'||rule.kind==='position'||designConstraintPanelIds(rule).some(id=>!ids.has(id)))).length??0
         notify(`${item.kind === 'panel' ? 'Panel' : item.kind === 'assembly' ? 'Assembly' : 'Selection'} copied.${omitted?` ${omitted} absolute-position or external ${omitted===1?'constraint stays':'constraints stay'} with the original.`:''} Select a target and press Ctrl/Cmd+V.`)
-      } catch (error) { notify((error as Error).message) }
+      } catch (error) { notify((error as Error).message,'error') }
     },
     paste: () => {
       if (!clipboard) { notify('Copy panels, connectors, or an assembly first with Ctrl/Cmd+C.'); return }
       try {
         const candidates = getPasteTargets(project, selectedIds, clipboard)
         const valid = candidates.filter(target => target.project)
-        if (!valid.length) { cancel(); notify(candidates.find(target => target.error)?.error ?? 'No compatible attachment points on this target.'); return }
+        if (!valid.length) { cancel(); notify(candidates.find(target => target.error)?.error ?? 'No compatible attachment points on this target.','error'); return }
         prepare(); setHoverId(null); setLocationId(null); setLocationHover(null); setLocationPage(0); setPlacement({ project, selection, targets: valid })
         notify('')
-      } catch (error) { cancel(); notify((error as Error).message) }
+      } catch (error) { cancel(); notify((error as Error).message,'error') }
     },
     attach: (id: string) => {
       const candidate = targets.find(target => target.id === id)
@@ -93,7 +94,7 @@ export function useCopyPaste({ project, selectedIds, selectedConnectorIds, commi
         commit(next); cancel(); select(ids)
         const message = placement?.insertion ? `${placement.insertion === 'panel' ? 'Panel' : 'Assembly'} attached.` : 'Copy attached.'
         notify(`${message}${candidate.warning ? ` ${candidate.warning.replace(/^Requires disassembly:/, 'Disassembled:')}` : ''} Undo is available.`)
-      } catch(error) { notify(error instanceof Error?error.message:'This attachment conflicts with a constraint.') }
+      } catch(error) { notify(error instanceof Error?error.message:'This attachment conflicts with a constraint.','error') }
     },
   }
 }

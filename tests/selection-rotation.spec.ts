@@ -131,7 +131,7 @@ test('a connected panel cannot turn alone, but selecting its complete structure 
   await openProject(page, project)
   await page.locator('.panel-list-select').filter({ hasText: /^Middle shelf$/ }).click()
   await page.keyboard.press('Shift+z')
-  await expect(page.locator('.toast')).toContainText(/select|detach/i)
+  await expect(page.getByRole('alert',{name:'Action not applied'})).toContainText(/select|detach/i)
   await expect(page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' })).toBeDisabled()
   expect(await savedProject(page)).toEqual(project)
 

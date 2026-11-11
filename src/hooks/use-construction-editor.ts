@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import { useEffect, useRef, useState } from 'react'
 import { addConstructionBox, combineConstructionObjects, copyConstructionObjects, duplicateConstructionObjects,
   pasteConstructionObjects, removeConstructionObjects, updateConstructionObject } from '@/lib/construction-objects'
@@ -10,7 +11,7 @@ import type { ConstructionObject, ConstructionObjects, ObjectBooleanOperation, P
 interface Props {
   project: Project;
   commit: (next: Project | ((current: Project) => Project), options?: { group?: string; repeat?: boolean }) => void;
-  notify: (message: string) => void;
+  notify: Notify;
   snapSettings: SnapSettings;
 }
 const EMPTY: ConstructionObjects = { roots: [], nodes: [] }
@@ -25,7 +26,7 @@ export function useConstructionEditor({ project, commit, notify, snapSettings }:
   const preview = draft?.source === project ? draft.objects : objects
   const editing = draft?.source === project
   const attempt = (action: () => void) => {
-    try { action(); return true } catch (error) { notify(error instanceof Error ? error.message : 'This object edit is unavailable.'); return false }
+    try { action(); return true } catch (error) { notify(error instanceof Error ? error.message : 'This object edit is unavailable.','error'); return false }
   }
   const cancel = () => setDraft(undefined)
   const select = (id: string | null, additive = false) => {

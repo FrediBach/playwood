@@ -1,3 +1,4 @@
+import type { Notify } from '@/editor/editor-notifications'
 import { useCallback, useRef, useState } from 'react'
 import { lockPanelSizes, setDesignConstraint } from '@/lib/design-constraint-commands'
 import { applyConstraintSuggestion, type ConstraintSuggestion } from '@/lib/constraint-suggestions'
@@ -10,7 +11,7 @@ interface Preview { source: Project; rule: DesignConstraint; project?: Project; 
 export function useDesignConstraints({ project, commit, notify }: {
   project: Project
   commit: (change: Project | ((current: Project) => Project)) => void
-  notify: (message: string) => void
+  notify: Notify
 }) {
   const [editing, setEditing] = useState(false)
   const source = useRef<Project | null>(null)
@@ -78,13 +79,13 @@ export function useDesignConstraints({ project, commit, notify }: {
         })
         if (added) setHighlight(added)
         notify(`${suggestion.label}: ${suggestion.adjusts ? 'panels adjusted and ' : ''}constraint${suggestion.rules.length > 1 ? 's' : ''} added. Undo is available.`)
-      } catch (error) { notify(error instanceof Error ? error.message : 'This constraint could not be added.') }
+      } catch (error) { notify(error instanceof Error ? error.message : 'This constraint could not be added.','error') }
     },
     lockSizes: (panelIds: readonly string[]) => {
       try {
         commit(current => lockPanelSizes(current, panelIds))
         notify('Panel size locked. Use the locks beside Width and Height to unlock.')
-      } catch (error) { notify(error instanceof Error ? error.message : 'Panel sizes could not be locked.') }
+      } catch (error) { notify(error instanceof Error ? error.message : 'Panel sizes could not be locked.','error') }
     },
     editing, openRequest, manageRequest, cancelRequest, onEditingChange, onPreview, onApply,
     previewProject: current?.project,
