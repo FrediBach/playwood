@@ -248,6 +248,30 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       && Math.abs(frames[parentIndex].axes[seamDimension].dot(movementAxis)) > 1 - EPSILON
     if ((edit.kind === 'resize' && !edit.local) || movingSpan) {
       const { dimension, childDimension, retainedEnds } = seamFits.get(connection.id)!
+      // Equal coplanar continuations at a T/cross joint describe a centered
+      // split. Preserve that midpoint when resizing the surrounding structure,
+      // but let direct edits to either half (and movement) break the inference.
+      const radialDimension = 1 - dimension, childRadialDimension = 1 - childDimension
+      const radialField = radialDimension === 0 ? 'width' : 'height'
+      const childRadialField = childRadialDimension === 0 ? 'width' : 'height'
+      if (edit.kind === 'resize' && ['t', 'cross'].includes(connection.type)
+        && !ids.has(parent.id) && !ids.has(child.id)
+        // A directly edited half can drive a matching split on the opposite
+        // side through other joints; that split must not restore symmetry.
+        && !selected.some(item => Math.abs(item.axes[2].dot(frames[parentIndex].axes[2])) > 1 - EPSILON
+          && (['width', 'height'] as const).some((field, dimension) => {
+            const target = (edit.patches?.[item.panel.id] ?? edit.patch)[field]
+            return target !== undefined && Math.abs(target - item.panel[field]) > EPSILON
+              && Math.abs(item.axes[dimension].dot(frames[parentIndex].axes[radialDimension])) > 1 - EPSILON
+          }))
+        && Math.abs(frames[parentIndex].axes[2].dot(frames[childIndex].axes[2])) > 1 - EPSILON
+        && Math.abs(parent[radialField] - child[childRadialField]) < CONTACT_TOLERANCE) {
+        const centered = inferred('alignment', [connection.id, 'centered-split'], parentIndex, childIndex,
+          'keep the split centered between equal panel halves')
+        add(centered, parentIndex * 5 + 3 + radialDimension, 1)
+        add(centered, childIndex * 5 + 3 + childRadialDimension, -1)
+        preferences.add(centered)
+      }
       if (retainedEnds.length === 2) cutGroups[cutRoot(parentIndex * 2 + dimension)] = cutRoot(childIndex * 2 + childDimension)
       for (const side of retainedEnds) {
         const constraint = inferred('setback', [connection.id, side], parentIndex, childIndex,

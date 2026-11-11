@@ -462,6 +462,10 @@ for (const example of ['H-table', 'Island display']) for (const [worker, viewpor
     for (const side of ['Left', 'Right']) {
       const pair = (source: Project) => source.panels.filter(p => [`${side} front leg`, `${side} rear leg`].includes(p.name)).reduce((sum, p) => sum + p.width, 0)
       expect(pair(after) - pair(project), `${side} split-leg span`).toBeCloseTo(growth, 4)
+      for (const end of ['front', 'rear']) {
+        const old = project.panels.find(p => p.name === `${side} ${end} leg`)!
+        expect(after.panels.find(p => p.id === old.id)!.width - old.width).toBeCloseTo(growth / 2, 4)
+      }
     }
   } else for (const name of ['Island middle platform', 'Island upper shelf']) {
     const old = project.panels.find(p => p.name === name)!, current = after.panels.find(p => p.name === name)!

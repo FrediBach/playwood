@@ -3,6 +3,8 @@ import { Euler, Vector3 } from 'three'
 import { hTableProject } from './example-geometry'
 import { islandProject } from './platform-examples'
 import { resolvePanels, rotateProject, validateProject } from './model'
+import { movePanels, resizePanelEdge } from './structure-edit'
+import { roundTripProject } from '../test/project-round-trip'
 import { movePreviewResize, preparePreviewResize, reviewPreviewResize } from './preview-resize'
 
 const cases = [
@@ -30,6 +32,12 @@ it.each(cases.flatMap(scenario => [0, 27].flatMap(angle => [-1, 1].flatMap(side 
   if (name === 'Desktop' && dimension === 'width') for (const side of ['Left', 'Right']) {
     const pair = (panels: typeof before) => panels.filter(p => [`${side} front leg`, `${side} rear leg`].includes(p.name)).reduce((sum, p) => sum + p.width, 0)
     expect(pair(after) - pair(before), `${side} split-leg span`).toBeCloseTo(distance, 4)
+    for (const end of ['front', 'rear']) {
+      const old = before.find(p => p.name === `${side} ${end} leg`)!
+      expect(after.find(p => p.id === old.id)!.width - old.width).toBeCloseTo(distance / 2, 4)
+    }
+    const spine = after.find(p => p.name === 'Central spine')!
+    expect(new Vector3(...spine.position).sub(new Vector3(...selected.position)).dot(axis)).toBeCloseTo(0, 4)
   }
   expect(() => reviewPreviewResize(session, handle, result.distance)).not.toThrow()
   expect(movePreviewResize(session, handle, 0).project).toBe(source)
@@ -47,4 +55,53 @@ it.each(cases.filter(item => ['H-table depth', 'Island depth'].includes(item.nam
     expect(next.height).toBeCloseTo(old.height, 4)
     next.position.forEach((value, axis) => expect(value).toBeCloseTo(old.position[axis], 4))
   }
+})
+
+it('keeps a centered split through successive resizes and reload', () => {
+  let project = hTableProject('Centered split', 1200)
+  const top = project.panels.find(p => p.name === 'Desktop')!
+  for (const side of [-1, 1, -1] as const) {
+    project = roundTripProject(resizePanelEdge(project, top.id, 'width', side, 60))
+    const panels = resolvePanels(project)
+    for (const end of ['Left', 'Right']) {
+      expect(panels.find(p => p.name === `${end} front leg`)!.width)
+        .toBeCloseTo(panels.find(p => p.name === `${end} rear leg`)!.width, 4)
+    }
+  }
+  expect(project.constraints ?? []).toEqual([])
+})
+
+it('allows moving the divider off center and does not recenter it on a later resize', () => {
+  const source = hTableProject('Off-center split', 1800)
+  const spine = resolvePanels(source).find(p => p.name === 'Central spine')!
+  const shifted = movePanels(source, [spine.id], [0, 0, 60])
+  const panels = resolvePanels(shifted)
+  expect(panels.find(p => p.id === spine.id)!.position[2] - spine.position[2]).toBeCloseTo(60, 4)
+  const top = panels.find(p => p.name === 'Desktop')!
+  const next = resolvePanels(resizePanelEdge(roundTripProject(shifted), top.id, 'width', 1, 80))
+  for (const end of ['Left', 'Right']) {
+    expect(Math.abs(next.find(p => p.name === `${end} front leg`)!.width
+      - next.find(p => p.name === `${end} rear leg`)!.width)).toBeGreaterThan(1)
+  }
+})
+
+it('lets a saved spine position override automatic centering', () => {
+  const source = hTableProject('Authored position', 1800)
+  const spine = resolvePanels(source).find(p => p.name === 'Central spine')!
+  source.constraints = [{ id: 'fixed-spine', enabled: true, kind: 'position', panelId: spine.id,
+    axis: 'z', reference: 'center', value: spine.position[2] }]
+  const top = source.panels.find(p => p.name === 'Desktop')!
+  const next = resolvePanels(resizePanelEdge(source, top.id, 'width', 1, 100))
+  expect(next.find(p => p.id === spine.id)!.position[2]).toBeCloseTo(spine.position[2], 4)
+  expect(next.find(p => p.id === top.id)!.width).toBeCloseTo(top.width + 100, 4)
+})
+
+it('allows directly resizing a split half to break symmetry', () => {
+  const source = hTableProject('Direct half edit', 1800)
+  const leg = source.panels.find(p => p.name === 'Left front leg')!
+  const result = resizePanelEdge(source, leg.id, 'width', -1, 60)
+  const panels = resolvePanels(result)
+  expect(panels.find(p => p.id === leg.id)!.width).toBeCloseTo(leg.width + 60, 4)
+  expect(Math.abs(panels.find(p => p.id === leg.id)!.width
+    - panels.find(p => p.name === 'Left rear leg')!.width)).toBeGreaterThan(1)
 })
