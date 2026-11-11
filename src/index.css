@@ -101,3 +101,7 @@
 .save-recovery { position: fixed; z-index: 60; bottom: 48px; left: 50%; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); padding: 16px; border: 1px solid #a86519; border-radius: 12px; background: #fff6e8; color: #49321a; box-shadow: 0 4px 24px #0002; }
 .save-recovery p { margin: 8px 0; }
 .save-recovery button { margin: 4px 8px 0 0; padding: 6px 10px; border: 1px solid currentColor; border-radius: 6px; }
+.project-loading-status{display:flex;align-items:center;gap:12px;margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--canvas);color:var(--foreground)}
+.project-loading-status>svg{width:22px;height:22px;flex-shrink:0;animation:project-loading-spin 1s linear infinite}.project-loading-status strong{font-size:14px}.project-loading-status p{margin:5px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
+@keyframes project-loading-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.project-loading-status>svg{animation:none}}

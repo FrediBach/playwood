@@ -2,8 +2,8 @@ import { LazyBlenderExport } from './LazyBlenderExport'
 import { ConnectorOrderDialog } from './ConnectorOrderDialog'
 import { needsPanelSvg } from '@/lib/panel-svg'
 import { getPhysicalConnectors } from '@/lib/connector-selection'
-import { lazy, Suspense, useRef, type ComponentProps, type Dispatch, type SetStateAction } from 'react'
-import { CircleHelp, Download, FolderOpen, ListChecks, Plus, Upload } from 'lucide-react'
+import { lazy, Suspense, useEffect, useState, useRef, type ComponentProps, type Dispatch, type SetStateAction } from 'react'
+import { CircleHelp, LoaderCircle, Download, FolderOpen, ListChecks, Plus, Upload } from 'lucide-react'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import { PanelFields, SelectField } from './fields'
@@ -80,7 +80,22 @@ function NewProjectDialog({onClose,onNew,exportProject,project}: Pick<Props, 'on
 }
 
 function ReplaceProjectDialog({onClose,onReplace,exportProject,project,replacementName,replacementReady,replacementLoading,replacementError}: Pick<Props, 'onClose' | 'onReplace' | 'exportProject' | 'project' | 'replacementName' | 'replacementReady' | 'replacementLoading' | 'replacementError'>) {
-  return <><DialogTitle>Replace current project?</DialogTitle><DialogDescription>This will replace “{project.name}” with “{replacementName}”, including its saved copy in this browser. Export your current project first to keep a separate copy. You can undo this change until you reload or close the app.</DialogDescription><Button variant="outline" onClick={exportProject}><Download size={17}/>Export current project</Button>{replacementLoading&&<p role="status" className="dialog-note">Preparing example…</p>}{replacementError&&<p role="alert" className="error-message">{replacementError}</p>}<div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={!replacementReady} onClick={onReplace}>Replace project</Button></div></>
+  const [opening,setOpening]=useState(false)
+  useEffect(()=>{
+    if(!opening)return
+    let secondFrame=0,task=0
+    // Give the busy state a painted frame before the synchronous project commit.
+    const firstFrame=requestAnimationFrame(()=>{
+      secondFrame=requestAnimationFrame(()=>{
+        task=window.setTimeout(()=>{try {onReplace()} finally {setOpening(false)}},0)
+      })
+    })
+    return ()=>{cancelAnimationFrame(firstFrame);cancelAnimationFrame(secondFrame);clearTimeout(task)}
+  },[opening,onReplace])
+  return <><DialogTitle>Replace current project?</DialogTitle><DialogDescription>This will replace “{project.name}” with “{replacementName}”, including its saved copy in this browser. Export your current project first to keep a separate copy. You can undo this change until you reload or close the app.</DialogDescription><Button variant="outline" disabled={opening} onClick={exportProject}><Download size={17}/>Export current project</Button>
+    {(replacementLoading||opening)&&<div role="status" className="project-loading-status"><LoaderCircle aria-hidden="true"/><div><strong>{opening?`Opening ${replacementName}…`:'Preparing example…'}</strong><p>{opening?'Loading the model into your workspace. Large builds may take a moment.':`Preparing ${replacementName}. Your current project is unchanged.`}</p></div></div>}
+    {replacementError&&<p role="alert" className="error-message">{replacementError}</p>}
+    <div className="dialog-footer"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={!replacementReady||opening} aria-busy={opening} onClick={()=>setOpening(true)}>{opening?'Opening…':'Replace project'}</Button></div></>
 }
 
 function RotateDialog({onClose,onRotate,project}: Pick<Props, 'onClose' | 'onRotate' | 'project'>) {
