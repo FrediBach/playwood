@@ -25,6 +25,15 @@ export type ResizeTarget =
   | { readonly kind: 'panel-edge'; readonly edge: Readonly<PanelEdgeResize>; readonly local: boolean }
   | { readonly kind: 'panel-edges'; readonly edges: readonly Readonly<PanelEdgeResize>[]; readonly refitOutlinePanelIds: readonly string[] }
 
+/** Specialized caller placement after full materialization. World projects and
+ * evaluated assembly-source geometry have intentionally different frames. */
+export interface ResizePlacementIntent {
+  readonly source: Project
+  readonly frame: 'world' | 'assembly-local'
+  readonly references: readonly ('center' | 'min' | 'authored')[]
+  readonly bounds: { readonly min: readonly number[]; readonly max: readonly number[] }
+}
+
 /** Transient request. Source identity is borrowed from immutable project history. */
 export interface ResizeIntent {
   readonly source: Project

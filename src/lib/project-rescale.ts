@@ -1,10 +1,11 @@
-import { getProjectBounds, moveProject, parseProject, resolvePanels, validateProject } from './model'
+import { parseProject, validateProject } from './model'
+import { createResizePlacementIntent, finishResizePlacement } from './resize-placement'
 import { resizePanelDimensions } from './structure-edit'
 import { rescaleAssemblies } from './assembly-rescale'
 import { getAssemblyParameterRange } from './assembly-parameters'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { getNiceValueStep, parseNiceValues, roundNiceValue } from './nice-values'
-import type { AssemblyParameter, NiceValuesSettings, Panel, Project, Vec3 } from './types'
+import type { AssemblyParameter, NiceValuesSettings, Panel, Project } from './types'
 
 export type RescaleValueKind = 'dimension' | 'thickness' | 'cornerRadius' | 'holeSize' | 'holeSpacing'
 export interface RescaleValue {
@@ -135,6 +136,7 @@ export function rescaleProject(project: Project, changes: Record<string, number>
     ? { ...next, niceValues: nextSettings } : next
   if (!replacements.size) return withSettings(project)
 
+  const placement = createResizePlacementIntent(project, 'world')
   const resize = (source: Project, parameters: readonly AssemblyParameter[] = [], trofastWorld = true): Project => {
     const dimensions: Record<string, Partial<Pick<Panel, 'width' | 'height' | 'thickness'>>> = Object.create(null)
     const details = new Map<string, Partial<Panel>>()
@@ -184,17 +186,7 @@ export function rescaleProject(project: Project, changes: Record<string, number>
     if (message) throw new Error(message, { cause: error })
     throw error
   }
-  const before = getProjectBounds(resolvePanels(project)), after = getProjectBounds(resolvePanels(next))
-  const shift: Vec3 = [(before.min[0] + before.max[0] - after.min[0] - after.max[0]) / 2,
-    before.min[1] - after.min[1], (before.min[2] + before.max[2] - after.min[2] - after.max[2]) / 2]
-  // Default grounding is only an editing preference. An explicit elevation
-  // already solved above owns vertical placement, including its chosen surface.
-  for (const rule of project.constraints ?? []) {
-    if (!rule.enabled) continue
-    if (rule.kind === 'floor') shift[1] = 0
-    if (rule.kind === 'position') shift[['x', 'y', 'z'].indexOf(rule.axis)] = 0
-  }
-  if (shift.some(value => Math.abs(value) > EPSILON)) next = moveProject(next, shift)
+  next = finishResizePlacement(project, next, placement)
   const previousIssues = new Set(validateProject(project).map(issue => issue.id))
   const issue = validateProject(next).find(item => !previousIssues.has(item.id)
     && (item.severity === 'error' || item.id.startsWith('collision-')))

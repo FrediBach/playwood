@@ -7,6 +7,9 @@ import { getProjectBounds, parseProject, validateProject } from '../src/lib/mode
 import type { Project } from '../src/lib/types'
 
 async function exportedProject(page: Page): Promise<Project> {
+  // Mobile drawers block toolbar actions until explicitly closed.
+  const inspector = page.getByRole('dialog', { name: 'Inspector', exact: true })
+  if (await inspector.isVisible()) await inspector.getByRole('button', { name: 'Collapse inspector', exact: true }).click()
   await page.getByRole('button', { name: 'Export project', exact: true }).click()
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: /Project file All panels/ }).click()
@@ -190,7 +193,7 @@ for (const width of [1440, 390]) test(`coordinated values resize a closed loop a
   if (width < 680) await page.getByRole('button', { name: 'Collapse panel list', exact: true }).click()
   const open = page.getByRole('button', { name: 'Edit coordinated values', exact: true })
   await open.click()
-  const dialog = page.getByRole('dialog')
+  const dialog = page.getByRole('dialog', { name: /^(Edit|Review) coordinated values$/ })
   const fields = dialog.locator('input[type="number"]')
   await expect(fields).toHaveCount(4)
   await fields.first().fill('500')
@@ -207,6 +210,7 @@ for (const width of [1440, 390]) test(`coordinated values resize a closed loop a
   await page.screenshot({ path: test.info().outputPath('coordinated-values.png') })
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   expect(await exportedProject(page)).toEqual(original)
+  if (width < 680) await page.getByRole('button', { name: 'Open inspector', exact: true }).click()
   await open.click()
   for (let index = 0; index < 4; index++) { await fields.nth(index).fill('500'); await fields.nth(index).press('Enter') }
   await page.getByLabel('Fixed reference instance', { exact: true }).selectOption(project.assemblies!.instances[2].id)
