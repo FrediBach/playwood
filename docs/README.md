@@ -13,6 +13,7 @@ These documents describe the implementation in this repository. Source links poi
 | [State and persistence](state-and-persistence.md) | Project history, preview transactions, selection, storage, project and assembly files, and compatibility |
 | [Rendering and interaction](rendering-and-interaction.md) | Scene composition, mesh ownership, materials, cameras, input, workers, and realistic preview |
 | [Development and verification](development.md) | Setup, actual package scripts, focused tests, browser checks, change recipes, and deployment assets |
+| [Focused quality assessment](quality-assessment.md) | Dated code and UX findings, evidence, priorities, and proposed regression coverage |
 
 ## Where to start for a change
 

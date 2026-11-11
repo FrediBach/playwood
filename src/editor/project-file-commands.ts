@@ -20,6 +20,8 @@ interface CreateProjectFileCommandsOptions {
   selectedIds: string[]
   clipboard: ReturnType<typeof useCopyPaste>
   project: Project
+  getSnapshot: ReturnType<typeof useProject>['getSnapshot']
+  importRequest: {current:number}
   commit: ReturnType<typeof useProject>['commit']
   assembly: ReturnType<typeof useAssemblyEditor>
   setSelectedIds: (next: SetStateAction<string[]>) => void
@@ -44,7 +46,7 @@ interface CreateProjectFileCommandsOptions {
 }
 
 export function createProjectFileCommands({
-  inspectingConnectors, selectedIds, clipboard, project,
+  inspectingConnectors, selectedIds, clipboard, project, getSnapshot, importRequest,
   commit, assembly, setSelectedIds, setInspectorTab,
   setRightOpen, setExploded, setRealisticPreview, setFitSignal,
   notify, setAssemblyImportError, setPendingTemplate, dialog,
@@ -82,12 +84,17 @@ export function createProjectFileCommands({
     } catch(error) { notify(error instanceof Error? error.message:'Could not export assembly.')}
   }
   const importAssembly=async (file: File) => {
+    const request=++importRequest.current
+    const source=getSnapshot()
     try {
       if(file.size>2000000) throw new Error('Choose an assembly file smaller than 2 MB.')
-      const definition=parseAssemblyFile(JSON.parse(await file.text()))
+      const text=await file.text()
+      if(request!==importRequest.current)return
+      assertImportSource(source)
+      const definition=parseAssemblyFile(JSON.parse(text))
       setAssemblyImportError('')
       insertModuleDefinition(definition)
-    } catch(error) { setAssemblyImportError(error instanceof Error? error.message:'This assembly file could not be read.')}
+    } catch(error) { if(request!==importRequest.current)return; setAssemblyImportError(error instanceof Error? error.message:'This assembly file could not be read.')}
   }
   const insertSavedAssembly=(id: string) => {
     if(inspectingConnectors||!selectedIds.length) { clipboard.cancel(); assembly.insert(id); return}
@@ -125,7 +132,28 @@ export function createProjectFileCommands({
     setSelectedIds(first? Object.values(first.panelIds):next.panels.slice(0,1).map(panel => panel.id))
     setInspectorTab('panel'); setExploded(false); setRealisticPreview(false); setFitSignal(v => v+1); setImportError(''); setDialog(null); setPendingTemplate(null)
   }
-  const importProject=async (file: File) => { try { if(file.size>2000000) throw new Error('Choose a project file smaller than 2 MB.'); const imported=parseProject(JSON.parse(await file.text())); const shelf=(imported.constraints?.length||imported.spaceConstraint?.enabled)? imported:repairLegacyShelf(imported); const repaired=(imported.constraints?.length||imported.spaceConstraint?.enabled)? shelf:repairLegacyExampleInserts(shelf); openProject(repaired); notify(repaired===imported? 'Project imported':repaired!==shelf? 'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')}  catch(e) { setImportError(e instanceof Error? e.message:'This project file could not be read.'); setDialog('export'); setPendingTemplate(null)}  }
+  const assertImportSource=(source:ReturnType<typeof getSnapshot>) => {
+    const current=getSnapshot()
+    if(current.project!==source.project||current.documentId!==source.documentId) throw new Error('The project changed while the file was being read. Choose the file again to import it.')
+  }
+  const importProject=async (file: File) => {
+    const request=++importRequest.current
+    const source=getSnapshot()
+    try {
+      if(file.size>2000000) throw new Error('Choose a project file smaller than 2 MB.')
+      const text=await file.text()
+      if(request!==importRequest.current)return
+      assertImportSource(source)
+      const imported=parseProject(JSON.parse(text))
+      const shelf=(imported.constraints?.length||imported.spaceConstraint?.enabled)? imported:repairLegacyShelf(imported)
+      const repaired=(imported.constraints?.length||imported.spaceConstraint?.enabled)? shelf:repairLegacyExampleInserts(shelf)
+      openProject(repaired)
+      notify(repaired===imported? 'Project imported':repaired!==shelf? 'Project imported · library inserts fitted':'Project imported · middle shelf joints corrected')
+    } catch(e) {
+      if(request!==importRequest.current)return
+      setImportError(e instanceof Error? e.message:'This project file could not be read.'); setDialog('export'); setPendingTemplate(null)
+    }
+  }
   return { loadTemplate,insertModule,insertModuleDefinition,insertSavedAssembly,exportAssembly,startNewProject,closeProjectDialog,applyTemplate,exportName,exportProject,importProject,openProject,importAssembly }
 }
 
