@@ -19,37 +19,42 @@
 .room-preview .workspace-top{top:27px;left:32px;right:28px}
 
 .room-preview .workspace-options{padding:5px;background:#fbfaf7dc;border-radius:7px}
-.room-details{position:absolute;left:20px;bottom:0;z-index:2;pointer-events:auto;max-width:360px;padding:19px 21px;background:#fbfaf7ed;border:1px solid #ffffff9c;border-radius:9px;backdrop-filter:blur(14px);box-shadow:0 8px 32px #493e2710}
+.room-details{position:absolute;left:20px;bottom:0;z-index:2;pointer-events:auto;width:min(330px,calc(100% - 40px));padding:19px 21px;background:#fbfaf7ed;border:1px solid #ffffff9c;border-radius:9px;backdrop-filter:blur(14px);box-shadow:0 8px 32px #493e2710}
 .room-eyebrow{display:flex;align-items:center;gap:7px;color:#737464;font-size:10px;font-weight:650;letter-spacing:1.35px}
 .room-details h2{font-size:18px;font-weight:500;letter-spacing:-.4px;margin:11px 0 10px}
 .room-details p{font-size:12px;line-height:1.6;color:#666b5e}
-.room-details .room-dimensions{font-size:14px;color:#353b30;font-variant-numeric:tabular-nums}
+.room-details .room-dimensions{margin-top:10px;font-size:18px;font-weight:500;letter-spacing:-.3px;line-height:1.3;color:#2f3529;font-variant-numeric:tabular-nums}
+.room-details .room-dimensions span{font-size:11px;font-weight:400;letter-spacing:0;color:#6b7162}
 .room-dimensions span{font-size:10px;color:#767b6d;white-space:nowrap}
-.room-details .room-scale-note{margin-top:11px;padding-top:10px;border-top:1px solid #deded3;font-size:11px}
-.room-furnishing-control{margin-top:11px;padding-top:10px;border-top:1px solid #deded3}
-.room-furnishing-control label{display:flex;align-items:center;gap:8px;min-height:28px;font-size:12px;font-weight:550;color:#353b30;cursor:pointer}
-.room-furnishing-control input{width:16px;height:16px;accent-color:#47553d;cursor:pointer;flex-shrink:0}
-.room-furnishing-control input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.room-furnishing-control label span{margin-left:auto;font-size:10px;font-weight:400;color:#6b7162}
-.room-details .room-furnishing-control p{margin-top:4px;font-size:11px;line-height:1.45}
-.room-details .room-furnishing-status{color:#47553d}
-.room-furnishing-options{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:7px}
-.room-furnishing-density{display:inline-flex;border:1px solid #d6d6ca;border-radius:6px;overflow:hidden;background:#fff}
-.room-furnishing-density button,.room-furnishing-actions button{font:inherit;font-size:11px;line-height:1;min-height:26px;padding:0 9px;color:#4c5941;background:transparent;border:0;cursor:pointer}
-.room-furnishing-density button+button{border-left:1px solid #e2e2d8}
-.room-furnishing-density button[aria-checked=true]{background:#47553d;color:#fff}
-.room-furnishing-control .room-furnishing-theme{min-height:26px;gap:6px;font-size:11px;font-weight:500;color:#5c6452}
-.room-furnishing-theme select{font:inherit;font-size:11px;min-height:26px;padding:0 6px;border:1px solid #d6d6ca;border-radius:6px;background:#fff;color:#353b30;cursor:pointer}
-.room-furnishing-actions{display:flex;gap:6px}
-.room-furnishing-actions button{display:inline-flex;align-items:center;gap:5px;border:1px solid #d6d6ca;border-radius:6px;background:#fff;color:#353b30}
-.room-furnishing-density button:focus-visible,.room-furnishing-actions button:focus-visible,.room-furnishing-theme select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.room-details .room-scale-note{margin-top:2px;font-size:11px}
+.room-furnishing-control{margin-top:12px;padding-top:11px;border-top:1px solid #deded3}
+.room-furnishing-header{display:flex;align-items:center;gap:8px;min-height:28px}
+.room-furnishing-switch{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:550;color:#353b30;cursor:pointer}
+.room-furnishing-switch input{appearance:none;position:relative;width:28px;height:16px;margin:0;border-radius:999px;background:#cfcfc4;cursor:pointer;flex-shrink:0;transition:background .15s}
+.room-furnishing-switch input:before{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0003;transition:transform .15s}
+.room-furnishing-switch input:checked{background:#47553d}
+.room-furnishing-switch input:checked:before{transform:translateX(12px)}
+.room-furnishing-switch input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.room-furnishing-actions{display:flex;gap:2px;margin-left:auto}
+.room-furnishing-actions .room-furnishing-icon{width:28px;height:28px;color:#4c5941}
+.room-furnishing-options{display:flex;align-items:center;gap:6px;margin-top:8px}
+.room-furnishing-density{display:flex;flex:1;min-width:0;padding:2px;border-radius:7px;background:#ecebe3}
+.room-furnishing-density button{flex:1;min-width:0;font-size:11px;line-height:1;height:24px;padding:0 6px;border-radius:5px;color:#5c6452;background:transparent;white-space:nowrap}
+.room-furnishing-density button:hover{color:#353b30}
+.room-furnishing-density button[aria-checked=true]{background:#fff;color:#2f3529;font-weight:550;box-shadow:0 1px 2px #2b30241f}
+.room-furnishing-theme{position:relative;flex-shrink:0}
+.room-furnishing-theme select{appearance:none;font-size:11px;height:28px;padding:0 24px 0 9px;border:0;border-radius:7px;background:#ecebe3;color:#353b30;cursor:pointer}
+.room-furnishing-theme select:hover{background:#e3e2d8}
+.room-furnishing-theme svg{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;color:#5c6452}
+.room-furnishing-density button:focus-visible,.room-furnishing-theme select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.room-details .room-furnishing-status{margin-top:7px;font-size:11px;line-height:1.45;color:#47553d}
 
 @media(max-width:680px){
   .preview-mode-switch button{font-size:11px;padding:8px 10px}
   .app-shell.room-preview{grid-template-columns:minmax(0,1fr)}.room-preview .workspace{grid-column:1}
   .room-preview .workspace-top{left:18px;right:18px;top:20px}
   .room-details{position:static;align-self:center;width:calc(100% - 12px);max-width:none;padding:12px 15px}
-  .room-details h2{font-size:16px;margin:7px 0 4px}.room-details .room-scale-note{margin-top:7px;padding-top:6px}.room-details .room-dimensions{font-size:13px}
+  .room-details h2{font-size:16px;margin:7px 0 4px}.room-details .room-scale-note{margin-top:7px;padding-top:6px}.room-details .room-dimensions{margin-top:0;font-size:15px}
   .room-details .room-eyebrow,.room-details h2{display:none}
   .room-details .room-scale-note{margin-top:4px;padding-top:0;border-top:0;font-size:10px}
   .room-furnishing-control{margin-top:7px;padding-top:6px}

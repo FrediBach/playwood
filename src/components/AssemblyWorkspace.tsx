@@ -6,7 +6,7 @@ import { furnishingOptions,resetPreviewFurnishing,shufflePreviewFurnishing,updat
 import { RepeatPreview } from '@/lib/preview-resize'
 import type { SnapSettings } from '@/lib/preview-snap'
 import type { CameraView,Connection,Panel,Side,Vec3 } from '@/lib/types'
-import { ArrowDownToLine,Box,Grid2X2,House,Move,PanelLeftOpen,Plus,RotateCcw,RotateCw,Ruler,Scaling,Shuffle,SlidersHorizontal,Sun } from 'lucide-react'
+import { ArrowDownToLine,Box,ChevronDown,Grid2X2,House,Move,PanelLeftOpen,Plus,RotateCcw,RotateCw,Ruler,Scaling,Shuffle,SlidersHorizontal,Sun } from 'lucide-react'
 import { useMemo,useState,type Dispatch,type SetStateAction } from 'react'
 import { AttachmentSideGuideState } from './AttachmentSideGuide'
 import { ConstructionLayerProps } from './ConstructionObjectLayer'
@@ -230,40 +230,44 @@ function getWorkspaceNotice(boxSelectActive: boolean|undefined,dragging: boolean
 const NO_FURNISHINGS: FurnishingPlacement[] = []
 
 function RoomDetails({ hasVisiblePanels, visibleBounds, furnishing, plan }: { hasVisiblePanels: boolean; visibleBounds: { width: number; height: number; depth: number; min: Vec3; max: Vec3 }; furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null })  {
+  const chosen = Object.keys(furnishing.roles).length
+  const customised = furnishing.seed !== 0 || chosen > 0 || furnishing.density !== 'balanced' || furnishing.theme !== 'auto'
   return <div className="room-details" aria-label="Room scale reference">
     <span className="room-eyebrow"><Sun size={14} />THE DAYLIGHT ROOM</span>
-    <h2>{hasVisiblePanels? 'Your design, in proportion.':'A room for your next idea.'}</h2>
-    {hasVisiblePanels? <p className="room-dimensions">{number(visibleBounds.width)} × {number(visibleBounds.height)} × {number(visibleBounds.depth)} <span>mm · W × H × D</span></p>:<p>Add or show a panel in Studio to see it here.</p>}
-    <p className="room-scale-note">Life-size setting · banana 22 cm long · floor lamp 165 cm tall</p>
+    {hasVisiblePanels
+      ? <p className="room-dimensions">{number(visibleBounds.width)} × {number(visibleBounds.height)} × {number(visibleBounds.depth)} <span>mm · W × H × D</span></p>
+      : <><h2>A room for your next idea.</h2><p>Add or show a panel in Studio to see it here.</p></>}
+    <p className="room-scale-note">Life-size · banana 22 cm · floor lamp 165 cm tall</p>
     <div className="room-furnishing-control">
-      <label><input type="checkbox" checked={furnishing.enabled} onChange={event => updatePreviewFurnishing({ enabled: event.target.checked })} aria-label="Auto furnish" aria-describedby="room-furnishing-note" />Auto furnish<span>Preview only</span></label>
-      <p id="room-furnishing-note">Books, decor, table settings and people, chosen by what each surface is for. May slow large previews.</p>
-      {furnishing.enabled&&<FurnishingOptionsControls furnishing={furnishing} plan={plan}/>}
+      <div className="room-furnishing-header">
+        <label className="room-furnishing-switch"><input type="checkbox" checked={furnishing.enabled} onChange={event => updatePreviewFurnishing({ enabled: event.target.checked })} aria-label="Auto furnish" aria-describedby="room-furnishing-note" />Auto furnish</label>
+        <span id="room-furnishing-note" className="visually-hidden">Preview only. Adds books, decor, table settings and people chosen by what each surface is for; never saved or exported as parts. May slow large previews.</span>
+        {furnishing.enabled&&<div className="room-furnishing-actions">
+          {customised&&<IconButton label="Reset" tooltipLabel="Reset arrangement" className="room-furnishing-icon" onClick={resetPreviewFurnishing}><RotateCcw size={14}/></IconButton>}
+          <IconButton label="Shuffle" tooltipLabel="Shuffle arrangement" className="room-furnishing-icon" onClick={shufflePreviewFurnishing}><Shuffle size={14}/></IconButton>
+        </div>}
+      </div>
+      {furnishing.enabled&&<FurnishingOptionsControls furnishing={furnishing} plan={plan} chosen={chosen}/>}
     </div>
   </div>
 }
 
-function FurnishingOptionsControls({ furnishing, plan }: { furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null }) {
+function FurnishingOptionsControls({ furnishing, plan, chosen }: { furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null; chosen: number }) {
   const furnished = plan?.surfaces.flatMap(surface => surface.furnished && surface.role ? [surface.role] : []) ?? []
-  const chosen = Object.keys(furnishing.roles).length
-  const customised = furnishing.seed !== 0 || chosen > 0 || furnishing.density !== 'balanced' || furnishing.theme !== 'auto'
   return <>
     <div className="room-furnishing-options">
       <div className="room-furnishing-density" role="radiogroup" aria-label="Furnishing density">
         {FURNISHING_DENSITIES.map(option => <button key={option.id} type="button" role="radio" aria-checked={furnishing.density===option.id}
           onClick={() => updatePreviewFurnishing({ density: option.id as FurnishingDensity })}>{option.label}</button>)}
       </div>
-      <label className="room-furnishing-theme">Style
+      <span className="room-furnishing-theme">
         <select value={furnishing.theme} onChange={event => updatePreviewFurnishing({ theme: event.target.value as FurnishingTheme })} aria-label="Furnishing style">
           {FURNISHING_THEMES.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
         </select>
-      </label>
-      <div className="room-furnishing-actions">
-        <button type="button" onClick={shufflePreviewFurnishing}><Shuffle size={13} aria-hidden="true"/>Shuffle</button>
-        {customised&&<button type="button" onClick={resetPreviewFurnishing}><RotateCcw size={13} aria-hidden="true"/>Reset</button>}
-      </div>
+        <ChevronDown size={13} aria-hidden="true"/>
+      </span>
     </div>
-    <p className="room-furnishing-status" role="status">{furnished.length? `Furnished: ${summarizeFurnishedRoles(furnished)}`:'No furnishings placed.'}{chosen? ` · ${chosen} ${chosen===1? 'surface':'surfaces'} set by you`:''}</p>
+    <p className="room-furnishing-status" role="status">{furnished.length? summarizeFurnishedRoles(furnished):'No furnishings placed.'}{chosen? ` · ${chosen} set by you`:''}</p>
   </>
 }
 

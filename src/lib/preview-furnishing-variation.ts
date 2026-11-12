@@ -17,7 +17,7 @@ export const FURNISHING_DENSITIES: readonly { id: FurnishingDensity; label: stri
 ]
 
 export const FURNISHING_THEMES: readonly { id: FurnishingTheme; label: string }[] = [
-  { id: 'auto', label: 'Automatic' },
+  { id: 'auto', label: 'Auto style' },
   { id: 'living', label: 'Living room' },
   { id: 'office', label: 'Office' },
   { id: 'kids', label: 'Kids' },
