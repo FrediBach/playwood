@@ -35,6 +35,8 @@ export async function exportSceneGlb(scene: Scene): Promise<ArrayBuffer> {
   }
   try {
     copy.traverse(object => {
+      // Preview-only shader effects, such as sunbeams, have no glTF equivalent.
+      if (object.userData.previewOnly) object.visible = false
       if (object instanceof Mesh) object.material = Array.isArray(object.material) ? object.material.map(materialFor) : materialFor(object.material)
       // glTF stores light direction as node rotation rather than a Three.js target.
       if (object instanceof DirectionalLight || object instanceof SpotLight) {

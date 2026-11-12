@@ -7,7 +7,9 @@ import { furnishingOptions,resetPreviewFurnishing,shufflePreviewFurnishing,updat
 import { RepeatPreview } from '@/lib/preview-resize'
 import type { SnapSettings } from '@/lib/preview-snap'
 import type { CameraView,Connection,Panel,Side,Vec3 } from '@/lib/types'
-import { ArrowDownToLine,Box,ChevronDown,Grid2X2,House,Move,PanelLeftOpen,Plus,RotateCcw,RotateCw,Ruler,Scaling,Shuffle,SlidersHorizontal,Sun } from 'lucide-react'
+import { ArrowDownToLine,Box,ChevronDown,Grid2X2,House,Move,PanelLeftOpen,Plus,RotateCcw,RotateCw,Ruler,Scaling,Shuffle,SlidersHorizontal,Sun,Moon,Cloud } from 'lucide-react'
+import { LIGHT_MOOD_LABELS, roomLighting } from '@/lib/room-lighting'
+import type { RoomStyleInput } from '@/lib/room-floor-style'
 import { useMemo,useState,type Dispatch,type SetStateAction } from 'react'
 import { AttachmentSideGuideState } from './AttachmentSideGuide'
 import { ConstructionLayerProps } from './ConstructionObjectLayer'
@@ -194,7 +196,7 @@ export function AssemblyWorkspace({
     status={connect?.gesture.active ? connect.panelIds.length ? undefined : <><span>Connect · drag between panels or click twice</span><kbd>Esc</kbd> Exit</> : movementStatus}
     notice={connect?.gesture.active ? undefined : notice}
     showTransformShortcuts={showTransformShortcuts(boxSelectActive,panelSelectionActive,selectedIds,movementEnabled,editingAssembly,dragging,resizing)}
-    roomDetails={realisticPreview&&<RoomDetails hasVisiblePanels={hasVisiblePanels} visibleBounds={visibleBounds} furnishing={furnishing} plan={furnishingPlan}/>}/>
+    roomDetails={realisticPreview&&<RoomDetails hasVisiblePanels={hasVisiblePanels} visibleBounds={visibleBounds} furnishing={furnishing} plan={furnishingPlan} roomStyle={roomStyle}/>}/>
       {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}
       {attachmentChooser}
     </main>
@@ -232,10 +234,12 @@ function getWorkspaceNotice(boxSelectActive: boolean|undefined,dragging: boolean
 
 const NO_FURNISHINGS: FurnishingPlacement[] = []
 
-function RoomDetails({ hasVisiblePanels, visibleBounds, furnishing, plan }: { hasVisiblePanels: boolean; visibleBounds: { width: number; height: number; depth: number; min: Vec3; max: Vec3 }; furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null })  {
+function RoomDetails({ hasVisiblePanels, visibleBounds, furnishing, plan, roomStyle }: { hasVisiblePanels: boolean; visibleBounds: { width: number; height: number; depth: number; min: Vec3; max: Vec3 }; furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null; roomStyle: RoomStyleInput })  {
+  const mood = useMemo(() => roomLighting(roomStyle).mood, [roomStyle])
+  const MoodIcon = mood === 'evening' ? Moon : mood === 'overcast' ? Cloud : Sun
   const customised = furnishing.seed !== 0 || furnishing.density !== 'balanced' || furnishing.theme !== 'auto'
   return <div className="room-details" aria-label="Room scale reference">
-    <span className="room-eyebrow"><Sun size={14} />THE DAYLIGHT ROOM</span>
+    <span className="room-eyebrow" data-room-light={mood}><MoodIcon size={14} />{LIGHT_MOOD_LABELS[mood].toUpperCase()}</span>
     {hasVisiblePanels
       ? <p className="room-dimensions">{number(visibleBounds.width)} × {number(visibleBounds.height)} × {number(visibleBounds.depth)} <span>mm · W × H × D</span></p>
       : <><h2>A room for your next idea.</h2><p>Add or show a panel in Studio to see it here.</p></>}

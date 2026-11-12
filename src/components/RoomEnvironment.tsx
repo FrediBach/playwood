@@ -11,6 +11,8 @@ import type { FurnishingPlacement } from '@/lib/preview-furnishings'
 import { RoomWallArt } from './RoomWallArt'
 import { RoomWalls } from './RoomWalls'
 import { lowerWallTop, roomWallStyle } from '@/lib/room-wall-style'
+import { roomLighting } from '@/lib/room-lighting'
+import { RoomLights } from './RoomLighting'
 
 RectAreaLightUniformsLib.init()
 
@@ -34,16 +36,6 @@ function LoungeChair({ position }: { position: Triple }) {
     <Box position={[0, 0.635, -0.195]} size={[0.58, 0.35, 0.095]} color="#c6b79f" radius={0.045} rotation={[-0.13, 0, 0]} />
     {[-1, 1].map(side => <Box key={side} position={[side * 0.35, 0.5, 0]} size={[0.12, 0.26, 0.74]} color="#b9a88f" radius={0.055} />)}
     <Box position={[0.14, 0.57, -0.05]} size={[0.3, 0.29, 0.105]} color="#62705d" radius={0.045} rotation={[-0.25, -0.15, -0.12]} />
-  </group>
-}
-
-function FloorLamp({ position }: { position: Triple }) {
-  return <group position={position} name="Floor lamp, 165 cm high">
-    <mesh position={[0, 0.018, 0]} castShadow receiveShadow><cylinderGeometry args={[0.18, 0.19, 0.036, 48]} /><meshStandardMaterial color="#343834" roughness={0.65} /></mesh>
-    <mesh position={[0, 0.738, 0]} castShadow><cylinderGeometry args={[0.012, 0.012, 1.44, 16]} /><meshStandardMaterial color="#43473e" roughness={0.5} metalness={0.25} /></mesh>
-    <mesh position={[0, 1.4, 0]} castShadow><sphereGeometry args={[0.25, 40, 24, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#ece4cf" roughness={0.66} side={THREE.DoubleSide} /></mesh>
-    <mesh position={[0, 1.4, 0]}><cylinderGeometry args={[0.246, 0.246, 0.012, 40]} /><meshStandardMaterial color="#fff3d4" emissive="#ffd891" emissiveIntensity={0.4} roughness={0.9} /></mesh>
-    <pointLight position={[0, 1.37, 0]} color="#ffdcb2" intensity={0.7} distance={2.5} decay={2} />
   </group>
 }
 
@@ -136,29 +128,23 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
     creation: { minX, maxX },
     obstacles: wallObstacles({ bounds: { min: { x: minX }, max: { x: maxX, y: maxY } }, floorY, chairX, plantX, furnishings }),
   }), [seed, theme, density, chairX, plantX, leftX, rightX, height, dado, minX, maxX, maxY, floorY, furnishings])
-  const lightTarget = useMemo(() => new THREE.Object3D(), [])
+  const lighting = useMemo(() => roomLighting({ seed, theme }), [seed, theme])
   const furnitureCenterZ = 0
-  useEffect(() => { lightTarget.position.set(layout.centerX, floorY + 0.55, furnitureCenterZ) }, [lightTarget, layout.centerX, floorY, furnitureCenterZ])
   const windowZ = backZ + 2.1
   const windowWidth = 2.4
   const windowHeight = 2.25
   const windowBottom = 0.35
   const windowOpening = useMemo(() => ({ z: windowZ, width: windowWidth, height: windowHeight, bottom: windowBottom }), [windowZ])
+  const lampPosition = useMemo<Triple>(() => [chairX + 0.63, floorY, chairZ - 0.34], [chairX, floorY, chairZ])
   return <group name="Modern home">
-    <ambientLight intensity={0.28} color="#fff5e4" />
-    <hemisphereLight args={['#edf3ff', '#b69c7a', 0.85]} />
-    <primitive object={lightTarget} />
-    <directionalLight position={[leftX + 0.5, floorY + 5.5, backZ + 4]} target={lightTarget} color="#fff1d8" intensity={2.8} castShadow
-      shadow-mapSize={[2048, 2048]} shadow-bias={-0.00015} shadow-normalBias={0.002} shadow-radius={4}
-      shadow-camera-left={-width} shadow-camera-right={width} shadow-camera-top={height + 2} shadow-camera-bottom={-height - 2} shadow-camera-near={0.1} shadow-camera-far={Math.max(30, width * 3)} />
-    <rectAreaLight position={[leftX + 0.15, floorY + 1.7, windowZ]} rotation={[0, -Math.PI / 2, 0]} width={windowWidth} height={windowHeight} color="#f4f7ff" intensity={3} />
-    <directionalLight position={[rightX, floorY + 3, backZ + 4]} target={lightTarget} color="#fff7e9" intensity={0.4} />
+    <RoomLights lighting={lighting} theme={theme} bounds={bounds} floorY={floorY} leftX={leftX} width={width} height={height}
+      window={windowOpening} lampPosition={lampPosition} sheer={walls.curtain.sheer} />
 
     <ParquetFloor style={style} position={[centerX, floorY - 0.006, centerZ]} width={width} depth={depth} />
     {/* A single-sided ceiling fills the upper view from inside the room while
         allowing an elevated orbit to see through it. It does not block daylight. */}
     <mesh position={[centerX, floorY + height, centerZ]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
-      <planeGeometry args={[width, depth]} /><meshStandardMaterial color="#edeae3" emissive="#edeae3" emissiveIntensity={0.65} roughness={1} />
+      <planeGeometry args={[width, depth]} /><meshStandardMaterial color="#edeae3" emissive="#edeae3" emissiveIntensity={lighting.ceiling} roughness={1} />
     </mesh>
     <Box position={[centerX, floorY + height / 2, backZ - 0.09]} size={[width, height, 0.18]} color="#e5e1d7" />
 
@@ -168,7 +154,7 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
     <Box position={[leftX - 0.09, floorY + (windowBottom + windowHeight / 2), (backZ + windowZ - windowWidth / 2) / 2]} size={[0.18, windowHeight, windowZ - windowWidth / 2 - backZ]} color="#e9e5dc" />
     <Box position={[leftX - 0.09, floorY + (windowBottom + windowHeight / 2), (windowZ + windowWidth / 2 + backZ + depth) / 2]} size={[0.18, windowHeight, backZ + depth - windowZ - windowWidth / 2]} color="#e9e5dc" />
     <mesh position={[leftX - 0.13, floorY + windowBottom + windowHeight / 2, windowZ]} rotation={[0, Math.PI / 2, 0]}>
-      <planeGeometry args={[windowWidth, windowHeight]} /><meshBasicMaterial color="#d9e5e8" />
+      <planeGeometry args={[windowWidth, windowHeight]} /><meshBasicMaterial color={lighting.window.sky} fog={false} />
     </mesh>
     {[windowZ - windowWidth / 2, windowZ, windowZ + windowWidth / 2].map(z => <Box key={z} position={[leftX, floorY + windowBottom + windowHeight / 2, z]} size={[0.055, windowHeight + 0.04, 0.035]} color="#6c716c" />)}
     {[windowBottom, windowBottom + windowHeight].map(y => <Box key={y} position={[leftX, floorY + y, windowZ]} size={[0.055, 0.035, windowWidth + 0.04]} color="#6c716c" />)}
@@ -180,7 +166,6 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
     <RoomWallArt plan={wallArt} wallZ={backZ} floorY={floorY} />
 
     <LoungeChair position={[chairX, floorY, chairZ]} />
-    <FloorLamp position={[chairX + 0.63, floorY, chairZ - 0.34]} />
     <SideTable position={[chairX + 0.68, floorY, chairZ + 0.42]} />
     <Plant position={[plantX, floorY, plantZ]} />
   </group>
