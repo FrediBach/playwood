@@ -33,6 +33,16 @@
 .room-furnishing-control label span{margin-left:auto;font-size:10px;font-weight:400;color:#6b7162}
 .room-details .room-furnishing-control p{margin-top:4px;font-size:11px;line-height:1.45}
 .room-details .room-furnishing-status{color:#47553d}
+.room-furnishing-options{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:7px}
+.room-furnishing-density{display:inline-flex;border:1px solid #d6d6ca;border-radius:6px;overflow:hidden;background:#fff}
+.room-furnishing-density button,.room-furnishing-actions button{font:inherit;font-size:11px;line-height:1;min-height:26px;padding:0 9px;color:#4c5941;background:transparent;border:0;cursor:pointer}
+.room-furnishing-density button+button{border-left:1px solid #e2e2d8}
+.room-furnishing-density button[aria-checked=true]{background:#47553d;color:#fff}
+.room-furnishing-control .room-furnishing-theme{min-height:26px;gap:6px;font-size:11px;font-weight:500;color:#5c6452}
+.room-furnishing-theme select{font:inherit;font-size:11px;min-height:26px;padding:0 6px;border:1px solid #d6d6ca;border-radius:6px;background:#fff;color:#353b30;cursor:pointer}
+.room-furnishing-actions{display:flex;gap:6px}
+.room-furnishing-actions button{display:inline-flex;align-items:center;gap:5px;border:1px solid #d6d6ca;border-radius:6px;background:#fff;color:#353b30}
+.room-furnishing-density button:focus-visible,.room-furnishing-actions button:focus-visible,.room-furnishing-theme select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 @media(max-width:680px){
   .preview-mode-switch button{font-size:11px;padding:8px 10px}

@@ -18,6 +18,8 @@ import { usePreviewResize } from '@/hooks/use-preview-resize'
 import { AssemblyAttachmentTarget } from '@/lib/assemblies'
 import { editConnectors } from '@/lib/connector-selection'
 import { getProjectBounds, resolvePanels } from '@/lib/model'
+import { furnishingNameHints } from '@/lib/preview-furnishings'
+import { useMemo } from 'react'
 import { getNiceValueStep } from '@/lib/nice-values'
 import { SnapSettings } from '@/lib/preview-snap'
 import type { AttachmentOptions,CameraView,Connection,ConstructionObjects,DesignConstraint,Panel,Project,Vec3 } from '@/lib/types'
@@ -127,8 +129,11 @@ export function EditorWorkspace({
   const rescale = usePreviewRescale(project, modalOpen || constraints.editing || drag.active || resize.active || clipboard.active || assembly.placementActive || !!assembly.editingDefinition || inspectorTab === 'attach' || exploded || objectMode || connect.gesture.active || boxSelectActive, commitWithInsertChecks)
   const workspaceParts = getWorkspaceParts({ resize, drag, constraintPreviewProject, clipboard, assembly, project, displayPanels, previewPanels, previewConnections })
   const workspaceInteraction = getWorkspaceInteractionProps({ displayedObjects, objectPreview, objects, objectMode, objectInteractionDisabled, objectGesture, boxSelectActive, snapSettings, chooseObject, realisticPreview, choosePanel, constraints, modalOpen, assembly, panels, inspectorTab, attachmentSideGuide, assemblyCount })
+  const { assemblies, listGroups } = project
+  const furnishingNames = useMemo(() => furnishingNameHints({ assemblies, listGroups }), [assemblies, listGroups])
   return <AssemblyWorkspace
     {...workspaceInteraction}
+    furnishingNames={furnishingNames}
     {...workspaceParts}
     {...(rescale.project ? { panels: resolvePanels(rescale.project), connections: rescale.project.connections, connectorOverrides: rescale.project.connectorOverrides } : {})}
     rescaleSliders={<PreviewRescale control={rescale} step={getNiceValueStep(project.niceValues)}/> }

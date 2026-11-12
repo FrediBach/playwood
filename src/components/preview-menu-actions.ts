@@ -2,6 +2,9 @@ import { previewShortcut, type PreviewCommandLabel } from '@/lib/preview-shortcu
 import { Eye, ArrowDownToLine, ArrowDownToDot, AlignVerticalSpaceAround, Equal, Pin, Ruler, Columns3, AlignStartHorizontal, Ellipsis, Box, Check, Clipboard, Copy, FolderPlus, Grid2X2, Link2, LockKeyhole, Maximize, Pencil, Plus, Rows3, Scan, Scissors, SlidersHorizontal, Square, Unlink, Ungroup, Trash2, type LucideIcon } from 'lucide-react'
 import { differingPanelDimension } from '@/lib/equal-panel-sizes'
 import type { PreviewMenuAction } from './PreviewContextMenu'
+import { Archive, Armchair, Ban, Bed, Coffee, CookingPot, Frame, Lamp, Laptop, Library, Monitor, Sparkles, Tv, UtensilsCrossed } from 'lucide-react'
+import { FURNISHING_ROLE_LABELS, FURNISHING_ROLES, type FurnishingRoleChoice } from '@/lib/preview-furnishing-roles'
+import type { FurnishingMenuState } from '@/editor/use-furnishing-menu'
 import type { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { assemblySelectionError } from '@/lib/assemblies'
 import { panelDistribution } from '@/lib/panel-distribution'
@@ -36,6 +39,8 @@ interface MenuContext {
   constraintSuggestions?: ConstraintSuggestion[]
   /** A constraint form or preview is open; one-click rules would make it stale. */
   constraintsEditing?: boolean
+  /** Realistic preview with Auto furnish: what the selected surfaces are used for. */
+  furnishing?: FurnishingMenuState
   actions: {
     cyclePanelVisibility: () => void
     equalizeSizes?: () => void
@@ -159,6 +164,21 @@ function addPanelActions(context: MenuContext, menuAction: AddAction) {
   if (panels.length>1) menuAction('Build', 'Auto-connect',Link2,addAutoConnectors,false,!canMenuAutoConnect)
 }
 
+const roleIcons: Record<FurnishingRoleChoice, LucideIcon> = {
+  shelf: Library, display: Frame, desk: Monitor, 'standing-desk': Laptop, 'dining-table': UtensilsCrossed, 'coffee-table': Coffee,
+  'side-table': Lamp, counter: CookingPot, sideboard: Archive, lowboard: Tv, bench: Armchair, bed: Bed, empty: Ban,
+}
+
+/** Automatic recognition first, then every role, then leaving the surface empty. */
+function furnishAsActions({ current, detected, choose }: FurnishingMenuState): PreviewMenuAction[] {
+  const automatic = `Automatic · ${detected ? FURNISHING_ROLE_LABELS[detected].label : 'Not furnished'}`
+  return [
+    { id: 'furnish-auto', label: automatic, icon: Sparkles, checked: current === 'auto', run: () => choose('auto') },
+    ...[...FURNISHING_ROLES, 'empty' as const].map(role => ({ id: `furnish-${role}`, label: FURNISHING_ROLE_LABELS[role].label,
+      group: role === 'empty' ? 'Other' : 'Use as', icon: roleIcons[role], checked: current === role, run: () => choose(role) })),
+  ]
+}
+
 export function buildPreviewMenuActions(context: MenuContext): PreviewMenuAction[] {
   const {panels, assembly, selectedIdSet, inspectingConnectors, hasVisiblePanels, actions}=context
   const {selectAll, openConstraints}=actions
@@ -167,6 +187,7 @@ export function buildPreviewMenuActions(context: MenuContext): PreviewMenuAction
   if (inspectingConnectors) addConnectorActions(context, menuAction)
   else if (assembly.editingInstance) addEditingActions(context, menuAction)
   else addPanelActions(context, menuAction)
+  if (context.furnishing) menuActions.push({ id: 'furnish-as', group: 'Preview', label: 'Furnish as', icon: Armchair, run: () => {}, submenu: furnishAsActions(context.furnishing) })
   if (!inspectingConnectors && context.selectedPanels.length) menuAction('Preview', 'Cycle panel visibility',Eye,actions.cyclePanelVisibility)
   if(context.selectedConnectorIds.length&&actions.separateSelectedConnectors&&!assembly.editingInstance&&!context.modalOpen)menuAction('Build', 'Separate overlapping connectors',Rows3,actions.separateSelectedConnectors)
   if (panels.length) menuAction('Preview', 'Select all panels',Scan,()=>selectAll(),false,!inspectingConnectors&&(assembly.editingInstance?Object.values(assembly.editingInstance.panelIds):panels.map(panel=>panel.id)).every(id=>selectedIdSet.has(id)))

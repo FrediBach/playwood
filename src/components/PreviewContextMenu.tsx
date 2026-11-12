@@ -1,7 +1,7 @@
 import { createPreviewShortcutHandler, flattenPreviewMenuActions, shortcutAria, shortcutLabel } from '@/lib/preview-shortcuts'
 import { useState, useEffectEvent, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, type LucideIcon } from 'lucide-react'
+import { Check, ChevronRight, type LucideIcon } from 'lucide-react'
 import './preview-context-menu.css'
 
 export interface PreviewMenuAction {
@@ -16,6 +16,8 @@ export interface PreviewMenuAction {
   disabled?: boolean
   /** Opens a nested menu instead of running; nested items may keep their own shortcuts. */
   submenu?: PreviewMenuAction[]
+  /** Present on one-of-several choices; renders a radio item with its state. */
+  checked?: boolean
 }
 
 function groupActions(actions: readonly PreviewMenuAction[]) {
@@ -38,7 +40,8 @@ function MenuItem({ action, onRun, expanded, onOpen, onHover }: {
   action: PreviewMenuAction; onRun: () => void; expanded?: boolean; onOpen?: () => void; onHover?: () => void
 }) {
   const submenu = !!action.submenu
-  return <button role="menuitem" aria-label={action.label} aria-haspopup={submenu ? 'menu' : undefined} aria-expanded={submenu ? !!expanded : undefined}
+  const choice = action.checked !== undefined
+  return <button role={choice ? 'menuitemradio' : 'menuitem'} aria-checked={choice ? action.checked : undefined} aria-label={action.label} aria-haspopup={submenu ? 'menu' : undefined} aria-expanded={submenu ? !!expanded : undefined}
     aria-keyshortcuts={action.shortcut ? shortcutAria(action.shortcut) : undefined} aria-disabled={action.disabled || undefined}
     className={[action.danger && 'is-destructive', expanded && 'is-expanded'].filter(Boolean).join(' ') || undefined}
     data-submenu={submenu ? action.id ?? action.label : undefined} onPointerEnter={onHover}
@@ -46,11 +49,12 @@ function MenuItem({ action, onRun, expanded, onOpen, onHover }: {
     <action.icon size={16} strokeWidth={1.75} aria-hidden="true" focusable="false"/>
     <span>{action.label}</span>
     {action.shortcut && <kbd aria-hidden="true">{shortcutLabel(action.shortcut)}</kbd>}
+    {action.checked && <Check className="preview-context-chevron" size={14} strokeWidth={2} aria-hidden="true" focusable="false"/>}
     {submenu && <ChevronRight className="preview-context-chevron" size={14} strokeWidth={1.75} aria-hidden="true" focusable="false"/>}
   </button>
 }
 
-const focusableItems = (root: HTMLElement | null) => root ? [...root.querySelectorAll<HTMLButtonElement>(':scope button[role="menuitem"]')] : []
+const focusableItems = (root: HTMLElement | null) => root ? [...root.querySelectorAll<HTMLButtonElement>(':scope button[role="menuitem"], :scope button[role="menuitemradio"]')] : []
 
 function moveFocus(event: React.KeyboardEvent, buttons: HTMLButtonElement[]) {
   if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return false

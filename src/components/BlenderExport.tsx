@@ -3,7 +3,8 @@ import { Component, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Box, Download, House } from 'lucide-react'
 import { Box3, Vector3 } from 'three'
 import { resolvePanels } from '@/lib/model'
-import { detectPreviewFurnishings } from '@/lib/preview-furnishings'
+import { detectPreviewFurnishings, furnishingNameHints, type FurnishingOptions } from '@/lib/preview-furnishings'
+import { furnishingOptions, usePreviewFurnishing } from '@/hooks/use-preview-furnishing'
 import type { Project } from '@/lib/types'
 import { ConnectorMeshes } from './ConnectorMeshes'
 import { PanelMesh } from './Scene'
@@ -14,15 +15,17 @@ import { DreameDockModel, DreameVacuumModel } from './RobotVacuumModel'
 import { createVacuumPlan } from './robot-vacuum-navigation'
 import { exportSceneGlb } from '@/lib/scene-export'
 
-interface Job { project: Project; room: boolean; furnished: boolean }
+/** Furnishing options are captured at start so the export matches the viewport's arrangement. */
+interface Job { project: Project; room: boolean; furnished: boolean; furnishing: FurnishingOptions }
 
 export function BlenderExport({ project }: { project: Project }) {
   const [job, setJob] = useState<Job | null>(null)
   const [furnished, setFurnished] = useState(false)
   const [status, setStatus] = useState('')
+  const furnishing = usePreviewFurnishing()
   function start(room: boolean) {
     setStatus('Preparing GLB…')
-    setJob({ project, room, furnished })
+    setJob({ project, room, furnished, furnishing: furnishingOptions(furnishing, furnishingNameHints(project)) })
   }
   return <section aria-label="Blender export">
     <h3>Export to Blender</h3>
@@ -32,6 +35,7 @@ export function BlenderExport({ project }: { project: Project }) {
       <button disabled={!!job} onClick={() => start(true)}><span className="export-icon"><House size={23}/></span><span><strong>Realistic scene · GLB</strong><small>Construction, room, decor, camera and supported lights</small></span><Download size={19}/></button>
     </div>
     <label><input type="checkbox" checked={furnished} disabled={!!job} onChange={event => setFurnished(event.target.checked)} /> Include auto furnishings in realistic scene</label>
+    <p className="dialog-note">Furnishings follow the density, style, shuffle and surface choices from Realistic preview.</p>
     <p className="dialog-note">Uses the assembled construction and a fitted camera. Shader effects, bump detail, ambient and area lighting may look different in Blender. The robot vacuum is exported docked, without animation.</p>
     {status && <p role="status">{status}</p>}
     {job && <div aria-hidden="true" style={{ position: 'fixed', left: -10000, width: 64, height: 64, pointerEvents: 'none' }}>
@@ -46,7 +50,7 @@ export function BlenderExport({ project }: { project: Project }) {
 
 function ExportContent({ job, onDone }: { job: Job; onDone: (error?: string) => void }) {
   const panels = useMemo(() => resolvePanels(job.project), [job.project])
-  const furnishings = useMemo(() => job.room && job.furnished ? detectPreviewFurnishings(panels) : [], [job, panels])
+  const furnishings = useMemo(() => job.room && job.furnished ? detectPreviewFurnishings(panels, job.furnishing) : [], [job, panels])
   const bounds = useMemo(() => boundsOf(panels), [panels])
   const vacuum = useMemo(() => job.room ? createVacuumPlan(bounds, panels, furnishings) : null, [job.room, bounds, panels, furnishings])
   return <>

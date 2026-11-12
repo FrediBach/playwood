@@ -17,6 +17,7 @@ import { ProjectStatus } from '@/components/ProjectStatus'
 import { TrofastInspector } from '@/components/TrofastInspector'
 import { NiceValuesContext } from '@/components/nice-values-context'
 import { buildPreviewMenuActions } from '@/components/preview-menu-actions'
+import { useFurnishingMenu } from '@/editor/use-furnishing-menu'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { EditorConstraints } from '@/editor/EditorConstraints'
 import { EditorConnectorInfill,EditorDialogs,EditorObjectConversion } from '@/editor/EditorDialogs'
@@ -174,8 +175,9 @@ export default function App() {
 
   const { canMenuAutoConnect,openConstraints }=useConstraintActions({ contextMenu, inspectingConnectors, assembly, project, selectedIds, objects, setAssemblyTab, notify, clipboard, closeContextMenu, selectedConnectorIds, setSelectedConnectorIds, setProjectConstraintsOpen, setInspectorTab, setRightOpen, setRealisticPreview, setExploded, setLeftOpen, constraints })
   const constraintSuggestions=useMemo(()=>contextMenu&&!inspectingConnectors&&!assembly.editingInstance?suggestDesignConstraints(project,selectedIds):[],[contextMenu,inspectingConnectors,assembly.editingInstance,project,selectedIds])
+  const furnishingMenu=useFurnishingMenu({ open: !!contextMenu, realisticPreview, inspectingConnectors, project, panels, selectedIds })
   const menuActions = buildPreviewMenuActions({
-    constraintSuggestions, constraintsEditing: constraints.editing,
+    constraintSuggestions, constraintsEditing: constraints.editing, furnishing: furnishingMenu,
     project, panels, selectedPanels, selectedIds, selectedConnectorIds, selectedIdSet,
     inspectingConnectors, modalOpen, assembly, splitCounts, splitDimensions, checkingSplits, canDivideGrid: !!gridCut, holes,
     canMenuAutoConnect, hasVisiblePanels, canAddConnectorsBetween: !infillReason, canConnectWithPanel: !!connectorPanelFit.result,

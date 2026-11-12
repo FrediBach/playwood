@@ -1,5 +1,6 @@
 import { Box3, Euler, Matrix4, Vector3 } from 'three'
 import type { Vec3 } from './types'
+import { seededRandom } from './preview-furnishing-variation'
 
 export type PreviewBookArrangement = 'upright' | 'leaning' | 'stacked'
 export type PreviewBookSupport = 'left' | 'right'
@@ -38,17 +39,6 @@ const palette = [
   ['#93654e', '#d4b68b', '#ead9b9'],
 ] as const
 const designs: PreviewBookDesign[] = ['band', 'arch', 'grid', 'minimal', 'split']
-
-function seededRandom(seed: string) {
-  let state = 2166136261
-  for (let i = 0; i < seed.length; i++) state = Math.imul(state ^ seed.charCodeAt(i), 16777619)
-  return () => {
-    state += 0x6d2b79f5
-    let value = Math.imul(state ^ state >>> 15, 1 | state)
-    value ^= value + Math.imul(value ^ value >>> 7, 61 | value)
-    return ((value ^ value >>> 14) >>> 0) / 4294967296
-  }
-}
 
 /** Seeded variation keeps a shelf stable through selection, camera moves and edits. */
 export function createPreviewBooks(seed: string, arrangement?: PreviewBookArrangement, supportSide: PreviewBookSupport = 'right'): PreviewBook[] {

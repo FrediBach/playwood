@@ -2,6 +2,7 @@ import { test, expect, type Page } from './browser-fixture'
 import { createPanel, resolvePanels } from '../src/lib/model'
 import { createExampleProject } from '../src/lib/example-library'
 import { createPreviewBenchProject } from '../src/lib/fixtures/preview-bench'
+import { furnitureArchetypes } from '../src/lib/fixtures/furniture-archetypes'
 import type { Panel } from '../src/lib/types'
 
 async function importPanels(page: Page, panels: Panel[]) {
@@ -275,6 +276,58 @@ test('auto furnishing seats a person on a bench extending from a shelf', async (
   await expect.poll(() => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())).not.toBe(unfurnished)
   await expectRenderedRoom(page)
   await page.screenshot({ path: 'test-results/realistic-preview-shelf-bench.png' })
+  expect(await exportedProject(page)).toEqual(original)
+  expect(errors).toEqual([])
+})
+
+test('auto furnish recognises a dining table, varies it, and follows a chosen purpose', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/')
+  await importPanels(page, furnitureArchetypes().find(item => item.id === 'dining')!.panels)
+  const original = await exportedProject(page)
+  await page.getByLabel('3D preview canvas', { exact: true }).focus()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
+  const status = page.locator('.room-furnishing-status')
+  const surface = page.locator('[data-preview-furnishings]')
+  await expect(status).toHaveText('Furnished: 1 dining table')
+  await expect(page.getByRole('radio', { name: 'Balanced', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expectRenderedRoom(page)
+  const frame = () => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())
+  const balanced = await frame()
+  // Lived-in seats a second diner in place of an empty chair.
+  await page.getByRole('radio', { name: 'Lived-in', exact: true }).click()
+  await expect(page.getByRole('radio', { name: 'Lived-in', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect.poll(frame).not.toBe(balanced)
+  const settled = await frame()
+  await page.getByRole('button', { name: 'Shuffle', exact: true }).click()
+  await expect.poll(() => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())).not.toBe(settled)
+  await page.screenshot({ path: 'test-results/realistic-preview-furnished-dining.png' })
+
+  const openMenu = async () => {
+    await page.getByLabel('3D preview canvas', { exact: true }).focus()
+    await page.keyboard.press('Shift+F10')
+    await page.getByRole('menuitem', { name: 'Furnish as', exact: true }).click()
+  }
+  await openMenu()
+  await expect(page.getByRole('menuitemradio', { name: 'Automatic · Dining table', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('menuitemradio', { name: 'Desk', exact: true }).click()
+  await expect(status).toHaveText('Furnished: 1 desk · 1 surface set by you')
+  await openMenu()
+  await expect(page.getByRole('menuitemradio', { name: 'Desk', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('menuitemradio', { name: 'Leave empty', exact: true }).click()
+  await expect(status).toHaveText('No furnishings placed. · 1 surface set by you')
+  await expect(surface).toHaveAttribute('data-preview-furnishings', '0')
+
+  await page.getByRole('button', { name: 'Reset', exact: true }).click()
+  await expect(status).toHaveText('Furnished: 1 dining table')
+  await expect(page.getByRole('radio', { name: 'Balanced', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByRole('button', { name: 'Reset', exact: true })).toHaveCount(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByRole('button', { name: 'Shuffle', exact: true })).toBeInViewport()
+  await page.screenshot({ path: 'test-results/realistic-preview-furnishing-controls-narrow.png' })
   expect(await exportedProject(page)).toEqual(original)
   expect(errors).toEqual([])
 })

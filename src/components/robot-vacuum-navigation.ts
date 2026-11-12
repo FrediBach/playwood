@@ -1,5 +1,5 @@
 import { Box3, Euler, Vector3 } from 'three'
-import type { FurnishingPlacement } from '@/lib/preview-furnishings'
+import { furnishingFootprint, type FurnishingPlacement } from '@/lib/preview-furnishings'
 import { getTrofastInsertObb } from '@/lib/trofast'
 import type { Panel } from '@/lib/types'
 import { getRoomLayout } from './room-layout'
@@ -88,17 +88,17 @@ function projectBoxes(panels: Panel[]): { id: string; bounds: Box3 }[] {
 function furnishingObstacles(furnishings: FurnishingPlacement[], ceiling: number): VacuumObstacle[] {
   return furnishings.flatMap(item => {
     const [x, y, z] = item.position
+    // Chairs stand on the floor whatever their seat height.
+    if (item.kind === 'chair') return [rectangle(`furnishing:${item.id}:chair`, x, z, ...furnishingFootprint(item), item.rotation)]
     if (item.kind === 'seated-person' || item.kind === 'seated-person-chair') {
       const footX = x + Math.sin(item.rotation) * 0.385
       const footZ = z + Math.cos(item.rotation) * 0.385
       const feet = rectangle(`furnishing:${item.id}:feet`, footX, footZ, 0.43, 0.29, item.rotation)
       return item.kind === 'seated-person-chair'
-        ? [feet, rectangle(`furnishing:${item.id}:chair`, x, z, 0.5, 0.47, item.rotation)] : [feet]
+        ? [feet, rectangle(`furnishing:${item.id}:chair`, x, z, ...furnishingFootprint(item), item.rotation)] : [feet]
     }
     if (y > ceiling) return []
-    const size = item.kind === 'computer' ? [0.62, 0.5] : item.kind === 'books' ? [0.48, 0.3]
-      : item.kind === 'table-lamp' ? [0.25, 0.25] : item.kind === 'plant' ? [0.21, 0.21] : [0.18, 0.18]
-    return [rectangle(`furnishing:${item.id}`, x, z, size[0], size[1], item.rotation)]
+    return [rectangle(`furnishing:${item.id}`, x, z, ...furnishingFootprint(item), item.rotation)]
   })
 }
 

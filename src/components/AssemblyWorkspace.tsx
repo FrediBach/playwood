@@ -1,9 +1,12 @@
 import { getProjectBounds } from '@/lib/model'
-import { detectPreviewFurnishings,FurnishingPlacement } from '@/lib/preview-furnishings'
+import { planPreviewFurnishings,type FurnishingPlacement,type FurnishingPlan } from '@/lib/preview-furnishings'
+import { summarizeFurnishedRoles } from '@/lib/preview-furnishing-roles'
+import { FURNISHING_DENSITIES,FURNISHING_THEMES,type FurnishingDensity,type FurnishingTheme } from '@/lib/preview-furnishing-variation'
+import { furnishingOptions,resetPreviewFurnishing,shufflePreviewFurnishing,updatePreviewFurnishing,usePreviewFurnishing,type PreviewFurnishingSettings } from '@/hooks/use-preview-furnishing'
 import { RepeatPreview } from '@/lib/preview-resize'
 import type { SnapSettings } from '@/lib/preview-snap'
 import type { CameraView,Connection,Panel,Side,Vec3 } from '@/lib/types'
-import { ArrowDownToLine,Box,Grid2X2,House,Move,PanelLeftOpen,Plus,RotateCw,Ruler,Scaling,SlidersHorizontal,Sun } from 'lucide-react'
+import { ArrowDownToLine,Box,Grid2X2,House,Move,PanelLeftOpen,Plus,RotateCcw,RotateCw,Ruler,Scaling,Shuffle,SlidersHorizontal,Sun } from 'lucide-react'
 import { useMemo,useState,type Dispatch,type SetStateAction } from 'react'
 import { AttachmentSideGuideState } from './AttachmentSideGuide'
 import { ConstructionLayerProps } from './ConstructionObjectLayer'
@@ -17,6 +20,8 @@ import { Tooltip } from './ui/tooltip'
 type Setter<T> = Dispatch<SetStateAction<T>>
 interface Props extends Omit<SceneProps, 'onSelect' | 'previewPanels' | 'previewConnections'> {
   rescaleSliders?: React.ReactNode
+  /** Assembly and group names per panel, used as purpose hints by Auto furnish. */
+  furnishingNames?: Record<string, string>
   attachmentChooser?: React.ReactNode
   objectPreviewStatus?: string
   boxSelectDisabled?: boolean
@@ -86,13 +91,14 @@ export function AssemblyWorkspace({
   attachmentSideGuide, visibleBounds, hasVisiblePanels, onDrillIn,
   attachmentHandles, onAttachmentPreview, onAttachmentCommit, attachmentBoundsPanels,
   suppressedConnectionIds=[], suppressedPanelIds=[], editingAssembly, assemblyHint,
-  attachmentSummary, attachmentWarning, attachmentChooser
+  attachmentSummary, attachmentWarning, attachmentChooser, furnishingNames
 }: Props) {
   const [panMode, setPanMode] = useState(false)
-  const [autoFurnish, setAutoFurnish] = useState(false)
+  const furnishing = usePreviewFurnishing()
   // Keep detection and all additional meshes out of the default preview path.
-  const furnishings = useMemo(() => realisticPreview && autoFurnish ? detectPreviewFurnishings(panels) : [], [panels, realisticPreview, autoFurnish])
-  const furnishedSurfaces = new Set(furnishings.map(item => item.panelId)).size
+  const furnishingPlan = useMemo(() => realisticPreview && furnishing.enabled ? planPreviewFurnishings(panels, furnishingOptions(furnishing, furnishingNames)) : null,
+    [panels, realisticPreview, furnishing, furnishingNames])
+  const furnishings = furnishingPlan?.placements ?? NO_FURNISHINGS
   const panelSelectionActive = (selectionKind ?? (selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'panels'
   const sceneProps: SceneProps=workspaceSceneProps(suppressedPanelIds,previewPanels,suppressedConnectionIds,previewConnections,realisticPreview,panels,connections,selectedIds,choosePanel,showDimensions,furnishings,fitSignal,frameSignal,zoomSignal,onDrillIn,attachmentSideGuide,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,view,showGrid,exploded)
   const movementStatus = getMovementStatus(constraintPicking,constraintEditing,boxSelectActive,objectSelection,resizing,repeatPreview,resizeLimited,resizeHandles,panelSelectionActive,selectedIds,editingAssembly,assemblyHint,movementEnabled,dragging,dragSnap,isAttaching,exploded)
@@ -185,7 +191,7 @@ export function AssemblyWorkspace({
     status={connect?.gesture.active ? connect.panelIds.length ? undefined : <><span>Connect · drag between panels or click twice</span><kbd>Esc</kbd> Exit</> : movementStatus}
     notice={connect?.gesture.active ? undefined : notice}
     showTransformShortcuts={showTransformShortcuts(boxSelectActive,panelSelectionActive,selectedIds,movementEnabled,editingAssembly,dragging,resizing)}
-    roomDetails={realisticPreview&&<RoomDetails hasVisiblePanels={hasVisiblePanels} visibleBounds={visibleBounds} autoFurnish={autoFurnish} setAutoFurnish={setAutoFurnish} furnishedSurfaces={furnishedSurfaces}/>}/>
+    roomDetails={realisticPreview&&<RoomDetails hasVisiblePanels={hasVisiblePanels} visibleBounds={visibleBounds} furnishing={furnishing} plan={furnishingPlan}/>}/>
       {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}
       {attachmentChooser}
     </main>
@@ -221,18 +227,44 @@ function getWorkspaceNotice(boxSelectActive: boolean|undefined,dragging: boolean
       :undefined
 }
 
-function RoomDetails({ hasVisiblePanels, visibleBounds, autoFurnish, setAutoFurnish, furnishedSurfaces }: { hasVisiblePanels: boolean; visibleBounds: { width: number; height: number; depth: number; min: Vec3; max: Vec3 }; autoFurnish: boolean; setAutoFurnish: Dispatch<SetStateAction<boolean>>; furnishedSurfaces: number })  {
+const NO_FURNISHINGS: FurnishingPlacement[] = []
+
+function RoomDetails({ hasVisiblePanels, visibleBounds, furnishing, plan }: { hasVisiblePanels: boolean; visibleBounds: { width: number; height: number; depth: number; min: Vec3; max: Vec3 }; furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null })  {
   return <div className="room-details" aria-label="Room scale reference">
     <span className="room-eyebrow"><Sun size={14} />THE DAYLIGHT ROOM</span>
     <h2>{hasVisiblePanels? 'Your design, in proportion.':'A room for your next idea.'}</h2>
     {hasVisiblePanels? <p className="room-dimensions">{number(visibleBounds.width)} × {number(visibleBounds.height)} × {number(visibleBounds.depth)} <span>mm · W × H × D</span></p>:<p>Add or show a panel in Studio to see it here.</p>}
     <p className="room-scale-note">Life-size setting · banana 22 cm long · floor lamp 165 cm tall</p>
     <div className="room-furnishing-control">
-      <label><input type="checkbox" checked={autoFurnish} onChange={event => setAutoFurnish(event.target.checked)} aria-label="Auto furnish" aria-describedby="room-furnishing-note" />Auto furnish<span>Preview only</span></label>
-      <p id="room-furnishing-note">Books, desk accessories, decor and people. May slow large previews.</p>
-      {autoFurnish&&<p className="room-furnishing-status" role="status">{furnishedSurfaces? `${furnishedSurfaces} ${furnishedSurfaces===1? 'surface furnished':'surfaces furnished'}`:'No furnishings placed.'}</p>}
+      <label><input type="checkbox" checked={furnishing.enabled} onChange={event => updatePreviewFurnishing({ enabled: event.target.checked })} aria-label="Auto furnish" aria-describedby="room-furnishing-note" />Auto furnish<span>Preview only</span></label>
+      <p id="room-furnishing-note">Books, decor, table settings and people, chosen by what each surface is for. May slow large previews.</p>
+      {furnishing.enabled&&<FurnishingOptionsControls furnishing={furnishing} plan={plan}/>}
     </div>
   </div>
+}
+
+function FurnishingOptionsControls({ furnishing, plan }: { furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null }) {
+  const furnished = plan?.surfaces.flatMap(surface => surface.furnished && surface.role ? [surface.role] : []) ?? []
+  const chosen = Object.keys(furnishing.roles).length
+  const customised = furnishing.seed !== 0 || chosen > 0 || furnishing.density !== 'balanced' || furnishing.theme !== 'auto'
+  return <>
+    <div className="room-furnishing-options">
+      <div className="room-furnishing-density" role="radiogroup" aria-label="Furnishing density">
+        {FURNISHING_DENSITIES.map(option => <button key={option.id} type="button" role="radio" aria-checked={furnishing.density===option.id}
+          onClick={() => updatePreviewFurnishing({ density: option.id as FurnishingDensity })}>{option.label}</button>)}
+      </div>
+      <label className="room-furnishing-theme">Style
+        <select value={furnishing.theme} onChange={event => updatePreviewFurnishing({ theme: event.target.value as FurnishingTheme })} aria-label="Furnishing style">
+          {FURNISHING_THEMES.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+        </select>
+      </label>
+      <div className="room-furnishing-actions">
+        <button type="button" onClick={shufflePreviewFurnishing}><Shuffle size={13} aria-hidden="true"/>Shuffle</button>
+        {customised&&<button type="button" onClick={resetPreviewFurnishing}><RotateCcw size={13} aria-hidden="true"/>Reset</button>}
+      </div>
+    </div>
+    <p className="room-furnishing-status" role="status">{furnished.length? `Furnished: ${summarizeFurnishedRoles(furnished)}`:'No furnishings placed.'}{chosen? ` · ${chosen} ${chosen===1? 'surface':'surfaces'} set by you`:''}</p>
+  </>
 }
 
 function getMovementStatus(constraintPicking: boolean|undefined,constraintEditing: boolean|undefined,boxSelectActive: boolean|undefined,objectSelection: boolean|undefined,resizing: boolean|undefined,repeatPreview: RepeatPreview|undefined,resizeLimited: boolean|undefined,resizeHandles: PreviewResizeHandle[]|undefined,panelSelectionActive: boolean,selectedIds: readonly string[],editingAssembly: { name: string; instanceCount: number; onDone: () => void }|undefined,assemblyHint: string|undefined,movementEnabled: boolean|undefined,dragging: boolean|undefined,dragSnap: { position: Vec3; label: string; warning?: string }|null|undefined,isAttaching: boolean,exploded: boolean) {
