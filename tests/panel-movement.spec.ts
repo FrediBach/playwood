@@ -254,6 +254,11 @@ test('removing the last constraint leaves the selected divider ready for keyboar
   await expect(page.getByLabel('3D preview canvas', { exact: true })).toBeFocused()
   await page.keyboard.press('Shift+ArrowDown')
   await expectPosition(page, divider.id, [divider.position[0], divider.position[1] - 100, divider.position[2]])
+  const moved = resolvePanels(await savedProject(page))
+  for (const support of resolvePanels(before).filter(panel => /leg$|spine/i.test(panel.name))) {
+    expect(getProjectBounds([moved.find(panel => panel.id === support.id)!]).min[1], support.name)
+      .toBeCloseTo(getProjectBounds([support]).min[1], 5)
+  }
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(before)
 })

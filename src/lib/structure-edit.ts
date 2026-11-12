@@ -28,7 +28,7 @@ export class StructureEditError extends Error {
   constructor(message: string, public panelIds: string[], public connectionIds: string[] = [], public inferredRelationships: InferredRelationship[] = [], public numerical?: NumericalDiagnostic) { super(message) }
 }
 export interface SelectionStretchEdge { panelId: string; dimension: 'width' | 'height'; side: -1 | 1 }
-type MovementScope = { panelIds: Set<string>; reference: number; preserveCuts?: Set<string> }
+type MovementScope = { panelIds: Set<string>; reference: number; preserveCuts?: Set<string>; preserveNeighborEnds?: boolean }
 type Edit = { kind: 'move'; delta: Vec3; deltas?: Record<string, Vec3>; releaseContacts?: boolean; scope?: MovementScope; stretch?: readonly SelectionStretchEdge[] } | { kind: 'resize'; relaxedRelationship?: string; patch: Dimensions; patches?: Record<string, PanelDimensions>; centerDelta?: Vec3; centerDeltas?: Record<string, Vec3>; local?: boolean; refitOutlinePanelIds?: readonly string[] } | { kind: 'reconcile'; anchorPanelId?: string; ruleId?: string } | { kind: 'fit'; connection: Connection }
 /** Assembly sources have their own origin; world floor/orientation checks run after materialization. */
 type ValidationContext = ResizeContext
@@ -486,6 +486,14 @@ function editComponent(project: Project, frames: Frame[], contacts: Contact[], i
       })
       if (edit.scope.preserveCuts?.has(item.panel.id)) {
         for (let dimension = 0; dimension < 2; dimension++) if (Math.abs(item.axes[dimension].dot(axis)) > 1 - EPSILON) add(row(), index * 5 + 3 + dimension, 1)
+      }
+      if (edit.scope.preserveNeighborEnds) {
+        // Local divider movement changes each adjacent span at the divider end.
+        // Anchor its far end even when staggered feet miss the global envelope.
+        const level = coordinate(selected[0], axis)
+        for (const side of [-1, 1]) {
+          if (side * (coordinate(item, axis, side) - level) > CONTACT_TOLERANCE) edge(row(), index, axis, side)
+        }
       }
       // The opposite outside face is the deliberate placement reference,
       // including continuous back/side panels spanning several compartments.
@@ -1017,8 +1025,8 @@ export function movePanelsWithReview(project: Project, ids: readonly string[], d
   const allowed = new Set([ids[0], ...neighbors.get(ids[0]) ?? []])
   for (const item of component) if (item !== selected && crossesLevel(item)) allowed.delete(item.panel.id)
   const previousCollisions = new Set(validateProject(project).filter(issue => issue.id.startsWith('collision-')).map(issue => issue.id))
-  const attempt = (panelIds: Set<string>, preserveCuts?: Set<string>) => {
-    const next = assertNoNewTrofastIssues(project, editStructure(project, ids, { kind: 'move', delta, scope: { panelIds, reference, preserveCuts } }))
+  const attempt = (panelIds: Set<string>, preserveCuts?: Set<string>, preserveNeighborEnds = false) => {
+    const next = assertNoNewTrofastIssues(project, editStructure(project, ids, { kind: 'move', delta, scope: { panelIds, reference, preserveCuts, preserveNeighborEnds } }))
     const collision = validateProject(next).find(issue => issue.id.startsWith('collision-') && !previousCollisions.has(issue.id))
     if (collision) throw new StructureEditError(`This move would introduce an overlap: ${collision.message}`, collision.panelIds)
     const resolved = resolvePanels(next)
@@ -1038,7 +1046,7 @@ export function movePanelsWithReview(project: Project, ids: readonly string[], d
     return next
   }
   let localError: unknown
-  try { return attempt(allowed) } catch (error) { localError = error }
+  try { return attempt(allowed, undefined, true) } catch (error) { localError = error }
   const boundaries = component.filter(item => item !== selected && Math.abs(item.axes[2].dot(axis)) > 1 - EPSILON
     && coordinate(item, axis) >= level - CONTACT_TOLERANCE).sort((a, b) => coordinate(a, axis) - coordinate(b, axis))
   const layers: Frame[][] = []
