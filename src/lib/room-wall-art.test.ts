@@ -3,16 +3,16 @@ import { Box3, Vector3 } from 'three'
 import { getRoomLayout } from '../components/room-layout'
 import type { FurnishingPlacement } from './preview-furnishings'
 import type { FurnishingDensity, ResolvedTheme } from './preview-furnishing-variation'
-import { ART_FAMILY, CEILING_CLEARANCE, FURNITURE_CLEARANCE, GROUP_GAP, planWallArt, wallObstacles, type WallArtPlan, type WallObstacle } from './room-wall-art'
+import { ART_FAMILY, CEILING_CLEARANCE, DADO_CLEARANCE, FURNITURE_CLEARANCE, GROUP_GAP, planWallArt, wallObstacles, type WallArtPlan, type WallObstacle } from './room-wall-art'
 
-function room(width: number, height: number, options: { seed?: number; theme?: ResolvedTheme; density?: FurnishingDensity; furnishings?: FurnishingPlacement[]; offsetX?: number } = {}) {
+function room(width: number, height: number, options: { seed?: number; theme?: ResolvedTheme; density?: FurnishingDensity; furnishings?: FurnishingPlacement[]; offsetX?: number; dado?: number } = {}) {
   const offset = options.offsetX ?? 0
   const bounds = new Box3(new Vector3(-width / 2 + offset, 0, -0.2), new Vector3(width / 2 + offset, height, 0.2))
   const layout = getRoomLayout(bounds)
   const obstacles = wallObstacles({ bounds, floorY: layout.floorY, chairX: layout.chairX, plantX: layout.plantX, furnishings: options.furnishings })
   const plan = planWallArt({
     seed: options.seed ?? 0, theme: options.theme ?? 'living', density: options.density ?? 'balanced',
-    wall: { left: layout.leftX, right: layout.rightX, height: layout.height },
+    wall: { left: layout.leftX, right: layout.rightX, height: layout.height, dado: options.dado },
     creation: { minX: bounds.min.x, maxX: bounds.max.x }, chairX: layout.chairX, plantX: layout.plantX, obstacles,
   })
   return { plan, layout, obstacles }
@@ -63,6 +63,15 @@ describe('room wall art', () => {
     expect(hero.y - hero.height / 2).toBeGreaterThanOrEqual(0.8 + 0.42 - layout.floorY + FURNITURE_CLEARANCE - 1e-6)
     expect(hero.y).toBeGreaterThan(plain.y)
     expectClear(plan, obstacles, layout)
+  })
+
+  it('hangs above a dado rail or painted lower wall', () => {
+    for (const seed of seeds.slice(0, 15)) {
+      const { plan, obstacles, layout } = room(1.6, 0.45, { seed, density: 'lived-in', dado: 1.2 })
+      expect(plan.groups.length).toBeGreaterThan(0)
+      for (const piece of pieces(plan)) expect(piece.y - piece.height / 2).toBeGreaterThanOrEqual(1.2 + DADO_CLEARANCE - 1e-6)
+      expectClear(plan, obstacles, layout)
+    }
   })
 
   it('hangs clear of furniture for every seed, style, density and size', () => {

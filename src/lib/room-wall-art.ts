@@ -53,8 +53,8 @@ export interface WallArtInput {
   seed: number
   theme: ResolvedTheme
   density: FurnishingDensity
-  /** Usable wall between the side walls, and the ceiling height. */
-  wall: { left: number; right: number; height: number }
+  /** Usable wall between the side walls, the ceiling height and the top of any dado or lower wall (0 for none). */
+  wall: { left: number; right: number; height: number; dado?: number }
   creation: { minX: number; maxX: number }
   chairX: number
   plantX: number
@@ -66,6 +66,8 @@ export const EYE_HEIGHT = 1.55
 /** Space between furniture and the bottom of the art above it. */
 export const FURNITURE_CLEARANCE = 0.2
 export const CEILING_CLEARANCE = 0.22
+/** Space above a dado rail or painted lower wall. */
+export const DADO_CLEARANCE = 0.12
 /** Space kept between separate groups. */
 export const GROUP_GAP = 0.3
 /** Art is not hung higher than this above furniture; it would float near the ceiling. */
@@ -284,7 +286,7 @@ function fitGroup(slots: readonly Slot[], zone: Zone, input: WallArtInput, place
     const preferred = zone.align === 'start' ? zone.minX : zone.align === 'end' ? zone.maxX - width : zone.centre - width / 2
     const minX = Math.min(Math.max(preferred, zone.minX), zone.maxX - width)
     const below = obstacleTop(input.obstacles, minX, minX + width)
-    const bottom = below === null ? 0.6 : below + FURNITURE_CLEARANCE
+    const bottom = Math.max(below === null ? 0.6 : below + FURNITURE_CLEARANCE, input.wall.dado ? input.wall.dado + DADO_CLEARANCE : 0)
     if (bottom > MAX_BOTTOM) return null
     const minY = Math.max(bottom, EYE_HEIGHT - height / 2)
     const rect = { minX, maxX: minX + width, minY, maxY: minY + height }

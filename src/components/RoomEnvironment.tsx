@@ -9,6 +9,8 @@ import { parquetTextures, rugTextures } from './room-floor-textures'
 import { planWallArt, wallObstacles } from '@/lib/room-wall-art'
 import type { FurnishingPlacement } from '@/lib/preview-furnishings'
 import { RoomWallArt } from './RoomWallArt'
+import { RoomWalls } from './RoomWalls'
+import { lowerWallTop, roomWallStyle } from '@/lib/room-wall-style'
 
 RectAreaLightUniformsLib.init()
 
@@ -115,18 +117,6 @@ function Rug({ style, position, extent }: { style: RoomFloorStyle; position: Tri
   </group>
 }
 
-function Curtain({ position, height }: { position: Triple; height: number }) {
-  const geometry = useMemo(() => {
-    const mesh = new THREE.PlaneGeometry(0.58, height, 36, 1)
-    const positions = mesh.attributes.position
-    for (let i = 0; i < positions.count; i++) positions.setZ(i, Math.cos((positions.getX(i) + 0.29) * 65) * 0.035)
-    mesh.computeVertexNormals()
-    return mesh
-  }, [height])
-  useEffect(() => () => geometry.dispose(), [geometry])
-  return <mesh position={position} rotation={[0, Math.PI / 2, 0]} geometry={geometry} castShadow receiveShadow><meshStandardMaterial color="#e7dfd1" roughness={1} side={THREE.DoubleSide} /></mesh>
-}
-
 const NO_FURNISHINGS: readonly FurnishingPlacement[] = []
 
 export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, furnishings = NO_FURNISHINGS }: { bounds: THREE.Box3; style?: RoomStyleInput; furnishings?: readonly FurnishingPlacement[] }) {
@@ -136,13 +126,16 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
   const centerZ = backZ + depth / 2
   const { seed, theme, density = 'balanced' } = input
   const style = useMemo(() => roomFloorStyle({ seed, theme }), [seed, theme])
+  const walls = useMemo(() => roomWallStyle({ seed, theme }), [seed, theme])
+  // Art hangs clear of a dado rail or painted lower wall, including its scallops.
+  const dado = lowerWallTop(walls.lower)
   const { min: { x: minX }, max: { x: maxX, y: maxY } } = bounds
   const wallArt = useMemo(() => planWallArt({
     seed, theme, density, chairX, plantX,
-    wall: { left: leftX, right: rightX, height },
+    wall: { left: leftX, right: rightX, height, dado },
     creation: { minX, maxX },
     obstacles: wallObstacles({ bounds: { min: { x: minX }, max: { x: maxX, y: maxY } }, floorY, chairX, plantX, furnishings }),
-  }), [seed, theme, density, chairX, plantX, leftX, rightX, height, minX, maxX, maxY, floorY, furnishings])
+  }), [seed, theme, density, chairX, plantX, leftX, rightX, height, dado, minX, maxX, maxY, floorY, furnishings])
   const lightTarget = useMemo(() => new THREE.Object3D(), [])
   const furnitureCenterZ = 0
   useEffect(() => { lightTarget.position.set(layout.centerX, floorY + 0.55, furnitureCenterZ) }, [lightTarget, layout.centerX, floorY, furnitureCenterZ])
@@ -150,6 +143,7 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
   const windowWidth = 2.4
   const windowHeight = 2.25
   const windowBottom = 0.35
+  const windowOpening = useMemo(() => ({ z: windowZ, width: windowWidth, height: windowHeight, bottom: windowBottom }), [windowZ])
   return <group name="Modern home">
     <ambientLight intensity={0.28} color="#fff5e4" />
     <hemisphereLight args={['#edf3ff', '#b69c7a', 0.85]} />
@@ -167,22 +161,20 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
       <planeGeometry args={[width, depth]} /><meshStandardMaterial color="#edeae3" emissive="#edeae3" emissiveIntensity={0.65} roughness={1} />
     </mesh>
     <Box position={[centerX, floorY + height / 2, backZ - 0.09]} size={[width, height, 0.18]} color="#e5e1d7" />
-    <Box position={[centerX, floorY + 0.055, backZ + 0.012]} size={[width, 0.11, 0.027]} color="#eee9df" />
 
     {/* The left wall is built around a real opening; daylight remains spatial. */}
     <Box position={[leftX - 0.09, floorY + windowBottom / 2, centerZ]} size={[0.18, windowBottom, depth]} color="#e9e5dc" />
     <Box position={[leftX - 0.09, floorY + (windowBottom + windowHeight + height) / 2, centerZ]} size={[0.18, height - windowBottom - windowHeight, depth]} color="#e9e5dc" />
     <Box position={[leftX - 0.09, floorY + (windowBottom + windowHeight / 2), (backZ + windowZ - windowWidth / 2) / 2]} size={[0.18, windowHeight, windowZ - windowWidth / 2 - backZ]} color="#e9e5dc" />
     <Box position={[leftX - 0.09, floorY + (windowBottom + windowHeight / 2), (windowZ + windowWidth / 2 + backZ + depth) / 2]} size={[0.18, windowHeight, backZ + depth - windowZ - windowWidth / 2]} color="#e9e5dc" />
-    <Box position={[leftX + 0.012, floorY + 0.055, centerZ]} size={[0.027, 0.11, depth]} color="#eee9df" />
     <mesh position={[leftX - 0.13, floorY + windowBottom + windowHeight / 2, windowZ]} rotation={[0, Math.PI / 2, 0]}>
       <planeGeometry args={[windowWidth, windowHeight]} /><meshBasicMaterial color="#d9e5e8" />
     </mesh>
     {[windowZ - windowWidth / 2, windowZ, windowZ + windowWidth / 2].map(z => <Box key={z} position={[leftX, floorY + windowBottom + windowHeight / 2, z]} size={[0.055, windowHeight + 0.04, 0.035]} color="#6c716c" />)}
     {[windowBottom, windowBottom + windowHeight].map(y => <Box key={y} position={[leftX, floorY + y, windowZ]} size={[0.055, 0.035, windowWidth + 0.04]} color="#6c716c" />)}
     <Box position={[leftX + 0.04, floorY + windowBottom - 0.012, windowZ]} size={[0.23, 0.035, windowWidth + 0.15]} color="#eeebe1" />
-    <Curtain position={[leftX + 0.14, floorY + 1.41, windowZ - windowWidth / 2 - 0.12]} height={2.72} />
-    <Curtain position={[leftX + 0.14, floorY + 1.41, windowZ + windowWidth / 2 + 0.12]} height={2.72} />
+    <RoomWalls style={walls} floorY={floorY} leftX={leftX} rightX={rightX} backZ={backZ} depth={depth} height={height}
+      window={windowOpening} />
 
     <Rug style={style} position={[layout.centerX + 0.12, floorY - 0.006, furnitureCenterZ + 0.16]} extent={[bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z]} />
     <RoomWallArt plan={wallArt} wallZ={backZ} floorY={floorY} />

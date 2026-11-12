@@ -36,7 +36,7 @@ export function BlenderExport({ project }: { project: Project }) {
       <button disabled={!!job} onClick={() => start(true)}><span className="export-icon"><House size={23}/></span><span><strong>Realistic scene · GLB</strong><small>Construction, room, decor, camera and supported lights</small></span><Download size={19}/></button>
     </div>
     <label><input type="checkbox" checked={furnished} disabled={!!job} onChange={event => setFurnished(event.target.checked)} /> Include auto furnishings in realistic scene</label>
-    <p className="dialog-note">Furnishings, floor, rug and wall art follow the density, style, shuffle and surface choices from Realistic preview.</p>
+    <p className="dialog-note">Furnishings and the room's floor, walls, curtains and art follow the density, style, shuffle and surface choices from Realistic preview.</p>
     <p className="dialog-note">Uses the assembled construction and a fitted camera. Shader effects, bump detail, ambient and area lighting may look different in Blender. The robot vacuum is exported docked, without animation.</p>
     {status && <p role="status">{status}</p>}
     {job && <div aria-hidden="true" style={{ position: 'fixed', left: -10000, width: 64, height: 64, pointerEvents: 'none' }}>
