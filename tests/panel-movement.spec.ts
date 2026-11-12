@@ -1,5 +1,7 @@
+import fixture from '../resources/library-3d/user-projects/h-table-monitor-speaker-stand.json' with { type: 'json' }
+import { openInspectorSection } from './inspector-helpers'
 import { test, expect, type Page } from '@playwright/test'
-import { createPanel, createStarterProject, getProjectBounds, resolvePanels, validateProject } from '../src/lib/model'
+import { parseProject, createPanel, createStarterProject, getProjectBounds, resolvePanels, validateProject } from '../src/lib/model'
 import type { Project, Vec3 } from '../src/lib/types'
 
 const STORAGE_KEY = 'playwood-studio-project-v1'
@@ -229,4 +231,29 @@ test('room arrows leave panels unchanged and Studio retains panel movement and u
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => savedProject(page)).toEqual(project)
   await expect(page.getByRole('button', { name: 'Studio', exact: true })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('removing the last constraint leaves the selected divider ready for keyboard movement', async ({ page }) => {
+  const project = parseProject(fixture)
+  await openProject(page, project)
+  await cameraView(page, 'front')
+  await page.locator('.panel-list-select').filter({ hasText: /^Center divider$/ }).click()
+  await openInspectorSection(page, 'Constraints')
+  await page.getByRole('button', { name: /^All \(/ }).click()
+  const remove = page.getByRole('button', { name: /^Remove constraint:/ })
+  await expect(remove).toHaveCount(project.constraints!.length)
+  for (let remaining = project.constraints!.length - 1; remaining >= 0; remaining--) {
+    await remove.first().click()
+    await expect(remove).toHaveCount(remaining)
+    if (remaining) await expect(remove.first()).toBeFocused()
+  }
+  await expect.poll(async () => (await savedProject(page)).constraints).toEqual([])
+  const before = await savedProject(page)
+  expect(before.constraints).toEqual([])
+  const divider = resolvePanels(before).find(panel => panel.name === 'Center divider')!
+  await expect(page.getByLabel('3D preview canvas', { exact: true })).toBeFocused()
+  await page.keyboard.press('Shift+ArrowDown')
+  await expectPosition(page, divider.id, [divider.position[0], divider.position[1] - 100, divider.position[2]])
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => savedProject(page)).toEqual(before)
 })

@@ -615,3 +615,17 @@ test('hovering an opening guide highlights both measurements and shows one share
   await expect(tooltips).toHaveCount(0)
   expect(await exportedProject(page)).toEqual(original)
 })
+
+test('removing the last constraint keeps focus inside a narrow inspector drawer', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 })
+  const project = shelfProject()
+  project.constraints = [{ id: 'floor', enabled: true, kind: 'floor', panelId: 'lower', reference: 'max', value: 218 }]
+  await importProject(page, project)
+  await page.getByRole('button', { name: 'Open inspector', exact: true }).click()
+  await openInspectorSection(page, 'Constraints')
+  const remove = page.getByRole('button', { name: /^Remove constraint:/ })
+  await expect(remove).toHaveCount(1)
+  await remove.click()
+  await expect(remove).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Add constraint', exact: true })).toBeFocused()
+})

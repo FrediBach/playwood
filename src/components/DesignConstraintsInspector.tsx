@@ -2,7 +2,7 @@ import { equalOpeningSelection } from '@/lib/equal-opening-selection'
 import { DESIGN_CONSTRAINT_TOLERANCE,DesignConstraintEvaluation,describeDesignConstraint,designConstraintCoordinate,designConstraintPanelIds,evaluateDesignConstraints,measureDesignConstraint,openingMeasurements } from '@/lib/design-constraints'
 import type { ConstraintReference,DesignConstraint,Panel } from '@/lib/types'
 import { ArrowLeftRight,Check,CircleAlert,LocateFixed,MousePointer2,Pencil,Plus,Ruler,Trash2 } from 'lucide-react'
-import { useEffect,useEffectEvent,useId,useRef,useState } from 'react'
+import { useEffect,useEffectEvent,useId,useLayoutEffect,useRef,useState } from 'react'
 import { createPortal } from 'react-dom'
 import './design-constraints.css'
 import { DesignConstraintFields } from './DesignConstraintFields'
@@ -97,6 +97,7 @@ export function DesignConstraintsInspector({
   const returnFocus = useRef<HTMLElement | null>(null)
   const addButton = useRef<HTMLButtonElement>(null)
   const form = useRef<HTMLDivElement>(null)
+  const removedFocus = useRef<{ button: HTMLElement; list: HTMLElement; index: number } | null>(null)
   const openedRequest = useRef(0)
   const cancelledRequest = useRef(0)
   const managedRequest = useRef(0)
@@ -123,6 +124,29 @@ export function DesignConstraintsInspector({
     return () => { if (focus !== undefined) window.clearTimeout(focus) }
   }, [draft])
   useEffect(() => () => { notifyPreview(null); notifyEditing(false); notifyHighlight(null) }, [])
+
+  useLayoutEffect(() => {
+    const pending = removedFocus.current
+    if (!pending || pending.button.isConnected) return
+    removedFocus.current = null
+    // Only restore focus lost with the deleted row, never another control's focus.
+    if (document.activeElement !== document.body && document.activeElement !== pending.button) return
+    const buttons = pending.list.isConnected ? pending.list.querySelectorAll<HTMLButtonElement>('button[aria-label^="Remove constraint:"]') : []
+    const next = buttons[Math.min(pending.index, buttons.length - 1)]
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas[aria-label="3D preview canvas"]')
+    const fallback = canvas && !canvas.closest('[inert]') ? canvas : addButton.current
+    const target = next ?? fallback
+    target?.focus({ preventScroll: true })
+  }, [constraints])
+  const removeConstraint = (id: string) => {
+    const button = document.activeElement
+    const list = button?.closest<HTMLElement>('.constraint-list')
+    if (button instanceof HTMLElement && list && button.getAttribute('aria-label')?.startsWith('Remove constraint:')) {
+      const buttons = [...list.querySelectorAll('button[aria-label^="Remove constraint:"]')]
+      removedFocus.current = { button, list, index: buttons.indexOf(button) }
+    }
+    onRemove(id)
+  }
 
   const close = () => {
     setDraft(null)
@@ -169,7 +193,7 @@ export function DesignConstraintsInspector({
       <button type="button" aria-pressed={!showAll} onClick={() => setShowAll(false)}>Selection ({applicable.length})</button>
       <button type="button" aria-pressed={showAll} onClick={() => setShowAll(true)}>All ({constraints.length})</button>
     </div>}
-    {!draft && rows.length > 0 && <ConstraintList rows={rows} panels={panels} start={start} onHighlight={onHighlight} onToggle={onToggle} onFindPanels={onFindPanels} onRemove={onRemove}/>}
+    {!draft && rows.length > 0 && <ConstraintList rows={rows} panels={panels} start={start} onHighlight={onHighlight} onToggle={onToggle} onFindPanels={onFindPanels} onRemove={removeConstraint}/>}
     {!draft && <ConstraintEmptyState rows={rows} constraints={constraints} selectedIds={selectedIds} showAll={showAll} previewError={previewError} addButton={addButton} eligiblePanels={eligiblePanels} start={start} panels={panels}/>}
     {draft && <ConstraintForm form={form} existing={existing} close={close} draft={draft} changeType={changeType} eligiblePanels={eligiblePanels} panelChoice={panelChoice} panels={panels} update={update} resetMeasurement={resetMeasurement} changeRequirement={changeRequirement} anchor={anchor} setAnchor={setAnchor} measuredText={measuredText} footerContainer={footerContainer} footer={footer}/>}
   </InspectorDisclosure>
