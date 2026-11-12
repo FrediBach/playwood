@@ -39,6 +39,8 @@ for (const room of [false, true]) {
     expect(hardware.some((node: { extras: { connectorId: string } }) => node.extras.connectorId === removed)).toBe(false)
     expect(hardware.find((node: { extras: { connectorId: string } }) => node.extras.connectorId === metal).extras.connectorMaterial).toBe('metal')
     expect(names.includes('Preview furnishings')).toBe(room)
+    expect(names.some((name?: string) => name?.startsWith('Wall art'))).toBe(room)
+    expect(names.some((name?: string) => name?.startsWith('Artwork, '))).toBe(room)
     expect(json.cameras).toHaveLength(1)
     expect(json.images.length).toBeGreaterThan(0)
     expect(json.images.every((image: { bufferView?: number; uri?: string }) => image.bufferView !== undefined && !image.uri)).toBe(true)

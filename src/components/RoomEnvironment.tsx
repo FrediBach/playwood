@@ -6,37 +6,13 @@ import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { DEFAULT_ROOM_STYLE, roomFloorStyle, rugSize, type RoomFloorStyle, type RoomStyleInput } from '@/lib/room-floor-style'
 import { parquetTextures, rugTextures } from './room-floor-textures'
+import { planWallArt, wallObstacles } from '@/lib/room-wall-art'
+import type { FurnishingPlacement } from '@/lib/preview-furnishings'
+import { RoomWallArt } from './RoomWallArt'
 
 RectAreaLightUniformsLib.init()
 
 type Triple = [number, number, number]
-
-function artworkTexture() {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 640
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#eee9df'
-  ctx.fillRect(0, 0, 512, 640)
-  ctx.fillStyle = '#a86647'
-  ctx.beginPath()
-  ctx.arc(309, 228, 117, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = '#b6ac8e'
-  ctx.beginPath()
-  ctx.roundRect(82, 202, 178, 347, [89, 89, 0, 0])
-  ctx.fill()
-  ctx.strokeStyle = '#494c42'
-  ctx.lineWidth = 5
-  for (let i = 0; i < 7; i++) {
-    ctx.beginPath()
-    ctx.roundRect(172 + i * 13, 345 - i * 12, 230 - i * 26, 270, [80, 80, 0, 0])
-    ctx.stroke()
-  }
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  return texture
-}
 
 function Box({ position, size, color, radius = 0, rotation, roughness = 0.85, metalness = 0 }: {
   position: Triple; size: Triple; color: string; radius?: number; rotation?: Triple; roughness?: number; metalness?: number
@@ -151,15 +127,22 @@ function Curtain({ position, height }: { position: Triple; height: number }) {
   return <mesh position={position} rotation={[0, Math.PI / 2, 0]} geometry={geometry} castShadow receiveShadow><meshStandardMaterial color="#e7dfd1" roughness={1} side={THREE.DoubleSide} /></mesh>
 }
 
-export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE }: { bounds: THREE.Box3; style?: RoomStyleInput }) {
+const NO_FURNISHINGS: readonly FurnishingPlacement[] = []
+
+export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, furnishings = NO_FURNISHINGS }: { bounds: THREE.Box3; style?: RoomStyleInput; furnishings?: readonly FurnishingPlacement[] }) {
   const layout = getRoomLayout(bounds)
-  const { floorY, leftX, rightX, backZ, width, depth, height, chairX, chairZ, artX, artY } = layout
+  const { floorY, leftX, rightX, backZ, width, depth, height, chairX, chairZ, plantX, plantZ } = layout
   const centerX = (leftX + rightX) / 2
   const centerZ = backZ + depth / 2
-  const { seed, theme } = input
+  const { seed, theme, density = 'balanced' } = input
   const style = useMemo(() => roomFloorStyle({ seed, theme }), [seed, theme])
-  const art = useMemo(artworkTexture, [])
-  useEffect(() => () => art.dispose(), [art])
+  const { min: { x: minX }, max: { x: maxX, y: maxY } } = bounds
+  const wallArt = useMemo(() => planWallArt({
+    seed, theme, density, chairX, plantX,
+    wall: { left: leftX, right: rightX, height },
+    creation: { minX, maxX },
+    obstacles: wallObstacles({ bounds: { min: { x: minX }, max: { x: maxX, y: maxY } }, floorY, chairX, plantX, furnishings }),
+  }), [seed, theme, density, chairX, plantX, leftX, rightX, height, minX, maxX, maxY, floorY, furnishings])
   const lightTarget = useMemo(() => new THREE.Object3D(), [])
   const furnitureCenterZ = 0
   useEffect(() => { lightTarget.position.set(layout.centerX, floorY + 0.55, furnitureCenterZ) }, [lightTarget, layout.centerX, floorY, furnitureCenterZ])
@@ -202,12 +185,11 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE }: {
     <Curtain position={[leftX + 0.14, floorY + 1.41, windowZ + windowWidth / 2 + 0.12]} height={2.72} />
 
     <Rug style={style} position={[layout.centerX + 0.12, floorY - 0.006, furnitureCenterZ + 0.16]} extent={[bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z]} />
-    <Box position={[artX, floorY + artY, backZ + 0.035]} size={[0.85, 1.05, 0.045]} color="#66543f" />
-    <mesh position={[artX, floorY + artY, backZ + 0.059]} receiveShadow><planeGeometry args={[0.806, 1.006]} /><meshStandardMaterial map={art} roughness={1} /></mesh>
+    <RoomWallArt plan={wallArt} wallZ={backZ} floorY={floorY} />
 
     <LoungeChair position={[chairX, floorY, chairZ]} />
     <FloorLamp position={[chairX + 0.63, floorY, chairZ - 0.34]} />
     <SideTable position={[chairX + 0.68, floorY, chairZ + 0.42]} />
-    <Plant position={[-(bounds.max.x - bounds.min.x) / 2 - 0.7, floorY, -(bounds.max.z - bounds.min.z) / 2 + 0.12]} />
+    <Plant position={[plantX, floorY, plantZ]} />
   </group>
 }

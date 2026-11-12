@@ -110,7 +110,7 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   exploded: boolean
   realisticPreview?: boolean
   furnishings?: FurnishingPlacement[]
-  /** The realistic room's floor and rug style. */
+  /** The realistic room's floor, rug and wall art style. */
   roomStyle?: RoomStyleInput
   panMode?: boolean
   fitSignal: number
@@ -572,7 +572,7 @@ function World(props: WorldProps) {
     <PreviewContextGesture onOpen={props.boxSelectActive ? undefined : props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
     <SceneMovement {...props} feedback={feedback}/>
     <SceneCamera props={props} realisticPreview={realisticPreview}/>
-    <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} roomStyle={props.roomStyle} snapSettings={props.snapSettings} guides={feedback.guides}/>
+    <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} roomStyle={props.roomStyle} furnishings={props.furnishings} snapSettings={props.snapSettings} guides={feedback.guides}/>
     <SceneVacuum plan={vacuumPlan} panels={displayPanels} dragging={props.dragging} resizing={props.resizing} boxSelectActive={props.boxSelectActive} designConstraint={props.designConstraint}/>
     {displayPanels.filter(panel => !panel.visible && panel.wireframe).map(panel => <PanelWireframe key={panel.id} panel={panel}/>)}
     <SceneParts {...props} shownPanels={shownPanels}

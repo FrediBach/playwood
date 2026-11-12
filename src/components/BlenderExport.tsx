@@ -36,7 +36,7 @@ export function BlenderExport({ project }: { project: Project }) {
       <button disabled={!!job} onClick={() => start(true)}><span className="export-icon"><House size={23}/></span><span><strong>Realistic scene · GLB</strong><small>Construction, room, decor, camera and supported lights</small></span><Download size={19}/></button>
     </div>
     <label><input type="checkbox" checked={furnished} disabled={!!job} onChange={event => setFurnished(event.target.checked)} /> Include auto furnishings in realistic scene</label>
-    <p className="dialog-note">Furnishings, floor and rug follow the density, style, shuffle and surface choices from Realistic preview.</p>
+    <p className="dialog-note">Furnishings, floor, rug and wall art follow the density, style, shuffle and surface choices from Realistic preview.</p>
     <p className="dialog-note">Uses the assembled construction and a fitted camera. Shader effects, bump detail, ambient and area lighting may look different in Blender. The robot vacuum is exported docked, without animation.</p>
     {status && <p role="status">{status}</p>}
     {job && <div aria-hidden="true" style={{ position: 'fixed', left: -10000, width: 64, height: 64, pointerEvents: 'none' }}>
@@ -54,7 +54,7 @@ function ExportContent({ job, onDone }: { job: Job; onDone: (error?: string) => 
   // The plan also gives the room style, which matches the preview's floor and rug.
   const plan = useMemo(() => job.room && (job.furnished || job.autoFurnish) ? planPreviewFurnishings(panels, job.furnishing) : null, [job, panels])
   const furnishings = useMemo(() => job.furnished ? plan?.placements ?? [] : [], [job.furnished, plan])
-  const roomStyle = useMemo(() => roomStyleFor({ enabled: job.autoFurnish, seed: job.furnishing.seed ?? 0 }, plan?.theme), [job, plan])
+  const roomStyle = useMemo(() => roomStyleFor({ enabled: job.autoFurnish, seed: job.furnishing.seed ?? 0, density: job.furnishing.density }, plan?.theme), [job, plan])
   const bounds = useMemo(() => boundsOf(panels), [panels])
   const vacuum = useMemo(() => job.room ? createVacuumPlan(bounds, panels, furnishings) : null, [job.room, bounds, panels, furnishings])
   return <>
@@ -62,7 +62,7 @@ function ExportContent({ job, onDone }: { job: Job; onDone: (error?: string) => 
       {panels.filter(panel => panel.visible).map(panel => <PanelMesh key={panel.id} panel={panel} selected={false} interactive={false} onSelect={() => {}} />)}
       <ConnectorMeshes panels={panels} connections={job.project.connections} connectorOverrides={job.project.connectorOverrides} />
     </group>
-    {job.room && <RoomEnvironment bounds={bounds} style={roomStyle} />}
+    {job.room && <RoomEnvironment bounds={bounds} style={roomStyle} furnishings={furnishings} />}
     {job.room && <PreviewFurnishings placements={furnishings} />}
     {vacuum && <group name="Robot vacuum"><group position={[vacuum.dock.x, vacuum.floorY, vacuum.dock.z]}><DreameDockModel /></group><group position={[vacuum.start.x, vacuum.floorY, vacuum.start.z]}><DreameVacuumModel /></group></group>}
     <SerializeScene job={job} bounds={bounds} onDone={onDone} />

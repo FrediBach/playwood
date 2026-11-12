@@ -1,4 +1,4 @@
-import { seededRandom, type ResolvedTheme } from './preview-furnishing-variation'
+import { seededRandom, type FurnishingDensity, type ResolvedTheme } from './preview-furnishing-variation'
 
 /**
  * The realistic preview's floor: a parquet pattern and a rug, chosen from the
@@ -43,8 +43,13 @@ export interface RugStyle {
 
 export interface RoomFloorStyle { key: string; parquet: ParquetStyle; rug: RugStyle }
 
-export interface RoomStyleInput { seed: number; theme: ResolvedTheme }
-export const DEFAULT_ROOM_STYLE: RoomStyleInput = { seed: 0, theme: 'living' }
+export interface RoomStyleInput {
+  seed: number
+  theme: ResolvedTheme
+  /** How much art hangs on the wall; the floor ignores it. */
+  density?: FurnishingDensity
+}
+export const DEFAULT_ROOM_STYLE: RoomStyleInput = { seed: 0, theme: 'living', density: 'balanced' }
 
 const WOODS: Record<string, WoodTone> = {
   oak: { id: 'oak', base: [176, 142, 103], spread: 0.55 },
@@ -153,7 +158,7 @@ export function rugSize(style: RugStyle, extentX: number, extentZ: number): [num
   return [snap(width), snap(depth)]
 }
 
-/** Auto furnish chooses the room's floor; without it the default room stays. */
-export function roomStyleFor(furnishing: { enabled: boolean; seed: number }, theme: ResolvedTheme | undefined): RoomStyleInput {
-  return furnishing.enabled ? { seed: furnishing.seed, theme: theme ?? 'living' } : DEFAULT_ROOM_STYLE
+/** Auto furnish chooses the room's floor and wall art; without it the default room stays. */
+export function roomStyleFor(furnishing: { enabled: boolean; seed: number; density?: FurnishingDensity }, theme: ResolvedTheme | undefined): RoomStyleInput {
+  return furnishing.enabled ? { seed: furnishing.seed, theme: theme ?? 'living', density: furnishing.density ?? 'balanced' } : DEFAULT_ROOM_STYLE
 }

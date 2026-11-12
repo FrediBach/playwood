@@ -109,6 +109,14 @@ export function furnishingFootprint(item: FurnishingPlacement): [number, number]
   return [size[0], size[2]]
 }
 
+/** W × H × D of a placement standing on its base; people and chairs, which sit forward of the furniture, return null. */
+export function furnishingSize(item: FurnishingPlacement): Vec3 | null {
+  if (item.kind === 'chair' || item.kind === 'seated-person' || item.kind === 'seated-person-chair') return null
+  if (item.size) return item.size
+  if (item.kind === 'books') return item.bookArrangement === 'stacked' ? PREVIEW_BOOK_STACK_BOUNDS : PREVIEW_BOOK_BOUNDS
+  return footprints[item.kind]
+}
+
 interface Obstacle { panel: Panel; obb: OBB; bounds: Box3; normal: Vector3 }
 /** A level board, or several coplanar boards that read as one top. The first member is primary. */
 interface Surface {
