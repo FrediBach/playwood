@@ -14,6 +14,12 @@ export interface TrofastInsert {
   /** Local Z face carrying the rim; it must face upward in the installed project. */
   face: 1 | -1;
 }
+/** Purposes recognised by Auto furnish in the realistic preview. */
+export type FurnishingRole =
+  | 'shelf' | 'display' | 'desk' | 'standing-desk' | 'dining-table' | 'coffee-table'
+  | 'side-table' | 'counter' | 'sideboard' | 'lowboard' | 'bench' | 'bed'
+/** A chosen purpose, or 'empty' to leave the surface unfurnished. */
+export type FurnishingRoleChoice = FurnishingRole | 'empty'
 export interface Panel {
   id: string; name: string; width: number; height: number; thickness: number;
   material: Material; color: string; pattern: Pattern;
@@ -25,6 +31,8 @@ export interface Panel {
   holeSize: number; holeSpacing: number; cornerRadius?: number;
   customOutline?: OutlinePoint[];
   trofastInserts?: TrofastInsert[];
+  /** Auto furnish purpose for a level board. Omitted means automatic recognition. */
+  furnishingRole?: FurnishingRoleChoice;
 }
 export interface Connection {
   id: string; parentId: string; childId: string; type: ConnectorType;

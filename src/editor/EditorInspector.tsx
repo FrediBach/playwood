@@ -87,6 +87,7 @@ interface EditorInspectorProps {
   connectorPanelFit: ReturnType<typeof getConnectorPanelFit>
   selectedIdSet: Set<string>
   trofastInspector: React.JSX.Element | undefined
+  furnishingInspector?: React.JSX.Element
   buildTools: React.JSX.Element | undefined
   selectedFinishCoverages: number[]
   validTargets: AssemblyAttachmentTarget[]
@@ -129,7 +130,7 @@ export function EditorInspector({
   notify, objectControlsDisabled, setObjectConversion, openConnectorInfill,
   infillReason, fittedConnectorPanel, selectedConnectors, commitWithInsertChecks,
   updateConnectorType, connectorTypeError, removeSelectedConnectors, connectWithPanel,
-  modalOpen, connectorPanelFit, selectedIdSet, trofastInspector,
+  modalOpen, connectorPanelFit, selectedIdSet, trofastInspector, furnishingInspector,
   buildTools, selectedFinishCoverages, validTargets, duplicateSelected,
   exportAssembly, deleteSelected, distributeSelection, panelEditError,
   openConstraints, constraintsInspector, issues, updateMultiplePanels,
@@ -178,6 +179,7 @@ export function EditorInspector({
     selectedIdSet={selectedIdSet}
     assemblyCount={assemblyCount}
     trofastInspector={trofastInspector}
+    furnishingInspector={furnishingInspector}
     instance={instance}
     buildTools={buildTools}
     selectedPanels={selectedPanels}
@@ -262,6 +264,7 @@ interface SelectionInspectorProps {
   selectedIdSet: Set<string>
   assemblyCount: (definitionId: string) => number
   trofastInspector: React.JSX.Element | undefined
+  furnishingInspector?: React.JSX.Element
   instance: AssemblyInstance|undefined
   buildTools: React.JSX.Element | undefined
   selectedPanels: Panel[]
@@ -305,7 +308,7 @@ interface SelectionInspectorProps {
 
 function SelectionInspector({
   clipboard, assembly, selectedIdSet, assemblyCount,
-  trofastInspector, instance, buildTools, selectedPanels,
+  trofastInspector, furnishingInspector, instance, buildTools, selectedPanels,
   selectedFinishCoverages, project, assemblyHint, validTargets,
   duplicateSelected, exportAssembly, deleteSelected, selected,
   distributeSelection, panelEditError, selectionKey, openConstraints,
@@ -320,9 +323,9 @@ function SelectionInspector({
   if (assembly.editingInstance&&assembly.editingDefinition) return <AssemblyEditingInspector
     panels={assembly.editingDefinition.panels.filter(panel => selectedIdSet.has(assembly.editingInstance!.panelIds[panel.id]))}
     definitionPanels={assembly.editingDefinition.panels} parameters={assembly.editingDefinition.parameters} onParametersChange={assembly.parameters}
-    name={assembly.editingDefinition.name} count={assemblyCount(assembly.editingDefinition.id)} onChange={assembly.updateDefinition} accessories={trofastInspector} />
+    name={assembly.editingDefinition.name} count={assemblyCount(assembly.editingDefinition.id)} onChange={assembly.updateDefinition} accessories={<>{trofastInspector}{furnishingInspector}</>} />
   if (instance&&assembly.definition) return <SelectedAssemblyInspector definition={assembly.definition} buildTools={buildTools} instance={instance} assembly={assembly} assemblyCount={assemblyCount} selectedPanels={selectedPanels} selectedFinishCoverages={selectedFinishCoverages} project={project} assemblyHint={assemblyHint} validTargets={validTargets} duplicateSelected={duplicateSelected} exportAssembly={exportAssembly} clipboard={clipboard} deleteSelected={deleteSelected} />
-  if (assembly.memberInstance&&selected&&assembly.definition) return <><AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={() => assembly.select(assembly.memberInstance!.id)} onEdit={() => assembly.edit(assembly.memberInstance!.id)} />{buildTools}</>
+  if (assembly.memberInstance&&selected&&assembly.definition) return <><AssemblyPartInspector panel={selected} instanceName={assembly.memberInstance.name} definitionName={assembly.definition.name} count={assemblyCount(assembly.definition.id)} onSelectInstance={() => assembly.select(assembly.memberInstance!.id)} onEdit={() => assembly.edit(assembly.memberInstance!.id)} />{furnishingInspector}{buildTools}</>
   if (assembly.hasMembers) return <>
     <div className="selected-heading"><Box size={15} /><span>MULTIPLE OBJECTS</span></div>
     <p className="assembly-help">{selectedPanels.length} panels selected, including linked instances. Select one assembly to edit its design. Arrow keys move connected instances together.</p>
@@ -353,6 +356,7 @@ function SelectionInspector({
     selected={selected}
     inspectorTab={inspectorTab}
     trofastInspector={trofastInspector}
+    furnishingInspector={furnishingInspector}
     extendToGround={extendToGround}
     groundPanelFit={groundPanelFit}
     panels={panels}
@@ -391,6 +395,7 @@ interface LoosePanelSelectionInspectorProps {
   selected: Panel|undefined
   inspectorTab: "panel" | "attach"
   trofastInspector: React.JSX.Element | undefined
+  furnishingInspector?: React.JSX.Element
   extendToGround: () => void
   groundPanelFit: ReturnType<typeof getPanelGroundExtension>
   panels: Panel[]
@@ -415,7 +420,7 @@ function LoosePanelSelectionInspector({
   openConstraints, constraintsInspector, buildTools, project,
   issues, updateMultiplePanels, commitWithInsertChecks, selectedIds,
   duplicateSelected, deleteSelected, detachSelection, selected,
-  inspectorTab, trofastInspector, extendToGround, groundPanelFit,
+  inspectorTab, trofastInspector, furnishingInspector, extendToGround, groundPanelFit,
   panels, connection, updatePanel, updateConnection,
   loosePanels, draft, setDraft, attachment,
   setAttachment, attachTarget, setAttachTarget, previewIssues,
@@ -433,6 +438,7 @@ function LoosePanelSelectionInspector({
     onManageConstraints={() => openConstraints()}
     constraints={constraintsInspector}
     buildTools={buildTools}
+    accessories={furnishingInspector}
     panels={selectedPanels}
     connections={project.connections}
     issues={issues}
@@ -448,6 +454,7 @@ function LoosePanelSelectionInspector({
     openConstraints={openConstraints}
     constraintsInspector={constraintsInspector}
     trofastInspector={trofastInspector}
+    furnishingInspector={furnishingInspector}
     extendToGround={extendToGround}
     groundPanelFit={groundPanelFit}
     buildTools={buildTools}
@@ -472,6 +479,7 @@ interface SelectedPanelInspectorProps {
   openConstraints: (add?: boolean) => void
   constraintsInspector: React.JSX.Element
   trofastInspector: React.JSX.Element | undefined
+  furnishingInspector?: React.JSX.Element
   extendToGround: () => void
   groundPanelFit: ReturnType<typeof getPanelGroundExtension>
   buildTools: React.JSX.Element | undefined
@@ -489,7 +497,7 @@ interface SelectedPanelInspectorProps {
 
 function SelectedPanelInspector({
   panelEditError, selectionKey, openConstraints, constraintsInspector,
-  trofastInspector, extendToGround, groundPanelFit, buildTools,
+  trofastInspector, furnishingInspector, extendToGround, groundPanelFit, buildTools,
   selected, project, panels, connection,
   issues, updatePanel, updateConnection, detachSelection,
   duplicateSelected, deleteSelected, onDimensionLockChange
@@ -500,7 +508,7 @@ function SelectedPanelInspector({
     editError={panelEditError?.selection===selectionKey? panelEditError.message:undefined}
     onManageConstraints={() => openConstraints()}
     constraints={constraintsInspector}
-    accessories={trofastInspector}
+    accessories={<>{trofastInspector}{furnishingInspector}</>}
     onExtendToGround={extendToGround}
     groundFitReason={groundPanelFit.reason}
     buildTools={buildTools}

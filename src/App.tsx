@@ -18,6 +18,8 @@ import { TrofastInspector } from '@/components/TrofastInspector'
 import { NiceValuesContext } from '@/components/nice-values-context'
 import { buildPreviewMenuActions } from '@/components/preview-menu-actions'
 import { useFurnishingMenu } from '@/editor/use-furnishing-menu'
+import { FurnishingPurposeField } from '@/components/FurnishingPurposeField'
+import { setPanelFurnishingRoles } from '@/lib/preview-furnishing-roles'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { EditorConstraints } from '@/editor/EditorConstraints'
 import { EditorConnectorInfill,EditorDialogs,EditorObjectConversion } from '@/editor/EditorDialogs'
@@ -175,7 +177,7 @@ export default function App() {
 
   const { canMenuAutoConnect,openConstraints }=useConstraintActions({ contextMenu, inspectingConnectors, assembly, project, selectedIds, objects, setAssemblyTab, notify, clipboard, closeContextMenu, selectedConnectorIds, setSelectedConnectorIds, setProjectConstraintsOpen, setInspectorTab, setRightOpen, setRealisticPreview, setExploded, setLeftOpen, constraints })
   const constraintSuggestions=useMemo(()=>contextMenu&&!inspectingConnectors&&!assembly.editingInstance?suggestDesignConstraints(project,selectedIds):[],[contextMenu,inspectingConnectors,assembly.editingInstance,project,selectedIds])
-  const furnishingMenu=useFurnishingMenu({ open: !!contextMenu, realisticPreview, inspectingConnectors, project, panels, selectedIds })
+  const furnishingMenu=useFurnishingMenu({ open: !!contextMenu, realisticPreview, inspectingConnectors, project, panels, selectedIds, commit })
   const menuActions = buildPreviewMenuActions({
     constraintSuggestions, constraintsEditing: constraints.editing, furnishing: furnishingMenu,
     project, panels, selectedPanels, selectedIds, selectedConnectorIds, selectedIdSet,
@@ -202,6 +204,7 @@ export default function App() {
   const buildTools = renderBuildTools(buildToolsProps, clipboard, inspectorTab)
   const fittedConnectorPanel=connectorPanelFit.result?.project.panels.find(panel=>panel.id===connectorPanelFit.result?.panelId)
   const trofastInspector=selected?<TrofastInspector key={`${selected.id}:${JSON.stringify(selected.trofastInserts)}`} project={project} panel={selected} onApply={inserts=>updatePanel({trofastInserts:inserts})} onPreview={previewTrofast}/>:undefined
+  const furnishingInspector=selectedPanels.length?<FurnishingPurposeField panels={selectedPanels} onChange={(ids,choice)=>commit(current=>setPanelFurnishingRoles(current,ids,choice))}/>:undefined
   const { constraintPreviewProject,displayPanels }=useDisplayedPanels({ trofastPreview, project, selectedId, inspectorTab, modalOpen, clipboard, assembly, exploded, constraints, setFrameSignal, panels })
   const editorConstraintsProps: React.ComponentProps<typeof EditorConstraints> = {
     panels, project, selectedIds, constraints, constraintPicker, setPickingConstraint, constraintFooter, setRightOpen,
@@ -251,7 +254,7 @@ export default function App() {
     projectConstraintsOpen, project, panels, commit, setFitSignal, notify, objectControlsDisabled, setObjectConversion,
     openConnectorInfill, infillReason, fittedConnectorPanel, selectedConnectors, commitWithInsertChecks,
     updateConnectorType, connectorTypeError, removeSelectedConnectors, connectWithPanel, modalOpen, connectorPanelFit,
-    selectedIdSet, trofastInspector, buildTools, selectedFinishCoverages, validTargets, duplicateSelected, exportAssembly,
+    selectedIdSet, trofastInspector, furnishingInspector, buildTools, selectedFinishCoverages, validTargets, duplicateSelected, exportAssembly,
     deleteSelected, distributeSelection, panelEditError, openConstraints, constraintsInspector, issues,
     updateMultiplePanels, selectedIds, detachSelection, extendToGround, groundPanelFit, connection, updatePanel,
     updateConnection, loosePanels, draft, setDraft, setAttachment, attachTarget, setAttachTarget, previewIssues,

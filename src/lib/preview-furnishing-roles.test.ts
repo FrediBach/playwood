@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePanels } from './model'
+import { parseProject, resolvePanels } from './model'
+import { updateAssemblyParameterValues } from './assemblies'
 import { createExampleProject } from './example-library'
 import { compartmentRow, furnitureArchetypes } from './fixtures/furniture-archetypes'
 import { planPreviewFurnishings, detectPreviewFurnishings, type FurnishingPlacement } from './preview-furnishings'
-import { chooseFurnishingRole, nameRoleHint, summarizeFurnishedRoles, type SurfaceFeatures } from './preview-furnishing-roles'
+import { chooseFurnishingRole, nameRoleHint, setPanelFurnishingRoles, summarizeFurnishedRoles, type FurnishingRoleChoice, type SurfaceFeatures } from './preview-furnishing-roles'
+import type { Panel } from './types'
 
 const archetype = (id: string) => furnitureArchetypes().find(item => item.id === id)!
 const roleOf = (panels: Parameters<typeof planPreviewFurnishings>[0], panelId: string, options = {}) =>
@@ -77,13 +79,39 @@ describe('furnishing purpose recognition', () => {
     expect(roleOf(bench.panels, bench.top, { names: { [bench.top]: 'Daybed' } })).toBe('bench')
   })
 
-  it('applies explicit role choices, including leaving a surface empty', () => {
+  it('applies saved purposes, including leaving a surface empty', () => {
     const sideboard = archetype('sideboard')
-    expect(kindsOn(detectPreviewFurnishings(sideboard.panels, { roles: { [sideboard.top]: 'empty' } }), sideboard.top)).toEqual([])
-    const plan = planPreviewFurnishings(sideboard.panels, { roles: { [sideboard.top]: 'display' } })
-    expect(plan.surfaces.find(surface => surface.panelId === sideboard.top)).toMatchObject({ role: 'display', source: 'choice' })
+    const withRole = (panels: Panel[], id: string, choice: FurnishingRoleChoice) =>
+      resolvePanels(setPanelFurnishingRoles({ version: 1, name: 'Test', panels, connections: [] }, [id], choice))
+    expect(kindsOn(detectPreviewFurnishings(withRole(sideboard.panels, sideboard.top, 'empty')), sideboard.top)).toEqual([])
+    const plan = planPreviewFurnishings(withRole(sideboard.panels, sideboard.top, 'display'))
+    expect(plan.surfaces.find(surface => surface.panelId === sideboard.top)).toMatchObject({ role: 'display', detected: 'sideboard', source: 'choice' })
     const desk = archetype('desk')
-    expect(kindsOn(detectPreviewFurnishings(desk.panels, { roles: { [desk.top]: 'dining-table' } }), desk.top)).toContain('place-setting')
+    expect(kindsOn(detectPreviewFurnishings(withRole(desk.panels, desk.top, 'dining-table')), desk.top)).toContain('place-setting')
+  })
+
+  it('saves, clears and parses panel purposes without changing unrelated panels', () => {
+    const project = createExampleProject('shelf')
+    const [first, second] = project.panels
+    const set = setPanelFurnishingRoles(project, [first.id], 'desk')
+    expect(set.panels[0].furnishingRole).toBe('desk')
+    expect(set.panels[1]).toBe(second)
+    expect(setPanelFurnishingRoles(set, [first.id], 'desk')).toBe(set)
+    expect(parseProject(structuredClone(set)).panels[0].furnishingRole).toBe('desk')
+    const cleared = setPanelFurnishingRoles(set, [first.id], 'auto')
+    expect(Object.hasOwn(cleared.panels[0], 'furnishingRole')).toBe(false)
+    expect(parseProject(structuredClone(project)).panels[0].furnishingRole).toBeUndefined()
+    expect(() => parseProject({ ...project, panels: [{ ...first, furnishingRole: 'throne' }, ...project.panels.slice(1)] })).toThrow('Invalid furnishing purpose.')
+  })
+
+  it('keeps a purpose on an assembly panel through instance rebuilds', () => {
+    const project = createExampleProject('assembly-cube')
+    const instance = project.assemblies!.instances[0]
+    const panelId = Object.values(instance.panelIds)[0]
+    const resized = updateAssemblyParameterValues(setPanelFurnishingRoles(project, [panelId], 'side-table'), instance.id, { 'side-length': 450 })
+    expect(resized.panels.find(panel => panel.id === panelId)).toMatchObject({ width: 450, furnishingRole: 'side-table' })
+    const cleared = updateAssemblyParameterValues(setPanelFurnishingRoles(resized, [panelId], 'auto'), instance.id, { 'side-length': 400 })
+    expect(cleared.panels.find(panel => panel.id === panelId)?.furnishingRole).toBeUndefined()
   })
 
   it('maps names to roles in several languages and ignores generic words', () => {

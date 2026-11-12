@@ -233,8 +233,7 @@ function getWorkspaceNotice(boxSelectActive: boolean|undefined,dragging: boolean
 const NO_FURNISHINGS: FurnishingPlacement[] = []
 
 function RoomDetails({ hasVisiblePanels, visibleBounds, furnishing, plan }: { hasVisiblePanels: boolean; visibleBounds: { width: number; height: number; depth: number; min: Vec3; max: Vec3 }; furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null })  {
-  const chosen = Object.keys(furnishing.roles).length
-  const customised = furnishing.seed !== 0 || chosen > 0 || furnishing.density !== 'balanced' || furnishing.theme !== 'auto'
+  const customised = furnishing.seed !== 0 || furnishing.density !== 'balanced' || furnishing.theme !== 'auto'
   return <div className="room-details" aria-label="Room scale reference">
     <span className="room-eyebrow"><Sun size={14} />THE DAYLIGHT ROOM</span>
     {hasVisiblePanels
@@ -250,12 +249,13 @@ function RoomDetails({ hasVisiblePanels, visibleBounds, furnishing, plan }: { ha
           <IconButton label="Shuffle" tooltipLabel="Shuffle arrangement" className="room-furnishing-icon" onClick={shufflePreviewFurnishing}><Shuffle size={14}/></IconButton>
         </div>}
       </div>
-      {furnishing.enabled&&<FurnishingOptionsControls furnishing={furnishing} plan={plan} chosen={chosen}/>}
+      {furnishing.enabled&&<FurnishingOptionsControls furnishing={furnishing} plan={plan}/>}
     </div>
   </div>
 }
 
-function FurnishingOptionsControls({ furnishing, plan, chosen }: { furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null; chosen: number }) {
+function FurnishingOptionsControls({ furnishing, plan }: { furnishing: PreviewFurnishingSettings; plan: FurnishingPlan|null }) {
+  const chosen = plan?.surfaces.filter(surface => surface.source === 'choice').length ?? 0
   const furnished = plan?.surfaces.flatMap(surface => surface.furnished && surface.role ? [surface.role] : []) ?? []
   return <>
     <div className="room-furnishing-options">

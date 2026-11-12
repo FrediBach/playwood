@@ -4,6 +4,7 @@ import { createExampleProject } from '../src/lib/example-library'
 import { createPreviewBenchProject } from '../src/lib/fixtures/preview-bench'
 import { furnitureArchetypes } from '../src/lib/fixtures/furniture-archetypes'
 import type { Panel } from '../src/lib/types'
+import { openInspectorSection } from './inspector-helpers'
 
 async function importPanels(page: Page, panels: Panel[]) {
   await page.getByRole('button', { name: 'Export project', exact: true }).click()
@@ -320,14 +321,55 @@ test('auto furnish recognises a dining table, varies it, and follows a chosen pu
   await page.getByRole('menuitemradio', { name: 'Leave empty', exact: true }).click()
   await expect(status).toHaveText('No furnishings placed. · 1 set by you')
   await expect(surface).toHaveAttribute('data-preview-furnishings', '0')
+  // The purpose is saved with the board, so Reset keeps it.
+  expect((await exportedProject(page)).panels.find((panel: Panel) => panel.id === 'dine-top').furnishingRole).toBe('empty')
 
   await page.getByRole('button', { name: 'Reset', exact: true }).click()
-  await expect(status).toHaveText('1 dining table')
+  await expect(status).toHaveText('No furnishings placed. · 1 set by you')
   await expect(page.getByRole('radio', { name: 'Balanced', exact: true })).toHaveAttribute('aria-checked', 'true')
   await expect(page.getByRole('button', { name: 'Reset', exact: true })).toHaveCount(0)
+  await openMenu()
+  await page.getByRole('menuitemradio', { name: 'Automatic · Dining table', exact: true }).click()
+  await expect(status).toHaveText('1 dining table')
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByRole('button', { name: 'Shuffle', exact: true })).toBeInViewport()
   await page.screenshot({ path: 'test-results/realistic-preview-furnishing-controls-narrow.png' })
+  expect(await exportedProject(page)).toEqual(original)
+  expect(errors).toEqual([])
+})
+
+test('the panel inspector saves a furnishing purpose that Auto furnish follows', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/')
+  await importPanels(page, furnitureArchetypes().find(item => item.id === 'dining')!.panels)
+  const original = await exportedProject(page)
+  const purpose = page.getByRole('combobox', { name: 'Furnish as', exact: true })
+
+  await page.locator('.panel-list-select').and(page.getByRole('button', { name: 'Side', exact: true })).first().click()
+  await expect(page.locator('.right-sidebar').getByText('Furnishing purpose', { exact: true })).toHaveCount(0)
+
+  await page.locator('.panel-list-select').and(page.getByRole('button', { name: 'Board', exact: true })).click()
+  await openInspectorSection(page, 'Furnishing purpose')
+  await expect(purpose).toHaveValue('auto')
+  await purpose.selectOption('desk')
+  await expect(purpose).toHaveValue('desk')
+  await page.locator('.right-sidebar').getByText('Furnishing purpose', { exact: true }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: 'test-results/panel-furnishing-purpose.png' })
+  expect((await exportedProject(page)).panels.find((panel: Panel) => panel.id === 'dine-top').furnishingRole).toBe('desk')
+
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
+  await expect(page.locator('.room-furnishing-status')).toHaveText('1 desk · 1 set by you')
+  await page.getByRole('button', { name: 'Studio', exact: true }).click()
+
+  // A mixed selection edits only its level boards.
+  await page.getByLabel('3D preview canvas', { exact: true }).focus()
+  await page.keyboard.press('ControlOrMeta+a')
+  await openInspectorSection(page, 'Furnishing purpose')
+  await expect(page.getByText('Applies to the 1 level board in the selection.')).toBeVisible()
+  await expect(purpose).toHaveValue('desk')
+  await purpose.selectOption('auto')
   expect(await exportedProject(page)).toEqual(original)
   expect(errors).toEqual([])
 })

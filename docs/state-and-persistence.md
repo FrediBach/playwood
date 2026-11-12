@@ -249,7 +249,7 @@ Project export downloads the current `Project` as indented JSON, named from the 
 Project
   version: 1
   name
-  panels[]           optional panel-local trofastInserts[]
+  panels[]           optional panel-local trofastInserts[] and furnishingRole
   connections[]
   constructionObjects? roots[] and nodes[] for editable box/Boolean source trees
   assemblies?         definitions, instances, physical links, loose ports
@@ -353,6 +353,8 @@ Resolved rectangular panel bounds, including hidden/rotated/custom-outline stock
 `ConnectorOrderDialog` holds color substitutions only for its open lifetime. `connector-order.ts` groups `getPhysicalConnectors` by effective type/material/color, validates substitutions against a dated manufacturer catalog, merges resulting order items, and calculates integer-cent EUR estimates. Metal silver maps to the shop’s Gray variant. The text download includes the catalog date, product links, and estimate limitations. This flow never commits project changes or changes saved formats; reopening resets substitutions. Entry unit prices exclude volume discounts, shipping, and supplier minimum quantities.
 
 Panel and construction-object visibility retains the version 1 `visible` boolean and adds optional `wireframe?: boolean` (omitted means false). Semi-visible items store `visible: false, wireframe: true`; hidden items have both false. Parsers validate the optional boolean. Copies retain the field through normal object spreads; paste placement keeps its existing behavior of making pasted panels fully visible. Project history, autosave, and JSON retain both fields. Assembly rebuilds preserve materialized panel visibility locally; standalone assembly files retain source visibility, rather than local instance display choices.
+
+Panels may also store an optional `furnishingRole` for Auto furnish: one of the preview purposes (`shelf`, `display`, `desk`, `standing-desk`, `dining-table`, `coffee-table`, `side-table`, `counter`, `sideboard`, `lowboard`, `bench`, `bed`) or `empty`. Omitted means automatic recognition, so older saves need no repair; `parseProject` rejects other values. It does not affect geometry, validation, cutting lists or GLB parts. `setPanelFurnishingRoles` sets or removes it as one undoable commit and returns the same project when nothing changes. Copies keep it through object spreads. Assembly rebuilds keep it per materialized panel like visibility, new instances inherit the source panel's value, and standalone assembly files carry source values only.
 
 ## Command feedback
 

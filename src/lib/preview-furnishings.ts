@@ -3,7 +3,7 @@ import { OBB } from 'three/examples/jsm/math/OBB.js'
 import type { Panel, Project, Vec3 } from './types'
 import { getTrofastInsertObb } from './trofast'
 import { createPreviewBooks, getPreviewBookBounds, PREVIEW_BOOK_BOUNDS, PREVIEW_BOOK_STACK_BOUNDS, type PreviewBookArrangement, type PreviewBookSupport } from './preview-books'
-import { chooseFurnishingRole, nameRoleHint, type FurnishingRole, type FurnishingRoleChoice, type RoleSource, type SurfaceFeatures } from './preview-furnishing-roles'
+import { chooseFurnishingRole, nameRoleHint, type FurnishingRole, type RoleSource, type SurfaceFeatures } from './preview-furnishing-roles'
 import { extraSegments, hashFraction, pickContent, seededRandom, shelfMix, variationHash, variationKey, type FurnishingDensity, type FurnishingTheme, type ResolvedTheme, type ShelfContent } from './preview-furnishing-variation'
 
 export type FurnishingKind =
@@ -38,8 +38,6 @@ export interface FurnishingOptions {
   seed?: number
   density?: FurnishingDensity
   theme?: FurnishingTheme
-  /** Per-panel user choices that replace automatic recognition. */
-  roles?: Readonly<Record<string, FurnishingRoleChoice>>
   /** Extra names per panel (assembly or group names) that can hint at purpose. */
   names?: Readonly<Record<string, string | undefined>>
 }
@@ -136,10 +134,18 @@ function obstacle(panel: Panel): Obstacle {
   return { panel, obb: new OBB(center, halfSize, rotation), bounds, normal: new Vector3(0, 0, 1).applyQuaternion(quaternion) }
 }
 
+const LEVEL_NORMAL_Y = 0.999999
+// A bounding rectangle cannot safely furnish a cutout, perforated or tilted board.
+const furnishableShape = (panel: Panel) => !panel.customOutline && !panel.trofastInserts?.length && panel.pattern === 'solid'
+
+/** A resolved board Auto furnish can read as a surface: level, solid and rectangular. Size and height are checked later. */
+export function furnishingSurfaceCandidate(panel: Panel) {
+  return furnishableShape(panel) && Math.abs(new Vector3(0, 0, 1).applyEuler(new Euler(...panel.rotation)).y) >= LEVEL_NORMAL_Y
+}
+
 function surface(item: Obstacle): Surface | null {
   const { panel, normal } = item
-  // A bounding rectangle cannot safely furnish a cutout, perforated or tilted board.
-  if (panel.customOutline || panel.trofastInserts?.length || panel.pattern !== 'solid' || Math.abs(normal.y) < 0.999999) return null
+  if (!furnishableShape(panel) || Math.abs(normal.y) < LEVEL_NORMAL_Y) return null
   const quaternion = new Quaternion().setFromEuler(new Euler(...panel.rotation))
   const x = (panel.width >= panel.height ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0)).applyQuaternion(quaternion)
   x.y = 0
@@ -502,6 +508,7 @@ export function planPreviewFurnishings(panels: Panel[], options: FurnishingOptio
   const obstacles = panels.filter(panel => panel.visible && [...panel.position, ...panel.rotation, panel.width, panel.height, panel.thickness].every(Number.isFinite)
     && panel.width > 0 && panel.height > 0 && panel.thickness > 0).map(obstacle)
   const objectOf = groupObjects(obstacles)
+  const panelById = new Map(obstacles.map(item => [item.panel.id, item.panel]))
   const order = (a: Surface, b: Surface) => a.center.y - b.center.y || a.center.x - b.center.x || a.center.z - b.center.z || a.obstacle.panel.id.localeCompare(b.obstacle.panel.id)
   // Small boards may still combine into a usable top, so merge before the size filter.
   const levels = obstacles.map(surface).filter((item): item is Surface => !!item && item.width >= 0.15 && item.depth >= 0.1
@@ -521,8 +528,8 @@ export function planPreviewFurnishings(panels: Panel[], options: FurnishingOptio
     const objectId = objectOf.get(base.obstacle.panel.id)!
     const analysis = analyse(base, obstacles, objectId, objectSurfaceCount.get(objectId) ?? 1, objectInserts.has(objectId))
     const panel = base.obstacle.panel
-    // A choice made on any board of a merged top applies to the whole top.
-    const choice = [...base.memberIds].map(id => options.roles?.[id]).find(Boolean)
+    // A purpose saved on any board of a merged top applies to the whole top.
+    const choice = [...base.memberIds].map(id => panelById.get(id)?.furnishingRole).find(Boolean)
     const detected = chooseFurnishingRole(analysis.features, nameRoleHint(panel.name, options.names?.[panel.id]))
     const role: FurnishingRole | null = choice === 'empty' ? null : choice ?? detected.role
     const source: RoleSource = choice ? 'choice' : detected.source

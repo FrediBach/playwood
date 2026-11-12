@@ -16,6 +16,7 @@ import { getTrofastColor, getTrofastItem } from './trofast-catalog'
 import { copyDesignConstraints, describeDesignConstraint, designConstraintPanelIds, evaluateDesignConstraints, parseDesignConstraints } from './design-constraints'
 import { assertDesignConstraintEdit } from './design-constraint-edits'
 import { outlineConnectionAligned } from './outline-closures'
+import { FURNISHING_ROLE_CHOICES } from './preview-furnishing-roles'
 
 const MATERIAL_COLORS = { birch: '#d9bd8c', oak: '#b88b54', walnut: '#76523b', mdf: '#ae9677', osb: '#dfc391', nazena: '#607d97', painted: '#e8e7df' }
 const uid = () => globalThis.crypto?.randomUUID?.() ?? `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
@@ -490,6 +491,7 @@ export function parseProject(input: unknown): Project {
       if (typeof raw.wireframe !== 'boolean') throw new Error('Invalid panel wireframe visibility.')
       p.wireframe = raw.wireframe
     }
+    if (raw.furnishingRole !== undefined) p.furnishingRole = enumIn(raw.furnishingRole, FURNISHING_ROLE_CHOICES, 'furnishing purpose')
     if (raw.finishCoverage !== undefined) p.finishCoverage = numberIn(raw.finishCoverage, 0, 1, 'finish coverage')
     if (raw.customOutline !== undefined) {
       const outlineError = getOutlineError(raw.customOutline)

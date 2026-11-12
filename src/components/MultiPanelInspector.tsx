@@ -21,6 +21,7 @@ interface Props extends PanelDimensionLocks {
   onDetach?: () => void
   onDistribute: () => void
   buildTools?: ReactNode
+  accessories?: ReactNode
   constraints?: ReactNode
   editError?: string
   onManageConstraints?: () => void
@@ -41,7 +42,7 @@ function SharedConnectionFields({connections,onChange}: {connections:(Connection
   </section>
 }
 
-export function MultiPanelInspector({ panels, connections, issues, onChange, onConnectionChange, onDuplicate, onDelete, onDetach, onDistribute, buildTools, constraints, editError, onManageConstraints, dimensionConstraints, onDimensionLockChange }: Props) {
+export function MultiPanelInspector({ panels, connections, issues, onChange, onConnectionChange, onDuplicate, onDelete, onDetach, onDistribute, buildTools, accessories, constraints, editError, onManageConstraints, dimensionConstraints, onDimensionLockChange }: Props) {
   const first = panels[0]
   const shared = getSharedPanelFields(panels)
   const selectedConnections = panels.map(panel => connections.find(c => c.childId === panel.id && c.role !== 'support'))
@@ -81,6 +82,7 @@ export function MultiPanelInspector({ panels, connections, issues, onChange, onC
     </section>
     {constraints}
     <PanelSecondaryFields resizeOnCommit panel={first} panels={panels} onChange={onChange}/>
+    {accessories}
     {buildTools}
     <div className="panel-actions"><Button variant="outline" size="sm" onClick={onDuplicate}><Copy size={15}/>Duplicate {panels.length}</Button><Button variant="ghost" size="icon" aria-label="Delete selected panels" className="delete-button" onClick={onDelete}><Trash2 size={16}/></Button></div>
   </>

@@ -160,7 +160,8 @@ function crossConnections(link: AssemblyLink, data: AssemblyData, panels: Panel[
 }
 
 function rebuild(project: Project, data: AssemblyData, oldData = project.assemblies ?? empty()): Project {
-  const visibility = new Map(project.panels.map(panel => [panel.id, { visible: panel.visible, wireframe: panel.wireframe }]))
+  // Per-instance panel state that the source definition does not drive. New instances inherit the source's purpose.
+  const visibility = new Map(project.panels.map(panel => [panel.id, { visible: panel.visible, wireframe: panel.wireframe, furnishingRole: panel.furnishingRole }]))
   const loose = restoreLoose(project, oldData)
   const panels = [...loose.panels]
   const connections = [...loose.connections]

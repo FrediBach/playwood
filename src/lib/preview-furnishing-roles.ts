@@ -8,15 +8,16 @@
  * explicit user choices override the result.
  */
 
-export type FurnishingRole =
-  | 'shelf' | 'display' | 'desk' | 'standing-desk' | 'dining-table' | 'coffee-table'
-  | 'side-table' | 'counter' | 'sideboard' | 'lowboard' | 'bench' | 'bed'
-export type FurnishingRoleChoice = FurnishingRole | 'empty'
+import type { FurnishingRole, FurnishingRoleChoice, Panel, Project } from './types'
+
+export type { FurnishingRole, FurnishingRoleChoice }
 
 export const FURNISHING_ROLES: readonly FurnishingRole[] = [
   'shelf', 'display', 'desk', 'standing-desk', 'dining-table', 'coffee-table',
   'side-table', 'counter', 'sideboard', 'lowboard', 'bench', 'bed',
 ]
+
+export const FURNISHING_ROLE_CHOICES: readonly FurnishingRoleChoice[] = [...FURNISHING_ROLES, 'empty']
 
 export const FURNISHING_ROLE_LABELS: Record<FurnishingRoleChoice, { label: string; one: string; plural: string }> = {
   shelf: { label: 'Shelf', one: 'shelf', plural: 'shelves' },
@@ -157,4 +158,18 @@ export function summarizeFurnishedRoles(roles: readonly FurnishingRole[]) {
   return [...counts].sort((a, b) => b[1] - a[1] || FURNISHING_ROLES.indexOf(a[0]) - FURNISHING_ROLES.indexOf(b[0]))
     .map(([role, count]) => `${count} ${FURNISHING_ROLE_LABELS[role][count === 1 ? 'one' : 'plural']}`)
     .join(' · ')
+}
+
+/** The saved purpose of each panel, or 'auto' to return it to recognition. Unchanged edits keep the same project. */
+export function setPanelFurnishingRoles(project: Project, panelIds: readonly string[], choice: FurnishingRoleChoice | 'auto'): Project {
+  const ids = new Set(panelIds)
+  let changed = false
+  const panels = project.panels.map((panel): Panel => {
+    if (!ids.has(panel.id) || (panel.furnishingRole ?? 'auto') === choice) return panel
+    changed = true
+    if (choice !== 'auto') return { ...panel, furnishingRole: choice }
+    const { furnishingRole: _removed, ...rest } = panel
+    return rest
+  })
+  return changed ? { ...project, panels } : project
 }

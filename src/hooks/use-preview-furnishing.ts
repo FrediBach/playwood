@@ -1,12 +1,12 @@
 import { useSyncExternalStore } from 'react'
 import type { FurnishingOptions } from '@/lib/preview-furnishings'
-import type { FurnishingRoleChoice } from '@/lib/preview-furnishing-roles'
 import type { FurnishingDensity, FurnishingTheme } from '@/lib/preview-furnishing-variation'
 
 /**
  * Auto furnish settings for the current browser session. They are workspace
  * state, not project data: the viewport, its context menu and the GLB export
- * read the same values, and nothing here is saved or undoable.
+ * read the same values, and nothing here is saved or undoable. Per-panel
+ * purposes are project data (`Panel.furnishingRole`).
  */
 export interface PreviewFurnishingSettings {
   enabled: boolean
@@ -14,11 +14,9 @@ export interface PreviewFurnishingSettings {
   seed: number
   density: FurnishingDensity
   theme: FurnishingTheme
-  /** Per-panel purpose choices from the realistic preview's context menu. */
-  roles: Readonly<Record<string, FurnishingRoleChoice>>
 }
 
-export const DEFAULT_FURNISHING_SETTINGS: PreviewFurnishingSettings = { enabled: false, seed: 0, density: 'balanced', theme: 'auto', roles: {} }
+export const DEFAULT_FURNISHING_SETTINGS: PreviewFurnishingSettings = { enabled: false, seed: 0, density: 'balanced', theme: 'auto' }
 
 let settings = DEFAULT_FURNISHING_SETTINGS
 const listeners = new Set<() => void>()
@@ -42,18 +40,6 @@ export function shufflePreviewFurnishing() {
   })
 }
 
-/** Set, or with 'auto' clear, the purpose of each surface panel. */
-export function setPreviewFurnishingRole(panelIds: readonly string[], choice: FurnishingRoleChoice | 'auto') {
-  updatePreviewFurnishing(current => {
-    const roles = { ...current.roles }
-    for (const id of panelIds) {
-      if (choice === 'auto') delete roles[id]
-      else roles[id] = choice
-    }
-    return { roles }
-  })
-}
-
 export function resetPreviewFurnishing() {
   updatePreviewFurnishing({ ...DEFAULT_FURNISHING_SETTINGS, enabled: settings.enabled })
 }
@@ -63,5 +49,5 @@ export function usePreviewFurnishing() {
 }
 
 export function furnishingOptions(current: PreviewFurnishingSettings, names?: FurnishingOptions['names']): FurnishingOptions {
-  return { seed: current.seed, density: current.density, theme: current.theme, roles: current.roles, names }
+  return { seed: current.seed, density: current.density, theme: current.theme, names }
 }
