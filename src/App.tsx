@@ -83,7 +83,7 @@ export default function App() {
   useEffect(()=>setToolRequest(undefined),[selectionKey,setToolRequest])
   useEffect(()=>{if(selectionKey||selectedConnectorIds.length)setProjectConstraintsOpen(false)},[selectionKey,selectedConnectorIds,setProjectConstraintsOpen])
   const {
-  selectedIdSet, selectedPanels, splitCounts, checkingSplits,
+  selectedIdSet, selectedPanels, splitCounts, splitDimensions, checkingSplits,
   gridCut, selectedFinishCoverages, selected, selectedId,
   groundPanelFit, attachmentSideGuide, connection, bounds,
   visibleBounds, hasVisiblePanels, issues
@@ -177,7 +177,7 @@ export default function App() {
   const menuActions = buildPreviewMenuActions({
     constraintSuggestions, constraintsEditing: constraints.editing,
     project, panels, selectedPanels, selectedIds, selectedConnectorIds, selectedIdSet,
-    inspectingConnectors, modalOpen, assembly, splitCounts, checkingSplits, canDivideGrid: !!gridCut, holes,
+    inspectingConnectors, modalOpen, assembly, splitCounts, splitDimensions, checkingSplits, canDivideGrid: !!gridCut, holes,
     canMenuAutoConnect, hasVisiblePanels, canAddConnectorsBetween: !infillReason, canConnectWithPanel: !!connectorPanelFit.result,
     canAttachPanel, canExtendToGround: !!groundPanelFit.result, canAttachCopy: validTargets.length > 0,
     actions: {

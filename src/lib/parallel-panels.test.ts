@@ -1,7 +1,7 @@
 import { roundTripProject } from '../test/project-round-trip'
 import { describe, expect, it } from 'vitest'
 import { createPanel, createStarterProject, getProjectBounds, resolvePanels, rotateProject, validateProject } from './model'
-import { parallelPanelCut, parallelPanelSplitCounts, splitParallelPanels } from './parallel-panels'
+import { parallelPanelCut, parallelPanelSplitCounts, parallelPanelSplitDimensions, splitParallelPanels } from './parallel-panels'
 import { gridProject } from './example-geometry'
 import type { Project } from './types'
 
@@ -11,6 +11,20 @@ const shelves = (width = 900, height = 300): Project => ({ version: 1, name: 'Pa
 ] })
 
 describe('split parallel panels', () => {
+  it('splits the shorter requested dimension and disables directions without clearance', () => {
+    const original = shelves()
+    expect(parallelPanelSplitDimensions(original, ['a', 'b'])).toEqual(['width', 'height'])
+    const result = splitParallelPanels(original, ['a', 'b'], 1, 'height')
+    const sections = resolvePanels(result.project).filter(panel => panel.name !== 'Center divider')
+    expect(sections).toHaveLength(4)
+    for (const section of sections) {
+      expect(section.width).toBe(900)
+      expect(section.height).toBeCloseTo((300 - 35) / 2)
+    }
+    expect(validateProject(result.project)).toEqual([])
+    expect(parallelPanelSplitDimensions(shelves(900, 100), ['a', 'b'])).toEqual(['width'])
+  })
+
   it.each([[900, 300], [300, 900]])('splits along the long dimension (%s × %s) and fits two T joints', (width, height) => {
     const original = shelves(width, height), before = structuredClone(original)
     const result = splitParallelPanels(original, ['a', 'b'])

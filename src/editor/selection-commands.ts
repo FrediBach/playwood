@@ -19,7 +19,7 @@ import { createListGroup,moveListItems,orderedConnectors,renameListGroup,ungroup
 import { detachPanel,duplicatePanel,removePanel,resolvePanels } from '@/lib/model'
 import { mergePanels } from '@/lib/panel-merge'
 import { distributePanels } from '@/lib/panel-distribution'
-import { splitParallelPanels } from '@/lib/parallel-panels'
+import { splitParallelPanels, type PanelSplitDimension } from '@/lib/parallel-panels'
 import { getSharedPanelFields,panelValuesEqual,selectPanelIds,updateSelectedPanels } from '@/lib/selection'
 import { MovementReviewRequired,movePanelsWithReview,movePanels,resizePanelDimensions,resizePanels,type MovementReview,type ResizeReview } from '@/lib/structure-edit'
 import { assertNoNewTrofastIssues } from '@/lib/trofast'
@@ -130,9 +130,9 @@ export function createSelectionCommands({ assembly, commit, selectedIds, notify,
     try { commit(current => mergePanels(current,selectedIds)); setSelectedIds([selectedIds[0]]); notify('Panels merged. Undo is available.','success') }
     catch(error) { notify(error instanceof Error? error.message:'These panels cannot be merged.','error') }
   }
-  const splitSelection=(count=1) => {
+  const splitSelection=(count=1, dimension?: PanelSplitDimension) => {
     try {
-      const result=splitParallelPanels(project,selectedIds,count)
+      const result=splitParallelPanels(project,selectedIds,count,dimension)
       commit(result.project); setSelectedIds(result.panelIds)
       notify(`Panels split into ${count+1} equal sections each with ${count} ${count===1? 'divider':'dividers'} and ${result.connectors} new connectors. Undo is available.`)
     } catch(error) { notify(error instanceof Error? error.message:'These panels could not be split.','error')}

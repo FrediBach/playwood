@@ -5,7 +5,7 @@ import type { PreviewMenuAction } from './PreviewContextMenu'
 import type { useAssemblyEditor } from '@/hooks/use-assembly-editor'
 import { assemblySelectionError } from '@/lib/assemblies'
 import { panelDistribution } from '@/lib/panel-distribution'
-import { parallelPanelCut } from '@/lib/parallel-panels'
+import { parallelPanelCut, type PanelSplitDimension } from '@/lib/parallel-panels'
 import type { findPanelHoles } from '@/lib/close-holes'
 import type { ConstraintSuggestion } from '@/lib/constraint-suggestions'
 import type { Panel, Project, ListKind } from '@/lib/types'
@@ -25,6 +25,7 @@ interface MenuContext {
   canAttachPanel?: boolean
   canExtendToGround: boolean
   canAttachCopy: boolean
+  splitDimensions: PanelSplitDimension[]
   splitCounts: number[]
   checkingSplits: boolean
   canDivideGrid: boolean
@@ -55,7 +56,7 @@ interface MenuContext {
     startAttach: () => void
     extendToGround: () => void
     detachSelection: () => void
-    splitSelection: () => void
+    splitSelection: (count?: number, dimension?: PanelSplitDimension) => void
     mergeSelection: () => void
     distributeSelection: () => void
     closeHole: (id: string) => void
@@ -118,7 +119,13 @@ function addLoosePanelActions(context: MenuContext, menuAction: AddAction) {
   if (project.connections.some(c=>selectedIdSet.has(c.parentId)||selectedIdSet.has(c.childId))) menuAction('Remove', 'Disconnect panels',Unlink,detachSelection)
   if (panelDistribution(selectedPanels)) menuAction('Build', 'Distribute evenly',Rows3,actions.distributeSelection)
   if (selectedPanels.length===2) menuAction('Build', 'Merge panels',Square,actions.mergeSelection,false,context.modalOpen)
-  if (splitCounts.includes(1)) menuAction('Build', 'Split in the middle',Scissors,()=>splitSelection())
+  if (parallelPanelCut(selectedPanels)) menuAction('Build', 'Split in the middle',Scissors,()=>splitSelection(),false,context.modalOpen,splitCounts.includes(1)?previewShortcut('Split in the middle'):'',undefined,[
+    ...(['width', 'height'] as const).map(dimension => ({
+      id: `split/${dimension}`, label: dimension === 'width' ? 'Local X · Width' : 'Local Y · Height', icon: Scissors,
+      disabled: context.modalOpen || !context.splitDimensions.includes(dimension), run: () => splitSelection(1, dimension),
+    })),
+    { id: 'split/thickness', label: 'Local Z · Thickness', icon: Scissors, disabled: true, run: () => {} },
+  ])
   if (canDivideGrid) menuAction('Build', 'Divide into a grid',Grid2X2,()=>actions.openTool('grid'))
   if (parallelPanelCut(selectedPanels)) menuAction('Build', 'Split x times',Rows3,()=>actions.openTool('parallel'),false,checkingSplits||!splitCounts.length)
 }

@@ -24,7 +24,7 @@ interface UsePanelSelectionDetailsOptions {
 export function usePanelSelectionDetails({ selectedIds, panels, project, attachment, attachmentSideHighlight, setAttachmentSideHighlight, setAttachment }: UsePanelSelectionDetailsOptions) {
   const selectedIdSet=useMemo(()=>new Set(selectedIds),[selectedIds])
   const selectedPanels=panels.filter(p=>selectedIdSet.has(p.id))
-  const {counts:splitCounts,checking:checkingSplits}=useParallelPanelSplitCounts(project,selectedIds)
+  const {counts:splitCounts,dimensions:splitDimensions,checking:checkingSplits}=useParallelPanelSplitCounts(project,selectedIds)
   const gridCut=gridPanelCut(selectedPanels)
   const selectedFinishCoverages=selectedPanels.map(p=>p.material==='painted'?1:p.finishCoverage??0)
   const selected=selectedPanels.length===1?selectedPanels[0]:undefined
@@ -43,7 +43,7 @@ export function usePanelSelectionDetails({ selectedIds, panels, project, attachm
   const visibleBounds=useMemo(()=>getProjectBounds(panels.filter(panel=>panel.visible)),[panels])
   const hasVisiblePanels=panels.some(panel=>panel.visible)
   const issues=useMemo(()=>validateProject(project),[project])
-  return { selectedIdSet, selectedPanels, splitCounts, checkingSplits, gridCut, selectedFinishCoverages, selected, selectedId, groundPanelFit, attachmentSideGuide, connection, bounds, visibleBounds, hasVisiblePanels, issues }
+  return { selectedIdSet, selectedPanels, splitCounts, splitDimensions, checkingSplits, gridCut, selectedFinishCoverages, selected, selectedId, groundPanelFit, attachmentSideGuide, connection, bounds, visibleBounds, hasVisiblePanels, issues }
 }
 
 interface UseConnectorSelectionDetailsOptions {

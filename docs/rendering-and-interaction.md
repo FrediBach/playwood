@@ -230,7 +230,7 @@ Two expensive split checks run in module workers created with `new Worker(new UR
 
 | Caller | Worker | Result handling |
 | --- | --- | --- |
-| [`useParallelPanelSplitCounts`](../src/hooks/useParallelPanelSplitCounts.ts) | [`parallel-panel-split.worker.ts`](../src/lib/parallel-panel-split.worker.ts) | Streams supported divider counts, then marks checking complete. Results are associated with the original project and selection identities. |
+| [`useParallelPanelSplitCounts`](../src/hooks/useParallelPanelSplitCounts.ts) | [`parallel-panel-split.worker.ts`](../src/lib/parallel-panel-split.worker.ts) | Checks the two local center-split dimensions independently for the context submenu, then streams supported divider counts for the default longer dimension and marks checking complete. Results are associated with the original project and selection identities. |
 | [`GridPanelSplit`](../src/components/GridPanelSplit.tsx) | [`grid-split.worker.ts`](../src/lib/grid-split.worker.ts) | Debounces changes by 120 ms, computes a complete proposed split or error, and enables Apply only for a matching successful result. |
 
 Both callers terminate workers during effect cleanup. The parallel split hook also ignores messages and errors from cleaned-up effects, and derives its initial checking state until a result matches the current project and selection. The workers run existing domain functions and return ordinary structured-clone data; they do not own project state. Project, selection, and input identity checks prevent older results from being displayed as current.

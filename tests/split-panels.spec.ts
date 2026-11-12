@@ -1,6 +1,6 @@
 import { openInspectorSection } from './inspector-helpers'
 import { test, expect } from '@playwright/test'
-import { createStarterProject, validateProject } from '../src/lib/model'
+import { createPanel, createStarterProject, validateProject } from '../src/lib/model'
 
 test('splits selected shelves with a center divider, saves, and undoes as one edit', async ({ page }) => {
   const original = createStarterProject()
@@ -173,4 +173,38 @@ test('divides four selected sides into a grid, validates inputs, saves and undoe
   await expect(page.locator('.panel-list-row')).toHaveCount(17)
   await page.reload()
   await expect(page.locator('.panel-list-row')).toHaveCount(17)
+})
+
+test('context split submenu selects an axis and disables cuts without room', async ({ page }) => {
+  await page.goto('/')
+  const load = async (height: number) => {
+    const project = { version: 1, name: 'Axis split', connections: [], panels: [
+      createPanel({ id: 'a', name: 'Front', width: 900, height, position: [0, 500, 0] }),
+      createPanel({ id: 'b', name: 'Back', width: 900, height, position: [0, 500, 400] }),
+    ] }
+    await page.getByLabel('Import project file').setInputFiles({ name: 'pair.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
+    await page.getByRole('checkbox', { name: 'Select Front', exact: true }).check()
+    await page.getByRole('checkbox', { name: 'Select Back', exact: true }).check()
+    await page.locator('canvas').focus()
+    await page.keyboard.press('Shift+F10')
+    await page.getByRole('menuitem', { name: 'Split in the middle', exact: true }).click()
+  }
+  await load(300)
+  const submenu = page.getByRole('menu', { name: 'Split in the middle', exact: true })
+  await expect(submenu.getByRole('menuitem', { name: 'Local Y · Height' })).toBeEnabled()
+  await expect(submenu.getByRole('menuitem', { name: 'Local Z · Thickness' })).toBeDisabled()
+  await submenu.getByRole('menuitem', { name: 'Local Y · Height' }).click()
+  await expect(page.locator('.panel-list-row')).toHaveCount(5)
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!).panels.length)).toBe(5)
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('playwood-studio-project-v1')!))
+  expect(saved.panels.filter((panel: { name: string }) => panel.name !== 'Center divider').every((panel: { width: number; height: number }) => panel.width === 900 && Math.abs(panel.height - 132.5) < 0.01)).toBe(true)
+  expect(validateProject(saved)).toEqual([])
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect(page.locator('.panel-list-row')).toHaveCount(2)
+  await load(100)
+  await expect(submenu.getByRole('menuitem', { name: 'Local X · Width' })).toBeEnabled()
+  await expect(submenu.getByRole('menuitem', { name: 'Local Y · Height' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(submenu).toHaveCount(0)
+  await expect(page.getByRole('menuitem', { name: 'Split in the middle', exact: true })).toBeFocused()
 })

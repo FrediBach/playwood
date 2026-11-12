@@ -5,8 +5,10 @@ import { CONNECTOR_PROFILES } from './connector-profile'
 import { createPanel, resolvePanels, validateProject } from './model'
 import type { Panel, Project } from './types'
 
+export type PanelSplitDimension = 'width' | 'height'
+
 /** Find a centered cut shared by two aligned, separated panel faces. */
-export function parallelPanelCut(panels: readonly Panel[]) {
+export function parallelPanelCut(panels: readonly Panel[], requestedDimension?: PanelSplitDimension) {
   if (panels.length !== 2 || panels.some(panel => !panel.visible || panel.customOutline || panel.trofastInserts?.length)) return undefined
   const [a, b] = panels
   const rotation = (panel: Panel) => new Quaternion().setFromEuler(new Euler(...panel.rotation))
@@ -16,18 +18,18 @@ export function parallelPanelCut(panels: readonly Panel[]) {
   const delta = new Vector3(...b.position).sub(new Vector3(...a.position)).applyQuaternion(qa.clone().invert())
   if (Math.abs(delta.x) > 0.01 || Math.abs(delta.y) > 0.01 || Math.abs(delta.z) <= (a.thickness + b.thickness) / 2) return undefined
   if (Math.abs(a.width - b.width) > 0.01 || Math.abs(a.height - b.height) > 0.01) return undefined
-  const dimension = a.width >= a.height ? 'width' : 'height'
+  const dimension = requestedDimension ?? (a.width >= a.height ? 'width' : 'height')
   return { a, b, dimension, separation: Math.abs(delta.z), direction: Math.sign(delta.z), rotation: qa } as const
 }
 
 /** One atomic edit: add evenly spaced dividers, fit T joints, and remap outer joints. */
-export function splitParallelPanels(project: Project, ids: readonly string[], count = 1) {
+export function splitParallelPanels(project: Project, ids: readonly string[], count = 1, requestedDimension?: PanelSplitDimension) {
   if (!Number.isInteger(count) || count < 1) throw new Error('Choose a positive whole number of splits.')
   const selectedIds = new Set(ids)
   const selected = resolvePanels(project).filter(panel => selectedIds.has(panel.id))
   if (selected.some(panel => panel.customOutline)) throw new Error('Remove custom outlines before splitting parallel panels.')
   if (selected.some(panel => panel.trofastInserts?.length)) throw new Error('Remove TROFAST inserts before splitting parallel panels.')
-  const cut = parallelPanelCut(selected)
+  const cut = parallelPanelCut(selected, requestedDimension)
   if (!cut || selectedIds.size !== 2) throw new Error('Select two aligned parallel panels with matching dimensions.')
   if (ids.some(id => isPanelConnectedToAssembly(project, id))) throw new Error('Disassemble these panels before splitting them.')
   const { a, b, dimension, separation, direction, rotation } = cut
@@ -70,4 +72,11 @@ export function parallelPanelSplitCounts(project: Project, ids: readonly string[
     try { splitParallelPanels(project, ids, count); counts.push(count); onValid?.(count) } catch { /* This count cannot preserve clearance and existing joints. */ }
   }
   return counts
+}
+
+/** Validate both local cut directions independently of the default long dimension. */
+export function parallelPanelSplitDimensions(project: Project, ids: readonly string[]): PanelSplitDimension[] {
+  return (['width', 'height'] as const).filter(dimension => {
+    try { splitParallelPanels(project, ids, 1, dimension); return true } catch { return false }
+  })
 }
