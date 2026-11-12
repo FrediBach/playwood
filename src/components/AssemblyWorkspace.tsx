@@ -1,4 +1,5 @@
 import { getProjectBounds } from '@/lib/model'
+import { roomStyleFor } from '@/lib/room-floor-style'
 import { planPreviewFurnishings,type FurnishingPlacement,type FurnishingPlan } from '@/lib/preview-furnishings'
 import { summarizeFurnishedRoles } from '@/lib/preview-furnishing-roles'
 import { FURNISHING_DENSITIES,FURNISHING_THEMES,type FurnishingDensity,type FurnishingTheme } from '@/lib/preview-furnishing-variation'
@@ -99,6 +100,7 @@ export function AssemblyWorkspace({
   const furnishingPlan = useMemo(() => realisticPreview && furnishing.enabled ? planPreviewFurnishings(panels, furnishingOptions(furnishing, furnishingNames)) : null,
     [panels, realisticPreview, furnishing, furnishingNames])
   const furnishings = furnishingPlan?.placements ?? NO_FURNISHINGS
+  const roomStyle = useMemo(() => roomStyleFor(furnishing, furnishingPlan?.theme), [furnishing, furnishingPlan?.theme])
   const panelSelectionActive = (selectionKind ?? (selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'panels'
   const sceneProps: SceneProps=workspaceSceneProps(suppressedPanelIds,previewPanels,suppressedConnectionIds,previewConnections,realisticPreview,panels,connections,selectedIds,choosePanel,showDimensions,furnishings,fitSignal,frameSignal,zoomSignal,onDrillIn,attachmentSideGuide,attachmentHandles,onAttachmentPreview,onAttachmentCommit,attachmentBoundsPanels,view,showGrid,exploded)
   const movementStatus = getMovementStatus(constraintPicking,constraintEditing,boxSelectActive,objectSelection,resizing,repeatPreview,resizeLimited,resizeHandles,panelSelectionActive,selectedIds,editingAssembly,assemblyHint,movementEnabled,dragging,dragSnap,isAttaching,exploded)
@@ -129,6 +131,7 @@ export function AssemblyWorkspace({
     setShowGrid={setShowGrid}/>
       <div className="scene-container"><Scene
     {...sceneProps}
+    roomStyle={roomStyle}
     connect={connect}
     objectSelection={objectSelection}
     constructionLayer={realisticPreview||exploded?undefined:constructionLayer}

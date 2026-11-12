@@ -4,65 +4,12 @@ import { Banana } from './Banana'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
+import { DEFAULT_ROOM_STYLE, roomFloorStyle, rugSize, type RoomFloorStyle, type RoomStyleInput } from '@/lib/room-floor-style'
+import { parquetTextures, rugTextures } from './room-floor-textures'
 
 RectAreaLightUniformsLib.init()
 
 type Triple = [number, number, number]
-
-function floorTexture() {
-  const canvas = document.createElement('canvas')
-  canvas.width = canvas.height = 1024
-  const ctx = canvas.getContext('2d')!
-  for (let row = 0; row < 12; row++) {
-    const y = row * 1024 / 12
-    const shade = Math.sin(row * 12.65) * 6
-    ctx.fillStyle = `rgb(${173 + shade}, ${145 + shade}, ${109 + shade})`
-    ctx.fillRect(0, y, 1024, 1024 / 12 + 1)
-    for (let line = 0; line < 42; line++) {
-      ctx.beginPath()
-      ctx.strokeStyle = line % 3 === 0 ? 'rgba(96,65,36,0.10)' : 'rgba(246,221,176,0.11)'
-      ctx.lineWidth = 0.55 + (line % 4) * 0.25
-      const lineY = y + line * 2
-      for (let x = 0; x <= 1024; x += 8) {
-        const grainY = lineY + Math.sin(x * 0.007 + row * 3) * 1.8 + Math.sin(x * 0.031 + line) * 0.45
-        if (x === 0) ctx.moveTo(x, grainY)
-        else ctx.lineTo(x, grainY)
-      }
-      ctx.stroke()
-    }
-    ctx.fillStyle = 'rgba(83,61,37,0.23)'
-    ctx.fillRect(0, y, 1024, 1.1)
-    ctx.fillStyle = 'rgba(255,236,207,0.22)'
-    ctx.fillRect(0, y + 1.1, 1024, 0.9)
-    const seam = ((row * 317) % 900) + 50
-    ctx.fillStyle = 'rgba(89,62,35,0.2)'
-    ctx.fillRect(seam, y, 1.1, 1024 / 12)
-  }
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 8
-  return texture
-}
-
-function textileTexture() {
-  const canvas = document.createElement('canvas')
-  canvas.width = canvas.height = 128
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#ded7c8'
-  ctx.fillRect(0, 0, 128, 128)
-  for (let i = 0; i < 128; i += 2) {
-    ctx.fillStyle = i % 4 === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(75,63,45,0.09)'
-    ctx.fillRect(i, 0, 1, 128)
-    ctx.fillRect(0, i, 128, 1)
-  }
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping
-  texture.repeat.set(12, 10)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 8
-  return texture
-}
 
 function artworkTexture() {
   const canvas = document.createElement('canvas')
@@ -154,6 +101,44 @@ function SideTable({ position }: { position: Triple }) {
   </group>
 }
 
+/** Parquet with UVs in tile units, so a pattern can turn without stretching. */
+function ParquetFloor({ style, position, width, depth }: { style: RoomFloorStyle; position: Triple; width: number; depth: number }) {
+  const { parquet, key } = style
+  const textures = useMemo(() => parquetTextures(parquet, key), [parquet, key])
+  useEffect(() => () => { textures.map.dispose(); textures.bump.dispose() }, [textures])
+  const geometry = useMemo(() => {
+    const plane = new THREE.PlaneGeometry(width, depth)
+    const uv = plane.attributes.uv
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * width / textures.metres, uv.getY(i) * depth / textures.metres)
+    return plane
+  }, [width, depth, textures.metres])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => {
+    for (const map of [textures.map, textures.bump]) map.rotation = parquet.angle
+  }, [textures, parquet.angle])
+  return <mesh name={`Parquet floor, ${parquet.pattern}, ${parquet.wood.id}`} position={position} rotation={[-Math.PI / 2, 0, 0]} geometry={geometry} receiveShadow>
+    <meshStandardMaterial map={textures.map} bumpMap={textures.bump} bumpScale={0.5} roughness={parquet.roughness} />
+  </mesh>
+}
+
+function Rug({ style, position, extent }: { style: RoomFloorStyle; position: Triple; extent: [number, number] }) {
+  const { rug, key } = style
+  const [width, depth] = rugSize(rug, ...extent)
+  const textures = useMemo(() => rugTextures(rug, key, [width, depth]), [rug, key, width, depth])
+  useEffect(() => () => { textures.map.dispose(); textures.bump.dispose(); textures.fringe?.dispose() }, [textures])
+  const pile = !['kilim', 'stripes', 'jute'].includes(rug.pattern)
+  const material = <meshStandardMaterial map={textures.map} bumpMap={textures.bump} bumpScale={pile ? 0.7 : 1} roughness={1} />
+  const [x, y, z] = position
+  return <group name={`Rug, ${rug.pattern}, ${width.toFixed(1)} × ${depth.toFixed(1)} m`} position={[x, y + rug.pile / 2, z]}>
+    {rug.shape === 'round'
+      ? <mesh receiveShadow><cylinderGeometry args={[width / 2, width / 2, rug.pile, 96]} />{material}</mesh>
+      : <mesh receiveShadow><boxGeometry args={[width, rug.pile, depth]} />{material}</mesh>}
+    {textures.fringe && [1, -1].map(side => <mesh key={side} position={[side * (width / 2 + 0.035), -rug.pile / 2 + 0.0012, 0]} rotation={[-Math.PI / 2, 0, side > 0 ? 0 : Math.PI]} receiveShadow>
+      <planeGeometry args={[0.07, depth - 0.04]} /><meshStandardMaterial map={textures.fringe} alphaTest={0.4} roughness={1} side={THREE.DoubleSide} />
+    </mesh>)}
+  </group>
+}
+
 function Curtain({ position, height }: { position: Triple; height: number }) {
   const geometry = useMemo(() => {
     const mesh = new THREE.PlaneGeometry(0.58, height, 36, 1)
@@ -166,16 +151,15 @@ function Curtain({ position, height }: { position: Triple; height: number }) {
   return <mesh position={position} rotation={[0, Math.PI / 2, 0]} geometry={geometry} castShadow receiveShadow><meshStandardMaterial color="#e7dfd1" roughness={1} side={THREE.DoubleSide} /></mesh>
 }
 
-export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
+export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE }: { bounds: THREE.Box3; style?: RoomStyleInput }) {
   const layout = getRoomLayout(bounds)
   const { floorY, leftX, rightX, backZ, width, depth, height, chairX, chairZ, artX, artY } = layout
   const centerX = (leftX + rightX) / 2
   const centerZ = backZ + depth / 2
-  const oak = useMemo(floorTexture, [])
-  const linen = useMemo(textileTexture, [])
+  const { seed, theme } = input
+  const style = useMemo(() => roomFloorStyle({ seed, theme }), [seed, theme])
   const art = useMemo(artworkTexture, [])
-  useEffect(() => () => { oak.dispose(); linen.dispose(); art.dispose() }, [oak, linen, art])
-  useEffect(() => { oak.repeat.set(width / 2.4, depth / 2.4) }, [oak, width, depth])
+  useEffect(() => () => art.dispose(), [art])
   const lightTarget = useMemo(() => new THREE.Object3D(), [])
   const furnitureCenterZ = 0
   useEffect(() => { lightTarget.position.set(layout.centerX, floorY + 0.55, furnitureCenterZ) }, [lightTarget, layout.centerX, floorY, furnitureCenterZ])
@@ -183,8 +167,6 @@ export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
   const windowWidth = 2.4
   const windowHeight = 2.25
   const windowBottom = 0.35
-  const rugWidth = Math.max(2.5, bounds.max.x - bounds.min.x + 1.3)
-  const rugDepth = Math.max(1.8, bounds.max.z - bounds.min.z + 1.3)
   return <group name="Modern home">
     <ambientLight intensity={0.28} color="#fff5e4" />
     <hemisphereLight args={['#edf3ff', '#b69c7a', 0.85]} />
@@ -195,9 +177,7 @@ export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
     <rectAreaLight position={[leftX + 0.15, floorY + 1.7, windowZ]} rotation={[0, -Math.PI / 2, 0]} width={windowWidth} height={windowHeight} color="#f4f7ff" intensity={3} />
     <directionalLight position={[rightX, floorY + 3, backZ + 4]} target={lightTarget} color="#fff7e9" intensity={0.4} />
 
-    <mesh position={[centerX, floorY - 0.006, centerZ]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <planeGeometry args={[width, depth]} /><meshStandardMaterial map={oak} bumpMap={oak} bumpScale={0.003} roughness={0.72} />
-    </mesh>
+    <ParquetFloor style={style} position={[centerX, floorY - 0.006, centerZ]} width={width} depth={depth} />
     {/* A single-sided ceiling fills the upper view from inside the room while
         allowing an elevated orbit to see through it. It does not block daylight. */}
     <mesh position={[centerX, floorY + height, centerZ]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
@@ -221,9 +201,7 @@ export function RoomEnvironment({ bounds }: { bounds: THREE.Box3 }) {
     <Curtain position={[leftX + 0.14, floorY + 1.41, windowZ - windowWidth / 2 - 0.12]} height={2.72} />
     <Curtain position={[leftX + 0.14, floorY + 1.41, windowZ + windowWidth / 2 + 0.12]} height={2.72} />
 
-    <mesh position={[layout.centerX + 0.12, floorY + 0.004, furnitureCenterZ + 0.16]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <planeGeometry args={[rugWidth, rugDepth]} /><meshStandardMaterial map={linen} roughness={1} bumpMap={linen} bumpScale={0.004} color="#ded5c2" />
-    </mesh>
+    <Rug style={style} position={[layout.centerX + 0.12, floorY - 0.006, furnitureCenterZ + 0.16]} extent={[bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z]} />
     <Box position={[artX, floorY + artY, backZ + 0.035]} size={[0.85, 1.05, 0.045]} color="#66543f" />
     <mesh position={[artX, floorY + artY, backZ + 0.059]} receiveShadow><planeGeometry args={[0.806, 1.006]} /><meshStandardMaterial map={art} roughness={1} /></mesh>
 

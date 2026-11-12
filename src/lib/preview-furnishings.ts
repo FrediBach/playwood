@@ -61,6 +61,8 @@ export interface FurnishingPlan {
   placements: FurnishingPlacement[]
   /** Every analysed surface, in detection order. */
   surfaces: FurnishedSurface[]
+  /** The style of the room as a whole, which also chooses its floor and rug. */
+  theme: ResolvedTheme
 }
 
 export const MAX_PREVIEW_FURNISHINGS = 48
@@ -837,7 +839,8 @@ export function planPreviewFurnishings(panels: Panel[], options: FurnishingOptio
     surfacesOut.push({ panelId, role, detected: item.detected, source: item.source, furnished: result.length > before,
       features: item.features, memberIds: [...item.base.memberIds] })
   }
-  return { placements: result, surfaces: surfacesOut }
+  const roomTheme = resolveTheme(options.theme ?? 'auto', analysed.map(item => item.role), objectInserts.size > 0)
+  return { placements: result, surfaces: surfacesOut, theme: roomTheme }
 }
 
 export function detectPreviewFurnishings(panels: Panel[], options: FurnishingOptions = {}): FurnishingPlacement[] {

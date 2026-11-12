@@ -5,6 +5,7 @@ import { isGeometryGuideActive, type SnapSettings } from '@/lib/preview-snap'
 import type { Vec3 } from '@/lib/types'
 import { GroundGrid } from './GroundGrid'
 import { RoomEnvironment } from './RoomEnvironment'
+import type { RoomStyleInput } from '@/lib/room-floor-style'
 
 const MM = 0.001
 interface Props {
@@ -13,16 +14,17 @@ interface Props {
   showGrid: boolean
   exploded: boolean
   realisticPreview?: boolean
+  roomStyle?: RoomStyleInput
   snapSettings?: SnapSettings
   guides: { targets: Vec3[]; sources: Vec3[]; direction: Vec3 }
 }
 
-export function SceneEnvironment({bounds, floorY, showGrid, exploded, realisticPreview, snapSettings, guides}: Props) {
+export function SceneEnvironment({bounds, floorY, showGrid, exploded, realisticPreview, roomStyle, snapSettings, guides}: Props) {
   const center = useMemo(() => bounds.getCenter(new Vector3()), [bounds])
   const extent = useMemo(() => Math.max(3, bounds.getSize(new Vector3()).length() * 2.5), [bounds])
   return <>
     <color attach="background" args={[realisticPreview ? '#e9e7df' : '#eeede8']} />
-    {realisticPreview ? <RoomEnvironment bounds={bounds} /> : <>
+    {realisticPreview ? <RoomEnvironment bounds={bounds} style={roomStyle} /> : <>
     <ambientLight intensity={0.9} />
     <hemisphereLight args={['#ffffff', '#b6b0a0', 1.0]} />
     <directionalLight position={[2.5, 5, 3.5]} intensity={2.3} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.001}

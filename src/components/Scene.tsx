@@ -5,6 +5,7 @@ import { getPhysicalConnectors } from '@/lib/connector-selection'
 import { constructionBounds } from '@/lib/object-geometry'
 import { getPanelMovementDelta } from '@/lib/panel-movement-direction'
 import type { FurnishingPlacement } from '@/lib/preview-furnishings'
+import type { RoomStyleInput } from '@/lib/room-floor-style'
 import type { PreviewResizeHandle,PreviewResizeMode,RepeatPreview } from '@/lib/preview-resize'
 import { snapPanelDelta,type SnapSettings } from '@/lib/preview-snap'
 import { spaceBounds } from '@/lib/space-constraint'
@@ -109,6 +110,8 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   exploded: boolean
   realisticPreview?: boolean
   furnishings?: FurnishingPlacement[]
+  /** The realistic room's floor and rug style. */
+  roomStyle?: RoomStyleInput
   panMode?: boolean
   fitSignal: number
   frameSignal?: number
@@ -569,7 +572,7 @@ function World(props: WorldProps) {
     <PreviewContextGesture onOpen={props.boxSelectActive ? undefined : props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
     <SceneMovement {...props} feedback={feedback}/>
     <SceneCamera props={props} realisticPreview={realisticPreview}/>
-    <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} snapSettings={props.snapSettings} guides={feedback.guides}/>
+    <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} roomStyle={props.roomStyle} snapSettings={props.snapSettings} guides={feedback.guides}/>
     <SceneVacuum plan={vacuumPlan} panels={displayPanels} dragging={props.dragging} resizing={props.resizing} boxSelectActive={props.boxSelectActive} designConstraint={props.designConstraint}/>
     {displayPanels.filter(panel => !panel.visible && panel.wireframe).map(panel => <PanelWireframe key={panel.id} panel={panel}/>)}
     <SceneParts {...props} shownPanels={shownPanels}
