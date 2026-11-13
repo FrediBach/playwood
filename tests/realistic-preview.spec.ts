@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './browser-fixture'
-import { createPanel, resolvePanels } from '../src/lib/model'
+import { createPanel, createStarterProject, resolvePanels } from '../src/lib/model'
 import { createExampleProject } from '../src/lib/example-library'
 import { createPreviewBenchProject } from '../src/lib/fixtures/preview-bench'
 import { furnitureArchetypes } from '../src/lib/fixtures/furniture-archetypes'
@@ -209,6 +209,35 @@ test('auto furnishing seats a person on the gallery bench', async ({ page }) => 
   await expect.poll(() => page.locator('canvas').evaluate(element => (element as HTMLCanvasElement).toDataURL())).not.toBe(unfurnished)
   await expect(page.getByRole('alert')).not.toBeVisible()
   await page.screenshot({ path: 'test-results/realistic-preview-furnished-bench.png' })
+})
+
+for (const reducedMotion of ['no-preference', 'reduce'] as const) test(`the desk worker ${reducedMotion === 'reduce' ? 'holds still with reduced motion' : 'types, points and reads at the computer'}`, async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.emulateMedia({ reducedMotion })
+  await page.goto('/')
+  await importPanels(page, resolvePanels(createStarterProject('desk')))
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
+  await expectRenderedRoom(page)
+  // Hands, mouse and screen are the parts that move; sample their transforms from the scene.
+  const pose = () => page.locator('canvas').evaluate(async canvas => {
+    const url = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/@react-three_fiber.js'))!
+    const { _roots } = await import(url)
+    const { scene } = _roots.get(canvas).store.getState()
+    const values: number[] = []
+    for (const name of ['seated-person-chair', 'computer']) scene.getObjectByName(name)?.traverse((item: { position: { x: number; y: number; z: number } }) => {
+      values.push(item.position.x, item.position.y, item.position.z)
+    })
+    return values.map(value => value.toFixed(4)).join(',')
+  })
+  const first = await pose()
+  expect(first.length).toBeGreaterThan(0)
+  if (reducedMotion === 'reduce') {
+    await page.waitForTimeout(1500)
+    expect(await pose()).toBe(first)
+  } else await expect.poll(pose, { timeout: 10000 }).not.toBe(first)
+  expect(errors).toEqual([])
 })
 
 test('deep cubby shelves mix furnishings with empty spaces and face books toward their openings', async ({ page }) => {

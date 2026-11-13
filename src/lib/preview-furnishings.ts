@@ -10,7 +10,19 @@ export type FurnishingKind =
   | 'books' | 'table-lamp' | 'computer' | 'laptop' | 'plant' | 'vase' | 'mug' | 'notebook' | 'picture-frame'
   | 'basket' | 'storage-box' | 'records' | 'jars' | 'bowl' | 'textiles' | 'tray' | 'place-setting' | 'cutting-board'
   | 'speaker' | 'tv' | 'cushion' | 'bedding' | 'chair' | 'seated-person' | 'seated-person-chair'
-export type SeatedPose = 'relaxed' | 'reading' | 'laptop'
+export type SeatedPose = 'relaxed' | 'reading' | 'laptop' | 'working'
+
+/** A computer or laptop in front of a seated person, in the person's frame (metres, facing +Z). */
+export interface Workstation {
+  kind: 'computer' | 'laptop'
+  /** Top of the keys, at the middle of the keyboard. */
+  keyboard: Vec3
+  /** Top of the mouse or trackpad. */
+  pointer: Vec3
+  screen: Vec3
+  /** Visible screen width and height. */
+  screenSize: [number, number]
+}
 
 /** Preview-only transforms, in metres. People and chairs originate at the top of their seat. */
 export interface FurnishingPlacement {
@@ -29,6 +41,10 @@ export interface FurnishingPlacement {
   variant?: number
   /** Seated activity; omitted is the relaxed default. */
   pose?: SeatedPose
+  /** Shared by a working person and their machine so the screen follows what they do. */
+  workSeed?: number
+  /** Where a working person's keyboard, pointer and screen are. */
+  workstation?: Workstation
   /** The supporting finish is dark; decor uses lighter tones. */
   tone?: 'dark'
 }
@@ -71,6 +87,21 @@ const UP = new Vector3(0, 1, 0)
 const MM = 0.001
 const CLEARANCE = 0.008
 const DESK_SEAT_HEIGHT = 0.46
+
+/** Work points of a machine in its own frame, matching PreviewFurnishings. */
+const MACHINE_POINTS: Record<Workstation['kind'], { keyboard: Vec3; pointer: Vec3; screen: Vec3; screenSize: [number, number] }> = {
+  computer: { keyboard: [-0.042, 0.026, 0.15], pointer: [0.236, 0.022, 0.142], screen: [0, 0.318, -0.12], screenSize: [0.511, 0.281] },
+  laptop: { keyboard: [0, 0.015, 0.035], pointer: [0, 0.015, 0.105], screen: [0, 0.119, -0.11], screenSize: [0.29, 0.18] },
+}
+
+function workstationFor(machine: FurnishingPlacement, person: FurnishingPlacement): Workstation {
+  const kind = machine.kind === 'computer' ? 'computer' : 'laptop'
+  const points = MACHINE_POINTS[kind]
+  const origin = new Vector3(...machine.position), seat = new Vector3(...person.position)
+  const local = (point: Vec3) => new Vector3(...point).applyAxisAngle(UP, machine.rotation).add(origin).sub(seat)
+    .applyAxisAngle(UP, -person.rotation).toArray().map(value => Math.round(value * 10000) / 10000) as Vec3
+  return { kind, keyboard: local(points.keyboard), pointer: local(points.pointer), screen: local(points.screen), screenSize: points.screenSize }
+}
 
 type FixedKind = Exclude<FurnishingKind, 'seated-person' | 'seated-person-chair' | 'chair'>
 const footprints: Record<FixedKind, Vec3> = {
@@ -712,7 +743,8 @@ export function planPreviewFurnishings(panels: Panel[], options: FurnishingOptio
           const poses: SeatedPose[] = ['relaxed', 'reading', 'laptop']
           const pose = density === 'minimal' ? 'relaxed' : poses[variationHash(`${id}:pose`, seed) % 3]
           push({ id, kind: 'seated-person', position: freeSeat.position.toArray() as Vec3,
-            rotation: freeSeat.rotation, seatHeight: freeSeat.seatHeight, ...(pose === 'relaxed' ? {} : { pose }) }, freeSeat.boxes)
+            rotation: freeSeat.rotation, seatHeight: freeSeat.seatHeight, ...(pose === 'relaxed' ? {} : { pose }),
+            ...(pose === 'laptop' ? { workSeed: variationHash(`${id}:work`, seed) } : {}) }, freeSeat.boxes)
           people++
         }
         if (width > 1.2) addObject('books', width / 2 - 0.19, -0.015, { arrangement: 'stacked' })
@@ -728,7 +760,9 @@ export function planPreviewFurnishings(panels: Panel[], options: FurnishingOptio
         const mirror = shuffled && random() < 0.5 ? -1 : 1
         const laptop = shuffled && random() < 0.35
         // A riser or shelf behind the work zone can leave room for a laptop only.
+        let station = result.length
         const useLaptop = laptop || !addObject('computer', mirror * 0.07, 0.01)
+        if (useLaptop) station = result.length
         const machine = useLaptop ? addObject('laptop', mirror * 0.04, 0.04) : true
         addObject('table-lamp', mirror * (-width / 2 + 0.17), -depth / 2 + 0.17)
         if (width > 1.4 && density !== 'minimal') addObject('plant', mirror * (width / 2 - 0.17), -depth / 2 + 0.17)
@@ -736,7 +770,13 @@ export function planPreviewFurnishings(panels: Panel[], options: FurnishingOptio
           addObject('mug', mirror * (useLaptop ? 0.3 : 0.45), depth / 2 - 0.1)
           addObject('notebook', mirror * -(useLaptop ? 0.3 : 0.42), depth / 2 - 0.13, { yaw: 0.12 + jitter() })
         }
-        if (machine) addTableSeat(mirror * (useLaptop ? 0.04 : 0.07), 1, true)
+        if (machine && addTableSeat(mirror * (useLaptop ? 0.04 : 0.07), 1, true)) {
+          // The person works at the machine; both share the story of that work.
+          const person = result[result.length - 1], computer = result[station]
+          const workSeed = variationHash(`${person.id}:work`, seed)
+          computer.workSeed = workSeed
+          Object.assign(person, { pose: 'working', workSeed, workstation: workstationFor(computer, person) })
+        }
         break
       }
       case 'standing-desk': {

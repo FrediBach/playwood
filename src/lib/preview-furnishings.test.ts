@@ -48,6 +48,36 @@ describe('optional preview furnishings', () => {
     expect(props.find(prop => prop.kind === 'seated-person-chair')?.seatHeight).toBe(0.46)
   })
 
+  it('links the desk worker to their machine with keyboard, pointer and screen in the sitter frame', () => {
+    const check = (panels: Panel[], seed = 0) => {
+      const props = detectPreviewFurnishings(panels, { seed })
+      const person = props.find(prop => prop.kind === 'seated-person-chair')!
+      const machine = props.find(prop => prop.kind === 'computer' || prop.kind === 'laptop')!
+      expect(person.pose).toBe('working')
+      expect(person.workSeed).toBeTypeOf('number')
+      expect(machine.workSeed).toBe(person.workSeed)
+      const station = person.workstation!
+      expect(station.kind).toBe(machine.kind)
+      // In front of the sitter, above the seat and at desk height, with the screen beyond the keyboard.
+      expect(station.keyboard[2]).toBeGreaterThan(0.3)
+      expect(station.keyboard[2]).toBeLessThan(0.65)
+      expect(station.keyboard[1]).toBeGreaterThan(0.25)
+      expect(station.screen[2]).toBeGreaterThan(station.keyboard[2])
+      expect(station.screen[1]).toBeGreaterThan(station.keyboard[1])
+      // A mouse lies to the sitter's right, which is -X when facing +Z.
+      if (station.kind === 'computer') expect(station.pointer[0]).toBeLessThan(station.keyboard[0])
+      return station
+    }
+    const station = check(starter('desk'))
+    const turned = check(transform(starter('desk'), 0.63, [1800, 0, 2300]))
+    turned.keyboard.forEach((value, axis) => expect(value).toBeCloseTo(station.keyboard[axis], 6))
+    // Panel ids feed the shuffle, so search and check the same desk.
+    const desk = starter('desk')
+    const laptopSeed = Array.from({ length: 40 }, (_, index) => index + 1)
+      .find(seed => detectPreviewFurnishings(desk, { seed }).some(prop => prop.kind === 'laptop'))!
+    expect(check(desk, laptopSeed).kind).toBe('laptop')
+  })
+
   it('treats symmetric inset desk legs equally when choosing the front', () => {
     const panels = [
       createPanel({ width: 1400, height: 700, position: [0, 741, 0], rotation: [-Math.PI / 2, 0, 0] }),

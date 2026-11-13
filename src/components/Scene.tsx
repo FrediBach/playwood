@@ -491,7 +491,7 @@ function SceneParts(props: WorldProps & { shownPanels: Panel[] }) {
   const repeatConnectionIds = new Set(props.repeatPreview?.connectionIds)
   return <>
     {shownPanels.map(panel => <PanelMesh key={panel.id} panel={panel} interactive={!props.constructionLayer?.active} selected={selectedIdSet.has(panel.id)} ghost={repeatPanelIds.has(panel.id)} onSelect={onSelect} onDrillIn={props.onDrillIn} />)}
-    {realisticPreview && !!props.furnishings?.length && <PreviewFurnishings placements={props.furnishings} />}
+    {realisticPreview && !!props.furnishings?.length && <PreviewFurnishings placements={props.furnishings} animate />}
     {!exploded && <ConnectorMeshes panels={panels} connections={connections.filter(connection => !repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} selectedConnectorIds={highlightedConnectors} onSelectConnector={realisticPreview || props.constructionLayer?.active ? undefined : props.onSelectConnector} />}
     {!exploded && !!repeatConnectionIds.size && <ConnectorMeshes panels={panels} connections={connections.filter(connection => repeatConnectionIds.has(connection.id))} connectorOverrides={props.connectorOverrides} ghost />}
     {previewPanels.filter(panel => panel.visible).map(panel => <PanelMesh key={`preview-${panel.id}`} panel={panel} selected={false} ghost onSelect={onSelect} />)}

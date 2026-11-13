@@ -1,7 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { RoundedBox } from '@react-three/drei'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { FurnishingPlacement, SeatedPose } from '@/lib/preview-furnishings'
+import type { FurnishingPlacement, SeatedPose, Workstation } from '@/lib/preview-furnishings'
+import { staticWorkTime, workFrame } from './desk-work'
+import { drawWorkScreen, workScreenKey } from './desk-screen'
+import {
+  FOREARM, HAND, HIP, LAP_LAPTOP, LAP_WORKSTATION, NECK, SHOULDER, UPPER_ARM, restingPose, shoulderPoint, solveArm, workPose,
+  type BodyPose,
+} from './seated-pose'
 import { createPreviewBooks, type PreviewBook, type PreviewBookArrangement, type PreviewBookSupport } from '@/lib/preview-books'
 import type { Vec3 } from '@/lib/types'
 
@@ -161,41 +168,109 @@ function KeyboardKeys() {
   </instancedMesh>
 }
 
-function Computer() {
+/** Desk work animates in the live room; exports and reduced motion show one still moment. */
+const WorkAnimation = createContext(false)
+const workClock = () => performance.now() / 1000
+
+/** A screen showing the work story of `seed`, redrawn only when what it shows changes. */
+function WorkScreen({ seed, size, position }: { seed: number; size: [number, number]; position: Vec3 }) {
+  const animate = useContext(WorkAnimation)
+  const [width, height] = [Math.round(216 * size[0] / size[1]), 216]
+  const resources = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = 4
+    return { canvas, texture, context: canvas.getContext('2d'), key: '', drawn: 0 }
+  }, [width, height])
+  useEffect(() => () => resources.texture.dispose(), [resources])
+  const draw = (time: number) => {
+    const { context, texture } = resources
+    if (!context) return
+    const frame = workFrame(seed, time)
+    const key = workScreenKey(frame, width, height)
+    if (key === resources.key) return
+    resources.key = key
+    drawWorkScreen(context, width, height, frame)
+    texture.needsUpdate = true
+  }
+  useLayoutEffect(() => {
+    resources.key = ''
+    draw(animate ? workClock() : staticWorkTime(seed))
+  })
+  useFrame(() => {
+    if (!animate || document.hidden) return
+    const now = performance.now()
+    // About twenty redraws a second is plenty for typing and a moving cursor.
+    if (now - resources.drawn < 45) return
+    resources.drawn = now
+    draw(now / 1000)
+  })
+  return <mesh position={position} raycast={noRaycast}>
+    <planeGeometry args={size}/>
+    <meshStandardMaterial map={resources.texture} emissiveMap={resources.texture} emissive="#ffffff" emissiveIntensity={0.5} roughness={0.35}/>
+  </mesh>
+}
+
+function Computer({ workSeed }: { workSeed?: number }) {
   return <group>
     <Box position={[0, 0.009, -0.12]} size={[0.205, 0.018, 0.15]} color="#9a9f98" radius={0.006} metalness={0.55} roughness={0.4}/>
     <Box position={[0, 0.097, -0.15]} size={[0.055, 0.17, 0.033]} color="#a7aba4" radius={0.006} metalness={0.5} roughness={0.4}/>
     <Box position={[0, 0.314, -0.135]} size={[0.54, 0.314, 0.028]} color={INK} radius={0.009} roughness={0.45}/>
-    <mesh position={[0, 0.318, -0.1205]} raycast={noRaycast}>
-      <planeGeometry args={[0.511, 0.281]}/><meshStandardMaterial color="#6c8581" emissive="#526e70" emissiveIntensity={0.25} roughness={0.4}/>
-    </mesh>
-    {/* A quiet, abstract desktop gives the screen depth without tiny UI text. */}
-    <mesh position={[0.111, 0.342, -0.1198]} raycast={noRaycast}>
-      <circleGeometry args={[0.082, 32]}/><meshStandardMaterial color="#bdbca6" emissive="#bdbca6" emissiveIntensity={0.12}/>
-    </mesh>
-    <Box position={[-0.095, 0.316, -0.1188]} size={[0.181, 0.187, 0.001]} color="#deddd3"/>
-    <Box position={[-0.095, 0.378, -0.118]} size={[0.143, 0.022, 0.001]} color="#a6afa0"/>
-    {[0, 1, 2, 3].map(row => <Box key={row} position={[-0.11 + (row % 2) * 0.015, 0.342 - row * 0.025, -0.118]} size={[row % 2 ? 0.133 : 0.103, 0.006, 0.001]} color="#a8afa7"/>)}
-    <Box position={[0.047, 0.195, -0.118]} size={[0.16, 0.013, 0.001]} color="#c5d0c8" radius={0.0004}/>
+    {workSeed !== undefined ? <WorkScreen seed={workSeed} size={[0.511, 0.281]} position={[0, 0.318, -0.1205]}/> : <>
+      <mesh position={[0, 0.318, -0.1205]} raycast={noRaycast}>
+        <planeGeometry args={[0.511, 0.281]}/><meshStandardMaterial color="#6c8581" emissive="#526e70" emissiveIntensity={0.25} roughness={0.4}/>
+      </mesh>
+      {/* A quiet, abstract desktop gives the screen depth without tiny UI text. */}
+      <mesh position={[0.111, 0.342, -0.1198]} raycast={noRaycast}>
+        <circleGeometry args={[0.082, 32]}/><meshStandardMaterial color="#bdbca6" emissive="#bdbca6" emissiveIntensity={0.12}/>
+      </mesh>
+      <Box position={[-0.095, 0.316, -0.1188]} size={[0.181, 0.187, 0.001]} color="#deddd3"/>
+      <Box position={[-0.095, 0.378, -0.118]} size={[0.143, 0.022, 0.001]} color="#a6afa0"/>
+      {[0, 1, 2, 3].map(row => <Box key={row} position={[-0.11 + (row % 2) * 0.015, 0.342 - row * 0.025, -0.118]} size={[row % 2 ? 0.133 : 0.103, 0.006, 0.001]} color="#a8afa7"/>)}
+      <Box position={[0.047, 0.195, -0.118]} size={[0.16, 0.013, 0.001]} color="#c5d0c8" radius={0.0004}/>
+    </>}
     <Box position={[-0.042, 0.013, 0.148]} size={[0.355, 0.022, 0.122]} color="#9ea49c" radius={0.007} metalness={0.25} roughness={0.5}/>
     <group position={[-0.042, 0, 0]}><KeyboardKeys/></group>
     <Box position={[0.236, 0.002, 0.145]} size={[0.128, 0.004, 0.19]} color="#8c9184" radius={0.001}/>
+    <WorkMouse seed={workSeed}/>
+  </group>
+}
+
+/** The mouse follows the cursor of the work story, so it moves under the person's hand. */
+function WorkMouse({ seed }: { seed?: number }) {
+  const animate = useContext(WorkAnimation)
+  const ref = useRef<THREE.Group>(null)
+  const place = (time: number) => {
+    if (!ref.current || seed === undefined) return
+    const frame = workFrame(seed, time)
+    const cursor = frame.activity === 'pointing' ? frame.cursor : [0.66, 0.62]
+    // The computer faces the person, so the person's right is the computer's +X.
+    ref.current.position.set((cursor[0] - 0.66) * 0.13, 0, (cursor[1] - 0.62) * 0.08)
+  }
+  useLayoutEffect(() => place(animate ? workClock() : staticWorkTime(seed ?? 0)))
+  useFrame(() => { if (animate && !document.hidden) place(workClock()) })
+  return <group ref={ref}>
     <Ellipsoid position={[0.236, 0.018, 0.142]} size={[0.032, 0.02, 0.052]} color="#e2e0d6" roughness={0.55}/>
     <Box position={[0.236, 0.038, 0.125]} size={[0.004, 0.003, 0.012]} color="#939b93" radius={0.001}/>
   </group>
 }
 
 /** Open laptop, hinge at the back; fits 0.34 × 0.25 × 0.27 m. */
-function Laptop({ variant }: Styled) {
+function Laptop({ variant, workSeed }: Styled & { workSeed?: number }) {
   const shell = pick(['#a9ada8', '#3c4044', '#c9c3b8'] as const, variant)
   return <group>
     <Box position={[0, 0.007, 0.02]} size={[0.32, 0.014, 0.22]} color={shell} radius={0.005} metalness={0.5} roughness={0.38}/>
-    <Box position={[0, 0.0145, 0.045]} size={[0.27, 0.001, 0.1]} color="#2f3336" roughness={0.7}/>
+    <Box position={[0, 0.0145, 0.035]} size={[0.27, 0.001, 0.085]} color="#2f3336" roughness={0.7}/>
+    <Box position={[0, 0.0145, 0.105]} size={[0.105, 0.001, 0.045]} color={shell} radius={0.0005} metalness={0.35} roughness={0.3}/>
     <group position={[0, 0.014, -0.088]} rotation={[-0.25, 0, 0]}>
       <Box position={[0, 0.105, 0]} size={[0.32, 0.21, 0.008]} color={shell} radius={0.004} metalness={0.5} roughness={0.38}/>
-      <mesh position={[0, 0.107, 0.0045]} raycast={noRaycast}>
-        <planeGeometry args={[0.29, 0.18]}/><meshStandardMaterial color="#6c8581" emissive="#526e70" emissiveIntensity={0.25} roughness={0.4}/>
-      </mesh>
+      {workSeed !== undefined ? <WorkScreen seed={workSeed} size={[0.29, 0.18]} position={[0, 0.107, 0.0045]}/>
+        : <mesh position={[0, 0.107, 0.0045]} raycast={noRaycast}>
+          <planeGeometry args={[0.29, 0.18]}/><meshStandardMaterial color="#6c8581" emissive="#526e70" emissiveIntensity={0.25} roughness={0.4}/>
+        </mesh>}
     </group>
   </group>
 }
@@ -416,31 +491,139 @@ function Chair({ seatHeight, variant }: { seatHeight: number } & Styled) {
   </group>
 }
 
+// Clothes keep clear of the skin tones so a sweater never reads as bare skin.
 const PEOPLE = [
-  { skin: '#bc8c6b', hair: '#443a31', sweater: '#a7aa95', trousers: '#525e62', shoe: '#65584b' },
-  { skin: '#8d5f45', hair: '#1f1b19', sweater: '#c98f73', trousers: '#3e4650', shoe: '#2f2a27' },
+  { skin: '#bc8c6b', hair: '#443a31', sweater: '#6f7c5f', trousers: '#525e62', shoe: '#65584b' },
+  { skin: '#8d5f45', hair: '#1f1b19', sweater: '#3f5d78', trousers: '#3e4650', shoe: '#2f2a27' },
   { skin: '#e2b99a', hair: '#9b6a3f', sweater: '#5f6b78', trousers: '#c9bfae', shoe: '#7a6248' },
-  { skin: '#5e3d2c', hair: '#151312', sweater: '#d8cbb3', trousers: '#2f3a36', shoe: '#3b302a' },
-  { skin: '#d5a684', hair: '#6d6a66', sweater: '#7f8f86', trousers: '#4a4440', shoe: '#5a4c40' },
+  { skin: '#5e3d2c', hair: '#151312', sweater: '#d6d9d2', trousers: '#2f3a36', shoe: '#3b302a' },
+  { skin: '#d5a684', hair: '#6d6a66', sweater: '#8a4b4f', trousers: '#4a4440', shoe: '#5a4c40' },
 ] as const
 
-function SeatedPerson({ seatHeight = 0.46, chair = false, variant = 0, pose }: { seatHeight?: number; chair?: boolean; pose?: SeatedPose } & Styled) {
+/** One smooth torso, hips to neckline, with sloping shoulders (radius, height). */
+const TORSO_PROFILE = [
+  [0.001, -0.012], [0.1, -0.008], [0.143, 0.018], [0.149, 0.06], [0.141, 0.13], [0.134, 0.19], [0.138, 0.25], [0.146, 0.31],
+  [0.15, 0.352], [0.147, 0.386], [0.13, 0.418], [0.1, 0.44], [0.07, 0.456], [0.046, 0.466], [0.001, 0.469],
+].map(([radius, y]) => new THREE.Vector2(radius, y))
+const TORSO_DEPTH = 0.64
+
+const shade = (color: string, amount: number) => `#${new THREE.Color(color).multiplyScalar(amount).getHexString()}`
+
+interface ArmRig { upper: THREE.Mesh | null; elbow: THREE.Mesh | null; fore: THREE.Mesh | null; hand: THREE.Mesh | null }
+const Y_AXIS = new THREE.Vector3(0, 1, 0)
+const SEGMENT = new THREE.Vector3()
+
+function setSegment(mesh: THREE.Mesh | null, from: THREE.Vector3, to: THREE.Vector3) {
+  if (!mesh) return
+  const delta = SEGMENT.subVectors(to, from), length = delta.length()
+  mesh.position.copy(from).add(to).multiplyScalar(0.5)
+  mesh.quaternion.setFromUnitVectors(Y_AXIS, delta.divideScalar(length || 1))
+  mesh.scale.set(1, length, 1)
+}
+
+function blendPose(current: BodyPose, target: BodyPose, amount: number) {
+  const mix = (a: number, b: number) => a + (b - a) * amount
+  current.lean = mix(current.lean, target.lean)
+  current.headPitch = mix(current.headPitch, target.headPitch)
+  current.headYaw = mix(current.headYaw, target.headYaw)
+  current.headRoll = mix(current.headRoll, target.headRoll)
+  current.hands.forEach((hand, index) => {
+    const goal = target.hands[index]
+    for (const key of ['position', 'direction', 'pole'] as const) hand[key] = hand[key].map((value, axis) => mix(value, goal[key][axis])) as Vec3
+  })
+}
+
+const RIG = {
+  shoulder: new THREE.Vector3(), elbow: new THREE.Vector3(), wrist: new THREE.Vector3(), palm: new THREE.Vector3(),
+  direction: new THREE.Vector3(), pole: new THREE.Vector3(), origin: new THREE.Vector3(), up: new THREE.Vector3(), matrix: new THREE.Matrix4(),
+}
+
+/** Places the torso, head and arm meshes; reuses scratch vectors because it runs every animated frame. */
+function applyBodyPose(torso: THREE.Group | null, head: THREE.Group | null, arms: readonly ArmRig[], body: BodyPose, offsets: [Vec3, Vec3]) {
+  torso?.rotation.set(body.lean, 0, 0)
+  head?.rotation.set(body.headPitch, body.headYaw, body.headRoll, 'YXZ')
+  const { shoulder, elbow, wrist, palm, direction, pole, origin, up, matrix } = RIG
+  ;([1, -1] as const).forEach((side, index) => {
+    const rig = arms[index], hand = body.hands[index]
+    shoulder.fromArray(shoulderPoint(body.lean, side))
+    direction.fromArray(hand.direction).normalize()
+    palm.fromArray(hand.position).add(origin.fromArray(offsets[index]))
+    solveArm(shoulder, palm.addScaledVector(direction, -HAND), pole.fromArray(hand.pole), elbow, wrist)
+    setSegment(rig.upper, shoulder, elbow)
+    rig.elbow?.position.copy(elbow)
+    setSegment(rig.fore, elbow, wrist)
+    if (rig.hand) {
+      rig.hand.position.copy(wrist).addScaledVector(direction, HAND)
+      // Palms face down unless the hand points up, as under the chin.
+      if (Math.abs(direction.y) > 0.8) up.set(side * 0.6, 0, -1)
+      else up.copy(Y_AXIS)
+      rig.hand.quaternion.setFromRotationMatrix(matrix.lookAt(direction, origin.set(0, 0, 0), up))
+    }
+  })
+}
+
+const clonePose = (pose: BodyPose): BodyPose => ({ ...pose, hands: pose.hands.map(hand => ({ ...hand })) as BodyPose['hands'] })
+
+function SeatedPerson({ seatHeight = 0.46, chair = false, variant = 0, pose, workSeed, workstation }: {
+  seatHeight?: number; chair?: boolean; pose?: SeatedPose; workSeed?: number; workstation?: Workstation
+} & Styled) {
   const { skin, hair, sweater, trousers, shoe } = pick(PEOPLE, variant)
+  const animate = useContext(WorkAnimation)
   const footY = -seatHeight
-  // Hands rest on the knees, hold a book, or reach a laptop on the lap.
-  const hand: Vec3 = pose === 'reading' ? [0.085, 0.25, 0.235] : pose === 'laptop' ? [0.1, 0.19, 0.245] : [0.122, 0.141, 0.272]
+  const station = workstation ?? (pose === 'laptop' ? LAP_WORKSTATION : undefined)
+  const seed = station ? workSeed : undefined
+  const torso = useRef<THREE.Group>(null), head = useRef<THREE.Group>(null)
+  const arms = useRef<[ArmRig, ArmRig]>([{ upper: null, elbow: null, fore: null, hand: null }, { upper: null, elbow: null, fore: null, hand: null }])
+  const motion = useRef<{ pose: BodyPose; last: number } | null>(null)
+
+  const target = (time: number) => station && seed !== undefined
+    ? workPose(station, workFrame(seed, time), time)
+    : { base: restingPose(pose), handOffsets: [[0, 0, 0], [0, 0, 0]] as [Vec3, Vec3] }
+
+  const apply = (body: BodyPose, offsets: [Vec3, Vec3]) => applyBodyPose(torso.current, head.current, arms.current, body, offsets)
+
+  useLayoutEffect(() => {
+    const time = animate ? workClock() : staticWorkTime(seed ?? 0)
+    const { base, handOffsets } = target(time)
+    motion.current = { pose: clonePose(base), last: 0 }
+    apply(base, handOffsets)
+  })
+
+  useFrame(() => {
+    const current = motion.current
+    if (!animate || seed === undefined || !current || document.hidden) return
+    const now = workClock()
+    const dt = current.last ? Math.min(now - current.last, 0.1) : 0
+    current.last = now
+    const { base, handOffsets } = target(now)
+    // Hands travel between keyboard, mouse and chin; key strikes stay crisp.
+    blendPose(current.pose, base, 1 - Math.exp(-7 * dt))
+    apply(current.pose, handOffsets)
+  })
+
   return <group>
     {chair && <Chair seatHeight={seatHeight} variant={variant}/>}
-    <Ellipsoid position={[0, 0.082, 0]} size={[0.164, 0.083, 0.123]} color={trousers}/>
-    <Ellipsoid position={[0, 0.31, -0.022]} size={[0.17, 0.244, 0.105]} color={sweater} rotation={[-0.07, 0, 0]}/>
-    <Ellipsoid position={[0, 0.505, -0.031]} size={[0.185, 0.073, 0.102]} color={sweater}/>
-    <Stem from={[0, 0.53, -0.032]} to={[0, 0.639, -0.021]} radius={0.038} endRadius={0.035} color={skin}/>
-    <group rotation={[pose === 'reading' || pose === 'laptop' ? 0.22 : 0, 0, 0]} position={[0, 0.64, -0.02]}>
-      <Ellipsoid position={[0, 0.068, 0.008]} size={[0.081, 0.111, 0.085]} color={skin}/>
-      <Ellipsoid position={[0, 0.103, -0.013]} size={[0.084, 0.085, 0.078]} color={hair}/>
-      <Ellipsoid position={[0, 0.165, -0.023]} size={[0.06, 0.037, 0.057]} color={hair}/>
-      <Ellipsoid position={[0, 0.057, 0.09]} size={[0.014, 0.025, 0.02]} color={skin}/>
-      {[-1, 1].map(side => <Ellipsoid key={side} position={[side * 0.077, 0.066, 0.014]} size={[0.013, 0.023, 0.015]} color={skin}/>)}
+    <Ellipsoid position={[0, 0.082, -0.005]} size={[0.164, 0.083, 0.128]} color={trousers}/>
+    <group ref={torso} position={HIP}>
+      <mesh scale={[1, 1, TORSO_DEPTH]} castShadow receiveShadow raycast={noRaycast}>
+        <latheGeometry args={[TORSO_PROFILE, 40]}/><meshStandardMaterial color={sweater} roughness={0.95}/>
+      </mesh>
+      {/* A ribbed hem and a crew neckline make the top read as clothing. */}
+      <mesh position={[0, 0.045, 0]} scale={[1, 1, TORSO_DEPTH]} castShadow receiveShadow raycast={noRaycast}>
+        <cylinderGeometry args={[0.1505, 0.1515, 0.032, 40, 1, true]}/><meshStandardMaterial color={shade(sweater, 0.82)} roughness={1} side={THREE.DoubleSide}/>
+      </mesh>
+      <mesh position={[0, 0.462, 0.002]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.82, 1]} castShadow raycast={noRaycast}>
+        <torusGeometry args={[0.046, 0.0095, 10, 28]}/><meshStandardMaterial color={shade(sweater, 0.82)} roughness={1}/>
+      </mesh>
+      {[-1, 1].map(side => <Ellipsoid key={side} position={[side * (SHOULDER[0] - 0.006), SHOULDER[1] + 0.004, 0]} size={[0.043, 0.047, 0.047]} color={sweater}/>)}
+      <Stem from={[0, 0.43, 0]} to={[0, NECK[1] + 0.025, NECK[2]]} radius={0.04} endRadius={0.036} color={skin}/>
+      <group ref={head} position={NECK}>
+        <Ellipsoid position={[0, 0.068, 0.008]} size={[0.081, 0.111, 0.085]} color={skin}/>
+        <Ellipsoid position={[0, 0.103, -0.013]} size={[0.084, 0.085, 0.078]} color={hair}/>
+        <Ellipsoid position={[0, 0.165, -0.023]} size={[0.06, 0.037, 0.057]} color={hair}/>
+        <Ellipsoid position={[0, 0.057, 0.09]} size={[0.014, 0.025, 0.02]} color={skin}/>
+        {[-1, 1].map(side => <Ellipsoid key={side} position={[side * 0.077, 0.066, 0.014]} size={[0.013, 0.023, 0.015]} color={skin}/>)}
+      </group>
     </group>
     {[-1, 1].map(side => <group key={side}>
       <Stem from={[side * 0.09, 0.083, 0.015]} to={[side * 0.1, 0.048, 0.29]} radius={0.075} endRadius={0.061} color={trousers}/>
@@ -448,29 +631,65 @@ function SeatedPerson({ seatHeight = 0.46, chair = false, variant = 0, pose }: {
       <Stem from={[side * 0.1, 0.035, 0.31]} to={[side * 0.105, footY + 0.095, 0.374]} radius={0.058} endRadius={0.037} color={trousers}/>
       <Ellipsoid position={[side * 0.105, footY + 0.043, 0.421]} size={[0.052, 0.043, 0.105]} color={shoe} roughness={0.65}/>
       <Box position={[side * 0.105, footY + 0.012, 0.425]} size={[0.098, 0.023, 0.19]} color="#49453e" radius={0.01}/>
-      <Ellipsoid position={[side * 0.17, 0.476, -0.022]} size={[0.069, 0.085, 0.074]} color={sweater}/>
-      <Stem from={[side * 0.176, 0.48, -0.014]} to={[side * 0.19, 0.275, 0.079]} radius={0.062} endRadius={0.047} color={sweater}/>
-      <Ellipsoid position={[side * 0.19, 0.275, 0.08]} size={[0.047, 0.048, 0.051]} color={sweater}/>
-      <Stem from={[side * 0.19, 0.275, 0.08]} to={[side * (hand[0] + 0.011), hand[1] + 0.018, hand[2] - 0.026]} radius={0.046} endRadius={0.031} color={sweater}/>
-      <Ellipsoid position={[side * hand[0], hand[1], hand[2]]} size={[0.034, 0.023, 0.059]} rotation={[-0.25, side * 0.15, 0]} color={skin}/>
     </group>)}
+    {([0, 1] as const).map(index => {
+      const rig = arms.current[index]
+      return <group key={index}>
+        <mesh ref={mesh => { rig.upper = mesh }} castShadow receiveShadow raycast={noRaycast}>
+          <cylinderGeometry args={[0.034, 0.039, 1, 14]}/><meshStandardMaterial color={sweater} roughness={0.95}/>
+        </mesh>
+        <mesh ref={mesh => { rig.elbow = mesh }} castShadow receiveShadow raycast={noRaycast}>
+          <sphereGeometry args={[0.034, 14, 10]}/><meshStandardMaterial color={sweater} roughness={0.95}/>
+        </mesh>
+        <mesh ref={mesh => { rig.fore = mesh }} castShadow receiveShadow raycast={noRaycast}>
+          <cylinderGeometry args={[0.027, 0.033, 1, 14]}/><meshStandardMaterial color={sweater} roughness={0.95}/>
+        </mesh>
+        <mesh ref={mesh => { rig.hand = mesh }} scale={[0.034, 0.021, 0.056]} castShadow receiveShadow raycast={noRaycast}>
+          <sphereGeometry args={[1, 18, 12]}/><meshStandardMaterial color={skin} roughness={0.9}/>
+        </mesh>
+      </group>
+    })}
     {pose === 'reading' && <group position={[0, 0.27, 0.22]} rotation={[-0.9, 0, 0]}>
       <Box position={[0, 0, 0]} size={[0.15, 0.2, 0.022]} color={pick(FABRICS, variant, 1)} radius={0.002}/>
       <Box position={[0, 0, 0.0115]} size={[0.142, 0.192, 0.001]} color="#efe9dc"/>
     </group>}
     {/* Turned towards the sitter and scaled to stay inside the seated clearance envelope. */}
-    {pose === 'laptop' && <group position={[0, 0.165, 0.2]} rotation={[0, Math.PI, 0]} scale={0.85}><Laptop variant={variant}/></group>}
+    {pose === 'laptop' && <group position={LAP_LAPTOP.position} rotation={[0, Math.PI, 0]} scale={LAP_LAPTOP.scale}><Laptop variant={variant} workSeed={workSeed}/></group>}
   </group>
+}
+
+/** Requests frames for desk work at a calm rate while the tab is visible. */
+function WorkTicker() {
+  const invalidate = useThree(state => state.invalidate)
+  useEffect(() => {
+    const timer = window.setInterval(() => { if (!document.hidden) invalidate() }, 1000 / 30)
+    return () => window.clearInterval(timer)
+  }, [invalidate])
+  return null
+}
+
+function usePrefersReducedMotion() {
+  const query = '(prefers-reduced-motion: reduce)'
+  const [reduced, setReduced] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches)
+  useEffect(() => {
+    const media = window.matchMedia?.(query)
+    if (!media) return
+    const update = () => setReduced(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+  return reduced
 }
 
 type Renderer = (placement: FurnishingPlacement, styled: Styled) => React.ReactNode
 const sized = (render: (size: Vec3, styled: Styled) => React.ReactNode): Renderer => (placement, styled) => placement.size ? render(placement.size, styled) : null
-const seated: Renderer = placement => <SeatedPerson seatHeight={placement.seatHeight} chair={placement.kind === 'seated-person-chair'} variant={placement.variant} pose={placement.pose}/>
+const seated: Renderer = placement => <SeatedPerson seatHeight={placement.seatHeight} chair={placement.kind === 'seated-person-chair'} variant={placement.variant}
+  pose={placement.pose} workSeed={placement.workSeed} workstation={placement.workstation}/>
 const RENDERERS: Record<FurnishingPlacement['kind'], Renderer> = {
   books: placement => <Books seed={placement.bookSeed ?? placement.id} arrangement={placement.bookArrangement} supportSide={placement.bookSupport}/>,
   'table-lamp': (_, styled) => <TableLamp {...styled}/>,
-  computer: () => <Computer/>,
-  laptop: (_, styled) => <Laptop {...styled}/>,
+  computer: placement => <Computer workSeed={placement.workSeed}/>,
+  laptop: (placement, styled) => <Laptop {...styled} workSeed={placement.workSeed}/>,
   plant: (_, styled) => <SmallPlant {...styled}/>,
   vase: (_, styled) => <Vase {...styled}/>,
   mug: (_, styled) => <Mug {...styled}/>,
@@ -494,11 +713,15 @@ const RENDERERS: Record<FurnishingPlacement['kind'], Renderer> = {
   'seated-person-chair': seated,
 }
 
-export function PreviewFurnishings({ placements }: { placements: FurnishingPlacement[] }) {
-  return <group name="Preview furnishings">
+/** `animate` lets people at desks work in the live room; other renders stay still. */
+export function PreviewFurnishings({ placements, animate = false }: { placements: FurnishingPlacement[]; animate?: boolean }) {
+  const reducedMotion = usePrefersReducedMotion()
+  const working = animate && !reducedMotion && placements.some(placement => placement.workSeed !== undefined)
+  return <WorkAnimation.Provider value={working}><group name="Preview furnishings">
+    {working && <WorkTicker/>}
     {placements.map(placement => <group key={placement.id} name={placement.kind} position={placement.position} rotation={[0, placement.rotation, 0]}
       userData={{ previewFurnishing: placement.kind, sourcePanelId: placement.panelId }}>
       {RENDERERS[placement.kind](placement, { variant: placement.variant, tone: placement.tone })}
     </group>)}
-  </group>
+  </group></WorkAnimation.Provider>
 }
