@@ -79,6 +79,24 @@ describe('room cat', () => {
     expect(catPose(cat, below).eyes).toBeGreaterThan(0)
   })
 
+  it('walks around each room style\'s own furniture and can still reach the lounge chair', () => {
+    for (const theme of ['living', 'kitchen', 'office', 'kids'] as const) {
+      const style = { seed: 3, theme, furnished: true }
+      const plan = createVacuumPlan(bounds, [], [], style)!
+      const setting = createCatSetting(plan, bounds, getRoomRug(bounds, style))!
+      expect(setting.obstacles.some(item => item.id.startsWith('room:') && /sofa|stove|whiteboard|rocking-horse/.test(item.id))).toBe(true)
+      const cat = createCat(setting)
+      expect(isCatRestClear(setting, cat)).toBe(true)
+      for (let disturbance = 1; disturbance <= CAT_SOFA_AFTER; disturbance++) {
+        const vacuum = { x: cat.x - 0.4, z: cat.z + CAT_WAKE_DISTANCE * 0.6 }
+        stepCat(cat, setting, vacuum, 1 / 60)
+        runUntilResting(cat, setting, vacuum)
+        if (cat.phase === 'sleeping') expect(isCatRestClear(setting, cat)).toBe(true)
+      }
+      expect(cat.onSofa, theme).toBe(true)
+    }
+  })
+
   it('is interrupted while lying down and still counts the disturbance', () => {
     const { setting } = setup()
     const cat = createCat(setting)

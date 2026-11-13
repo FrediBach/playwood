@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Box3, Vector3 } from 'three'
 import { createPanel } from '@/lib/model'
 import { createVacuumPlan, isVacuumSegmentClear, rejoinVacuumRoute, VACUUM_CLEARANCE, VACUUM_RADIUS, type VacuumPlan } from './robot-vacuum-navigation'
-import { getRoomLayout } from './room-layout'
+import { getRoomLayout, getRoomPiece, roomPieceFootprint } from './room-layout'
 
 const bounds = new Box3(new Vector3(-0.7, 0, -0.35), new Vector3(0.7, 1.2, 0.35))
 
@@ -42,6 +42,24 @@ describe('robot vacuum navigation', () => {
     expect(plan.waypoints.some(point => point.x > 4)).toBe(true)
     expectSafeRoute(plan)
     expect(createVacuumPlan(bounds, [])).toEqual(plan)
+  })
+
+  it('steers around each room style\'s own piece of furniture, only when the room is furnished', () => {
+    expect(createVacuumPlan(bounds, [])!.obstacles.map(item => item.id)).not.toEqual(expect.arrayContaining([expect.stringMatching(/sofa|stove|whiteboard|rocking-horse/)]))
+    for (const theme of ['living', 'kitchen', 'office', 'kids'] as const) {
+      const style = { seed: 3, theme, furnished: true }
+      const piece = getRoomPiece(bounds, style)!
+      const plan = createVacuumPlan(bounds, [], [], style)!
+      expect(plan.obstacles).toContainEqual({ id: `room:${piece.kind}`, ...roomPieceFootprint(piece) })
+      expect(plan.petObstacles.map(item => item.id)).toContain(`room:${piece.kind}`)
+      // The piece leaves the room's built-in furniture, the dock and the creation clear.
+      const footprint = roomPieceFootprint(piece)
+      for (const other of plan.obstacles.filter(item => item.id !== `room:${piece.kind}`)) {
+        expect(other.minX >= footprint.maxX || other.maxX <= footprint.minX || other.minZ >= footprint.maxZ || other.maxZ <= footprint.minZ, other.id).toBe(true)
+      }
+      expect(footprint.maxZ <= bounds.min.z || footprint.minZ >= bounds.max.z || footprint.maxX <= bounds.min.x || footprint.minX >= bounds.max.x).toBe(true)
+      expectSafeRoute(plan)
+    }
   })
 
   it('uses resolved translated and rotated panel footprints without mutating them', () => {

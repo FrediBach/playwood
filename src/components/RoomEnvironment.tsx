@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
-import { getRoomLayout, RUG_OFFSET } from './room-layout'
+import { getRoomLayout, getRoomPiece, roomPieceFootprint, RUG_OFFSET } from './room-layout'
+import { RoomPiece } from './RoomPiece'
 import { Banana } from './Banana'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
@@ -122,12 +123,15 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
   // Art hangs clear of a dado rail or painted lower wall, including its scallops.
   const dado = lowerWallTop(walls.lower)
   const { min: { x: minX }, max: { x: maxX, y: maxY } } = bounds
+  const piece = useMemo(() => getRoomPiece(bounds, input), [bounds, input])
   const wallArt = useMemo(() => planWallArt({
     seed, theme, density, chairX, plantX,
     wall: { left: leftX, right: rightX, height, dado },
     creation: { minX, maxX },
-    obstacles: wallObstacles({ bounds: { min: { x: minX }, max: { x: maxX, y: maxY } }, floorY, chairX, plantX, furnishings }),
-  }), [seed, theme, density, chairX, plantX, leftX, rightX, height, dado, minX, maxX, maxY, floorY, furnishings])
+    obstacles: [...wallObstacles({ bounds: { min: { x: minX }, max: { x: maxX, y: maxY } }, floorY, chairX, plantX, furnishings }),
+      // The rocking horse stands out in the room; the others are in front of the wall. The stove's pot rises above it.
+      ...piece && piece.kind !== 'rocking-horse' ? [{ ...roomPieceFootprint(piece), top: piece.kind === 'stove' ? 1.1 : piece.height }] : []],
+  }), [seed, theme, density, chairX, plantX, leftX, rightX, height, dado, minX, maxX, maxY, floorY, furnishings, piece])
   const lighting = useMemo(() => roomLighting({ seed, theme }), [seed, theme])
   const windowZ = backZ + 2.1
   const windowWidth = 2.4
@@ -167,5 +171,6 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
     <LoungeChair position={[chairX, floorY, chairZ]} />
     <SideTable position={[chairX + 0.68, floorY, chairZ + 0.42]} />
     <Plant position={[plantX, floorY, plantZ]} />
+    {piece && <RoomPiece piece={piece} floorY={floorY} />}
   </group>
 }

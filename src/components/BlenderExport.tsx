@@ -56,7 +56,7 @@ function ExportContent({ job, onDone }: { job: Job; onDone: (error?: string) => 
   const furnishings = useMemo(() => job.furnished ? plan?.placements ?? [] : [], [job.furnished, plan])
   const roomStyle = useMemo(() => roomStyleFor({ enabled: job.autoFurnish, seed: job.furnishing.seed ?? 0, density: job.furnishing.density }, plan?.theme), [job, plan])
   const bounds = useMemo(() => boundsOf(panels), [panels])
-  const vacuum = useMemo(() => job.room ? createVacuumPlan(bounds, panels, furnishings) : null, [job.room, bounds, panels, furnishings])
+  const vacuum = useMemo(() => job.room ? createVacuumPlan(bounds, panels, furnishings, roomStyle) : null, [job.room, bounds, panels, furnishings, roomStyle])
   return <>
     <group name="Construction">
       {panels.filter(panel => panel.visible).map(panel => <PanelMesh key={panel.id} panel={panel} selected={false} interactive={false} onSelect={() => {}} />)}

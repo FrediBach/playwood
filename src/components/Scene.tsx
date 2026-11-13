@@ -31,7 +31,7 @@ import { PreviewFurnishings } from './PreviewFurnishings'
 import { PreviewResizeHandles } from './PreviewResizeHandles'
 import { createVacuumPlan,type VacuumPoint } from './robot-vacuum-navigation'
 import { RobotVacuum } from './RobotVacuum'
-import { getRoomLayout,getRoomRug,PREVIEW_FLOOR_Y } from './room-layout'
+import { getRoomLayout,getRoomPiece,getRoomRug,PREVIEW_FLOOR_Y } from './room-layout'
 import { createCatSetting } from './room-cat'
 import { makePanelGeometry } from './scene-geometry'
 import { SceneEnvironment } from './SceneEnvironment'
@@ -191,16 +191,17 @@ function Dimensions({ bounds }: { bounds: THREE.Box3 }) {
   </group>
 }
 
-function CameraController({ bounds, vacuumDock, view, fitSignal, frameSignal, zoomSignal, realisticPreview, panMode }: Pick<SceneProps, 'view' | 'fitSignal' | 'frameSignal' | 'zoomSignal' | 'realisticPreview' | 'panMode'> & { bounds: THREE.Box3; vacuumDock?: VacuumPoint }) {
+function CameraController({ bounds, vacuumDock, roomStyle, view, fitSignal, frameSignal, zoomSignal, realisticPreview, panMode }: Pick<SceneProps, 'view' | 'fitSignal' | 'frameSignal' | 'zoomSignal' | 'realisticPreview' | 'panMode' | 'roomStyle'> & { bounds: THREE.Box3; vacuumDock?: VacuumPoint }) {
   const controls = useRef<OrbitControlsImpl>(null)
   const [roomMaxDistance, setRoomMaxDistance] = useState(100)
   const { camera, gl, setSize, invalidate } = useThree()
   const boundsRef = useRef(bounds)
   const dockRef = useRef(vacuumDock)
+  const roomStyleRef = useRef(roomStyle)
   const lastZoomKey = useRef(0)
   const lastFrameSignal = useRef(frameSignal)
   const lastFitSignal = useRef(fitSignal)
-  useLayoutEffect(() => { boundsRef.current = bounds; dockRef.current = vacuumDock }, [bounds, vacuumDock])
+  useLayoutEffect(() => { boundsRef.current = bounds; dockRef.current = vacuumDock; roomStyleRef.current = roomStyle }, [bounds, vacuumDock, roomStyle])
   useLayoutEffect(() => {
     // The sidebar layout has changed before Fiber's ResizeObserver catches up.
     // Fit once against the actual viewport, not the previous mode's dimensions.
@@ -228,6 +229,12 @@ function CameraController({ bounds, vacuumDock, view, fitSignal, frameSignal, zo
       if (dockRef.current) {
         cameraBounds.expandByPoint(new THREE.Vector3(dockRef.current.x - 0.2, room.floorY, dockRef.current.z - 0.24))
         cameraBounds.expandByPoint(new THREE.Vector3(dockRef.current.x + 0.2, room.floorY + 0.59, dockRef.current.z + 0.75))
+      }
+      // At least the near half of the style's own piece, without zooming far out for a long sofa.
+      const piece = getRoomPiece(boundsRef.current, roomStyleRef.current)
+      if (piece) {
+        cameraBounds.expandByPoint(new THREE.Vector3(piece.x, room.floorY, piece.z))
+        cameraBounds.expandByPoint(new THREE.Vector3(piece.x, room.floorY + Math.min(piece.height, 1.2), piece.z))
       }
     }
     const center = cameraBounds.getCenter(new THREE.Vector3())
@@ -560,7 +567,7 @@ function World(props: WorldProps) {
   const { panels, previewPanels = EMPTY_PANELS, attachmentBoundsPanels = EMPTY_PANELS, showGrid, showDimensions, exploded, realisticPreview } = props
   const displayPanels = useDisplayPanels(panels, exploded)
   const bounds = useMemo(() => boundsOf(displayPanels), [displayPanels])
-  const vacuumPlan = useMemo(() => realisticPreview ? createVacuumPlan(bounds, displayPanels, props.furnishings) : null, [realisticPreview, bounds, displayPanels, props.furnishings])
+  const vacuumPlan = useMemo(() => realisticPreview ? createVacuumPlan(bounds, displayPanels, props.furnishings, props.roomStyle) : null, [realisticPreview, bounds, displayPanels, props.furnishings, props.roomStyle])
   const cameraBounds = useMemo(() => {
     const bounds=expandCameraBounds(displayPanels,previewPanels,attachmentBoundsPanels,props,realisticPreview,exploded)
     return bounds
@@ -586,7 +593,7 @@ function World(props: WorldProps) {
     <SceneResizeHandles {...props} feedback={feedback} onInspectBlockers={inspectBlockers}/>
     {props.attachmentHandles?.filter(handle => handle.active && handle.segment).map(handle => <Line key={handle.id} points={handle.segment!.map(point => point.map(value => value * MM) as Vec3)} color="#e7753f" lineWidth={5} depthTest={false} renderOrder={100}/>)}
     <AttachmentHandlePositions handles={props.attachmentHandles ?? EMPTY_ATTACHMENT_HANDLES} elements={props.attachmentElements}/>
-    <CameraController panMode={props.panMode} bounds={cameraBounds} vacuumDock={vacuumPlan?.dock} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
+    <CameraController panMode={props.panMode} bounds={cameraBounds} vacuumDock={vacuumPlan?.dock} roomStyle={props.roomStyle} view={props.view} fitSignal={props.fitSignal} frameSignal={props.frameSignal} zoomSignal={props.zoomSignal} realisticPreview={realisticPreview} />
   </>
 }
 

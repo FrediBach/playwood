@@ -2,7 +2,8 @@ import { Box3, Euler, Vector3 } from 'three'
 import { furnishingFootprint, type FurnishingPlacement } from '@/lib/preview-furnishings'
 import { getTrofastInsertObb } from '@/lib/trofast'
 import type { Panel } from '@/lib/types'
-import { getRoomLayout } from './room-layout'
+import { getRoomLayout, getRoomPiece, roomPieceFootprint } from './room-layout'
+import type { RoomStyleInput } from '@/lib/room-floor-style'
 
 export interface VacuumPoint { x: number; z: number }
 export interface VacuumObstacle { minX: number; maxX: number; minZ: number; maxZ: number; id: string }
@@ -31,9 +32,7 @@ const MAX_GRID_AXIS = 128
 const MM = 0.001
 
 function rectangle(id: string, x: number, z: number, width: number, depth: number, rotation = 0): VacuumObstacle {
-  const halfX = (Math.abs(Math.cos(rotation)) * width + Math.abs(Math.sin(rotation)) * depth) / 2
-  const halfZ = (Math.abs(Math.sin(rotation)) * width + Math.abs(Math.cos(rotation)) * depth) / 2
-  return { id, minX: x - halfX, maxX: x + halfX, minZ: z - halfZ, maxZ: z + halfZ }
+  return { id, ...roomPieceFootprint({ x, z, width, depth, rotation }) }
 }
 
 function footprint(id: string, bounds: Box3): VacuumObstacle {
@@ -164,13 +163,16 @@ export function rejoinVacuumRoute(plan: VacuumPlan, position: VacuumPoint, allow
  * 128 × 128 cells and traversal is linear; floor plans cannot make route finding
  * exponential. Conservative rectangles intentionally exclude narrow passages.
  */
-export function createVacuumPlan(bounds: Box3, panels: Panel[], furnishings: FurnishingPlacement[] = []): VacuumPlan | null {
+export function createVacuumPlan(bounds: Box3, panels: Panel[], furnishings: FurnishingPlacement[] = [], style?: RoomStyleInput): VacuumPlan | null {
   const layout = getRoomLayout(bounds)
   const { floorY, leftX, rightX, backZ, depth, chairX, chairZ } = layout
   if (![floorY, leftX, rightX, backZ, depth].every(Number.isFinite)) return null
   const room = { minX: leftX, maxX: rightX, minZ: backZ, maxZ: backZ + depth }
   const size = bounds.getSize(new Vector3())
+  // The style's own piece stands on the floor; nothing can pass beneath it.
+  const piece = getRoomPiece(bounds, style)
   const builtIn = [
+    ...piece ? [rectangle(`room:${piece.kind}`, piece.x, piece.z, piece.width, piece.depth, piece.rotation)] : [],
     rectangle('room:chair', chairX, chairZ, 0.84, 0.82, -0.2),
     rectangle('room:lamp', chairX + 0.63, chairZ - 0.34, 0.38, 0.38),
     rectangle('room:table', chairX + 0.68, chairZ + 0.42, 0.47, 0.47),

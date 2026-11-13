@@ -36,8 +36,8 @@ describe('room floor style', () => {
 
   it('uses the default room when Auto furnish is off', () => {
     expect(roomStyleFor({ enabled: false, seed: 99 }, 'kids')).toEqual(DEFAULT_ROOM_STYLE)
-    expect(roomStyleFor({ enabled: true, seed: 99 }, 'kids')).toEqual({ seed: 99, theme: 'kids', density: 'balanced' })
-    expect(roomStyleFor({ enabled: true, seed: 0 }, undefined)).toEqual(DEFAULT_ROOM_STYLE)
+    expect(roomStyleFor({ enabled: true, seed: 99 }, 'kids')).toEqual({ seed: 99, theme: 'kids', density: 'balanced', furnished: true })
+    expect(roomStyleFor({ enabled: true, seed: 0 }, undefined)).toEqual({ ...DEFAULT_ROOM_STYLE, furnished: true })
   })
 
   it('sizes rugs in whole decimetres around the design', () => {

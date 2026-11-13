@@ -48,6 +48,8 @@ export interface RoomStyleInput {
   theme: ResolvedTheme
   /** How much art hangs on the wall; the floor ignores it. */
   density?: FurnishingDensity
+  /** Auto furnish is on, so the room adds its style's own piece of furniture. */
+  furnished?: boolean
 }
 export const DEFAULT_ROOM_STYLE: RoomStyleInput = { seed: 0, theme: 'living', density: 'balanced' }
 
@@ -160,5 +162,5 @@ export function rugSize(style: RugStyle, extentX: number, extentZ: number): [num
 
 /** Auto furnish chooses the room's floor and wall art; without it the default room stays. */
 export function roomStyleFor(furnishing: { enabled: boolean; seed: number; density?: FurnishingDensity }, theme: ResolvedTheme | undefined): RoomStyleInput {
-  return furnishing.enabled ? { seed: furnishing.seed, theme: theme ?? 'living', density: furnishing.density ?? 'balanced' } : DEFAULT_ROOM_STYLE
+  return furnishing.enabled ? { seed: furnishing.seed, theme: theme ?? 'living', density: furnishing.density ?? 'balanced', furnished: true } : DEFAULT_ROOM_STYLE
 }
