@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { getRoomLayout } from './room-layout'
+import { getRoomLayout, RUG_OFFSET } from './room-layout'
 import { Banana } from './Banana'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
@@ -129,7 +129,6 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
     obstacles: wallObstacles({ bounds: { min: { x: minX }, max: { x: maxX, y: maxY } }, floorY, chairX, plantX, furnishings }),
   }), [seed, theme, density, chairX, plantX, leftX, rightX, height, dado, minX, maxX, maxY, floorY, furnishings])
   const lighting = useMemo(() => roomLighting({ seed, theme }), [seed, theme])
-  const furnitureCenterZ = 0
   const windowZ = backZ + 2.1
   const windowWidth = 2.4
   const windowHeight = 2.25
@@ -162,7 +161,7 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
     <RoomWalls style={walls} floorY={floorY} leftX={leftX} rightX={rightX} backZ={backZ} depth={depth} height={height}
       window={windowOpening} />
 
-    <Rug style={style} position={[layout.centerX + 0.12, floorY - 0.006, furnitureCenterZ + 0.16]} extent={[bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z]} />
+    <Rug style={style} position={[layout.centerX + RUG_OFFSET.x, floorY - 0.006, RUG_OFFSET.z]} extent={[bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z]} />
     <RoomWallArt plan={wallArt} wallZ={backZ} floorY={floorY} />
 
     <LoungeChair position={[chairX, floorY, chairZ]} />

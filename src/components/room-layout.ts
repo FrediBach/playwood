@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { DEFAULT_ROOM_STYLE, roomFloorStyle, rugSize, type RoomStyleInput } from '@/lib/room-floor-style'
 
 // Leave clearance for hardware below panels resting at world Y = 0.
 export const PREVIEW_FLOOR_Y = -0.012
@@ -28,3 +29,16 @@ export function getRoomLayout(bounds: THREE.Box3) {
   }
 }
 
+
+/** The rug is centred slightly right of and in front of the creation. */
+export const RUG_OFFSET = { x: 0.12, z: 0.16 } as const
+
+export interface RoomRug { x: number; z: number; width: number; depth: number; round: boolean }
+
+/** Floor footprint of the room's rug, in meters, matching `RoomEnvironment`. */
+export function getRoomRug(bounds: THREE.Box3, style: RoomStyleInput = DEFAULT_ROOM_STYLE): RoomRug {
+  const size = bounds.getSize(new THREE.Vector3())
+  const rug = roomFloorStyle(style).rug
+  const [width, depth] = rugSize(rug, size.x, size.z)
+  return { x: getRoomLayout(bounds).centerX + RUG_OFFSET.x, z: RUG_OFFSET.z, width, depth, round: rug.shape === 'round' }
+}

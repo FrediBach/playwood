@@ -13,6 +13,8 @@ export interface VacuumPlan {
   /** First and last points are the clear egress position; repeat from index 1. */
   waypoints: VacuumPoint[]
   obstacles: VacuumObstacle[]
+  /** Floor footprints below a resting or walking cat's height, including the dock. */
+  petObstacles: VacuumObstacle[]
   room: VacuumRoom
   floorY: number
 }
@@ -24,6 +26,7 @@ const VACUUM_HEIGHT = 0.111
 const DOCK_WIDTH = 0.34
 const DOCK_DEPTH = 0.457
 const DOCK_HEIGHT = 0.59
+const PET_HEIGHT = 0.3
 const MAX_GRID_AXIS = 128
 const MM = 0.001
 
@@ -185,6 +188,11 @@ export function createVacuumPlan(bounds: Box3, panels: Panel[], furnishings: Fur
       .map(item => footprint(item.id, item.bounds)),
     ...furnishingObstacles(furnishings, floorY + DOCK_HEIGHT + 0.02),
   ]
+  const petObstacles = [...builtIn,
+    ...boxes.filter(item => item.bounds.min.y <= floorY + PET_HEIGHT && item.bounds.max.y >= floorY)
+      .map(item => footprint(item.id, item.bounds)),
+    ...furnishingObstacles(furnishings, floorY + PET_HEIGHT),
+  ]
   const dockZ = backZ + DOCK_DEPTH / 2 + 0.045
   const preferredX = -size.x / 2 - 1.45
   const candidates = [preferredX, ...Array.from({ length: 33 }, (_, index) =>
@@ -200,6 +208,7 @@ export function createVacuumPlan(bounds: Box3, panels: Panel[], furnishings: Fur
   const start = { x: dock.x, z: dock.z + 0.15 }
   const escape = { x: dock.x, z: dock.z + 0.75 }
   obstacles.push(rectangle('dock', dock.x, dock.z + 0.06, DOCK_WIDTH, DOCK_DEPTH + 0.12))
+  petObstacles.push(obstacles.at(-1)!)
 
   const minX = leftX + VACUUM_CLEARANCE + 0.015, maxX = rightX - VACUUM_CLEARANCE - 0.015
   const minZ = backZ + VACUUM_CLEARANCE + 0.015, maxZ = backZ + depth - VACUUM_CLEARANCE - 0.015
@@ -240,5 +249,5 @@ export function createVacuumPlan(bounds: Box3, panels: Panel[], furnishings: Fur
     }
   }
   appendPoint(waypoints, escape)
-  return { dock, start, waypoints, obstacles, room, floorY }
+  return { dock, start, waypoints, obstacles, petObstacles, room, floorY }
 }

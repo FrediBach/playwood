@@ -310,3 +310,80 @@ test('vacuum driving respects fields and modifiers and releases held keys on blu
   expect((await vacuumState(page))?.phase).toBe('cleaning')
   expect(await exportedProject(page)).toEqual(original)
 })
+
+interface CatState { x: number; z: number; phase: string; displaced: number; onSofa: boolean; obstacles: VacuumPlan['petObstacles'] }
+
+async function catState(page: Page): Promise<CatState | null> {
+  const url = fiberUrls.get(page)
+  if (!url) return null
+  return page.locator('canvas').evaluate(async (canvas, url) => {
+    const { _roots } = await import(url)
+    const cat = _roots.get(canvas)?.store.getState().scene?.getObjectByName('Room cat')
+    if (!cat) return null
+    const { phase, displaced, onSofa } = cat.userData
+    const plan = cat.parent.getObjectByName('Dreame X50 Ultra Complete').userData.plan
+    return { x: cat.position.x, z: cat.position.z, phase, displaced, onSofa, obstacles: plan.petObstacles }
+  }, url)
+}
+
+/** Steers with plain arrow keys: turn toward the target, then drive in short bursts. */
+async function driveVacuumToward(page: Page, target: { x: number; z: number }, until: () => Promise<boolean>) {
+  for (let step = 0; step < 80 && !(await until()); step++) {
+    const state = (await vacuumState(page))!
+    const error = Math.atan2(Math.sin(Math.atan2(target.x - state.x, target.z - state.z) - state.heading), Math.cos(Math.atan2(target.x - state.x, target.z - state.z) - state.heading))
+    const key = Math.abs(error) > 0.12 ? error > 0 ? 'ArrowLeft' : 'ArrowRight' : 'ArrowUp'
+    await page.keyboard.down(key)
+    await page.clock.runFor(key === 'ArrowUp' ? Math.min(800, Math.max(150, (distance(state, target) - 0.8) * 2500)) : Math.max(50, Math.abs(error) / 1.8 * 1000))
+    await page.keyboard.up(key)
+  }
+}
+
+test('the sleeping cat on the rug gets up and moves away when the vacuum is driven close', async ({ page }) => {
+  // Driving across the room renders every simulated frame; a small viewport keeps that quick.
+  test.setTimeout(150000)
+  await page.setViewportSize({ width: 800, height: 520 })
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await page.goto('/')
+  const original = await exportedProject(page)
+  await page.clock.pauseAt(new Date('2026-01-01T01:00:00Z'))
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await page.clock.runFor(100)
+  await expect.poll(() => catState(page)).not.toBeNull()
+  const home = (await catState(page))!
+  expect(home.phase).toBe('sleeping')
+  expect(home.displaced).toBe(0)
+  // The cat sleeps on the front-right part of the rug, in front of the creation.
+  expect(home.x).toBeGreaterThan(0.12)
+  expect(home.z).toBeGreaterThan(0.16)
+  for (const obstacle of home.obstacles) {
+    const x = Math.max(obstacle.minX, Math.min(home.x, obstacle.maxX)), z = Math.max(obstacle.minZ, Math.min(home.z, obstacle.maxZ))
+    expect(Math.hypot(home.x - x, home.z - z), obstacle.id).toBeGreaterThan(0.15)
+  }
+
+  await page.locator('canvas').focus()
+  const docked = (await vacuumState(page))!
+  // Leave the dock straight ahead, then approach the cat across the open floor in front of the creation and the plant.
+  await driveVacuumToward(page, { x: docked.x, z: 1 }, async () => (await vacuumState(page))!.z > 0.7)
+  const approach = { x: home.x - 0.55, z: home.z + 0.5 }
+  await driveVacuumToward(page, approach, async () => distance((await vacuumState(page))!, approach) < 0.3)
+  await driveVacuumToward(page, home, async () => (await catState(page))!.displaced > 0)
+  const woken = (await catState(page))!
+  expect(woken.displaced).toBe(1)
+  expect(['waking', 'walking']).toContain(woken.phase)
+  const vacuum = (await vacuumState(page))!
+  expect(vacuum.phase).toBe('manual')
+
+  for (let index = 0; index < 60 && (await catState(page))!.phase !== 'sleeping'; index++) await page.clock.runFor(250)
+  const moved = (await catState(page))!
+  expect(moved.phase).toBe('sleeping')
+  expect(moved.onSofa).toBe(false)
+  expect(distance(moved, home)).toBeGreaterThan(0.7)
+  expect(distance(moved, vacuum)).toBeGreaterThan(1.2)
+  expect(await exportedProject(page)).toEqual(original)
+
+  await page.getByRole('button', { name: 'Studio', exact: true }).click()
+  await expect.poll(() => catState(page)).toBeNull()
+  expect(errors).toEqual([])
+})

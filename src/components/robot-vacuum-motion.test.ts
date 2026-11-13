@@ -72,7 +72,7 @@ describe('preview vacuum movement', () => {
 describe('manual vacuum driving', () => {
   const roomPlan = (): VacuumPlan => ({
     dock: { x: -1.5, z: -1.5 }, start: { x: -1.5, z: -1.35 }, floorY: -0.012,
-    room: { minX: -2, maxX: 2, minZ: -2, maxZ: 2 }, obstacles: [],
+    room: { minX: -2, maxX: 2, minZ: -2, maxZ: 2 }, obstacles: [], petObstacles: [],
     waypoints: [{ x: -1, z: -1 }, { x: 1, z: -1 }, { x: 1, z: 1 }, { x: -1, z: 1 }, { x: -1, z: -1 }],
   })
   const bounds = new Box3(new Vector3(-0.7, 0, -0.35), new Vector3(0.7, 1.2, 0.35))

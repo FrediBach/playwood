@@ -7,8 +7,10 @@ import { DreameDockModel, DreameVacuumModel } from './RobotVacuumModel'
 import { rejoinVacuumRoute, type VacuumPlan, type VacuumPoint } from './robot-vacuum-navigation'
 import { advanceVacuum, createVacuumMotion, driveVacuum, type VacuumMotion } from './robot-vacuum-motion'
 import { recordVacuumTrail, recoverVacuumRoute } from './robot-vacuum-recovery'
+import { RoomCat } from './RoomCat'
+import type { CatSetting } from './room-cat'
 
-export function RobotVacuum({ plan, projectPanels, controlsEnabled }: { plan: VacuumPlan; projectPanels: Panel[]; controlsEnabled: boolean }) {
+export function RobotVacuum({ plan, cat, projectPanels, controlsEnabled }: { plan: VacuumPlan; cat?: CatSetting | null; projectPanels: Panel[]; controlsEnabled: boolean }) {
   const robot = useRef<Group>(null)
   const motion = useRef<VacuumMotion | null>(null)
   const route = useRef<VacuumPoint[] | null>(null)
@@ -78,5 +80,6 @@ export function RobotVacuum({ plan, projectPanels, controlsEnabled }: { plan: Va
   return <>
     <group name="Dreame X50 Ultra Complete dock" position={[plan.dock.x, plan.floorY, plan.dock.z]}><DreameDockModel /></group>
     <group ref={robot} name="Dreame X50 Ultra Complete" userData={data}><DreameVacuumModel /></group>
+    {cat && <RoomCat setting={cat} plan={plan} vacuum={motion} session={data} />}
   </>
 }

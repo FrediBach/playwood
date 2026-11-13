@@ -31,7 +31,8 @@ import { PreviewFurnishings } from './PreviewFurnishings'
 import { PreviewResizeHandles } from './PreviewResizeHandles'
 import { createVacuumPlan,type VacuumPoint } from './robot-vacuum-navigation'
 import { RobotVacuum } from './RobotVacuum'
-import { getRoomLayout,PREVIEW_FLOOR_Y } from './room-layout'
+import { getRoomLayout,getRoomRug,PREVIEW_FLOOR_Y } from './room-layout'
+import { createCatSetting } from './room-cat'
 import { makePanelGeometry } from './scene-geometry'
 import { SceneEnvironment } from './SceneEnvironment'
 import { SpaceConstraintOverlay } from './SpaceConstraintOverlay'
@@ -548,9 +549,10 @@ function useDisplayPanels(panels: Panel[], exploded: boolean) {
   return displayPanels
 }
 
-function SceneVacuum({ plan, panels, dragging, resizing, boxSelectActive, designConstraint }: Pick<SceneProps, 'panels' | 'dragging' | 'resizing' | 'boxSelectActive' | 'designConstraint'> & { plan: ReturnType<typeof createVacuumPlan> | null }) {
+function SceneVacuum({ plan, bounds, roomStyle, panels, dragging, resizing, boxSelectActive, designConstraint }: Pick<SceneProps, 'panels' | 'dragging' | 'resizing' | 'boxSelectActive' | 'designConstraint' | 'roomStyle'> & { plan: ReturnType<typeof createVacuumPlan> | null; bounds: THREE.Box3 }) {
+  const cat = useMemo(() => plan ? createCatSetting(plan, bounds, getRoomRug(bounds, roomStyle)) : null, [plan, bounds, roomStyle])
   if (!plan) return null
-  return <RobotVacuum plan={plan} projectPanels={panels} controlsEnabled={!dragging && !resizing && !boxSelectActive && !designConstraint}/>
+  return <RobotVacuum plan={plan} cat={cat} projectPanels={panels} controlsEnabled={!dragging && !resizing && !boxSelectActive && !designConstraint}/>
 }
 
 function World(props: WorldProps) {
@@ -573,7 +575,7 @@ function World(props: WorldProps) {
     <SceneMovement {...props} feedback={feedback}/>
     <SceneCamera props={props} realisticPreview={realisticPreview}/>
     <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} roomStyle={props.roomStyle} furnishings={props.furnishings} snapSettings={props.snapSettings} guides={feedback.guides}/>
-    <SceneVacuum plan={vacuumPlan} panels={displayPanels} dragging={props.dragging} resizing={props.resizing} boxSelectActive={props.boxSelectActive} designConstraint={props.designConstraint}/>
+    <SceneVacuum plan={vacuumPlan} bounds={bounds} roomStyle={props.roomStyle} panels={displayPanels} dragging={props.dragging} resizing={props.resizing} boxSelectActive={props.boxSelectActive} designConstraint={props.designConstraint}/>
     {displayPanels.filter(panel => !panel.visible && panel.wireframe).map(panel => <PanelWireframe key={panel.id} panel={panel}/>)}
     <SceneParts {...props} shownPanels={shownPanels}
       constraintPanelIds={[...props.constraintPanelIds ?? [], ...blockers?.panelIds ?? []]}

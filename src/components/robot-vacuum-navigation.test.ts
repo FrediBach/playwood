@@ -136,7 +136,7 @@ describe('robot vacuum navigation', () => {
 describe('rejoining a changed furnishing route', () => {
   const square = (): VacuumPlan => ({
     dock: { x: -4, z: -4 }, start: { x: -4, z: -3.85 }, floorY: -0.012,
-    room: { minX: -8, maxX: 8, minZ: -8, maxZ: 8 }, obstacles: [],
+    room: { minX: -8, maxX: 8, minZ: -8, maxZ: 8 }, obstacles: [], petObstacles: [],
     waypoints: [{ x: -1, z: -1 }, { x: 1, z: -1 }, { x: 1, z: 1 }, { x: -1, z: 1 }, { x: -1, z: -1 }],
   })
 
