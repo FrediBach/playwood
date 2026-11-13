@@ -35,6 +35,7 @@ import { getRoomLayout,getRoomPiece,getRoomRug,PREVIEW_FLOOR_Y } from './room-la
 import { createCatSetting } from './room-cat'
 import { makePanelGeometry } from './scene-geometry'
 import { SceneEnvironment } from './SceneEnvironment'
+import { RoomRenderCompletion, RoomPreparing, SceneUnavailable } from './RoomPreparation'
 import { SpaceConstraintOverlay } from './SpaceConstraintOverlay'
 import { TrofastMeshes } from './TrofastMeshes'
 import { createWoodTextures } from './wood-texture'
@@ -110,6 +111,8 @@ export interface SceneProps extends PreviewDragProps, BoxSelectionProps {
   showDimensions: boolean
   exploded: boolean
   realisticPreview?: boolean
+  preparingRealisticPreview?: boolean
+  onRoomRendered?: () => void
   furnishings?: FurnishingPlacement[]
   /** The realistic room's floor, rug and wall art style. */
   roomStyle?: RoomStyleInput
@@ -653,13 +656,15 @@ export default function Scene(props: SceneProps) {
     const attachmentHandles = visibleAttachmentHandles(props,controlHeld)
   return <ViewportBoundary>
     <div className={`scene-surface${props.boxSelectActive ? ' is-box-selecting' : ''}${props.connect?.gesture.active ? ' is-connecting' : ''}`} data-preview-furnishings={props.realisticPreview ? props.furnishings?.length ?? 0 : 0}>
-    <Canvas aria-label={props.connect?.gesture.active ? 'Connect mode. Drag between panels or click two endpoints to add a connector. Arrow keys aim the crosshair; Enter chooses an endpoint. Escape cancels and exits.' : props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
+    <Canvas aria-busy={props.preparingRealisticPreview || undefined} aria-label={props.connect?.gesture.active ? 'Connect mode. Drag between panels or click two endpoints to add a connector. Arrow keys aim the crosshair; Enter chooses an endpoint. Escape cancels and exits.' : props.realisticPreview ? 'Realistic furniture preview in a modern home, at actual scale. Drag to orbit, right-drag or enable Pan view to pan, and scroll to zoom. Control-drag a selected panel or assembly to move and snap it.' : 'Interactive 3D furniture design. Drag to orbit, right-drag or enable Pan view to pan, scroll to zoom, click a panel to select it. Control-drag the selection to move and snap it. Shift-click, Command-click, or Control-click to select multiple panels.'} shadows frameloop="demand" dpr={[1, 2]} camera={{ position: [2, 1.5, 2.5], fov: 35, near: 0.01, far: 200 }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
       style={{ width: '100%', height: '100%', touchAction: 'none', cursor: props.boxSelectActive || props.connect?.gesture.active ? 'crosshair' : props.panMode ? 'grab' : undefined }}
       onPointerMissed={event => { if (!props.connect?.gesture.active && event.type === 'click') props.onSelect(null, event.shiftKey || event.metaKey || event.ctrlKey) }}
-      fallback={<div style={{ padding: 32 }}>Your browser needs WebGL to display this 3D workspace.</div>}>
+      fallback={<SceneUnavailable onSettled={props.onRoomRendered} />}>
       <World {...props} boxPreview={boxPreview} onBoxPreview={setBoxPreview} attachmentHandles={attachmentHandles} attachmentElements={attachmentElements}/>
+      <RoomRenderCompletion onRendered={props.onRoomRendered} />
     </Canvas>
+    {props.preparingRealisticPreview && <RoomPreparing />}
     {props.boxSelectActive && boxPreview && <div className="box-selection-rectangle" style={boxPreview.rectangle} aria-hidden="true">
       <span className="box-selection-count">{boxPreview.additive ? '+ ' : ''}{boxSelectionLabel}</span>
     </div>}

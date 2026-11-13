@@ -1,0 +1,7 @@
+.room-preparing{position:absolute;inset:0;z-index:1;display:grid;place-items:center;padding:24px;background:#eeede8ed;cursor:progress}
+.room-preparing-card{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:320px;text-align:center;color:#353b30}
+.room-preparing-card strong{font-size:16px;font-weight:550;letter-spacing:-.2px}
+.room-preparing-card span{font-size:12px;line-height:1.6;color:#666b5e}
+.room-preparing-spinner{color:#68765b;animation:room-preparing-spin 1s linear infinite;will-change:transform}
+@keyframes room-preparing-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.room-preparing-spinner{animation:none;will-change:auto}}

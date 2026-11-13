@@ -1,3 +1,4 @@
+import { useRoomPreparation } from '@/hooks/use-room-preparation'
 import { getProjectBounds } from '@/lib/model'
 import { roomStyleFor } from '@/lib/room-floor-style'
 import { planPreviewFurnishings,type FurnishingPlacement,type FurnishingPlan } from '@/lib/preview-furnishings'
@@ -97,10 +98,11 @@ export function AssemblyWorkspace({
   attachmentSummary, attachmentWarning, attachmentChooser, furnishingNames
 }: Props) {
   const [panMode, setPanMode] = useState(false)
+  const preparation = useRoomPreparation(realisticPreview)
   const furnishing = usePreviewFurnishing()
   // Keep detection and all additional meshes out of the default preview path.
-  const furnishingPlan = useMemo(() => realisticPreview && furnishing.enabled ? planPreviewFurnishings(panels, furnishingOptions(furnishing, furnishingNames)) : null,
-    [panels, realisticPreview, furnishing, furnishingNames])
+  const furnishingPlan = useMemo(() => preparation.renderRoom && furnishing.enabled ? planPreviewFurnishings(panels, furnishingOptions(furnishing, furnishingNames)) : null,
+    [panels, preparation.renderRoom, furnishing, furnishingNames])
   const furnishings = furnishingPlan?.placements ?? NO_FURNISHINGS
   const roomStyle = useMemo(() => roomStyleFor(furnishing, furnishingPlan?.theme), [furnishing, furnishingPlan?.theme])
   const panelSelectionActive = (selectionKind ?? (selectedConnectorIds?.length ? 'connectors' : 'panels')) === 'panels'
@@ -133,6 +135,9 @@ export function AssemblyWorkspace({
     setShowGrid={setShowGrid}/>
       <div className="scene-container"><Scene
     {...sceneProps}
+    realisticPreview={preparation.renderRoom}
+    preparingRealisticPreview={preparation.preparing}
+    onRoomRendered={preparation.onRendered}
     roomStyle={roomStyle}
     connect={connect}
     objectSelection={objectSelection}
@@ -196,7 +201,7 @@ export function AssemblyWorkspace({
     status={connect?.gesture.active ? connect.panelIds.length ? undefined : <><span>Connect · drag between panels or click twice</span><kbd>Esc</kbd> Exit</> : movementStatus}
     notice={connect?.gesture.active ? undefined : notice}
     showTransformShortcuts={showTransformShortcuts(boxSelectActive,panelSelectionActive,selectedIds,movementEnabled,editingAssembly,dragging,resizing)}
-    roomDetails={realisticPreview&&<RoomDetails hasVisiblePanels={hasVisiblePanels} visibleBounds={visibleBounds} furnishing={furnishing} plan={furnishingPlan} roomStyle={roomStyle}/>}/>
+    roomDetails={preparation.ready&&<RoomDetails hasVisiblePanels={hasVisiblePanels} visibleBounds={visibleBounds} furnishing={furnishing} plan={furnishingPlan} roomStyle={roomStyle}/>}/>
       {!realisticPreview&&<div className="axis-label" aria-hidden="true"><span className="axis-y">Y</span><span className="axis-z">Z</span><span className="axis-x">X</span><i/><b/></div>}
       {attachmentChooser}
     </main>
