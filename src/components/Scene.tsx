@@ -581,7 +581,7 @@ function World(props: WorldProps) {
     <PreviewContextGesture onOpen={props.boxSelectActive ? undefined : props.onPreviewContextMenu} realisticPreview={props.realisticPreview}/>
     <SceneMovement {...props} feedback={feedback}/>
     <SceneCamera props={props} realisticPreview={realisticPreview}/>
-    <SceneEnvironment bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} roomStyle={props.roomStyle} furnishings={props.furnishings} snapSettings={props.snapSettings} guides={feedback.guides}/>
+    <SceneEnvironment panels={panels} bounds={bounds} floorY={floorY} showGrid={showGrid} exploded={exploded} realisticPreview={realisticPreview} roomStyle={props.roomStyle} furnishings={props.furnishings} snapSettings={props.snapSettings} guides={feedback.guides}/>
     <SceneVacuum plan={vacuumPlan} bounds={bounds} roomStyle={props.roomStyle} panels={displayPanels} dragging={props.dragging} resizing={props.resizing} boxSelectActive={props.boxSelectActive} designConstraint={props.designConstraint}/>
     {displayPanels.filter(panel => !panel.visible && panel.wireframe).map(panel => <PanelWireframe key={panel.id} panel={panel}/>)}
     <SceneParts {...props} shownPanels={shownPanels}

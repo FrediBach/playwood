@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { getRoomLayout, getRoomPiece, roomPieceFootprint, RUG_OFFSET } from './room-layout'
 import { RoomPiece } from './RoomPiece'
+import type { Panel } from '@/lib/types'
 import { Banana } from './Banana'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
@@ -112,7 +113,7 @@ function Rug({ style, position, extent }: { style: RoomFloorStyle; position: Tri
 
 const NO_FURNISHINGS: readonly FurnishingPlacement[] = []
 
-export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, furnishings = NO_FURNISHINGS }: { bounds: THREE.Box3; style?: RoomStyleInput; furnishings?: readonly FurnishingPlacement[] }) {
+export function RoomEnvironment({ bounds, panels, style: input = DEFAULT_ROOM_STYLE, furnishings = NO_FURNISHINGS }: { bounds: THREE.Box3; panels: readonly Panel[]; style?: RoomStyleInput; furnishings?: readonly FurnishingPlacement[] }) {
   const layout = getRoomLayout(bounds)
   const { floorY, leftX, rightX, backZ, width, depth, height, chairX, chairZ, plantX, plantZ } = layout
   const centerX = (leftX + rightX) / 2
@@ -171,6 +172,6 @@ export function RoomEnvironment({ bounds, style: input = DEFAULT_ROOM_STYLE, fur
     <LoungeChair position={[chairX, floorY, chairZ]} />
     <SideTable position={[chairX + 0.68, floorY, chairZ + 0.42]} />
     <Plant position={[plantX, floorY, plantZ]} />
-    {piece && <RoomPiece piece={piece} floorY={floorY} />}
+    {piece && <RoomPiece piece={piece} floorY={floorY} panels={panels} />}
   </group>
 }

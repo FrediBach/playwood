@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises'
 import { test, expect, type Page } from './browser-fixture'
 import { createPanel, createStarterProject, resolvePanels } from '../src/lib/model'
 import { createExampleProject } from '../src/lib/example-library'
@@ -400,5 +401,41 @@ test('the panel inspector saves a furnishing purpose that Auto furnish follows',
   await expect(purpose).toHaveValue('desk')
   await purpose.selectOption('auto')
   expect(await exportedProject(page)).toEqual(original)
+  expect(errors).toEqual([])
+})
+
+
+test('office whiteboard sketches the current furniture and restores it on undo', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/')
+  const panels = resolvePanels(createStarterProject('desk'))
+  await importPanels(page, panels)
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  const furnish = page.getByRole('checkbox', { name: 'Auto furnish', exact: true })
+  await furnish.check()
+  await page.getByRole('combobox', { name: 'Furnishing style' }).selectOption('office')
+  const sketch = () => page.locator('canvas').evaluate(async canvas => {
+    const url = performance.getEntriesByType('resource').map(entry => entry.name).find(url => url.includes('/@react-three_fiber.js'))!
+    const { _roots } = await import(url)
+    const { scene } = _roots.get(canvas).store.getState()
+    return scene.getObjectByName('Whiteboard furniture sketch')?.material.map.image.toDataURL() ?? null
+  })
+  await expect.poll(sketch).toMatch(/^data:image\/png;base64,/)
+  const original = (await sketch())!
+  await writeFile('test-results/whiteboard-sketch.png', Buffer.from(original.split(',')[1], 'base64'))
+  await page.screenshot({ path: 'test-results/whiteboard-room.png' })
+  await page.getByRole('button', { name: 'Studio', exact: true }).click()
+  await page.locator('.panel-list-select').first().click()
+  await page.getByLabel('Width', { exact: true }).fill(String(panels[0].width * 1.5))
+  await page.getByLabel('Width', { exact: true }).press('Enter')
+  await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+  await expect.poll(async () => { const image = await sketch(); return !!image && image !== original }).toBe(true)
+  await page.getByRole('button', { name: 'Undo (⌘/Ctrl Z)' }).click()
+  await expect.poll(async () => await sketch() === original).toBe(true)
+  await furnish.uncheck()
+  await expect.poll(sketch).toBeNull()
+  await furnish.check()
+  await expect.poll(async () => await sketch() === original).toBe(true)
   expect(errors).toEqual([])
 })

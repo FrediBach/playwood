@@ -1,7 +1,9 @@
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import type { RoomPiece as RoomPieceSpec } from './room-layout'
+import type { Panel } from '@/lib/types'
+import { whiteboardTexture } from './whiteboard-sketch'
 
 type Triple = [number, number, number]
 
@@ -83,23 +85,10 @@ function Stove() {
   </>
 }
 
-/** A marker line on the board, in the board's centred XY plane. */
-function Stroke({ from, to, color }: { from: [number, number]; to: [number, number]; color: string }) {
-  const length = Math.hypot(to[0] - from[0], to[1] - from[1])
-  return <mesh position={[(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, 0]} rotation={[0, 0, Math.atan2(to[1] - from[1], to[0] - from[0])]}>
-    <planeGeometry args={[length, 0.007]} /><meshBasicMaterial color={color} />
-  </mesh>
-}
-
-function Whiteboard() {
+function Whiteboard({ panels }: { panels: readonly Panel[] }) {
   const frame = '#b8bcc0'
-  const box = (x: number, y: number, w: number, h: number, color: string) => {
-    const [l, r, b, t] = [x - w / 2, x + w / 2, y - h / 2, y + h / 2]
-    return <group key={`${x}:${y}`}>
-      <Stroke from={[l, b]} to={[r, b]} color={color} /><Stroke from={[r, b]} to={[r, t]} color={color} />
-      <Stroke from={[r, t]} to={[l, t]} color={color} /><Stroke from={[l, t]} to={[l, b]} color={color} />
-    </group>
-  }
+  const texture = useMemo(() => whiteboardTexture(panels), [panels])
+  useEffect(() => () => texture.dispose(), [texture])
   return <>
     {[-1, 1].map(side => <group key={side} position={[side * 0.62, 0, 0]}>
       <Block position={[0, 0.065, 0]} size={[0.06, 0.04, 0.55]} color={frame} roughness={0.4} metalness={0.6} />
@@ -108,14 +97,10 @@ function Whiteboard() {
     </group>)}
     <Block position={[0, 0.55, 0]} size={[1.24, 0.03, 0.03]} color={frame} roughness={0.4} metalness={0.6} />
     <Block position={[0, 1.32, 0]} size={[1.2, 0.9, 0.03]} color={frame} roughness={0.4} metalness={0.6} />
-    <mesh position={[0, 1.32, 0.016]} receiveShadow><planeGeometry args={[1.16, 0.86]} /><meshStandardMaterial color="#f6f6f2" roughness={0.25} /></mesh>
-    {/* A sketched flow chart and sticky notes. */}
+    <mesh name="Whiteboard furniture sketch" position={[0, 1.32, 0.016]} receiveShadow><planeGeometry args={[1.16, 0.86]} /><meshStandardMaterial map={texture} roughness={0.25} /></mesh>
+    {/* A few notes beside the drawing leave the construction unobstructed. */}
     <group position={[0, 1.32, 0.018]}>
-      {box(-0.36, 0.2, 0.22, 0.12, '#2c4d8f')}{box(0.02, 0.2, 0.22, 0.12, '#2c4d8f')}{box(0.02, -0.08, 0.22, 0.12, '#2a2a2a')}
-      <Stroke from={[-0.25, 0.2]} to={[-0.09, 0.2]} color="#2c4d8f" /><Stroke from={[-0.12, 0.22]} to={[-0.09, 0.2]} color="#2c4d8f" /><Stroke from={[-0.12, 0.18]} to={[-0.09, 0.2]} color="#2c4d8f" />
-      <Stroke from={[0.02, 0.14]} to={[0.02, -0.02]} color="#2a2a2a" />
-      {[-0.3, -0.2, -0.1].map(y => <Stroke key={y} from={[-0.48, y]} to={[-0.48 + 0.22 + y * 0.4, y]} color="#b83c32" />)}
-      {[[0.35, 0.24, '#f3d86a', 0.05], [0.45, 0.22, '#f2a7b5', -0.08], [0.38, 0.12, '#9fd0e6', 0.1], [0.47, 0.1, '#f3d86a', -0.04], [0.36, -0.22, '#b8dc93', 0.06]].map(([x, y, color, turn]) =>
+      {[[0.47, 0.24, '#f3d86a', 0.05], [0.49, 0.13, '#f2a7b5', -0.08], [0.46, -0.22, '#b8dc93', 0.06]].map(([x, y, color, turn]) =>
         <mesh key={`${x}:${y}`} position={[x as number, y as number, 0.001]} rotation={[0, 0, turn as number]}><planeGeometry args={[0.075, 0.075]} /><meshStandardMaterial color={color as string} roughness={0.9} /></mesh>)}
     </group>
     <Block position={[0, 0.865, 0.04]} size={[1.0, 0.012, 0.06]} color={frame} roughness={0.4} metalness={0.6} />
@@ -158,8 +143,8 @@ const NAMES: Record<RoomPieceSpec['kind'], string> = {
   'rocking-horse': 'Rocking horse',
 }
 
-export function RoomPiece({ piece, floorY }: { piece: RoomPieceSpec; floorY: number }) {
+export function RoomPiece({ piece, floorY, panels }: { piece: RoomPieceSpec; floorY: number; panels: readonly Panel[] }) {
   return <group name={NAMES[piece.kind]} position={[piece.x, floorY, piece.z]} rotation={[0, piece.rotation, 0]}>
-    {piece.kind === 'sofa' ? <Sofa /> : piece.kind === 'stove' ? <Stove /> : piece.kind === 'whiteboard' ? <Whiteboard /> : <RockingHorse />}
+    {piece.kind === 'sofa' ? <Sofa /> : piece.kind === 'stove' ? <Stove /> : piece.kind === 'whiteboard' ? <Whiteboard panels={panels} /> : <RockingHorse />}
   </group>
 }

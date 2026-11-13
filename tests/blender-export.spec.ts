@@ -16,7 +16,12 @@ for (const room of [false, true]) {
       createPanel({ name: 'Hidden board', visible: false }),
     ] }
     await page.getByLabel('Import project file').setInputFiles({ name: 'scene.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) })
-    if (room) await page.setViewportSize({ width: 390, height: 844 })
+    if (room) {
+      await page.getByRole('button', { name: 'Realistic preview', exact: true }).click()
+      await page.getByRole('checkbox', { name: 'Auto furnish', exact: true }).check()
+      await page.getByRole('combobox', { name: 'Furnishing style' }).selectOption('office')
+      await page.setViewportSize({ width: 390, height: 844 })
+    }
     await page.getByRole('button', { name: 'Export project', exact: true }).click()
     if (room) await page.getByRole('checkbox', { name: 'Include auto furnishings in realistic scene' }).check()
     const downloadPromise = page.waitForEvent('download', { timeout: 90000 })
@@ -33,6 +38,7 @@ for (const room of [false, true]) {
     expect(names).toContain('Export board')
     expect(names).not.toContain('Hidden board')
     expect(names.includes('Modern home')).toBe(room)
+    expect(names.includes('Whiteboard furniture sketch')).toBe(room)
     expect(names.includes('Robot vacuum')).toBe(room)
     const hardware = json.nodes.filter((node: { extras?: { connectorId?: string } }) => node.extras?.connectorId)
     expect(hardware).toHaveLength(getPhysicalConnectors(project).length)

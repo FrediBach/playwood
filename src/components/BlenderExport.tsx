@@ -62,7 +62,7 @@ function ExportContent({ job, onDone }: { job: Job; onDone: (error?: string) => 
       {panels.filter(panel => panel.visible).map(panel => <PanelMesh key={panel.id} panel={panel} selected={false} interactive={false} onSelect={() => {}} />)}
       <ConnectorMeshes panels={panels} connections={job.project.connections} connectorOverrides={job.project.connectorOverrides} />
     </group>
-    {job.room && <RoomEnvironment bounds={bounds} style={roomStyle} furnishings={furnishings} />}
+    {job.room && <RoomEnvironment panels={panels} bounds={bounds} style={roomStyle} furnishings={furnishings} />}
     {job.room && <PreviewFurnishings placements={furnishings} />}
     {vacuum && <group name="Robot vacuum"><group position={[vacuum.dock.x, vacuum.floorY, vacuum.dock.z]}><DreameDockModel /></group><group position={[vacuum.start.x, vacuum.floorY, vacuum.start.z]}><DreameVacuumModel /></group></group>}
     <SerializeScene job={job} bounds={bounds} onDone={onDone} />
