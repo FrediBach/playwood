@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { FLOOR_LAMP_HEIGHT, pendantLayout, type FloorLampStyle, type PendantStyle, type RoomLighting } from '@/lib/room-lighting'
+import { FLOOR_LAMP_HEIGHT, floorLampBulbHeight, keyLightSource, pendantLayout, type FloorLampStyle, type PendantStyle, type RoomLighting } from '@/lib/room-lighting'
 import type { ResolvedTheme } from '@/lib/preview-furnishing-variation'
 import type { WindowOpening } from './RoomWalls'
 
@@ -56,7 +56,7 @@ function LampShade({ style }: { style: FloorLampStyle }) {
 export function FloorLamp({ position, style }: { position: Triple; style: FloorLampStyle }) {
   const stemTop = FLOOR_LAMP_HEIGHT - (style.shade === 'globe' ? 0.3 : 0.25)
   const stemBottom = style.base === 'tripod' ? 0.85 : 0.03
-  const lightY = FLOOR_LAMP_HEIGHT - (style.shade === 'globe' ? 0.17 : 0.28)
+  const lightY = floorLampBulbHeight(style.shade)
   return <group position={position} name={`Floor lamp, 165 cm high, ${style.shade} shade`}>
     <LampBase style={style} />
     <mesh position={[0, (stemTop + stemBottom) / 2, 0]} castShadow><cylinderGeometry args={[0.012, 0.012, stemTop - stemBottom, 16]} /><meshStandardMaterial color={style.metal} roughness={0.5} metalness={style.metalness} /></mesh>
@@ -228,6 +228,8 @@ function Exposure({ value }: { value: number }) {
   return null
 }
 
+const KEY_LIGHT_NAMES = { window: 'Sunlight', lamp: 'Floor lamp key light', pendant: 'Pendant downlight' } as const
+
 export interface RoomLightsProps {
   lighting: RoomLighting
   theme: ResolvedTheme
@@ -243,16 +245,21 @@ export interface RoomLightsProps {
 }
 
 export function RoomLights({ lighting, theme, bounds, floorY, leftX, width, height, window, lampPosition, sheer }: RoomLightsProps) {
-  const { sun, haze } = lighting
+  const { sun, haze, lamp } = lighting
   const pendants = usePendants(lighting.pendant, theme, bounds, floorY, height)
   const targetX = (bounds.min.x + bounds.max.x) / 2, targetZ = (bounds.min.z + bounds.max.z) / 2
   // Daylight is a distant, narrow spot aimed through a point in the window at
   // the creation: rays are nearly parallel, the walls shape a window-shaped
   // patch of sun, and the shadow map only spends its resolution on the beam.
-  // After dark the key light is the pendant's downlight instead.
+  // After dark the key light moves to whichever lamp lights the creation most,
+  // so shadows fall away from the brightest light in the room.
   const key = useMemo(() => {
     const target = new THREE.Vector3(targetX, floorY + 0.55, targetZ)
-    if (sun.source === 'window') {
+    const { positions, bottom } = pendants
+    const pendantBulb = new THREE.Vector3(positions[0].x, floorY + bottom - 0.05, positions[0].z)
+    const lampBulb = new THREE.Vector3(lampPosition[0], lampPosition[1] + floorLampBulbHeight(lamp.shade), lampPosition[2])
+    const source = keyLightSource({ sun, lamp, pendant: lighting.pendant }, { lamp: lampBulb.distanceTo(target), pendant: pendantBulb.distanceTo(target) })
+    if (source === 'window') {
       const aim = new THREE.Vector3(leftX, floorY + sun.aim, window.z + sun.offset)
       const toSource = aim.clone().sub(target)
       const span = toSource.length()
@@ -262,21 +269,22 @@ export function RoomLights({ lighting, theme, bounds, floorY, leftX, width, heig
       const reach = Math.max(...[window.bottom, window.bottom + window.height].flatMap(y => [-1, 1].map(side =>
         Math.hypot(y - sun.aim, window.z + side * window.width / 2 - aim.z)))) + 0.5
       return {
-        position: target.clone().addScaledVector(toSource, far).toArray() as Triple, direction: toSource.clone().negate(),
+        source, position: target.clone().addScaledVector(toSource, far).toArray() as Triple, direction: toSource.clone().negate(),
         angle: Math.atan(reach / SUN_DISTANCE), penumbra: 0.15, decay: 0, intensity: sun.intensity, near: SUN_DISTANCE - 1.5, far: far + width + height,
       }
     }
-    const { positions, bottom } = pendants
-    const source = new THREE.Vector3(positions[0].x, floorY + bottom - 0.05, positions[0].z)
-    const toSource = source.clone().sub(target)
+    const bulb = source === 'lamp' ? lampBulb : pendantBulb
+    const toSource = bulb.clone().sub(target)
     const span = toSource.length()
     const halfWidth = (bounds.max.x - bounds.min.x) / 2 + 0.8
-    // Candela giving the mood's illuminance at the creation.
+    // Candela giving the mood's illuminance at the creation. The floor lamp's
+    // bulb sits inside its shade, so the near plane clips the shade from the shadow map.
     return {
-      position: source.toArray() as Triple, direction: toSource.normalize().negate(),
-      angle: THREE.MathUtils.clamp(Math.atan(halfWidth / span), 0.6, 1.15), penumbra: 0.7, decay: 2, intensity: sun.intensity * span * span, near: 0.05, far: span + height + 4,
+      source, position: bulb.toArray() as Triple, direction: toSource.normalize().negate(),
+      angle: THREE.MathUtils.clamp(Math.atan(halfWidth / span), 0.6, 1.15), penumbra: 0.7, decay: 2, intensity: sun.intensity * span * span,
+      near: source === 'lamp' ? 0.4 : 0.05, far: span + height + 4,
     }
-  }, [targetX, targetZ, floorY, leftX, width, height, window, sun.source, sun.aim, sun.offset, sun.intensity, pendants, bounds])
+  }, [targetX, targetZ, floorY, leftX, width, height, window, sun, lamp, lighting.pendant, lampPosition, pendants, bounds])
   const target = useMemo(() => new THREE.Object3D(), [])
   useEffect(() => { target.position.set(targetX, floorY + 0.55, targetZ); target.updateMatrixWorld() }, [target, targetX, targetZ, floorY])
   const shafts = sun.source === 'window' ? haze.shafts * (sheer ? 0.45 : 1) : 0
@@ -286,7 +294,7 @@ export function RoomLights({ lighting, theme, bounds, floorY, leftX, width, heig
     <ambientLight intensity={lighting.ambient.intensity} color={lighting.ambient.color} />
     <hemisphereLight args={[lighting.hemisphere.sky, lighting.hemisphere.ground, lighting.hemisphere.intensity]} />
     <primitive object={target} />
-    <spotLight name={sun.source === 'window' ? 'Sunlight' : 'Pendant downlight'} position={key.position} target={target} color={sun.color} intensity={key.intensity}
+    <spotLight name={KEY_LIGHT_NAMES[key.source]} position={key.position} target={target} color={sun.color} intensity={key.intensity}
       angle={key.angle} penumbra={key.penumbra} decay={key.decay} distance={0} castShadow
       shadow-mapSize={[2048, 2048]} shadow-bias={-0.0001} shadow-normalBias={0.003} shadow-camera-near={key.near} shadow-camera-far={key.far} />
     <rectAreaLight position={[leftX + 0.15, floorY + window.bottom + window.height / 2, window.z]} rotation={[0, -Math.PI / 2, 0]} width={window.width} height={window.height}

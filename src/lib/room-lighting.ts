@@ -295,6 +295,20 @@ function fromMood(key: string, mood: LightMood, fixtures: Pick<RoomLighting, 'la
 /** Where the floor lamp's shade sits; its top stays at the 165 cm scale reference. */
 export const FLOOR_LAMP_HEIGHT = 1.65
 
+/** Height of the floor lamp's bulb, inside or just under its shade. */
+export const floorLampBulbHeight = (shade: FloorLampShade) => FLOOR_LAMP_HEIGHT - (shade === 'globe' ? 0.17 : 0.28)
+
+/**
+ * After dark, the shadow-casting key light sits at whichever lamp lights the
+ * creation most (inverse-square illuminance); by day it is always the window.
+ * Distances are metres from each bulb to the creation.
+ */
+export function keyLightSource(lighting: Pick<RoomLighting, 'sun' | 'lamp' | 'pendant'>, distance: { lamp: number; pendant: number }): 'window' | 'lamp' | 'pendant' {
+  if (lighting.sun.source === 'window') return 'window'
+  const lux = (intensity: number, metres: number) => intensity / Math.max(0.25, metres) ** 2
+  return lux(lighting.lamp.intensity, distance.lamp) > lux(lighting.pendant.intensity, distance.pendant) ? 'lamp' : 'pendant'
+}
+
 /**
  * Pendant placement in room coordinates (metres). Kitchen and office pendants
  * hang over a low creation as task lights; otherwise one hangs in front of it,

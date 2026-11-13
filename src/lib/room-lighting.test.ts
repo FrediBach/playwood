@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_ROOM_STYLE } from './room-floor-style'
-import { mixColor, pendantLayout, roomLighting } from './room-lighting'
+import { keyLightSource, mixColor, pendantLayout, roomLighting } from './room-lighting'
 
 const seeds = Array.from({ length: 80 }, (_, index) => 1 + index * 7919)
 const themes = ['living', 'office', 'kids', 'kitchen'] as const
@@ -56,6 +56,17 @@ describe('room lighting', () => {
       expect(sun.aim).toBeLessThan(2.45)
       expect(Math.abs(sun.offset)).toBeLessThanOrEqual(0.55)
     }
+  })
+
+  it('casts shadows from the window by day and from the brightest lamp after dark', () => {
+    const living = seeds.map(seed => roomLighting({ seed, theme: 'living' }))
+    const day = living.find(lighting => lighting.sun.source === 'window')!
+    expect(keyLightSource(day, { lamp: 0.5, pendant: 3 })).toBe('window')
+    const evening = living.find(lighting => lighting.mood === 'evening')!
+    const ratio = Math.sqrt(evening.lamp.intensity / evening.pendant.intensity)
+    expect(keyLightSource(evening, { lamp: 1.5, pendant: 1.5 * ratio * 1.1 })).toBe('lamp')
+    expect(keyLightSource(evening, { lamp: 1.5, pendant: 1.5 * ratio * 0.9 })).toBe('pendant')
+    expect(keyLightSource({ ...evening, lamp: { ...evening.lamp, intensity: 0 } }, { lamp: 0.5, pendant: 3 })).toBe('pendant')
   })
 
   it('mixes colours', () => {
